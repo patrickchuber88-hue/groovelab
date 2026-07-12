@@ -2029,7 +2029,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       '#f59e0b': { color: '#f59e0b', bg: '#fef3c7' }, // Gelb
       '#3b82f6': { color: '#3b82f6', bg: '#eff6ff' }, // Blau
       '#ef4444': { color: '#ef4444', bg: '#fee2e2' }, // Rot
-      '#10b981': { color: '#10b981', bg: '#ecfdf5' }, // Grün
+      '#34a853': { color: '#34a853', bg: '#ecfdf5' }, // Grün
     };
 
     if (ev.color && COLOR_MAP[ev.color]) {
@@ -2040,13 +2040,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const cLower = (ev.category || '').toLowerCase();
 
     if (cLower.includes('ferien') || cLower.includes('feiertag') || tLower.includes('ferien') || tLower.includes('feiertag') || tLower.includes('schulfrei') || tLower.includes('holiday') || tLower.includes('break')) {
-      return { color: '#10b981', bg: '#ecfdf5' };
+      return { color: '#34a853', bg: '#ecfdf5' };
     }
     if (cLower.includes('vorspiel') || cLower.includes('klassenvorspiel') || tLower.includes('vorspiel') || tLower.includes('klassenvorspiel') || tLower.includes('schülervorspiel') || tLower.includes('recital')) {
       return { color: '#3b82f6', bg: '#eff6ff' };
     }
     if (cLower.includes('fest') || tLower.includes('fest') || tLower.includes('weihnachtsfeier') || tLower.includes('party') || tLower.includes('feier')) {
-      return { color: '#10b981', bg: '#ecfdf5' }; // Grün (was Orange)
+      return { color: '#34a853', bg: '#ecfdf5' }; // Grün (was Orange)
     }
     if (cLower.includes('konzert') || cLower.includes('auftritt') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig')) {
       return { color: '#a855f7', bg: '#f3e8ff' };
@@ -2367,7 +2367,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           const isHoliday = title.toLowerCase().includes('ferien') || title.toLowerCase().includes('feiertag') || title.toLowerCase().includes('schulfrei');
           
           const isAllDay = ev.rawEnd && !ev.rawEnd.includes('T');
-          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
           if (ev.dtend && isAllDay) {
             end.setDate(end.getDate() - 1);
           }
@@ -2509,7 +2509,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       if (schedules) {
         schedules.forEach((sch: any) => {
           if (!sch.student_id) return; // Skip unassigned slots/breaks
-          let current = new Date(schoolYearStart);
+          const current = new Date(schoolYearStart);
           while (current <= schoolYearEnd) {
             const currentDay = current.getDay() || 7;
             const diff = sch.day_of_week - currentDay;
@@ -7040,7 +7040,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     let statusLabel = 'Eingereicht';
                     if (pp.status === 'approved') {
                       statusBg = '#ecfdf5';
-                      statusColor = '#059669';
+                      statusColor = '#137333';
                       statusLabel = 'Freigegeben';
                     } else if (pp.status === 'rejected') {
                       statusBg = '#fef2f2';
@@ -9614,7 +9614,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           </button>
                           <button
                             type="submit"
-                            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#ffffff', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#34a853', color: '#ffffff', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
                           >
                             Speichern
                           </button>
@@ -9746,7 +9746,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               return (
                 <div key={stageNum} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: techViewMode === 'all' ? '12px' : '0', borderBottom: techViewMode === 'all' ? '1px solid rgba(0,0,0,0.05)' : 'none', paddingBottom: techViewMode === 'all' ? '28px' : '0' }}>
                   {techViewMode === 'all' && (
-                    <h4 style={{ margin: '12px 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h4 style={{ margin: '12px 0 4px 0', fontSize: '1.05rem', fontWeight: 800, color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       🟢 Bühne {stageNum} <span style={{ fontSize: '0.72rem', color: theme.textMuted, fontWeight: 500 }}>({stagePoints.length} Beiträge geplant)</span>
                     </h4>
                   )}
@@ -9759,12 +9759,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       flexDirection: 'column',
                       gap: '12px',
                       background: theme.cardBg,
-                      border: '1px solid rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(52, 168, 83, 0.15)',
                       borderRadius: '16px',
                       padding: '18px',
                       boxShadow: '0 4px 20px rgba(0,0,0,0.01)'
                     }}>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                         Bühnen-Logistik (Maximalbedarf)
                       </span>
                       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '6px' }}>
@@ -9796,12 +9796,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       flexDirection: 'column',
                       gap: '12px',
                       background: theme.cardBg,
-                      border: '1px solid rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(52, 168, 83, 0.15)',
                       borderRadius: '16px',
                       padding: '18px',
                       boxShadow: '0 4px 20px rgba(0,0,0,0.01)'
                     }}>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                         FOH Audio Patch (Gesamtbedarf)
                       </span>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
@@ -9816,15 +9816,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               style={{
                                 fontSize: '0.72rem',
                                 fontWeight: 700,
-                                background: 'rgba(16, 185, 129, 0.08)',
-                                color: '#10b981',
+                                background: 'rgba(52, 168, 83, 0.08)',
+                                color: '#34a853',
                                 padding: '5px 10px',
                                 borderRadius: '8px',
-                                border: '1px solid rgba(16, 185, 129, 0.15)',
+                                border: '1px solid rgba(52, 168, 83, 0.15)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: '0 1px 2px rgba(16, 185, 129, 0.02)'
+                                boxShadow: '0 1px 2px rgba(52, 168, 83, 0.02)'
                               }}
                             >
                               {count}x {name}
@@ -9917,7 +9917,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                   fontSize: '0.72rem',
                                                   lineHeight: 1.2
                                                 }}>
-                                                  <span style={{ color: '#10b981', fontWeight: 800, fontFamily: 'monospace', minWidth: '18px' }}>
+                                                  <span style={{ color: '#34a853', fontWeight: 800, fontFamily: 'monospace', minWidth: '18px' }}>
                                                     {item.count}×
                                                   </span>
                                                   <span style={{ color: theme.text, fontWeight: 550 }}>
@@ -10047,7 +10047,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               fontSize: '0.72rem',
                               fontWeight: 700,
                               cursor: 'pointer',
-                              background: isSelected ? '#10b981' : 'transparent',
+                              background: isSelected ? '#34a853' : 'transparent',
                               color: isSelected ? '#ffffff' : theme.textMuted,
                               transition: 'all 0.2s',
                               outline: 'none'
@@ -10067,7 +10067,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           fontSize: '0.72rem',
                           fontWeight: 700,
                           cursor: 'pointer',
-                          background: techViewMode === 'all' ? '#10b981' : 'transparent',
+                          background: techViewMode === 'all' ? '#34a853' : 'transparent',
                           color: techViewMode === 'all' ? '#ffffff' : theme.textMuted,
                           transition: 'all 0.2s',
                           outline: 'none'
@@ -10085,7 +10085,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: '#10b981',
+                        background: '#34a853',
                         color: '#ffffff',
                         border: 'none',
                         padding: '7px 14px',
@@ -10093,12 +10093,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         fontSize: '0.74rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 5px rgba(16,185,129,0.2)',
+                        boxShadow: '0 2px 5px rgba(52,168,83,0.2)',
                         transition: 'all 0.2s',
                         outline: 'none'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#059669'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#10b981'}
+                      onMouseEnter={e => e.currentTarget.style.background = '#137333'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#34a853'}
                     >
                       <span>Speichern</span>
                       <span>PDF speichern</span>
@@ -10560,7 +10560,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       width: '100%',
       boxSizing: 'border-box',
       padding: '0px'
-    }} className="animation-fade-in">
+    }} className="animation-fade-in campus-events-grid">
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes calendarPulse {
           0% {
@@ -10578,6 +10578,34 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
         .pulse-calendar {
           animation: calendarPulse 2s infinite ease-in-out;
+        }
+        @media (max-width: 900px) {
+          .campus-events-grid {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 16px !important;
+            padding: 10px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .campus-events-grid > div {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-radius: 16px !important;
+            padding: 16px !important;
+          }
+          .campus-events-grid > div > div[style*="overflowY"],
+          .campus-events-grid > div > div[style*="overflow-y"] {
+            overflow-y: visible !important;
+            overflow: visible !important;
+            height: auto !important;
+            flex: none !important;
+          }
         }
         @keyframes autoSaveFade {
           0%, 100% { opacity: 0.5; }
@@ -10977,7 +11005,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                      background: '#ecfdf5', border: '1.5px solid #a7f3d0', color: '#059669',
+                      background: '#ecfdf5', border: '1.5px solid #a7f3d0', color: '#137333',
                       padding: '10px', borderRadius: '12px', cursor: 'pointer',
                       fontWeight: 800, fontSize: '0.82rem',
                       transition: 'all 0.15s',

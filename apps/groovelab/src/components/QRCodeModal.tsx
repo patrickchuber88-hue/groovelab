@@ -457,7 +457,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           <div 
             ref={cardRef} 
             style={{
-              background: isAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+              background: isAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
@@ -657,7 +657,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           onClick={downloadImage}
           style={{
             width: '100%',
-            background: activePlatform === 'campus' ? '#137333' : brandColor,
+            background: activePlatform === 'campus' ? '#34a853' : brandColor,
             color: 'white',
             border: 'none',
             borderRadius: '24px',
@@ -669,7 +669,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
             fontWeight: 900,
             fontSize: '1rem',
             cursor: 'pointer',
-            boxShadow: `0 15px 35px ${activePlatform === 'campus' ? '#137333' : brandColor}50`,
+            boxShadow: `0 15px 35px ${activePlatform === 'campus' ? '#34a853' : brandColor}50`,
             transition: 'all 0.2s',
             marginTop: '24px'
           }}

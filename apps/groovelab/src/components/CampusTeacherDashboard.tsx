@@ -244,7 +244,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             return `${y}-${m}-${day}`;
           };
           
-          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
           if (ev.dtend && ev.isAllDay) {
             end.setDate(end.getDate() - 1);
           }
@@ -1935,7 +1935,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               bottom: '-20px',
               width: '100px',
               height: '100px',
-              background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(52, 168, 83, 0.08) 0%, transparent 70%)',
               pointerEvents: 'none'
             }} />
             <div className="p-3.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/10 rounded-2xl flex-shrink-0 shadow-lg shadow-emerald-500/5">
@@ -2006,8 +2006,8 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               {/* Card 2: Cockpit Auslastung (Green) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.4)',
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.4)',
                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                 padding: '14px 16px', boxSizing: 'border-box',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -2190,8 +2190,8 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                     width: '10px', 
                                     height: '10px', 
                                     borderRadius: '50%', 
-                                    background: '#10b981', 
-                                    boxShadow: '0 0 8px #10b981',
+                                    background: '#34a853', 
+                                    boxShadow: '0 0 8px #34a853',
                                     display: 'inline-block' 
                                   }} 
                                 />
@@ -2434,7 +2434,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                             key={`${day}-${slot}`} 
                             className="p-2 min-w-[120px] relative transition-colors duration-150"
                             style={{
-                              backgroundColor: dragOverSlotKey === `${day}-${slot}` ? 'rgba(16, 185, 129, 0.05)' : undefined
+                              backgroundColor: dragOverSlotKey === `${day}-${slot}` ? 'rgba(52, 168, 83, 0.05)' : undefined
                             }}
                           >
                             {isBreak ? (
@@ -2952,7 +2952,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                             : 'Freie Buchung';
 
                                           const displayTitle = booking.student 
-                                            ? `${booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : 'Unterricht'}: ${isCurrentTeacherBooking ? `${booking.student.first_name} ${booking.student.last_name}` : 'Besetzt'} (${bookingTimeDisplay}) - Coach: ${booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name}` : 'Unbekannt'}`
+                                            ? `${booking.status === 'pending_reschedule' ? 'Reservierung' : booking.status === 'rescheduled_confirmed' ? 'Verschoben' : 'Unterricht'}: ${isCurrentTeacherBooking ? `${booking.student.first_name} ${booking.student.last_name[0] ? booking.student.last_name[0] + '.' : ''}` : 'Besetzt'} (${bookingTimeDisplay}) - Coach: ${booking.teacher ? `${booking.teacher.first_name} ${booking.teacher.last_name}` : 'Unbekannt'}`
                                             : `Freie Buchung (${bookingTimeDisplay})`;
 
                                           return (
@@ -3140,7 +3140,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                     <option value="">-- Schüler wählen --</option>
                     {students.map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.first_name} {s.last_name} ({s.instrument || 'Kein Instrument'})
+                        {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''} ({s.instrument || 'Kein Instrument'})
                       </option>
                     ))}
                   </select>
@@ -3201,7 +3201,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               <div>
                 <h3 className="text-lg font-black text-white">Schüler-Notizbuch</h3>
                 <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mt-0.5">
-                  {selectedStudentForDoc.first_name} {selectedStudentForDoc.last_name}
+                  {selectedStudentForDoc.first_name} {selectedStudentForDoc.last_name ? selectedStudentForDoc.last_name.charAt(0) + '.' : ''}
                 </p>
               </div>
               <button 

@@ -392,7 +392,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
 
   const presetColors = [
     '#3b82f6', // Blue
-    '#10b981', // Green
+    '#34a853', // Green
     '#eab308', // Yellow
     '#ef4444', // Red
     '#8b5cf6', // Purple
@@ -400,8 +400,8 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   ];
 
   const inputFocusStyle = {
-    borderColor: '#10b981',
-    boxShadow: '0 0 0 4px rgba(16, 185, 129, 0.15)',
+    borderColor: '#34a853',
+    boxShadow: '0 0 0 4px rgba(52, 168, 83, 0.15)',
     background: 'rgba(255, 255, 255, 0.08)'
   };
 
@@ -435,9 +435,9 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
           transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .signup-input:focus {
-          border-color: #10b981 !important;
+          border-color: #34a853 !important;
           background: #ffffff !important;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+          box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.12) !important;
         }
         .signup-input::placeholder {
           color: #94a3b8 !important;
@@ -448,7 +448,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         }
         .signup-btn-next:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 12px 24px rgba(16, 185, 129, 0.2) !important;
+          box-shadow: 0 12px 24px rgba(52, 168, 83, 0.2) !important;
           filter: brightness(1.03);
         }
         .signup-btn-next:active:not(:disabled) {
@@ -542,7 +542,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             {step < 3 && (
           <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.08)', paddingBottom: '20px', marginBottom: '24px', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', color: '#10b981', justifyContent: 'center' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', display: 'flex', alignItems: 'center', color: '#34a853', justifyContent: 'center' }}>
                 <School size={22} />
               </div>
               <div style={{ textAlign: 'left' }}>
@@ -597,7 +597,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               <div style={{ marginTop: '6px', fontSize: '12px' }}>
                 {checkingSubdomain && <span style={{ color: '#64748b' }}>Prüfe Verfügbarkeit...</span>}
                 {!checkingSubdomain && subdomainAvailable === true && (
-                  <span style={{ color: '#059669', fontWeight: 600 }}>✓ Subdomain ist frei und verfügbar!</span>
+                  <span style={{ color: '#137333', fontWeight: 600 }}>✓ Subdomain ist frei und verfügbar!</span>
                 )}
                 {!checkingSubdomain && subdomainAvailable === false && (
                   <span style={{ color: '#dc2626', fontWeight: 600 }}>✗ Diese Subdomain ist bereits vergeben.</span>
@@ -814,12 +814,12 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             <div 
               ref={cardRef}
               style={{
-                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #fbbc05 100%)',
                 borderRadius: '20px',
                 padding: '16px',
                 width: '100%',
                 maxWidth: '280px',
-                boxShadow: '0 12px 24px rgba(19, 115, 51, 0.15)',
+                boxShadow: '0 12px 24px rgba(52, 168, 83, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1030,13 +1030,13 @@ const nextButtonStyle: React.CSSProperties = {
   flex: 1.5,
   padding: '14px 20px',
   borderRadius: '16px',
-  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
   border: 'none',
   color: '#ffffff',
   fontWeight: 800,
   fontSize: '0.95rem',
   cursor: 'pointer',
-  boxShadow: '0 10px 20px rgba(16, 185, 129, 0.15)',
+  boxShadow: '0 10px 20px rgba(52, 168, 83, 0.15)',
   transition: 'transform 0.2s, box-shadow 0.2s',
   outline: 'none',
   display: 'flex',

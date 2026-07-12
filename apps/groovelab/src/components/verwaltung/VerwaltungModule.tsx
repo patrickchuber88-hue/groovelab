@@ -195,7 +195,7 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
                     {t.instrument || 'Kein Hauptfach'}
                   </span>
                   <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
-                    {t.isCampusActive && <span style={{ background: '#e6f4ea', color: '#137333', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '20px' }}>CAMPUS</span>}
+                    {t.isCampusActive && <span style={{ background: '#e6f4ea', color: '#34a853', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '20px' }}>CAMPUS</span>}
                     {t.isGroovelabActive && <span style={{ background: '#eff6ff', color: '#1d4ed8', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '20px' }}>GROOVELAB</span>}
                   </div>
                 </div>

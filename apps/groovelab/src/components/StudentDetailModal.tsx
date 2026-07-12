@@ -706,6 +706,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   };
 
+  const handleUpdateStreak = async (newStreak: number) => {
+    try {
+      const { error: avatarErr } = await supabase
+        .from('avatars')
+        .update({ streak_flame: newStreak })
+        .eq('user_id', student.id);
+      if (avatarErr) throw avatarErr;
+
+      const { error: statsErr } = await supabase
+        .from('student_stats')
+        .update({ streak_flame: newStreak })
+        .eq('student_id', student.id);
+      if (statsErr) throw statsErr;
+
+      if (avatar) {
+        setAvatar({ ...avatar, streak_flame: newStreak });
+      }
+      if (studentStats) {
+        setStudentStats({ ...studentStats, streak_flame: newStreak });
+      }
+    } catch (err: any) {
+      alert('Fehler beim Aktualisieren des Streaks: ' + err.message);
+    }
+  };
+
   const handleTogglePremium = async (newVal: boolean) => {
     try {
       const { error } = await supabase
@@ -1122,9 +1147,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.2s',
-              background: localTab === 'campus' ? 'linear-gradient(135deg, #137333 0%, #064e3b 100%)' : '#1e293b',
+              background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)' : '#1e293b',
               color: '#ffffff',
-              boxShadow: localTab === 'campus' ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
+              boxShadow: localTab === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
             }}
             className="hover-scale"
           >
@@ -1224,7 +1249,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 {/* Activation badges */}
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                   {isCampusActive && (
-                    <span style={{ background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
+                    <span style={{ background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
                       🎓 Campus
                     </span>
                   )}
@@ -1284,7 +1309,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 {/* Card 2: Campus Songs (Green) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #10b981, #047857)',
+                  background: 'linear-gradient(135deg, #34a853, #047857)',
                   color: 'white',
                   borderRadius: '16px',
                   padding: '12px 16px',
@@ -1319,19 +1344,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 {/* Card 3: Fokus (Yellow) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #fbbf24, #d97706)',
-                  color: '#1e293b',
+                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                  color: 'white',
                   borderRadius: '16px',
                   padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  boxShadow: '0 6px 15px rgba(217, 119, 6, 0.1)',
+                  boxShadow: '0 6px 15px rgba(234, 179, 8, 0.2)',
                   height: '100%',
                   boxSizing: 'border-box'
                 }}>
                   <div style={{
-                    background: 'rgba(30, 41, 59, 0.1)',
+                    background: 'rgba(255, 255, 255, 0.18)',
                     borderRadius: '10px',
                     width: '32px',
                     height: '32px',
@@ -1340,7 +1365,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    <Clock size={18} color="#1e293b" />
+                    <Clock size={18} color="white" />
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
@@ -1377,11 +1402,46 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   }}>
                     <span style={{ fontSize: '1.1rem', filter: 'grayscale(100%)' }}>🔥</span>
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {streakDays} {streakDays === 1 ? 'Tag' : 'Tage'}
+                   <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {streakDays} {streakDays === 1 ? 'Tag' : 'Tage'}
+                      </span>
+                      {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                        <button
+                          onClick={async () => {
+                            const val = prompt('Übe-Streak (Tage) manuell anpassen:', String(streakDays));
+                            if (val !== null) {
+                              const num = parseInt(val, 10);
+                              if (!isNaN(num) && num >= 0) {
+                                await handleUpdateStreak(num);
+                              } else {
+                                alert('Bitte gib eine gültige Zahl >= 0 ein.');
+                              }
+                            }
+                          }}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.25)',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '0.62rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 800,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            transition: 'background 0.2s',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'}
+                          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
+                        >
+                          Bearbeiten
+                        </button>
+                      )}
                     </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '4px', lineHeight: 1.1 }}>
                       SERIE AM LAUFEN
                     </div>
                   </div>
@@ -1398,19 +1458,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               }}>
                 {/* GL Card 1: GrooveLab XP (Yellow/Gold) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #eab308, #ca8a04)',
-                  color: '#1e293b',
+                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                  color: 'white',
                   borderRadius: '16px',
                   padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  boxShadow: '0 6px 15px rgba(202, 138, 4, 0.15)',
+                  boxShadow: '0 6px 15px rgba(234, 179, 8, 0.2)',
                   height: '100%',
                   boxSizing: 'border-box'
                 }}>
                   <div style={{
-                    background: 'rgba(30, 41, 59, 0.1)',
+                    background: 'rgba(255, 255, 255, 0.18)',
                     borderRadius: '10px',
                     width: '32px',
                     height: '32px',
@@ -1419,7 +1479,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    <Star size={18} fill="#1e293b" color="#1e293b" />
+                    <Star size={18} fill="white" color="white" />
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
@@ -1482,7 +1542,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Award size={18} style={{ color: '#137333' }} />
+                  <Award size={18} style={{ color: '#34a853' }} />
                   <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                     Errungenschaften &amp; Badges
                   </h4>
@@ -1560,10 +1620,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                           const isReview = sched.status === 'ready_for_admin_review';
                           const statusText = isApproved ? 'Aktiv' : isReview ? 'In Prüfung' : 'Entwurf';
                           const badgeBg = isApproved ? '#ffffff' : isReview ? '#ffffff' : '#e2e8f0';
-                          const badgeColor = isApproved ? '#137333' : isReview ? '#b45309' : '#64748b';
+                          const badgeColor = isApproved ? '#34a853' : isReview ? '#b45309' : '#64748b';
                           const cardBg = isApproved ? '#e6f4ea' : isReview ? '#fffbeb' : '#f8fafc';
                           const cardBorder = isApproved ? '1.5px solid rgba(52, 168, 83, 0.15)' : isReview ? '1.5px solid rgba(245, 158, 11, 0.15)' : '1.5px solid #e2e8f0';
-                          const textColor = isApproved ? '#137333' : isReview ? '#b45309' : '#475569';
+                          const textColor = isApproved ? '#34a853' : isReview ? '#b45309' : '#475569';
 
                           const WEEKDAYS_DE = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
                           const weekday = WEEKDAYS_DE[sched.day_of_week] || 'Wochentag';
@@ -1614,7 +1674,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                                     borderRadius: '6px', 
                                     fontSize: '0.58rem', 
                                     fontWeight: 900,
-                                    border: isApproved ? '1px solid rgba(52,168,83,0.15)' : '1px solid rgba(245,158,11,0.15)'
+                                    border: isApproved ? '1px solid rgba(52, 168, 83,0.15)' : '1px solid rgba(245,158,11,0.15)'
                                   }}>
                                     {statusText}
                                   </span>
@@ -1645,7 +1705,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   gap: '16px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.08em', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', letterSpacing: '0.08em', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Music size={16} /> Songs & Lehrwerke
                     </h3>
 
@@ -1740,7 +1800,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                               </span>
                               <span style={{ 
                                 background: percent > 0 ? '#e6f4ea' : '#f1f5f9', 
-                                color: percent > 0 ? '#137333' : '#64748b', 
+                                color: percent > 0 ? '#34a853' : '#64748b', 
                                 padding: '2px 8px', 
                                 borderRadius: '6px', 
                                 fontWeight: 900,
@@ -1924,7 +1984,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       gap: '8px',
                       background: copiedOnboardingLink ? '#e6f4ea' : '#ffffff',
                       border: copiedOnboardingLink ? '1.5px solid #a7f3d0' : '1.5px solid #cbd5e1',
-                      color: copiedOnboardingLink ? '#137333' : '#0f172a',
+                      color: copiedOnboardingLink ? '#34a853' : '#0f172a',
                       borderRadius: '16px',
                       cursor: 'pointer',
                       marginTop: '8px',
@@ -2012,7 +2072,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     ) : (
                       <span style={{ 
                         background: isCampusActive ? '#e6f4ea' : '#f1f5f9', 
-                        color: isCampusActive ? '#137333' : '#64748b', 
+                        color: isCampusActive ? '#34a853' : '#64748b', 
                         padding: '4px 10px', 
                         borderRadius: '10px', 
                         fontSize: '0.75rem', 
@@ -2330,7 +2390,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                           gap: '2px'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#137333' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853' }}>
                               ✓ {log.consent_type === 'terms_privacy' ? 'AGB & Datenschutz akzeptiert' : 'Direkt-Kommunikation freigegeben'}
                             </span>
                             <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>
@@ -2370,10 +2430,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>
                     Verknüpft im Gruppenunterricht mit:
                     <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {groupStudents.map(s => (
+                       {groupStudents.map(s => (
                         <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
                           <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#64748b' }}></span>
-                          {s.first_name} {s.last_name}
+                          {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
                         </div>
                       ))}
                     </div>
@@ -2511,7 +2571,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                                       onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
                                       onMouseLeave={e => e.currentTarget.style.background = selectedStudentToLink === s.id ? '#e6f4ea' : '#ffffff'}
                                     >
-                                      {s.first_name} {s.last_name}
+                                      {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
                                     </div>
                                   ))}
                                 {schoolStudents.filter(s => {
@@ -2531,7 +2591,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                               disabled={!selectedStudentToLink}
                               style={{
                                 flex: 1,
-                                background: selectedStudentToLink ? '#10b981' : '#cbd5e1',
+                                background: selectedStudentToLink ? '#34a853' : '#cbd5e1',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '8px',
@@ -2639,7 +2699,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             {localTab === 'campus' ? (
               /* ============ CAMPUS PASS OVERLAY ============ */
               <div style={{ 
-                background: 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+                background: 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)', 
                 borderRadius: '32px', 
                 padding: '32px', 
                 color: 'white',

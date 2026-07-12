@@ -128,12 +128,7 @@ export default function CampusDirectMessages({
     if (u.id === user.id) return false;
     if (selectedRecipient && u.id === selectedRecipient.id) return true;
     if (isStudent) {
-      const isAssignedTeacher = u.id === user.teacher_id;
-      const hasHistory = campusMessages.some(m => 
-        (m.sender_id === user.id && m.recipient_id === u.id) ||
-        (m.sender_id === u.id && m.recipient_id === user.id)
-      );
-      return (u.role === 'teacher' || u.role === 'admin') && (isAssignedTeacher || hasHistory);
+      return u.role === 'teacher' && String(u.id) === String(user.teacher_id);
     } else {
       if (user.role?.toLowerCase() === 'teacher') {
         const isAssignedStudent = u.teacher_id === user.id;
@@ -257,7 +252,7 @@ export default function CampusDirectMessages({
               <button 
                 onClick={() => setShowNewChatModal(true)}
                 style={{
-                  background: '#137333',
+                  background: '#34a853',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
@@ -268,7 +263,7 @@ export default function CampusDirectMessages({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  boxShadow: '0 2px 8px rgba(19, 115, 51, 0.15)'
+                  boxShadow: '0 2px 8px rgba(52, 168, 83, 0.15)'
                 }}
                 className="hover-scale"
                 type="button"
@@ -308,7 +303,7 @@ export default function CampusDirectMessages({
                 padding: '6px 16px',
                 borderRadius: '999px',
                 border: 'none',
-                background: filterType === 'all' ? '#137333' : '#e2e8f0',
+                background: filterType === 'all' ? '#34a853' : '#e2e8f0',
                 color: filterType === 'all' ? 'white' : '#64748b',
                 fontSize: '0.75rem',
                 fontWeight: 800,
@@ -324,7 +319,7 @@ export default function CampusDirectMessages({
                 padding: '6px 16px',
                 borderRadius: '999px',
                 border: 'none',
-                background: filterType === 'unread' ? '#137333' : '#e2e8f0',
+                background: filterType === 'unread' ? '#34a853' : '#e2e8f0',
                 color: filterType === 'unread' ? 'white' : '#64748b',
                 fontSize: '0.75rem',
                 fontWeight: 800,
@@ -338,8 +333,8 @@ export default function CampusDirectMessages({
               <span>Ungelesen</span>
               {partnersWithMetadata.filter(p => p.unreadCount > 0).length > 0 && (
                 <span style={{
-                  background: filterType === 'unread' ? 'white' : '#137333',
-                  color: filterType === 'unread' ? '#137333' : 'white',
+                  background: filterType === 'unread' ? 'white' : '#34a853',
+                  color: filterType === 'unread' ? '#34a853' : 'white',
                   borderRadius: '50%',
                   width: '16px',
                   height: '16px',
@@ -398,7 +393,7 @@ export default function CampusDirectMessages({
                         position: 'absolute',
                         bottom: '-2px',
                         right: '-2px',
-                        background: '#137333',
+                        background: '#34a853',
                         color: 'white',
                         borderRadius: '50%',
                         width: '18px',
@@ -409,7 +404,7 @@ export default function CampusDirectMessages({
                         alignItems: 'center',
                         justifyContent: 'center',
                         border: '2px solid white',
-                        boxShadow: '0 2px 5px rgba(19, 115, 51, 0.3)'
+                        boxShadow: '0 2px 5px rgba(52, 168, 83, 0.3)'
                       }}>
                         {partner.unreadCount}
                       </div>
@@ -418,7 +413,7 @@ export default function CampusDirectMessages({
 
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#137333' : '#1e293b' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
                         {partner.first_name} {partner.last_name || ''}
                       </span>
                       {partner.lastMessage && (
@@ -494,8 +489,8 @@ export default function CampusDirectMessages({
                   fontWeight: 900,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  background: selectedRecipient.role === 'student' ? '#e6f4ea' : '#fee2e2',
-                  color: selectedRecipient.role === 'student' ? '#137333' : '#ef4444',
+                  background: '#e6f4ea',
+                  color: '#34a853',
                   padding: '2px 8px',
                   borderRadius: '6px',
                   display: 'inline-block',
@@ -565,7 +560,7 @@ export default function CampusDirectMessages({
                         style={{
                           padding: '12px 18px',
                           borderRadius: isSelf ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                          background: isSelf ? '#137333' : 'white',
+                          background: isSelf ? '#34a853' : 'white',
                           color: isSelf ? 'white' : '#1e293b',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                           border: isSelf ? 'none' : '1px solid #f1f5f9',
@@ -585,8 +580,8 @@ export default function CampusDirectMessages({
                         </span>
                         {isSelf && (
                           <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                            <Check size={12} color={msg.is_read ? '#137333' : '#cbd5e1'} strokeWidth={3} />
-                            <Check size={12} color={msg.is_read ? '#137333' : '#cbd5e1'} strokeWidth={3} style={{ marginLeft: '-8px' }} />
+                            <Check size={12} color={msg.is_read ? '#34a853' : '#cbd5e1'} strokeWidth={3} />
+                            <Check size={12} color={msg.is_read ? '#34a853' : '#cbd5e1'} strokeWidth={3} style={{ marginLeft: '-8px' }} />
                           </div>
                         )}
                       </div>
@@ -624,7 +619,7 @@ export default function CampusDirectMessages({
                 <button
                   type="submit"
                   style={{
-                    background: '#137333',
+                    background: '#34a853',
                     color: 'white',
                     border: 'none',
                     width: '44px',
@@ -634,7 +629,7 @@ export default function CampusDirectMessages({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(19, 115, 51, 0.25)',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
                     transition: 'all 0.2s',
                     flexShrink: 0
                   }}
@@ -658,7 +653,7 @@ export default function CampusDirectMessages({
               boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
               marginBottom: '24px'
             }}>
-              <Inbox size={36} style={{ strokeWidth: 1.5, color: '#137333' }} />
+              <Inbox size={36} style={{ strokeWidth: 1.5, color: '#34a853' }} />
             </div>
             <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Willkommen im Chat</h3>
             <p style={{ fontSize: '0.95rem', color: '#64748b', maxWidth: '360px', lineHeight: 1.6, margin: '0' }}>
@@ -725,7 +720,7 @@ export default function CampusDirectMessages({
                 schoolUsers.filter(u => {
                   if (u.id === user.id) return false;
                   if (isStudent) {
-                    return u.role === 'teacher' || u.role === 'admin';
+                    return u.role === 'teacher' && String(u.id) === String(user.teacher_id);
                   } else {
                     if (user.role?.toLowerCase() === 'teacher') {
                       return u.role === 'student' && u.teacher_id === user.id;
@@ -762,7 +757,7 @@ export default function CampusDirectMessages({
                 .filter(u => {
                   if (u.id === user.id) return false;
                   if (isStudent) {
-                    return u.role === 'teacher' || u.role === 'admin';
+                    return u.role === 'teacher' && String(u.id) === String(user.teacher_id);
                   } else {
                     if (user.role?.toLowerCase() === 'teacher') {
                       return u.role === 'student' && u.teacher_id === user.id;

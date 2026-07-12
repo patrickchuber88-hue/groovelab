@@ -41,7 +41,7 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
     'linear-gradient(135deg, #6366f1, #a855f7)', // Indigo to Purple
     'linear-gradient(135deg, #ec4899, #f43f5e)', // Pink to Rose
     'linear-gradient(135deg, #3b82f6, #06b6d4)', // Blue to Cyan
-    'linear-gradient(135deg, #10b981, #3b82f6)', // Emerald to Blue
+    'linear-gradient(135deg, #34a853, #3b82f6)', // Emerald to Blue
     'linear-gradient(135deg, #f59e0b, #e11d48)'  // Amber to Rose
   ];
   

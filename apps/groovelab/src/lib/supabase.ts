@@ -115,3 +115,98 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+/**
+ * Helper to physically and fully delete all storage assets associated with users (e.g. custom avatars and homework audio files)
+ * from Supabase Storage buckets to ensure absolute GDPR/COPPA compliance when deleting a user/student.
+ */
+export const deleteUserStorageAssets = async (userIds: string[]) => {
+  if (!userIds || userIds.length === 0) return;
+  console.log('[GDPR/COPPA Cleanup] Starting physical storage cleanup for user IDs:', userIds);
+
+  try {
+    // 1. Fetch user photo_urls to delete custom avatars
+    const { data: users, error: userErr } = await supabase
+      .from('users')
+      .select('id, photo_url')
+      .in('id', userIds);
+
+    if (!userErr && users) {
+      const groovelabFiles: string[] = [];
+      const campusFiles: string[] = [];
+
+      users.forEach(user => {
+        const url = user.photo_url;
+        if (url && url.startsWith('http')) {
+          // Check groovelab-assets
+          const glMarker = '/storage/v1/object/public/groovelab-assets/';
+          const glIdx = url.indexOf(glMarker);
+          if (glIdx !== -1) {
+            groovelabFiles.push(url.substring(glIdx + glMarker.length));
+          }
+
+          // Check campus-assets
+          const cpMarker = '/storage/v1/object/public/campus-assets/';
+          const cpIdx = url.indexOf(cpMarker);
+          if (cpIdx !== -1) {
+            campusFiles.push(url.substring(cpIdx + cpMarker.length));
+          }
+        }
+      });
+
+      if (groovelabFiles.length > 0) {
+        console.log('[GDPR/COPPA Cleanup] Deleting custom avatars from groovelab-assets:', groovelabFiles);
+        const { error: delErr } = await supabase.storage.from('groovelab-assets').remove(groovelabFiles);
+        if (delErr) console.error('[GDPR/COPPA Cleanup] Error deleting groovelab custom avatars:', delErr);
+      }
+      if (campusFiles.length > 0) {
+        console.log('[GDPR/COPPA Cleanup] Deleting custom avatars from campus-assets:', campusFiles);
+        const { error: delErr } = await supabase.storage.from('campus-assets').remove(campusFiles);
+        if (delErr) console.error('[GDPR/COPPA Cleanup] Error deleting campus custom avatars:', delErr);
+      }
+    }
+
+    // 2. Fetch homework_notes containing audio from progress_matrix
+    const { data: progressItems, error: pmErr } = await supabase
+      .from('progress_matrix')
+      .select('homework_notes')
+      .in('student_id', userIds);
+
+    if (!pmErr && progressItems) {
+      const audioFilesToDelete: string[] = [];
+      progressItems.forEach(item => {
+        if (item.homework_notes) {
+          try {
+            const notes = typeof item.homework_notes === 'string' ? JSON.parse(item.homework_notes) : item.homework_notes;
+            if (Array.isArray(notes)) {
+              notes.forEach((note: string) => {
+                if (note && note.startsWith('AUDIO:')) {
+                  const parts = note.substring(6).split('|');
+                  const audioUrl = parts[0];
+                  if (audioUrl && audioUrl.startsWith('http')) {
+                    const marker = '/storage/v1/object/public/campus-assets/';
+                    const markerIdx = audioUrl.indexOf(marker);
+                    if (markerIdx !== -1) {
+                      audioFilesToDelete.push(audioUrl.substring(markerIdx + marker.length));
+                    }
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.error('[GDPR/COPPA Cleanup] Error parsing homework_notes for audio deletion:', e);
+          }
+        }
+      });
+
+      if (audioFilesToDelete.length > 0) {
+        console.log('[GDPR/COPPA Cleanup] Physically deleting audio recordings from campus-assets:', audioFilesToDelete);
+        const { error: delErr } = await supabase.storage.from('campus-assets').remove(audioFilesToDelete);
+        if (delErr) console.error('[GDPR/COPPA Cleanup] Error deleting audio recordings:', delErr);
+      }
+    }
+  } catch (err) {
+    console.error('[GDPR/COPPA Cleanup] Unexpected error during asset deletion:', err);
+  }
+};
+
+

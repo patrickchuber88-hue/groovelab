@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX } from 'lucide-react';
 import { 
   ResponsiveContainer,
@@ -556,7 +556,7 @@ export function AdminDashboard({
             }
           };
           
-          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
           if (ev.dtend && ev.isAllDay) {
             end.setUTCDate(end.getUTCDate() - 1);
           }
@@ -1681,7 +1681,7 @@ export function AdminDashboard({
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
 
-  const brandColor = admin?.schools?.brand_color || '#16a34a';
+  const brandColor = '#ea4335';
 
   const getStatusColor = (studentId: string, lastSeen: string | null, createdAt?: string | null) => {
     const hasLiveSession = activeSessions.some(se => se.user_id === studentId);
@@ -1699,7 +1699,7 @@ export function AdminDashboard({
       }
     }
     
-    if (hasLiveSession) return '#10b981'; // Green
+    if (hasLiveSession) return '#34a853'; // Green
     if (isOnline) return '#fbbf24'; // Yellow (Home)
     return '#ef4444'; // Red
   };
@@ -1743,7 +1743,7 @@ export function AdminDashboard({
         insertData.external_name = extName;
       }
 
-      let { error } = await supabase.from('band_members').insert(insertData);
+      const { error } = await supabase.from('band_members').insert(insertData);
       if (error && error.message.includes('external_name')) {
         if (!userId) {
           throw new Error("Der Server unterstützt keine externen Mitglieder. Bitte führen Sie die SQL-Migration aus.");
@@ -1785,7 +1785,7 @@ export function AdminDashboard({
             return slotObj;
          });
 
-         let { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);
+         const { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);
          if (slotErr && slotErr.message.includes('external_name')) {
             if (!userId) {
                console.error("Failed to insert slots for external member:", slotErr);
@@ -2016,6 +2016,7 @@ export function AdminDashboard({
             // Hard delete users who requested deletion
             const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
             if (toDelete.length > 0) {
+              await deleteUserStorageAssets(toDelete);
               await supabase.from('user_song_skills').delete().in('user_id', toDelete);
               await supabase.from('sessions').delete().in('user_id', toDelete);
               await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);
@@ -2558,14 +2559,14 @@ export function AdminDashboard({
 
     if (studentIds.length > 0) {
       // Fetch sessions, focus logs, and skills filtered by active students and date range
-      let sessionsSq = supabase
+      const sessionsSq = supabase
         .from('sessions')
         .select('check_in_time, check_out_time, station_id, user_id')
         .in('user_id', studentIds)
         .not('check_out_time', 'is', null)
         .gte('check_in_time', sessionStartDate.toISOString());
 
-      let focusLogsSq = supabase
+      const focusLogsSq = supabase
         .from('fokus_logs')
         .select('user_id, duration_minutes, duration_seconds, created_at')
         .in('user_id', studentIds)
@@ -3108,6 +3109,7 @@ export function AdminDashboard({
           await supabase.from('band_shoutbox').delete().eq('user_id', id);
           await supabase.from('band_song_slots').delete().eq('user_id', id);
           await supabase.from('help_requests').delete().eq('user_id', id);
+          await deleteUserStorageAssets([id]);
           const { error } = await supabase.from('users').delete().eq('id', id);
           if (error) throw error;
         }
@@ -3275,7 +3277,7 @@ export function AdminDashboard({
         await supabase.from('band_shoutbox').delete().eq('user_id', id);
         await supabase.from('band_song_slots').delete().eq('user_id', id);
         await supabase.from('help_requests').delete().eq('user_id', id);
-        
+        await deleteUserStorageAssets([id]);
         const { error } = await supabase.from('users').delete().eq('id', id);
         if (error) throw error;
         
@@ -3603,7 +3605,7 @@ export function AdminDashboard({
 
       if (fetchError || !latestRoom) return;
 
-      let currentPoints = Array.isArray(latestRoom.geofence_points) ? [...latestRoom.geofence_points] : [];
+      const currentPoints = Array.isArray(latestRoom.geofence_points) ? [...latestRoom.geofence_points] : [];
       const newPoint = { lat, lng, timestamp: new Date().toISOString() };
       currentPoints.push(newPoint);
 
@@ -4143,7 +4145,7 @@ export function AdminDashboard({
   );
 
   const renderBandsTab = () => {
-    const brandColor = activePlatform === 'campus' ? (admin?.schools?.brand_color || '#16a34a') : '#eab308';
+    const brandColor = '#ea4335';
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     
     const filteredBands = allBands.filter(band => {
@@ -4659,6 +4661,7 @@ export function AdminDashboard({
       await supabase.from('band_song_slots').delete().in('user_id', studentIds);
       await supabase.from('help_requests').delete().in('user_id', studentIds);
       await supabase.from('avatars').delete().in('user_id', studentIds);
+      await deleteUserStorageAssets(studentIds);
       await supabase.from('users').delete().in('id', studentIds);
 
       setStudents([]);
@@ -4670,7 +4673,7 @@ export function AdminDashboard({
   };
 
   const renderStudentsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#16a34a' : '#eab308';
+    const brandColor = '#ea4335';
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -5180,7 +5183,7 @@ export function AdminDashboard({
                             ⏳ PROBE
                           </div>
                         ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
-                          <div style={{ padding: '1px 5px', background: '#e6f4ea', color: '#137333', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          <div style={{ padding: '1px 5px', background: '#e6f4ea', color: '#34a853', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
                             Aktiv
                           </div>
                         ) : (
@@ -5241,7 +5244,7 @@ export function AdminDashboard({
   };
 
   const renderTeachersTab = () => {
-    const brandColor = activePlatform === 'campus' ? (admin?.schools?.brand_color || '#16a34a') : '#eab308';
+    const brandColor = '#ea4335';
     return (
       <div style={{ marginTop: '0px' }}>
       <div 
@@ -9283,7 +9286,7 @@ export function AdminDashboard({
   };
 
   const renderSongsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#16a34a' : '#eab308';
+    const brandColor = '#ea4335';
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -10552,9 +10555,9 @@ export function AdminDashboard({
                 {[
                   { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
                   { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                  { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#10b981', bg: '#f0fdf4' },
+                  { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#34a853', bg: '#f0fdf4' },
                   { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
-                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#10b981' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
+                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
                   { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
                   { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
                   { label: 'Ø Zeit / Kopf (Monat)', value: formatMins(classCount > 0 ? Math.round(currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
@@ -10714,7 +10717,7 @@ export function AdminDashboard({
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
                           <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
-                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>{masteredGoals}</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#34a853', marginTop: '2px' }}>{masteredGoals}</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                           <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
@@ -10742,8 +10745,8 @@ export function AdminDashboard({
                               position: 'relative',
                               display: 'flex',
                               flexDirection: 'column',
-                              background: '#10b981',
-                              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.12)',
+                              background: '#34a853',
+                              boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
                               borderRadius: '16px',
                               padding: '12px 14px',
                               gap: '8px'
@@ -10868,7 +10871,7 @@ export function AdminDashboard({
             {/* Column 3: Jahresstatistik */}
             <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-                <div style={{ background: '#ecfdf5', color: '#10b981', padding: '8px', borderRadius: '12px' }}>
+                <div style={{ background: '#ecfdf5', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
                   <Calendar size={18} />
                 </div>
                 <div>
@@ -10950,12 +10953,12 @@ export function AdminDashboard({
                             numColor = '#14532d';
                             shadow = '0 4px 12px rgba(22, 163, 74, 0.12)';
                           } else {
-                            bg = 'linear-gradient(135deg, #10b981 0%, #047857 100%)';
-                            border = '1px solid #059669';
+                            bg = 'linear-gradient(135deg, #34a853 0%, #047857 100%)';
+                            border = '1px solid #137333';
                             labelColor = 'rgba(255, 255, 255, 0.8)';
                             textColor = 'rgba(255, 255, 255, 0.9)';
                             numColor = '#ffffff';
-                            shadow = '0 6px 15px rgba(16, 185, 129, 0.25)';
+                            shadow = '0 6px 15px rgba(52, 168, 83, 0.25)';
                           }
                         }
 
@@ -10997,7 +11000,7 @@ export function AdminDashboard({
                         { color: '#f0fdf4', label: '<15m', border: '#dcfce7' },
                         { color: '#dcfce7', label: '<1h', border: '#bbf7d0' },
                         { color: '#bbf7d0', label: '<3h', border: '#86efac' },
-                        { color: '#10b981', label: '3h+', border: '#059669' }
+                        { color: '#34a853', label: '3h+', border: '#137333' }
                       ].map(pill => (
                         <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: pill.color, border: `1px solid ${pill.border}` }} />
@@ -11031,7 +11034,7 @@ export function AdminDashboard({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
             {[
-              { label: 'Schüler Gesamt', value: stats.studentCount, icon: Users, color: '#10b981', bg: '#f0fdf4' },
+              { label: 'Schüler Gesamt', value: stats.studentCount, icon: Users, color: '#34a853', bg: '#f0fdf4' },
               { label: 'Songs in Library', value: stats.songCount, icon: Music, color: '#3b82f6', bg: '#eff6ff' },
               { label: 'Team-Mitglieder', value: teachers.length, icon: Shield, color: '#8b5cf6', bg: '#f5f3ff' },
               { 
@@ -11435,7 +11438,7 @@ export function AdminDashboard({
   };
 
   const renderMissionsTab = () => {
-    const brandColor = '#16a34a';
+    const brandColor = '#ea4335';
     
     const filteredSubmissions = submissions.filter(sub => {
       const studentName = `${sub.users?.first_name || ''} ${sub.users?.last_name || ''}`.toLowerCase();
@@ -12238,7 +12241,7 @@ export function AdminDashboard({
           <div 
             ref={qrCardRef}
             style={(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? {
-              background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #137333 0%, #064e3b 100%)', 
+              background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
@@ -12433,7 +12436,7 @@ export function AdminDashboard({
             style={{ 
               width: '100%', 
               background: (selectedQRUser.role === 'student' || isQRAdminOrSecretary) 
-                ? (isQRAdminOrSecretary ? '#b91c1c' : '#137333') 
+                ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') 
                 : '#34a853', 
               color: 'white', 
               border: 'none', 
@@ -12447,7 +12450,7 @@ export function AdminDashboard({
               justifyContent: 'center', 
               gap: '10px', 
               marginTop: '24px', 
-              boxShadow: `0 15px 35px ${(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (isQRAdminOrSecretary ? '#b91c1c' : '#137333') : '#34a853'}50`, 
+              boxShadow: `0 15px 35px ${(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') : '#34a853'}50`, 
               transition: 'all 0.2s' 
             }} 
           >
@@ -16075,16 +16078,23 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
               </div>
 
               {/* Status Header */}
-              <div style={{ 
-                background: u.role === 'student' ? '#eab308' : '#34a853', 
-                padding: '6px', 
-                textAlign: 'center',
-                textTransform: 'uppercase'
-              }}>
-                <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-                  {u.role === 'student' ? 'Member Access' : 'Staff / Coach'}
-                </div>
-              </div>
+              {(() => {
+                const isQRAdminOrSec = u.role === 'admin' || u.role === 'secretary';
+                const cardHeaderColor = isQRAdminOrSec ? '#ea4335' : (u.role === 'student' ? '#eab308' : '#34a853');
+                const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (u.role === 'student' ? 'Member Access' : 'Staff / Coach');
+                return (
+                  <div style={{ 
+                    background: cardHeaderColor, 
+                    padding: '6px', 
+                    textAlign: 'center',
+                    textTransform: 'uppercase'
+                  }}>
+                    <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
+                      {cardBadgeLabel}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Content Area */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
@@ -16093,7 +16103,7 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
                   width: '130px', 
                   height: '130px', 
                   borderRadius: '100px', 
-                  border: `4px solid ${u.role === 'student' ? '#eab308' : '#34a853'}`,
+                  border: `4px solid ${u.role === 'student' ? '#eab308' : (u.role === 'admin' || u.role === 'secretary') ? '#ea4335' : '#34a853'}`,
                   padding: '6px',
                   background: 'white'
                 }}>
@@ -16377,7 +16387,7 @@ function DeviceSetupScreen({
             <span style={{
               fontSize: '0.65rem',
               fontWeight: 800,
-              color: activeSession ? '#10b981' : '#64748b',
+              color: activeSession ? '#34a853' : '#64748b',
               background: activeSession ? '#d1fae5' : '#f1f5f9',
               padding: '2px 8px',
               borderRadius: '12px'

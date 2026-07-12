@@ -195,14 +195,14 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
 
           {suggestion && (
             <div className="animation-pulse" style={{ 
-              background: 'rgba(16, 185, 129, 0.1)', 
-              border: '1px solid rgba(16, 185, 129, 0.3)', 
+              background: 'rgba(52, 168, 83, 0.1)', 
+              border: '1px solid rgba(52, 168, 83, 0.3)', 
               padding: '8px 20px', 
               borderRadius: '12px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              color: '#10b981',
+              color: '#34a853',
               fontSize: '0.8rem',
               fontWeight: 900
             }}>
@@ -241,7 +241,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', opacity: 0.1 }}>👤</div>
                   )}
                   {isMe && (
-                     <div style={{ position: 'absolute', inset: 0, border: '4px solid #10b981', borderRadius: '40px', boxShadow: 'inset 0 0 20px rgba(16,185,129,0.5)' }} />
+                     <div style={{ position: 'absolute', inset: 0, border: '4px solid #34a853', borderRadius: '40px', boxShadow: 'inset 0 0 20px rgba(52,168,83,0.5)' }} />
                   )}
                 </div>
                 
@@ -262,7 +262,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
           <button 
             onClick={onClose}
             style={{ 
-              background: 'linear-gradient(135deg, #10b981, #059669)', 
+              background: 'linear-gradient(135deg, #34a853, #137333)', 
               border: 'none', 
               padding: '18px 45px', 
               borderRadius: '20px', 
@@ -270,7 +270,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
               fontWeight: 900, 
               color: 'white', 
               cursor: 'pointer', 
-              boxShadow: '0 10px 30px rgba(16, 185, 129, 0.4)',
+              boxShadow: '0 10px 30px rgba(52, 168, 83, 0.4)',
               transition: 'all 0.2s',
               letterSpacing: '0.02em'
             }}

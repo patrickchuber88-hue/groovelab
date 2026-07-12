@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { 
   Calendar, 
   Plus, 
@@ -1290,6 +1290,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     try {
       setLoading(true);
       // 1. Delete user record if exists
+      await deleteUserStorageAssets([studentId]);
       const { error: userErr } = await supabase.from('users').delete().eq('id', studentId);
       if (userErr) console.error("Error deleting user during reset:", userErr);
       
@@ -1379,7 +1380,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         for (const board of currentBoards) {
           // Determine the start time for the student on this board
           // The student would be appended to the end of the board's students list
-          let startAnchorTime = board.startAnchor;
+          const startAnchorTime = board.startAnchor;
           let currentMinutes = 0;
           if (board.students.length > 0) {
             // Find the last student's end time
@@ -1998,8 +1999,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     };
 
     setBoards(prev => {
-      let sourceBoard = prev.find(b => b.id === sourceBoardId);
-      let targetBoard = prev.find(b => b.id === targetBoardId);
+      const sourceBoard = prev.find(b => b.id === sourceBoardId);
+      const targetBoard = prev.find(b => b.id === targetBoardId);
       if (!targetBoard) return prev;
 
       // 1. If moving within boards
@@ -2776,7 +2777,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         <>
           {showCelebration ? (
         <div className="animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(30px) saturate(190%)', WebkitBackdropFilter: 'blur(30px) saturate(190%)', borderRadius: '28px', padding: '40px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.5)', boxShadow: '0 20px 50px rgba(0,0,0,0.04)', maxWidth: '480px', margin: '40px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 211, 153, 0.15)', border: '1px solid rgba(52, 211, 153, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 211, 153, 0.15)', border: '1px solid rgba(52, 211, 153, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
@@ -2868,8 +2869,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
               {hasSubmittedSchedule && scheduleStatus === 'approved' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(16, 185, 129, 0.15)', color: '#065f46', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
-                  <span style={{ color: '#10b981', fontSize: '0.8rem' }}>✓</span> 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(52, 168, 83, 0.15)', color: '#065f46', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                  <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span> 
                   <span>Freigegeben</span>
                 </div>
               )}
@@ -3017,9 +3018,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 onClick={handleAutoAssign}
                 disabled={students.filter(s => !s.assignedDay && !s.isBreak).length === 0}
                 style={{
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  color: '#10b981',
-                  border: '1px solid rgba(16, 185, 129, 0.15)',
+                  background: 'rgba(52, 168, 83, 0.1)',
+                  color: '#34a853',
+                  border: '1px solid rgba(52, 168, 83, 0.15)',
                   fontWeight: 600,
                   padding: '5px 12px',
                   borderRadius: '8px',
@@ -3032,8 +3033,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   opacity: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 0.5 : 1,
                   pointerEvents: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'none' : 'auto'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.1)'}
               >
                 <Sparkles size={12} />
                 Automatisch zuteilen
@@ -3283,7 +3284,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                        {/* Hour marker & 15-minute subdivision lines */}
                       {hourMarkers.map(m => {
                         const subMarkers = [];
-                        for (let minOffset of [15, 30, 45]) {
+                        for (const minOffset of [15, 30, 45]) {
                           const subTop = m.top + minOffset * PX_PER_MIN;
                           if (subTop <= columnHeightPx) {
                             subMarkers.push(
@@ -3508,7 +3509,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                         top: `${top}px`,
                                         height: `${height}px`,
                                         border: '2px solid #8b5cf6',
-                                        background: 'repeating-linear-gradient(45deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.1) 8px, rgba(139, 92, 246, 0.1) 8px, rgba(139, 92, 246, 0.1) 16px)',
+                                        background: 'repeating-linear-gradient(45deg, rgba(52, 168, 83, 0.1), rgba(52, 168, 83, 0.1) 8px, rgba(139, 92, 246, 0.1) 8px, rgba(139, 92, 246, 0.1) 16px)',
                                         zIndex: 4,
                                         pointerEvents: 'none',
                                         boxSizing: 'border-box'
@@ -3693,17 +3694,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           : `Raumkonflikt: Raum besetzt durch Lehrkraft ${roomConflictTeacherName} (Schüler: ${roomConflictStudentName})`;
 
                         const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-                        const campusPrimary = '#137333';
+                        const campusPrimary = '#34a853';
                         const campusBg = 'rgba(230, 244, 234, 0.65)';
-                        const campusBorder = 'rgba(19, 115, 51, 0.2)';
-                        const campusText = '#137333';
+                        const campusBorder = 'rgba(52, 168, 83, 0.2)';
+                        const campusText = '#34a853';
 
                         const cardBg = hasConflict
                           ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
                           : (isInsideWunsch
                               ? '#064e3b'
                               : (isSelected 
-                                  ? (isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
+                                  ? (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
                                   : (isSubmitted 
                                       ? 'rgba(220, 252, 231, 0.5)' 
                                       : (isCampus ? campusBg : 'rgba(219, 234, 254, 0.65)'))));
@@ -3715,16 +3716,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               : (isSelected 
                                   ? (isCampus ? `1.5px solid ${campusPrimary}` : '1.5px solid #007aff') 
                                   : (isSubmitted 
-                                      ? '1px solid rgba(16, 185, 129, 0.18)' 
+                                      ? '1px solid rgba(52, 168, 83, 0.18)' 
                                       : (isCampus ? `1px solid ${campusBorder}` : '1px solid rgba(59, 130, 246, 0.2)'))));
 
                         const cardBorderLeft = hasConflict
                           ? '4px solid #dc2626'
                           : (isInsideWunsch
-                              ? '4px solid #10b981'
+                              ? '4px solid #34a853'
                               : (isSelected 
                                   ? (isCampus ? `4px solid ${campusPrimary}` : '4px solid #007aff') 
-                                  : (isSubmitted ? '4px solid #10b981' : (isCampus ? `4px solid ${campusPrimary}` : '4px solid #3b82f6'))));
+                                  : (isSubmitted ? '4px solid #34a853' : (isCampus ? `4px solid ${campusPrimary}` : '4px solid #3b82f6'))));
 
                         const textColor = hasConflict
                           ? '#991b1b'
@@ -3739,8 +3740,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           : (isInsideWunsch
                               ? 'rgba(255, 255, 255, 0.2)'
                               : (isSelected 
-                                  ? (isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
-                                  : (isSubmitted ? 'rgba(16, 185, 129, 0.08)' : (isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(59, 130, 246, 0.08)'))));
+                                  ? (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
+                                  : (isSubmitted ? 'rgba(52, 168, 83, 0.08)' : (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(59, 130, 246, 0.08)'))));
 
                         const badgeColor = hasConflict
                           ? '#ef4444'
@@ -3751,22 +3752,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   : (isSubmitted ? '#047857' : (isCampus ? campusText : '#1d4ed8'))));
 
                         const shadowColor = isSubmitted 
-                          ? 'rgba(16,185,129,0.06)' 
-                          : (isCampus ? 'rgba(19,115,51,0.06)' : 'rgba(59,130,246,0.06)');
+                          ? 'rgba(52,168,83,0.06)' 
+                          : (isCampus ? 'rgba(52, 168, 83,0.06)' : 'rgba(59,130,246,0.06)');
                         const shadowHoverColor = isSubmitted 
-                          ? 'rgba(16,185,129,0.14)' 
-                          : (isCampus ? 'rgba(19,115,51,0.14)' : 'rgba(59,130,246,0.14)');
+                          ? 'rgba(52,168,83,0.14)' 
+                          : (isCampus ? 'rgba(52, 168, 83,0.14)' : 'rgba(59,130,246,0.14)');
                         const cardShadow = hasConflict
                           ? '0 4px 10px rgba(239, 68, 68, 0.15)'
                           : (isInsideWunsch
-                              ? '0 6px 16px rgba(16, 185, 129, 0.25)'
+                              ? '0 6px 16px rgba(52, 168, 83, 0.25)'
                               : (isSelected 
                                   ? (isCampus ? `0 0 10px ${campusPrimary}40` : '0 0 10px rgba(0, 122, 255, 0.25)') 
                                   : `0 2px 6px ${shadowColor}`));
 
                         const isSelectedForGroup = selectedForGroup.includes(bs.id);
                         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-                        const highlightColor = isCampusTheme ? '#137333' : '#007aff';
+                        const highlightColor = isCampusTheme ? '#34a853' : '#007aff';
 
                         if (bs.isGroup) {
                           return (
@@ -3788,7 +3789,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 top: `${Math.max(cardTopPx, 0)}px`,
                                 height: `${Math.max(cardHeightPx, 32)}px`,
                                 background: isCampusTheme ? 'rgba(230, 244, 234, 0.95)' : 'rgba(219, 234, 254, 0.95)',
-                                border: isSelected ? `1.5px solid ${highlightColor}` : '1px solid rgba(16, 185, 129, 0.25)',
+                                border: isSelected ? `1.5px solid ${highlightColor}` : '1px solid rgba(52, 168, 83, 0.25)',
                                 borderLeft: `4px solid ${highlightColor}`,
                                 borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                                 cursor: 'grab', display: 'flex', flexDirection: 'column',
@@ -3961,7 +3962,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       {(() => {
                         if (dragOverBoardId !== board.id || dragOverIndex === null) return null;
                         const isGreenTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-                        const lineColor = isGreenTheme ? '#137333' : '#007aff';
+                        const lineColor = isGreenTheme ? '#34a853' : '#007aff';
                         
                         let topPx = 0;
                         if (dragOverIndex < board.students.length) {
@@ -4258,7 +4259,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       {dropDecisionState && (() => {
         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampusTheme ? '#137333' : '#ea4335';
+        const primaryColor = isCampusTheme ? '#34a853' : '#ea4335';
         
         // Find names of the students
         const getStudentName = (id: string) => {
@@ -4326,7 +4327,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           fontWeight: 700,
                           cursor: 'pointer',
                           transition: 'all 0.2s',
-                          boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
+                          boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(52, 168, 83, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
                         }}
                         onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                         onMouseOut={e => e.currentTarget.style.filter = 'none'}
@@ -4489,7 +4490,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       {/* Fallback rendering of deleteBreakState modal when dropDecisionState is not active */}
       {!dropDecisionState && deleteBreakState && (() => {
         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampusTheme ? '#137333' : '#ea4335';
+        const primaryColor = isCampusTheme ? '#34a853' : '#ea4335';
         const bgAccent = isCampusTheme ? '#e6f4ea' : '#fce8e6';
         
         return (
@@ -4533,7 +4534,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(19, 115, 51, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
+                    boxShadow: `0 4px 12px ${isCampusTheme ? 'rgba(52, 168, 83, 0.2)' : 'rgba(234, 67, 53, 0.2)'}`
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
@@ -4591,7 +4592,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       {instrumentSelectorState && (() => {
         const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampus ? '#137333' : '#ea4335';
+        const primaryColor = isCampus ? '#34a853' : '#ea4335';
         const studentObj = students.find(s => s.id === instrumentSelectorState.sourceId);
         const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : 'Schüler';
 
@@ -4765,10 +4766,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   height: '40px',
                   borderRadius: '50%',
                   backgroundColor: isCampus ? '#e6f4ea' : '#fce8e6',
-                  color: isCampus ? '#137333' : '#ea4335',
+                  color: isCampus ? '#34a853' : '#ea4335',
                   flexShrink: 0
                 }}>
-                  <AlertCircle size={20} style={{ color: isCampus ? '#137333' : '#ea4335' }} />
+                  <AlertCircle size={20} style={{ color: isCampus ? '#34a853' : '#ea4335' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <h3 style={{
@@ -4826,12 +4827,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     padding: '10px 18px',
                     borderRadius: '10px',
                     border: 'none',
-                    backgroundColor: isCampus ? '#137333' : '#ea4335',
+                    backgroundColor: isCampus ? '#34a853' : '#ea4335',
                     color: '#ffffff',
                     fontSize: '0.85rem',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    boxShadow: isCampus ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
+                    boxShadow: isCampus ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
                     transition: 'all 0.15s ease'
                   }}
                 >

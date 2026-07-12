@@ -773,7 +773,7 @@ export function BillingDashboard() {
           font-weight: 700;
         }
         .status-badge-active {
-          color: #137333;
+          color: #34a853;
           background: #e6f4ea;
         }
         .status-badge-trial {
@@ -1283,13 +1283,13 @@ export function BillingDashboard() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
                                       <span style={{ color: '#64748b' }}>Module:</span>
                                       <div style={{ display: 'flex', gap: '8px' }}>
-                                        {inv.hasCampus && <span style={{ color: '#137333', fontWeight: 700, fontSize: '0.78rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '6px' }}>Campus</span>}
+                                        {inv.hasCampus && <span style={{ color: '#34a853', fontWeight: 700, fontSize: '0.78rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '6px' }}>Campus</span>}
                                         {inv.hasGroovelab && <span style={{ color: '#d97706', fontWeight: 700, fontSize: '0.78rem', background: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>Groovelab</span>}
                                       </div>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center' }}>
                                       <span style={{ color: '#64748b' }}>Kombi-Rabatt (Schule):</span>
-                                      <strong style={{ color: inv.hasKombiDiscount ? '#137333' : '#64748b', fontWeight: 700 }}>
+                                      <strong style={{ color: inv.hasKombiDiscount ? '#34a853' : '#64748b', fontWeight: 700 }}>
                                         {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Nein'}
                                       </strong>
                                     </div>
@@ -1325,7 +1325,7 @@ export function BillingDashboard() {
                                       </div>
                                     </div>
                                     {inv.hasKombiDiscount && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#137333' }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#34a853' }}>
                                         <span style={{ fontWeight: 700 }}>Kombi-Rabatt:</span>
                                         <span style={{ fontWeight: 700 }}>-{inv.kombiDiscountAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
                                       </div>

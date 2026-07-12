@@ -759,7 +759,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         right: '-10%',
         width: '50vw',
         height: '50vw',
-        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(52, 168, 83, 0.06) 0%, transparent 70%)',
         pointerEvents: 'none',
         zIndex: 0
       }} />
@@ -801,11 +801,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             {/* App Logo & Branding */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '44px', padding: '0 8px' }}>
               <div style={{
-                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #fbbc05 100%)',
                 width: '40px',
                 height: '40px',
                 borderRadius: '12px',
-                boxShadow: '0 8px 20px rgba(19, 115, 51, 0.2)',
+                boxShadow: '0 8px 20px rgba(52, 168, 83, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -816,7 +816,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
                   Campus-Groovelab
                 </h1>
-                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   Admin Leitstand
                 </span>
               </div>
@@ -825,10 +825,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             {/* Sidebar Navigation */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
-                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
+                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#137333', bg: 'rgba(52, 168, 83, 0.1)' },
                 { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' },
                 { id: 'billing', label: 'Abrechnung & Abonnements', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
-                { id: 'banking', label: 'System & Master-Admins', icon: <Shield size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.1)' },
+                { id: 'banking', label: 'System & Master-Admins', icon: <Shield size={18} />, color: '#137333', bg: 'rgba(52, 168, 83, 0.1)' },
                 { id: 'pricing', label: 'System-Preise', icon: <Tag size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' }
               ].map((tab) => {
                 const isActive = activePortalTab === tab.id;
@@ -896,14 +896,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 width: '40px',
                 height: '40px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #fbbc05 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
                 fontWeight: 900,
                 fontSize: '0.85rem',
-                boxShadow: '0 4px 12px rgba(19, 115, 51, 0.15)'
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
               }}>
                 {((currentUser?.first_name?.[0] || '') + (currentUser?.last_name?.[0] || '')) || 'MA'}
               </div>
@@ -919,8 +919,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     display: 'inline-block',
                     padding: '2px 6px',
                     borderRadius: '6px',
-                    background: 'rgba(19, 115, 51, 0.08)',
-                    color: '#137333',
+                    background: 'rgba(52, 168, 83, 0.08)',
+                    color: '#34a853',
                     fontSize: '0.6rem',
                     fontWeight: 900,
                     letterSpacing: '0.04em',
@@ -1069,7 +1069,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                 onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
                 >
-                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Award size={24} />
                   </div>
                   <div>
@@ -1155,7 +1155,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     alignItems: 'center',
                     gap: '16px'
                   }}>
-                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Check size={32} />
                     </div>
                     <div>
@@ -1660,8 +1660,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           width: '40px',
                           height: '40px',
                           borderRadius: '12px',
-                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
+                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(52, 168, 83, 0.1)',
+                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#34a853',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center'
@@ -1688,15 +1688,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           borderRadius: '9999px',
                           fontSize: '0.82rem',
                           fontWeight: 800,
-                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#10b981',
-                          border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)'}`
+                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(52, 168, 83, 0.08)',
+                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#34a853',
+                          border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(52, 168, 83, 0.15)'}`
                         }}>
                           <span style={{
                             width: '8px',
                             height: '8px',
                             borderRadius: '50%',
-                            background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#10b981',
+                            background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#34a853',
                             display: 'inline-block'
                           }} />
                           {healthStatus === 'critical' && 'KRITISCH (Upgrade empfohlen)'}
@@ -1747,7 +1747,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             <Cpu size={14} /> CPU Auslastung
                           </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#10b981' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#34a853' }}>
                             {cpuVal.toFixed(2)} / 2.0 Cores
                           </span>
                         </div>
@@ -1756,7 +1756,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <div style={{
                             height: '100%',
                             width: `${Math.min((cpuVal / 2.0) * 100, 100)}%`,
-                            background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#10b981',
+                            background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#34a853',
                             borderRadius: '4px',
                             transition: 'width 0.5s ease-in-out'
                           }} />
@@ -1778,7 +1778,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             <Sliders size={14} /> Arbeitsspeicher (RAM)
                           </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#10b981' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#34a853' }}>
                             {(ramUsed / 1024).toFixed(2)} GB / {(ramTotal / 1024).toFixed(2)} GB
                           </span>
                         </div>
@@ -1787,7 +1787,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <div style={{
                             height: '100%',
                             width: `${Math.min(ramPct, 100)}%`,
-                            background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#10b981',
+                            background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#34a853',
                             borderRadius: '4px',
                             transition: 'width 0.5s ease-in-out'
                           }} />
@@ -1809,7 +1809,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             <Database size={14} /> DB Pool Connections
                           </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#10b981' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#34a853' }}>
                             {dbConns} / 100
                           </span>
                         </div>
@@ -1818,7 +1818,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           <div style={{
                             height: '100%',
                             width: `${Math.min(dbConns, 100)}%`,
-                            background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#10b981',
+                            background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#34a853',
                             borderRadius: '4px',
                             transition: 'width 0.5s ease-in-out'
                           }} />
@@ -1869,8 +1869,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 {/* Definitions for grid line pattern or gradients */}
                                 <defs>
                                   <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.00"/>
+                                    <stop offset="0%" stopColor="#34a853" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#34a853" stopOpacity="0.00"/>
                                   </linearGradient>
                                   <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25"/>
@@ -1908,14 +1908,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 )}
 
                                 {/* Line curves */}
-                                <polyline fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
+                                <polyline fill="none" stroke="#34a853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
                                 <polyline fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(ramPoints)} />
                                 <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(dbPoints)} />
 
                                 {/* Interactive dots on latest point */}
                                 {cpuPoints.length > 0 && (
                                   <>
-                                    <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+                                    <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#34a853" stroke="#ffffff" strokeWidth="2" />
                                     <circle cx={ramPoints[ramPoints.length - 1].x} cy={ramPoints[ramPoints.length - 1].y} r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2" />
                                     <circle cx={dbPoints[dbPoints.length - 1].x} cy={dbPoints[dbPoints.length - 1].y} r="5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" />
                                   </>
@@ -1934,7 +1934,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           flexWrap: 'wrap'
                         }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#10b981', borderRadius: '2px' }} />
+                            <span style={{ width: '12px', height: '3px', background: '#34a853', borderRadius: '2px' }} />
                             CPU-Auslastung (Skaliert auf 4.0 Cores)
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
@@ -2136,7 +2136,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
                   }}>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      <Percent size={20} color="#059669" /> Rabatt-Kampagne erstellen
+                      <Percent size={20} color="#137333" /> Rabatt-Kampagne erstellen
                     </h3>
 
                     <form onSubmit={handleAddSpecialOffer} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -2229,7 +2229,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               width: '40px',
                               height: '24px',
                               borderRadius: '12px',
-                              background: newOfferActive ? '#10b981' : 'rgba(15, 23, 42, 0.08)',
+                              background: newOfferActive ? '#34a853' : 'rgba(15, 23, 42, 0.08)',
                               border: 'none',
                               cursor: 'pointer',
                               padding: '0',
@@ -2256,13 +2256,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         style={{
                           padding: '12px',
                           borderRadius: '12px',
-                          background: '#059669',
+                          background: '#137333',
                           color: '#ffffff',
                           border: 'none',
                           fontSize: '0.88rem',
                           fontWeight: 800,
                           cursor: 'pointer',
-                          boxShadow: '0 4px 15px rgba(5, 150, 105, 0.2)',
+                          boxShadow: '0 4px 15px rgba(19, 115, 51, 0.2)',
                           transition: 'all 0.2s ease',
                           display: 'flex',
                           alignItems: 'center',
@@ -2311,8 +2311,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
                                 {offer.name}
                               </div>
-                              <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ background: 'rgba(5, 150, 105, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
+                              <div style={{ fontSize: '0.78rem', color: '#137333', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ background: 'rgba(19, 115, 51, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
                                   {offer.discount_percent}% Rabatt
                                 </span>
                                 {offer.code && (
@@ -2332,7 +2332,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                   width: '38px',
                                   height: '22px',
                                   borderRadius: '11px',
-                                  background: offer.is_active ? '#10b981' : 'rgba(15, 23, 42, 0.08)',
+                                  background: offer.is_active ? '#34a853' : 'rgba(15, 23, 42, 0.08)',
                                   border: 'none',
                                   cursor: 'pointer',
                                   padding: '0',
@@ -2412,7 +2412,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                       <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                        <Shield size={20} color="#137333" /> Master-Admins
+                        <Shield size={20} color="#34a853" /> Master-Admins
                       </h3>
                       <button
                         onClick={() => {
@@ -2422,9 +2422,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         style={{
                           padding: '8px 14px',
                           borderRadius: '10px',
-                          background: showAddAdminForm ? '#f1f5f9' : 'rgba(19, 115, 51, 0.08)',
+                          background: showAddAdminForm ? '#f1f5f9' : 'rgba(52, 168, 83, 0.08)',
                           border: 'none',
-                          color: showAddAdminForm ? '#475569' : '#137333',
+                          color: showAddAdminForm ? '#475569' : '#34a853',
                           fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
@@ -2503,7 +2503,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                           style={{
                             padding: '12px',
                             borderRadius: '10px',
-                            background: '#137333',
+                            background: '#34a853',
                             color: '#ffffff',
                             border: 'none',
                             fontSize: '0.85rem',
@@ -2514,7 +2514,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             alignItems: 'center',
                             justifyContent: 'center',
                             gap: '6px',
-                            boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)'
+                            boxShadow: '0 4px 10px rgba(52, 168, 83, 0.2)'
                           }}
                         >
                           {creatingAdmin ? 'Erstellt...' : 'Admin erstellen'}
@@ -2538,8 +2538,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               padding: '14px 18px',
                               borderRadius: '16px',
                               background: isSelectedForEdit ? '#f8fafc' : '#ffffff',
-                              border: isSelectedForEdit ? '1.5px solid #137333' : '1px solid rgba(15, 23, 42, 0.06)',
-                              boxShadow: isSelectedForEdit ? '0 4px 12px rgba(19, 115, 51, 0.04)' : 'none',
+                              border: isSelectedForEdit ? '1.5px solid #34a853' : '1px solid rgba(15, 23, 42, 0.06)',
+                              boxShadow: isSelectedForEdit ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none',
                               transition: 'all 0.2s'
                             }}
                           >
@@ -2548,7 +2548,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 width: '36px',
                                 height: '36px',
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #137333 0%, #fbbc05 100%)',
+                                background: 'linear-gradient(135deg, #34a853 0%, #fbbc05 100%)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -2565,7 +2565,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                     {adm.first_name} {adm.last_name}
                                   </span>
                                   {isCurrent && (
-                                    <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
+                                    <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#34a853', padding: '1px 5px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
                                       Du
                                     </span>
                                   )}
@@ -2587,7 +2587,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                   width: '32px',
                                   height: '32px',
                                   borderRadius: '8px',
-                                  background: selectedAdminForQr?.id === adm.id ? '#137333' : '#f1f5f9',
+                                  background: selectedAdminForQr?.id === adm.id ? '#34a853' : '#f1f5f9',
                                   border: 'none',
                                   color: selectedAdminForQr?.id === adm.id ? '#ffffff' : '#475569',
                                   cursor: 'pointer',
@@ -2611,9 +2611,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                   width: '32px',
                                   height: '32px',
                                   borderRadius: '8px',
-                                  background: isSelectedForEdit ? 'rgba(19, 115, 51, 0.1)' : '#f1f5f9',
+                                  background: isSelectedForEdit ? 'rgba(52, 168, 83, 0.1)' : '#f1f5f9',
                                   border: 'none',
-                                  color: isSelectedForEdit ? '#137333' : '#475569',
+                                  color: isSelectedForEdit ? '#34a853' : '#475569',
                                   cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -2699,7 +2699,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       paddingTop: '28px'
                     }}>
                       <h4 style={{ margin: '0 0 16px 0', fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Key size={14} color="#137333" /> Zugangsdaten für {adminUser.first_name} bearbeiten
+                        <Key size={14} color="#34a853" /> Zugangsdaten für {adminUser.first_name} bearbeiten
                       </h4>
                       <form onSubmit={handleUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div>
@@ -2787,7 +2787,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
                 }}>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                    <Settings size={20} color="#059669" /> Betreiber Rechnungsdaten
+                    <Settings size={20} color="#137333" /> Betreiber Rechnungsdaten
                   </h3>
 
                   <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -2978,9 +2978,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       style={{
                         padding: '14px',
                         borderRadius: '12px',
-                        background: 'rgba(5, 150, 105, 0.1)',
-                        border: '1px solid rgba(5, 150, 105, 0.25)',
-                        color: '#059669',
+                        background: 'rgba(19, 115, 51, 0.1)',
+                        border: '1px solid rgba(19, 115, 51, 0.25)',
+                        color: '#137333',
                         fontSize: '0.9rem',
                         fontWeight: 800,
                         cursor: 'pointer',
@@ -2992,12 +2992,12 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         marginTop: '12px'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#059669';
+                        e.currentTarget.style.background = '#137333';
                         e.currentTarget.style.color = '#ffffff';
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.background = 'rgba(5, 150, 105, 0.1)';
-                        e.currentTarget.style.color = '#059669';
+                        e.currentTarget.style.background = 'rgba(19, 115, 51, 0.1)';
+                        e.currentTarget.style.color = '#137333';
                       }}
                     >
                       {updatingBilling ? 'Speichern...' : 'Rechnungsdaten aktualisieren'}
@@ -3230,7 +3230,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                         <div style={{ 
                                           width: `${Math.min(100, (students / (school.max_students ?? 6)) * 100)}%`, 
                                           height: '100%', 
-                                          background: '#10b981', 
+                                          background: '#34a853', 
                                           borderRadius: '10px' 
                                         }} />
                                       </div>
@@ -3275,7 +3275,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                   width: '38px',
                                   height: '22px',
                                   borderRadius: '11px',
-                                  background: school.is_paused ? 'rgba(15, 23, 42, 0.08)' : '#10b981',
+                                  background: school.is_paused ? 'rgba(15, 23, 42, 0.08)' : '#34a853',
                                   border: 'none',
                                   cursor: 'pointer',
                                   padding: '0',
@@ -3304,9 +3304,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                                 style={{
                                   padding: '6px 12px',
                                   borderRadius: '100px',
-                                  background: copiedId === school.id ? 'rgba(16, 185, 129, 0.1)' : '#ffffff',
+                                  background: copiedId === school.id ? 'rgba(52, 168, 83, 0.1)' : '#ffffff',
                                   border: '1px solid rgba(15, 23, 42, 0.06)',
-                                  color: copiedId === school.id ? '#10b981' : '#4f46e5',
+                                  color: copiedId === school.id ? '#34a853' : '#4f46e5',
                                   fontSize: '0.72rem',
                                   fontWeight: 800,
                                   cursor: 'pointer',
@@ -3611,9 +3611,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       textTransform: 'uppercase',
                       padding: '2px 8px',
                       borderRadius: '100px',
-                      background: editStatus === 'active' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                      color: editStatus === 'active' ? '#10b981' : '#dc2626',
-                      border: `1px solid ${editStatus === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                      background: editStatus === 'active' ? 'rgba(52, 168, 83, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                      color: editStatus === 'active' ? '#34a853' : '#dc2626',
+                      border: `1px solid ${editStatus === 'active' ? 'rgba(52, 168, 83, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
                     }}>
                       {editStatus === 'active' ? 'Aktiv' : 'Inaktiv/Gesperrt'}
                     </span>
@@ -3759,7 +3759,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         fontSize: '0.8rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        background: editStatus === 'active' ? '#10b981' : 'transparent',
+                        background: editStatus === 'active' ? '#34a853' : 'transparent',
                         color: editStatus === 'active' ? '#ffffff' : '#64748b',
                         transition: 'all 0.2s'
                       }}
@@ -3967,14 +3967,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editHasCampus ? 'rgba(19, 115, 51, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editHasCampus ? 'rgba(19, 115, 51, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editHasCampus ? 'rgba(52, 168, 83, 0.08)' : '#f8fafc',
+                        border: `1px solid ${editHasCampus ? 'rgba(52, 168, 83, 0.2)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
                         <span style={{ display: 'flex', alignItems: 'center' }}>
-                          <GraduationCap size={16} color={editHasCampus ? '#137333' : '#64748b'} style={{ marginRight: '8px' }} />
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasCampus ? '#137333' : '#475569' }}>Campus Modul</span>
+                          <GraduationCap size={16} color={editHasCampus ? '#34a853' : '#64748b'} style={{ marginRight: '8px' }} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasCampus ? '#34a853' : '#475569' }}>Campus Modul</span>
                         </span>
                         <input
                           type="checkbox"
@@ -4326,7 +4326,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                             </div>
                             <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                               {admin.is_pin_activated ? (
-                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '100px' }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#34a853', background: 'rgba(52, 168, 83, 0.1)', padding: '2px 8px', borderRadius: '100px' }}>
                                   PIN Aktiviert
                                 </span>
                               ) : (
@@ -4420,15 +4420,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         }
 
         .premium-input:focus {
-          border-color: #10b981 !important;
+          border-color: #34a853 !important;
           background: #ffffff !important;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+          box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.12) !important;
         }
         
         .search-input-field:focus {
-          border-color: #10b981 !important;
+          border-color: #34a853 !important;
           background: #ffffff !important;
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+          box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.12) !important;
         }
 
         .school-list-card:hover {

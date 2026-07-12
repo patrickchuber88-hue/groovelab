@@ -41,9 +41,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(16, 185, 129, 0.1);
+  background: var(--brand-green-light);
   color: var(--status-success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--brand-green-border);
 }
 
 .status-dot {
@@ -830,7 +830,7 @@ div:hover > .photo-overlay {
 /* Active background states based on specific sub-platform tags */
 .google-sidebar-item.active.campus, .sidebar-item.active.campus {
   background: rgba(52, 168, 83, 0.08) !important;
-  color: #137333 !important;
+  color: #34a853 !important;
   font-weight: 700 !important;
 }
 .google-sidebar-item.active.briefing, .sidebar-item.active.briefing {

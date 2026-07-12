@@ -93,12 +93,7 @@ export function ScheduleCalendarView({
   };
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [showWeekend, setShowWeekend] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth > 1024;
-    }
-    return true;
-  });
+  const [showWeekend, setShowWeekend] = useState(false);
   const [currentMinutes, setCurrentMinutes] = useState(() => {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
@@ -328,7 +323,7 @@ export function ScheduleCalendarView({
             return `${y}-${m}-${day}`;
           };
           
-          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
           if (ev.dtend && ev.isAllDay) {
             end.setDate(end.getDate() - 1);
           }
@@ -1305,6 +1300,25 @@ export function ScheduleCalendarView({
 
   const weekNumber = getWeekNumber(currentDate);
 
+  const hasWeekendAppointments = useMemo(() => {
+    const sat = new Date(weekStart);
+    sat.setDate(sat.getDate() + 5);
+    const sun = new Date(weekStart);
+    sun.setDate(sun.getDate() + 6);
+    const satStr = toLocalYYYYMMDD(sat);
+    const sunStr = toLocalYYYYMMDD(sun);
+
+    return occurrences.some(o => {
+      if (o.date !== satStr && o.date !== sunStr) return false;
+      const isVacant = o.student_id === 'vacant';
+      const isCancelled = o.status === 'cancelled';
+      const isBreak = !o.student_id;
+      return !isVacant && !isCancelled && !isBreak;
+    });
+  }, [weekStart, occurrences]);
+
+  const isWeekendVisible = showWeekend || hasWeekendAppointments;
+
   const prevWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() - 7);
@@ -1958,7 +1972,7 @@ export function ScheduleCalendarView({
       return;
     }
 
-    let icsContent = [
+    const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//Campus-Groovelab//Stundenplan//DE',
@@ -2343,8 +2357,8 @@ export function ScheduleCalendarView({
       highlightBg = 'repeating-linear-gradient(-45deg, rgba(237, 233, 254, 0.85) 0px, rgba(237, 233, 254, 0.85) 8px, rgba(255,255,255,0.85) 8px, rgba(255,255,255,0.85) 16px)';
       ghostBorder = '2px dashed #7c3aed';
     } else {
-      highlightColor = isCampus ? '#137333' : '#007aff';
-      highlightBg = isCampus ? 'rgba(19, 115, 51, 0.08)' : 'rgba(0, 122, 255, 0.08)';
+      highlightColor = isCampus ? '#34a853' : '#007aff';
+      highlightBg = isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)';
       ghostBorder = `2px dashed ${highlightColor}`;
     }
     
@@ -2829,13 +2843,13 @@ export function ScheduleCalendarView({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#10b981', text: '#065f46' };
+      case 'scheduled': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#34a853', text: '#065f46' };
       case 'cancelled':
       case 'teacher_sick':
       case 'canceled_by_teacher_sick':
         return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#10b981', text: '#065f46' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#34a853', text: '#065f46' };
       default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
     }
   };
@@ -3064,7 +3078,7 @@ export function ScheduleCalendarView({
                   activeRooms.map(room => {
                     const isActive = selectedRoomIdForXRay === room.id;
                     const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-                    const primaryColor = isCampus ? '#137333' : '#ea4335';
+                    const primaryColor = isCampus ? '#34a853' : '#ea4335';
                     return (
                       <button
                         key={room.id}
@@ -3115,7 +3129,7 @@ export function ScheduleCalendarView({
               type="button"
               onClick={() => setShowWeekend(prev => !prev)}
               style={{
-                background: showWeekend ? '#ffffff' : 'rgba(0,0,0,0.03)',
+                background: isWeekendVisible ? '#ffffff' : 'rgba(0,0,0,0.03)',
                 color: '#475569',
                 border: '1px solid rgba(0,0,0,0.08)',
                 borderRadius: '8px',
@@ -3128,10 +3142,10 @@ export function ScheduleCalendarView({
                 alignItems: 'center',
                 gap: '6px',
                 minHeight: '36px',
-                boxShadow: showWeekend ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                boxShadow: isWeekendVisible ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
               }}
             >
-              <span>📅</span> {showWeekend ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
+              <CalendarIcon size={14} /> {isWeekendVisible ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
             </button>
             {Object.keys(pendingChanges).length > 0 && (
               <button 
@@ -3175,7 +3189,7 @@ export function ScheduleCalendarView({
                 type="button"
                 onClick={handleMergeSelectedOccurrences}
                 style={{
-                  background: localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#ea4335',
+                  background: localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#ea4335',
                   color: 'white',
                   border: 'none',
                   fontWeight: 650,
@@ -3188,7 +3202,7 @@ export function ScheduleCalendarView({
                   gap: '6px',
                   transition: 'all 0.15s',
                   minHeight: '36px',
-                  boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(19, 115, 51, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
+                  boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(52, 168, 83, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
                 }}
               >
                 Zusammenführen ({selectedForGroup.length})
@@ -3305,8 +3319,8 @@ export function ScheduleCalendarView({
 
             <button 
               onClick={jumpToToday}
-              style={{ background: 'transparent', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)'}
+              style={{ background: 'transparent', color: '#34a853', border: '1px solid rgba(52, 168, 83, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.04)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
               Heute
@@ -3407,7 +3421,7 @@ export function ScheduleCalendarView({
 
         <div ref={gridRef} style={{ 
           display: 'grid', 
-          gridTemplateColumns: showWeekend ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', 
+          gridTemplateColumns: isWeekendVisible ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', 
           gap: '0px',
           background: '#ffffff',
           borderRadius: '24px',
@@ -3416,7 +3430,7 @@ export function ScheduleCalendarView({
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
           overflow: 'hidden'
         }}>
-        {[0, 1, 2, 3, 4, 5, 6].filter(offset => showWeekend || offset < 5).map(offset => {
+        {[0, 1, 2, 3, 4, 5, 6].filter(offset => isWeekendVisible || offset < 5).map(offset => {
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
@@ -3536,7 +3550,7 @@ export function ScheduleCalendarView({
                       <div style={{ 
                         fontSize: '0.7rem', 
                         fontWeight: 800, 
-                        color: isToday ? '#137333' : '#86868b', 
+                        color: isToday ? '#34a853' : '#86868b', 
                         textTransform: 'uppercase', 
                         letterSpacing: '0.05em' 
                       }}>
@@ -3546,10 +3560,10 @@ export function ScheduleCalendarView({
                         fontSize: '0.9rem',
                         fontWeight: 900,
                         color: isToday ? '#ffffff' : '#1d1d1f',
-                        background: isToday ? '#137333' : 'transparent',
+                        background: isToday ? '#34a853' : 'transparent',
                         padding: isToday ? '3px 10px' : '0px',
                         borderRadius: isToday ? '12px' : '0px',
-                        boxShadow: isToday ? '0 2px 6px rgba(19, 115, 51, 0.2)' : 'none',
+                        boxShadow: isToday ? '0 2px 6px rgba(52, 168, 83, 0.2)' : 'none',
                         marginTop: isToday ? '2px' : '0px',
                         display: 'inline-block',
                         lineHeight: isToday ? '1.4' : 'inherit'
@@ -3564,7 +3578,7 @@ export function ScheduleCalendarView({
                     fontSize: '0.62rem',
                     fontWeight: 900,
                     color: '#047857',
-                    background: 'rgba(16, 185, 129, 0.08)',
+                    background: 'rgba(52, 168, 83, 0.08)',
                     padding: '2px 6px',
                     borderRadius: '4px',
                     textTransform: 'uppercase',
@@ -3834,7 +3848,7 @@ export function ScheduleCalendarView({
               ) : dayOccurrences.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 500 }}>Keine Termine</div>
               ) : (() => {
-                let lastEndTimeMinutes = dayBaselineMinutes;
+                const lastEndTimeMinutes = dayBaselineMinutes;
                 
                 // Grouping logic for rendering
                 const renderedGroups: { key: string, occurrences: any[], mainOcc: any }[] = [];
@@ -3905,9 +3919,9 @@ export function ScheduleCalendarView({
                     : isSick 
                       ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
                       : isVacant
-                        ? { bg: 'rgba(16, 185, 129, 0.02)', border: '#10b981', text: '#047857' }
+                        ? { bg: 'rgba(52, 168, 83, 0.02)', border: '#34a853', text: '#047857' }
                         : getStatusColor(occ.status);
-                  let finalColors = { ...colors };
+                  const finalColors = { ...colors };
                   let cardBackground = '';
  
                   const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
@@ -3939,12 +3953,12 @@ export function ScheduleCalendarView({
                       if (isGruppenunterricht) {
                         if (isWaiting) {
                           cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
-                          finalColors.border = '#10b981';
-                          finalColors.text = '#137333';
+                          finalColors.border = '#34a853';
+                          finalColors.text = '#34a853';
                         } else {
                           cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
-                          finalColors.border = '#10b981';
-                          finalColors.text = '#137333';
+                          finalColors.border = '#34a853';
+                          finalColors.text = '#34a853';
                         }
                       } else {
                         if (isWaiting) {
@@ -3971,12 +3985,12 @@ export function ScheduleCalendarView({
                       // Campus: green confirmed / green-white diagonal unconfirmed
                       if (isWaiting) {
                         cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#10b981';
-                        finalColors.text = '#137333';
+                        finalColors.border = '#34a853';
+                        finalColors.text = '#34a853';
                       } else {
                         cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
-                        finalColors.border = '#10b981';
-                        finalColors.text = '#137333';
+                        finalColors.border = '#34a853';
+                        finalColors.text = '#34a853';
                       }
                     }
                   }
@@ -4102,22 +4116,22 @@ export function ScheduleCalendarView({
                         style={{ 
                           background: cardBackground || finalColors.bg, 
                           border: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `2px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
+                            ? `2px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#007aff'}`
                             : (isRescheduled 
                               ? (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`) 
                               : isVacant 
-                                ? '1px dashed #10b981' 
+                                ? '1px dashed #34a853' 
                                 : isBreak 
                                   ? '1px dashed #f97316' 
                                   : (isSick || isCancelled)
                                     ? '1px solid rgba(239, 68, 68, 0.15)' 
                                     : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`)),
                           borderLeft: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `4px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
+                            ? `4px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#007aff'}`
                             : (isRescheduled 
                               ? `4px solid ${finalColors.border}` 
                               : isVacant 
-                                ? '3px dashed #10b981' 
+                                ? '3px dashed #34a853' 
                                 : isBreak 
                                   ? '4px solid #f97316' 
                                   : (isSick || isCancelled)
@@ -4135,7 +4149,7 @@ export function ScheduleCalendarView({
                           left: '8px',
                           right: '8px',
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `0 0 10px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#137333' : '#007aff'}`
+                            ? `0 0 10px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#007aff'}`
                             : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
                           transition: 'all 0.2s',
                           userSelect: 'none',
@@ -4210,7 +4224,7 @@ export function ScheduleCalendarView({
                                         width: '6px', 
                                         height: '6px', 
                                         borderRadius: '50%', 
-                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'), 
                                         boxShadow: 'none',
                                         display: 'inline-block',
                                         flexShrink: 0
@@ -4316,7 +4330,7 @@ export function ScheduleCalendarView({
                                          width: '8px', 
                                          height: '8px', 
                                          borderRadius: '50%', 
-                                         background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                         background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'), 
                                          boxShadow: 'none',
                                          display: 'inline-block' 
                                        }} 
@@ -4455,7 +4469,7 @@ export function ScheduleCalendarView({
                                         width: '8px', 
                                         height: '8px', 
                                         borderRadius: '50%', 
-                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#10b981' : '#f59e0b'), 
+                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'), 
                                         boxShadow: 'none',
                                         display: 'inline-block' 
                                       }} 
@@ -4682,7 +4696,7 @@ export function ScheduleCalendarView({
                 {rescheduledOcc ? (
                   <div style={{ 
                     background: '#f0fdf4', 
-                    border: '1px solid #10b981', 
+                    border: '1px solid #34a853', 
                     borderRadius: '16px', 
                     padding: '14px 18px', 
                     width: '100%', 
@@ -4713,16 +4727,16 @@ export function ScheduleCalendarView({
                     padding: '12px 28px',
                     borderRadius: '12px',
                     border: 'none',
-                    background: '#10b981',
+                    background: '#34a853',
                     color: '#ffffff',
                     fontSize: '0.9rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                     transition: 'all 0.2s'
                   }}
-                  onMouseOver={e => e.currentTarget.style.background = '#059669'}
-                  onMouseOut={e => e.currentTarget.style.background = '#10b981'}
+                  onMouseOver={e => e.currentTarget.style.background = '#137333'}
+                  onMouseOut={e => e.currentTarget.style.background = '#34a853'}
                 >
                   Schließen
                 </button>
@@ -4926,7 +4940,7 @@ export function ScheduleCalendarView({
                           if (newTime) {
                             const newEndMin = timeToMinutes(newTime);
                             const startMin = timeToMinutes(editOccState.start_time);
-                            let diff = newEndMin - startMin;
+                            const diff = newEndMin - startMin;
                             if (diff >= 0) {
                               setEditOccState({ ...editOccState, duration: diff });
                             }
@@ -5612,7 +5626,7 @@ export function ScheduleCalendarView({
         if (!sourceOcc || !targetOcc) return null;
 
         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-        const primaryColor = isCampusTheme ? '#137333' : '#007aff';
+        const primaryColor = isCampusTheme ? '#34a853' : '#007aff';
         
         const srcName = `${sourceOcc.student?.first_name || ''} ${sourceOcc.student?.last_name || ''}`.trim() || 'Schüler';
         const tgtName = `${targetOcc.student?.first_name || ''} ${targetOcc.student?.last_name || ''}`.trim() || 'Schüler';
@@ -5909,10 +5923,10 @@ export function ScheduleCalendarView({
                 height: '40px',
                 borderRadius: '50%',
                 backgroundColor: isCampus ? '#e6f4ea' : '#fce8e6',
-                color: isCampus ? '#137333' : '#ea4335',
+                color: isCampus ? '#34a853' : '#ea4335',
                 flexShrink: 0
               }}>
-                <AlertCircle size={20} style={{ color: isCampus ? '#137333' : '#ea4335' }} />
+                <AlertCircle size={20} style={{ color: isCampus ? '#34a853' : '#ea4335' }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <h3 style={{
@@ -5970,12 +5984,12 @@ export function ScheduleCalendarView({
                   padding: '10px 18px',
                   borderRadius: '10px',
                   border: 'none',
-                  backgroundColor: isCampus ? '#137333' : '#ea4335',
+                  backgroundColor: isCampus ? '#34a853' : '#ea4335',
                   color: '#ffffff',
                   fontSize: '0.85rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: isCampus ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
+                  boxShadow: isCampus ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
                   transition: 'all 0.15s ease'
                 }}
               >

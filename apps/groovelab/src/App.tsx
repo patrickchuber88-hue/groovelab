@@ -6,6 +6,7 @@ import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
 import { LandingPage } from './components/LandingPage';
 import { subscribeUserToPush } from './utils/webPush';
+import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
 
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -83,222 +84,6 @@ const APP_INSTRUMENT_COLORS: Record<string, string> = {
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
 const brandColor = "#f59e0b"; // Orange (matched with legend)
-
-// --- ANTI-FLICKER AVATAR SYSTEM ---
-const getInstrumentAvatarUrl = (instrument: string | null | undefined): string => {
-  if (!instrument) return '/avatars/gitarre_avatar_new.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('e-gitarre')) return '/avatars/egitarre_avatar.png';
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/gitarre_avatar_new.png';
-  if (inst.includes('e-bass')) return '/avatars/ebass_avatar.png';
-  if (inst.includes('kontrabass') || inst.includes('double bass')) return '/avatars/kontrabass_avatar.png';
-  if (inst.includes('bass')) return '/avatars/bass_avatar.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/schlagzeug_avatar.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/klavier_avatar_new.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/gesang_avatar.png';
-  if (inst.includes('trompete') || inst.includes('trumpet')) return '/avatars/trompete_avatar_new.png';
-  if (inst.includes('posaune') || inst.includes('trombone')) return '/avatars/posaune_avatar.png';
-  if (inst.includes('horn')) return '/avatars/horn_avatar_new.png';
-  if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
-  if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
-  if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
-  if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
-  if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
-  if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
-  if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
-  return '/avatars/gitarre_avatar_new.png';
-};
-
-// --- ANTI-FLICKER AVATAR SYSTEM ---
-const getDefaultMusicianAvatarUrl = (instrument: string | null | undefined, role: string | null | undefined): string => {
-  const isTeacher = (role || '').toLowerCase() === 'teacher' || (role || '').toLowerCase() === 'admin';
-  if (isTeacher) return '/avatar_ghost.jpg';
-  
-  if (!instrument) return '/avatars/student_eguitar_1.png';
-  const inst = instrument.toLowerCase().trim();
-  if (inst.includes('guitar') || inst.includes('gitarre')) return '/avatars/student_boy_black_guitar.png';
-  if (inst.includes('bass')) return '/avatars/student_boy_black_bass.png';
-  if (inst.includes('drum') || inst.includes('schlagzeug')) return '/avatars/student_boy_black_drums.png';
-  if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier') || inst.includes('keyboard')) return '/avatars/student_boy_black_piano.png';
-  if (inst.includes('vocal') || inst.includes('gesang') || inst.includes('stimme') || inst.includes('singer')) return '/avatars/student_boy_red_vocals.png';
-  return '/avatars/student_eguitar_1.png';
-};
-
-const StudioAvatar = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null | undefined, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(user?.instrument || null);
-  
-  const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
-  
-  useEffect(() => {
-    if (user && user.role === 'student' && (!user.instrument || user.instrument === 'Allgemein' || user.instrument === 'ohne Zuweisung') && user.teacher_id) {
-      supabase
-        .from('users')
-        .select('instrument')
-        .eq('id', user.teacher_id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.instrument) {
-            setResolvedInstrument(data.instrument);
-          }
-        });
-    } else {
-      setResolvedInstrument(user?.instrument || null);
-    }
-  }, [user]);
-
-  let displaySrc = src;
-  const targetUser = user;
-  const role = (targetUser?.role || '').toLowerCase();
-  
-  if (role === 'admin' || role === 'secretary') {
-    displaySrc = '/campus_login_hero.png';
-  } else if (activePlat === 'campus') {
-    if (targetUser) {
-      if (role === 'student' || role === 'teacher') {
-        displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
-      }
-    } else {
-      displaySrc = '/avatar_ghost.jpg';
-    }
-  } else {
-    // GrooveLab platform: strictly block instrument avatars and fall back to student/musician avatars
-    const isStudentAvatar = src && (
-      src.includes('student_') ||
-      src.includes('bandstyle_') ||
-      src.includes('teen_') ||
-      src.includes('avatar_boy') ||
-      src.includes('avatar_girl')
-    );
-    const isInstrumentAvatar = !isStudentAvatar && src && (
-      src.includes('avatar.png') || 
-      src.includes('avatar_new') ||
-      src.includes('_avatar') ||
-      src.includes('guitar_avatar') || 
-      src.includes('gitarre_avatar') || 
-      src.includes('ebass_avatar') || 
-      src.includes('egitarre_avatar') || 
-      src.includes('kontrabass_avatar') || 
-      src.includes('bass_avatar') || 
-      src.includes('drums_avatar') || 
-      src.includes('schlagzeug_avatar') || 
-      src.includes('piano_avatar') || 
-      src.includes('klavier_avatar') || 
-      src.includes('vocals_avatar') || 
-      src.includes('gesang_avatar') || 
-      src.includes('trumpet_avatar') || 
-      src.includes('trompete_avatar') || 
-      src.includes('trombone_avatar') || 
-      src.includes('posaune_avatar') || 
-      src.includes('horn_avatar') || 
-      src.includes('cello_avatar') || 
-      src.includes('violin_avatar') || 
-      src.includes('violine_avatar') || 
-      src.includes('clarinet_avatar') || 
-      src.includes('klarinette_avatar') || 
-      src.includes('flute_avatar') || 
-      src.includes('querfloete_avatar') || 
-      src.includes('saxophone_avatar') || 
-      src.includes('saxophon_avatar') || 
-      src.includes('blockfloete_avatar') || 
-      src.includes('bariton_avatar') || 
-      src.includes('oboe_avatar')
-    );
-    if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
-      displaySrc = '/avatar_ghost.jpg';
-    }
-  }
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onClick) {
-      onClick();
-      return;
-    }
-    const target = user || userId;
-    if (target && (window as any).openUserProfile) {
-      (window as any).openUserProfile(target);
-    }
-  };
-
-  const hasAction = !!(onClick || user || userId);
-
-  return (
-    <div 
-      onClick={hasAction ? handleClick : undefined}
-      style={{ 
-        width: '100%', 
-        height: '100%', 
-        background: '#f1f5f9', 
-        position: 'relative', 
-        overflow: 'hidden', 
-        cursor: hasAction ? 'pointer' : 'default',
-        ...style 
-      }} 
-      className={`studio-avatar-wrapper ${hasAction ? 'hover-scale-mini' : ''} ${className || ''}`}
-    >
-      <img 
-        src={displaySrc || '/avatar_ghost.jpg'} 
-        onLoad={() => setIsLoaded(true)}
-        style={{ 
-          width: '100%', 
-          height: '100%', 
-          objectFit: 'cover', 
-          opacity: isLoaded ? 1 : 0,
-          transition: 'opacity 0.3s ease-in-out',
-          willChange: 'opacity',
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden'
-        }} 
-        alt=""
-        onError={(e) => { (e.target as HTMLImageElement).src = '/avatar_ghost.jpg'; }}
-      />
-    </div>
-  );
-}, (prev, next) => prev.src === next.src && prev.user?.id === next.user?.id && prev.userId === next.userId && prev.user?.instrument === next.user?.instrument && prev.activePlatform === next.activePlatform);
-
-const renderBandAvatar = (name: string, photoUrl?: string | null, size: string = '64px', borderRadius: string = '18px') => {
-  if (photoUrl) {
-    return (
-      <div style={{ width: size, height: size, borderRadius, overflow: 'hidden', flexShrink: 0 }}>
-        <img src={photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={name} />
-      </div>
-    );
-  }
-  
-  // Hash the name to pick a beautiful premium gradient
-  const gradients = [
-    'linear-gradient(135deg, #6366f1, #a855f7)', // Indigo to Purple
-    'linear-gradient(135deg, #ec4899, #f43f5e)', // Pink to Rose
-    'linear-gradient(135deg, #3b82f6, #06b6d4)', // Blue to Cyan
-    'linear-gradient(135deg, #10b981, #3b82f6)', // Emerald to Blue
-    'linear-gradient(135deg, #f59e0b, #e11d48)'  // Amber to Rose
-  ];
-  
-  let hash = 0;
-  const str = name || '';
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const gradient = gradients[Math.abs(hash) % gradients.length];
-  const firstLetter = (name || 'B').substring(0, 1).toUpperCase();
-  
-  return (
-    <div style={{ 
-      width: size, height: size, borderRadius, 
-      background: gradient, 
-      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-      color: 'white', fontWeight: 950, fontSize: `calc(${size} * 0.4)`,
-      textShadow: '0 2px 4px rgba(0,0,0,0.15)',
-      flexShrink: 0,
-      userSelect: 'none'
-    }}>
-      {firstLetter}
-    </div>
-  );
-};
-
 
 
 const showMissionsFeature = false;
@@ -905,7 +690,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexShrink: 0, paddingLeft: '20px', borderLeft: width > 1000 ? '1px solid #f1f5f9' : 'none', marginLeft: 'auto' }}>
             <div style={{ textAlign: 'right', minWidth: '100px' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Gesamt</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 950, color: localProgress >= 100 ? '#10b981' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
+              <div style={{ fontSize: '1.75rem', fontWeight: 950, color: localProgress >= 100 ? '#34a853' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
                 {localProgress}%
               </div>
             </div>
@@ -949,7 +734,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                       onClick={(e) => { e.stopPropagation(); setActiveDifficulty('starter'); }} 
                       style={{ 
                         background: activeDifficulty === 'starter' ? 'white' : 'transparent', 
-                        color: activeDifficulty === 'starter' ? '#10b981' : '#64748b', 
+                        color: activeDifficulty === 'starter' ? '#34a853' : '#64748b', 
                         border: 'none', padding: '8px 20px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', 
                         boxShadow: activeDifficulty === 'starter' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
                         transition: 'all 0.3s'
@@ -1421,8 +1206,8 @@ if (typeof window !== 'undefined') {
       }
     }
     let titleText = isCampus ? 'Campus' : 'GrooveLab';
-    let btnBackground = 'linear-gradient(135deg, #10b981, #059669)';
-    let btnShadow = '0 4px 12px rgba(16, 185, 129, 0.2)';
+    let btnBackground = 'linear-gradient(135deg, #34a853, #137333)';
+    let btnShadow = '0 4px 12px rgba(52, 168, 83, 0.2)';
     
     if (isError) {
       titleText = 'Hinweis';
@@ -1435,8 +1220,8 @@ if (typeof window !== 'undefined') {
       `;
     } else if (isSuccess) {
       iconHtml = `
-        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(16, 185, 129, 0.08); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(16, 185, 129, 0.15);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(52, 168, 83, 0.08); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(52, 168, 83, 0.15);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#34a853" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </div>
       `;
     } else {
@@ -3124,19 +2909,44 @@ function App() {
       }
 
       if (isInitial) {
-        setActivePlatform(allowedPlatform);
-        localStorage.setItem('groovelab_active_platform', allowedPlatform);
+        const isTeacher = userData.role?.toLowerCase() === 'teacher';
+        const isSecretary = userData.role?.toLowerCase() === 'secretary';
 
-        if (allowedPlatform === 'campus') {
-          const storedTab = localStorage.getItem('campus_active_tab');
-          const defaultTab = storedTab ? storedTab : (isStudent ? 'briefing' : 'live');
-          setActiveStudentTab(defaultTab);
-          localStorage.setItem('campus_active_tab', defaultTab);
+        if (isStudent) {
+          allowedPlatform = 'campus';
+          setActivePlatform('campus');
+          localStorage.setItem('groovelab_active_platform', 'campus');
+          setActiveStudentTab('briefing');
+          localStorage.setItem('campus_active_tab', 'briefing');
+        } else if (isTeacher) {
+          allowedPlatform = 'campus';
+          setActivePlatform('campus');
+          localStorage.setItem('groovelab_active_platform', 'campus');
+          setActiveStudentTab('live');
+          localStorage.setItem('campus_active_tab', 'live');
+        } else if (isSecretary) {
+          allowedPlatform = 'campus';
+          setActivePlatform('campus');
+          localStorage.setItem('groovelab_active_platform', 'campus');
+          localStorage.setItem('groovelab_active_workspace', 'secretary');
+          localStorage.setItem('groovelab_secretary_subtab', 'briefing');
+          setActiveStudentTab('briefing');
+          localStorage.setItem('campus_active_tab', 'briefing');
         } else {
-          const storedTab = localStorage.getItem('groovelab_active_tab');
-          const defaultTab = storedTab ? storedTab : 'live';
-          setActiveStudentTab(defaultTab);
-          localStorage.setItem('groovelab_active_tab', defaultTab);
+          setActivePlatform(allowedPlatform);
+          localStorage.setItem('groovelab_active_platform', allowedPlatform);
+
+          if (allowedPlatform === 'campus') {
+            const storedTab = localStorage.getItem('campus_active_tab');
+            const defaultTab = storedTab ? storedTab : (isStudent ? 'briefing' : 'live');
+            setActiveStudentTab(defaultTab);
+            localStorage.setItem('campus_active_tab', defaultTab);
+          } else {
+            const storedTab = localStorage.getItem('groovelab_active_tab');
+            const defaultTab = storedTab ? storedTab : 'live';
+            setActiveStudentTab(defaultTab);
+            localStorage.setItem('groovelab_active_tab', defaultTab);
+          }
         }
       }
 
@@ -3517,7 +3327,7 @@ function App() {
       if (isInitial && !isStudent && formingBands.length > 0) {
         // Run auto-fill asynchronously to not block the main dashboard load
         (async () => {
-          let currentMemberships = await supabase.from('band_members').select('user_id, bands(id, song_id)').then(r => r.data || []);
+          const currentMemberships = await supabase.from('band_members').select('user_id, bands(id, song_id)').then(r => r.data || []);
           for (const band of formingBands) {
             const bandSong = band.band_songs?.[0];
             if (!bandSong) continue;
@@ -3690,7 +3500,7 @@ function App() {
 
               // 2. Add core band members who aren't in slots yet
               const coreBand = formingBands.find((b: any) => b.id === bs.band_id);
-              let instCount: Record<string, number> = {};
+              const instCount: Record<string, number> = {};
               members.forEach((m: any) => {
                 instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
               });
@@ -5585,9 +5395,15 @@ function App() {
       localStorage.setItem('groovelab_active_workspace', 'secretary');
       localStorage.setItem('groovelab_active_platform', 'campus');
       localStorage.setItem('campus_active_tab', 'briefing');
-    } else if (isTeacher) {
+      if (finalAdminRole === 'secretary') {
+        localStorage.setItem('groovelab_secretary_subtab', 'briefing');
+      }
+    } else if (userToLogin?.role === 'student') {
       localStorage.setItem('groovelab_active_platform', 'campus');
       localStorage.setItem('campus_active_tab', 'briefing');
+    } else if (isTeacher) {
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'live');
     }
 
     // Force checkout from active sessions for Campus logins / Admins / Secretaries to prevent automatic check-in visibility
@@ -5617,24 +5433,43 @@ function App() {
     // Default start tab: Always open the briefing board for all users in Campus, and for staff/teachers in GrooveLab.
     // GrooveLab students start on the 'live' tab.
     const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
-    localStorage.setItem('campus_active_tab', 'briefing');
     
     // Check if the user selected 'groovelab' on the login screen
-    const selectedPlat = localStorage.getItem('groovelab_active_platform') || 'campus';
+    let selectedPlat = localStorage.getItem('groovelab_active_platform') || 'campus';
+    if (userToLogin?.role === 'student' || userToLogin?.role === 'teacher') {
+      selectedPlat = 'campus';
+      localStorage.setItem('groovelab_active_platform', 'campus');
+    }
     
     if (userToLogin?.role === 'student') {
-      if (selectedPlat === 'groovelab') {
-        localStorage.setItem('groovelab_active_tab', 'live');
-      } else {
-        localStorage.setItem('groovelab_active_tab', 'briefing');
-        localStorage.setItem('campus_active_tab', 'briefing');
-      }
-    } else {
+      localStorage.setItem('campus_active_tab', 'briefing');
+      localStorage.setItem('groovelab_active_tab', 'briefing');
+    } else if (userToLogin?.role === 'teacher') {
+      localStorage.setItem('campus_active_tab', 'live');
       localStorage.setItem('groovelab_active_tab', 'live');
+    } else if (userToLogin?.role === 'secretary') {
+      localStorage.setItem('groovelab_active_workspace', 'secretary');
+      localStorage.setItem('groovelab_secretary_subtab', 'briefing');
+      localStorage.setItem('campus_active_tab', 'briefing');
+    } else {
+      localStorage.setItem('campus_active_tab', 'live');
+      if (userToLogin?.role === 'student') {
+        if (selectedPlat === 'groovelab') {
+          localStorage.setItem('groovelab_active_tab', 'live');
+        } else {
+          localStorage.setItem('groovelab_active_tab', 'briefing');
+          localStorage.setItem('campus_active_tab', 'briefing');
+        }
+      } else {
+        localStorage.setItem('groovelab_active_tab', 'live');
+      }
     }
     
     const resolvedPlatform = selectedPlat;
-    const startTab = (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : 'briefing';
+    const startTab = (userToLogin?.role === 'student') ? 'briefing' : 
+                      (userToLogin?.role === 'teacher') ? 'live' :
+                      (userToLogin?.role === 'secretary') ? 'briefing' :
+                      (resolvedPlatform === 'groovelab' && userToLogin?.role === 'student') ? 'live' : 'live';
     setActiveStudentTab(startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition!)
@@ -6165,9 +6000,9 @@ function App() {
 
       if (newRole === 'teacher') {
         localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'briefing');
+        localStorage.setItem('campus_active_tab', 'live');
         setActivePlatform('campus');
-        setActiveStudentTab('briefing');
+        setActiveStudentTab('live');
       } else if (newRole === 'admin' || newRole === 'secretary') {
         localStorage.setItem('groovelab_active_workspace', 'secretary');
         localStorage.setItem('groovelab_active_platform', 'campus');
@@ -6395,8 +6230,8 @@ function App() {
     }
     if (nameLower.includes('boris')) {
       return {
-        solidBg: '#10b981', solidBorder: '#059669',
-        lightBg: 'rgba(16, 185, 129, 0.12)', lightBorder: 'rgba(16, 185, 129, 0.5)', lightText: '#059669'
+        solidBg: '#34a853', solidBorder: '#137333',
+        lightBg: 'rgba(52, 168, 83, 0.12)', lightBorder: 'rgba(52, 168, 83, 0.5)', lightText: '#137333'
       };
     }
     
@@ -6421,13 +6256,13 @@ function App() {
       const containsMe = teachersInSlot.some(t => t.user_id === loggedInUserId);
       if (containsMe) {
         return {
-          bgColor: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)',
+          bgColor: 'linear-gradient(135deg, #f59e0b 0%, #34a853 100%)',
           border: '1px solid #cbd5e1',
           textColor: 'white'
         };
       } else {
         return {
-          bgColor: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%)',
+          bgColor: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(52, 168, 83, 0.12) 100%)',
           border: '1px dashed #cbd5e1',
           textColor: '#475569'
         };
@@ -7357,7 +7192,7 @@ function App() {
               padding: '16px', 
               borderRadius: '20px', 
               border: activeStudentTab === 'profile'
-                ? (activePlatform === 'campus' ? '2.5px solid #137333' : '2.5px solid #eab308')
+                ? (activePlatform === 'campus' ? '2.5px solid #34a853' : '2.5px solid #eab308')
                 : '1px solid #e2e8f0', 
               background: activeStudentTab === 'profile'
                 ? (activePlatform === 'campus' ? '#e6f4ea' : '#fefce8')
@@ -7405,7 +7240,7 @@ function App() {
                 textOverflow: 'ellipsis',
                 marginBottom: '2px'
               }}>
-                {user.role === 'student' ? 'Hausaufgabenheft' : user.first_name}
+                {user.role === 'student' ? 'Mein Profil' : user.first_name}
               </div>
               <div style={{ 
                 fontSize: '0.68rem', 
@@ -7679,8 +7514,7 @@ function App() {
                                 <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                               </>
                             )}
-                            <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <User size={14} color="#34a853" />
+                            <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span>
                                 {user.first_name || 'Schüler'}
                               </span>
@@ -8066,7 +7900,7 @@ function App() {
                     {/* Badges row */}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
                       <span style={{
-                        background: 'linear-gradient(135deg, #34a853, #1e7e34)',
+                        background: 'linear-gradient(135deg, #34a853, #137333)',
                         color: 'white',
                         padding: '4px 14px',
                         borderRadius: '10px',
@@ -8074,7 +7908,7 @@ function App() {
                         fontWeight: 900,
                         textTransform: 'uppercase' as const,
                         letterSpacing: '0.1em',
-                        boxShadow: '0 4px 10px rgba(52,168,83,0.25)',
+                        boxShadow: '0 4px 10px rgba(52, 168, 83,0.25)',
                       }}>
                         Campus Lehrkraft
                       </span>
@@ -8108,7 +7942,7 @@ function App() {
                           gap: '6px',
                           background: 'rgba(52, 168, 83, 0.07)',
                           border: '1px solid rgba(52, 168, 83, 0.18)',
-                          color: '#1e7e34',
+                          color: '#137333',
                           padding: '5px 14px',
                           borderRadius: '12px',
                           fontSize: '0.8rem',
@@ -8127,7 +7961,7 @@ function App() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            background: 'linear-gradient(135deg, #34a853, #1e7e34)',
+                            background: 'linear-gradient(135deg, #34a853, #137333)',
                             color: 'white',
                             padding: '6px 14px',
                             borderRadius: '12px',
@@ -8135,7 +7969,7 @@ function App() {
                             fontWeight: 800,
                             border: 'none',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                            boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)',
                             transition: 'all 0.2s',
                           }}
                           onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
@@ -8166,7 +8000,7 @@ function App() {
 
                   {/* Metric 2: Unterrichtszeit */}
                   <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-                    <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Clock size={22} />
                     </div>
                     <div>
@@ -9014,7 +8848,7 @@ function App() {
                                     width: '12px', 
                                     height: '12px', 
                                     borderRadius: '3px', 
-                                    background: 'linear-gradient(135deg, #f59e0b 0%, #10b981 100%)', 
+                                    background: 'linear-gradient(135deg, #f59e0b 0%, #34a853 100%)', 
                                     border: '1px solid #cbd5e1'
                                   }}></div> {activeTeachers.length === 2 ? 'Beide' : 'Mehrere'}
                                 </div>
@@ -10056,7 +9890,7 @@ function App() {
                                     </div>
                                     <div style={{ flex: 1 }}>
                                       <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{u.first_name} {u.last_name || ''}</div>
-                                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: u.role === 'student' ? '#3b82f6' : '#10b981', textTransform: 'uppercase' }}>
+                                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: u.role === 'student' ? '#3b82f6' : '#34a853', textTransform: 'uppercase' }}>
                                         {u.role === 'student' ? 'Schüler' : 'Lehrer'}
                                       </div>
                                     </div>
@@ -10433,7 +10267,7 @@ function App() {
               <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
                 <div style={{ marginBottom: '32px' }}>
                   <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-                    <div style={{ color: '#10b981' }}><Award size={32} /></div>
+                    <div style={{ color: '#34a853' }}><Award size={32} /></div>
                     Dein Repertoire
                   </h2>
                   <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Hier sind deine Meisterleistungen. Du hast diese Songs zu 100% gemeistert!</p>
@@ -10454,7 +10288,7 @@ function App() {
                           <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', lineHeight: 1 }}>{group.artist}</div>
                           <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2 }}>{group.title}</div>
                         </div>
-                        <div style={{ background: '#f0fdf4', color: '#10b981', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                        <div style={{ background: '#f0fdf4', color: '#34a853', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
                           <Award size={12} /> 100%
                         </div>
                       </div>
@@ -10467,8 +10301,8 @@ function App() {
                         ))}
                       </div>
 
-                      <div style={{ background: '#10b981', height: '4px', borderRadius: '2px', width: '100%', marginBottom: '6px' }}></div>
-                      <div style={{ color: '#10b981', fontSize: '0.72rem', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div style={{ background: '#34a853', height: '4px', borderRadius: '2px', width: '100%', marginBottom: '6px' }}></div>
+                      <div style={{ color: '#34a853', fontSize: '0.72rem', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Du bist bereit für eine Band
                       </div>
                       
@@ -10479,7 +10313,7 @@ function App() {
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                               {group.skills.filter((s: any) => s.verified_by).map((s: any) => (
                                 <div key={s.id} style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <Check size={10} color="#10b981" strokeWidth={3} />
+                                  <Check size={10} color="#34a853" strokeWidth={3} />
                                   {s.instrument}: {s.verified_by.first_name} {s.verified_by.last_name?.[0]}.
                                 </div>
                               ))}
@@ -10657,13 +10491,13 @@ function App() {
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'space-between',
-                                      boxShadow: '0 4px 20px rgba(16, 185, 129, 0.08)',
+                                      boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)',
                                       gap: '16px',
                                       marginBottom: '20px',
                                       animation: 'slideUp 0.3s ease-out'
                                     }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                        <div style={{ background: '#10b981', color: 'white', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(16, 185, 129, 0.2)' }}>
+                                        <div style={{ background: '#34a853', color: 'white', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(52, 168, 83, 0.2)' }}>
                                           <CheckCircle size={24} />
                                         </div>
                                         <div>
@@ -11110,7 +10944,7 @@ function App() {
                   {/* Right Column: Vocal Sidebar */}
                   <div style={{ background: '#f8fafc', borderRadius: '32px', padding: '24px', alignSelf: 'start', position: 'sticky', top: '24px', border: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
                       <Mic size={20} />
                     </div>
                       <div>
@@ -11211,7 +11045,7 @@ function App() {
                               </div>
 
                               {isMeIn ? (
-                                <div style={{ textAlign: 'center', padding: '10px', background: '#f0fdf4', borderRadius: '12px', color: '#10b981', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <div style={{ textAlign: 'center', padding: '10px', background: '#f0fdf4', borderRadius: '12px', color: '#34a853', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                                   <CheckCircle size={16} /> Du bist dabei!
                                 </div>
                               ) : (
@@ -11252,7 +11086,7 @@ function App() {
                                     }}
                                     style={{ 
                                       width: '100%', padding: '12px', borderRadius: '16px', border: 'none', 
-                                      background: isFull ? '#f1f5f9' : '#10b981', 
+                                      background: isFull ? '#f1f5f9' : '#34a853', 
                                       color: isFull ? '#94a3b8' : 'white', fontWeight: 900, cursor: (isFull || isJoiningVocal === bandSong.id) ? 'default' : 'pointer',
                                       fontSize: '0.85rem', transition: 'all 0.2s',
                                       opacity: isJoiningVocal === bandSong.id ? 0.7 : 1
@@ -11422,7 +11256,7 @@ function App() {
                     const LEVEL_COLORS: Record<string | number, string> = {
                       '1': '#ef4444', // Red
                       '2': '#3b82f6', // Blue
-                      '3': '#10b981', // Emerald
+                      '3': '#34a853', // Emerald
                       '4': '#8b5cf6', // Violet
                       '5': '#ec4899', // Pink
                       'starter': '#ef4444',
@@ -12616,7 +12450,7 @@ function App() {
 
           if (activeClass === 'campus') {
             activeBg = 'rgba(52, 168, 83, 0.08)';
-            activeTextColor = '#137333';
+            activeTextColor = '#34a853';
           } else if (activeClass === 'briefing') {
             activeBg = 'rgba(234, 67, 53, 0.08)';
             activeTextColor = '#ea4335';
@@ -13008,7 +12842,7 @@ function App() {
                   setShowAutoLockWarning(false);
                 }}
                 style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '16px 24px',
@@ -13016,7 +12850,7 @@ function App() {
                   fontSize: '1rem',
                   fontWeight: 850,
                   cursor: 'pointer',
-                  boxShadow: '0 8px 20px rgba(16,185,129,0.3)',
+                  boxShadow: '0 8px 20px rgba(52,168,83,0.3)',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
@@ -13073,7 +12907,7 @@ function App() {
         }}>
           <div className="glass-panel animation-slide-up" style={{
             background: '#ffffff',
-            border: '1px solid rgba(19, 115, 51, 0.2)',
+            border: '1px solid rgba(52, 168, 83, 0.2)',
             padding: '36px',
             borderRadius: '28px',
             maxWidth: '460px',
@@ -13090,11 +12924,11 @@ function App() {
               height: '56px',
               borderRadius: '50%',
               background: '#e6f4ea',
-              color: '#137333',
+              color: '#34a853',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(19, 115, 51, 0.15)'
+              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
             }}>
               <Lock size={24} />
             </div>
@@ -13362,7 +13196,7 @@ function App() {
                 <div style={{ width: '1px', background: '#e2e8f0' }}></div>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '4px' }}>Status</div>
-                  <div style={{ fontWeight: 900, color: '#10b981' }}>Ready</div>
+                  <div style={{ fontWeight: 900, color: '#34a853' }}>Ready</div>
                 </div>
               </div>
             </div>
@@ -13932,7 +13766,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         if (entry.contentRect.width) {
           setContainerWidth(entry.contentRect.width);
         }
@@ -14208,7 +14042,7 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
   }, [showScrollPausedToast]);
 
   const getSecureEmbedUrl = () => {
-    let url = activeUrl;
+    const url = activeUrl;
     if (!url) return '';
     if (url.includes('drive.google.com')) {
       const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);

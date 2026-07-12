@@ -229,11 +229,11 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Konfliktfreie Raumverwaltung &amp; Stundenpläne.</div>
                   </div>
                   <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#137333' }}>Für Musiklehrer</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#34a853' }}>Für Musiklehrer</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Direktes Feedback &amp; einfaches Zuweisen.</div>
                   </div>
                   <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#137333' }}>Für Schüler &amp; Eltern</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#34a853' }}>Für Schüler &amp; Eltern</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Übersichtliche Hausaufgaben &amp; Motivation.</div>
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 cursor: 'pointer',
                 fontWeight: 650,
                 fontSize: '14px',
-                color: '#137333',
+                color: '#34a853',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px'
@@ -297,7 +297,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <button 
               onClick={() => onRegister()}
               style={{
-                backgroundColor: '#137333',
+                backgroundColor: '#34a853',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '100px',
@@ -305,15 +305,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 fontSize: '14px',
                 padding: '10px 20px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 10px rgba(19, 115, 51, 0.15)',
+                boxShadow: '0 4px 10px rgba(52, 168, 83, 0.15)',
                 transition: 'all 0.2s'
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#0f5b29';
+                e.currentTarget.style.backgroundColor = '#137333';
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#137333';
+                e.currentTarget.style.backgroundColor = '#34a853';
                 e.currentTarget.style.transform = 'none';
               }}
             >
@@ -364,13 +364,13 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ fontWeight: 700, fontSize: '12px', color: '#7d7d82', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zielgruppen</div>
               <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#ea4335', paddingLeft: '8px' }}>Für Schulleiter &amp; Admins</div>
-              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#137333', paddingLeft: '8px' }}>Für Musiklehrer</div>
-              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#137333', paddingLeft: '8px' }}>Für Schüler &amp; Eltern</div>
+              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#34a853', paddingLeft: '8px' }}>Für Musiklehrer</div>
+              <div onClick={() => scrollToSection('target-audiences')} style={{ fontWeight: 600, fontSize: '16px', color: '#34a853', paddingLeft: '8px' }}>Für Schüler &amp; Eltern</div>
             </div>
 
             <div onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }} style={{ fontWeight: 600, fontSize: '16px', color: '#232326', cursor: 'pointer' }}>Preise</div>
             
-            <div onClick={() => { setShowPrivacyAudits(true); setMobileMenuOpen(false); }} style={{ fontWeight: 650, fontSize: '16px', color: '#137333', cursor: 'pointer' }}>🛡️ Datenschutz &amp; Sicherheit</div>
+            <div onClick={() => { setShowPrivacyAudits(true); setMobileMenuOpen(false); }} style={{ fontWeight: 650, fontSize: '16px', color: '#34a853', cursor: 'pointer' }}>🛡️ Datenschutz &amp; Sicherheit</div>
             
             <hr style={{ border: 'none', borderTop: '1px solid #e8e8ed' }} />
 
@@ -396,7 +396,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 style={{
                   width: '100%',
                   padding: '12px',
-                  backgroundColor: '#137333',
+                  backgroundColor: '#34a853',
                   border: 'none',
                   borderRadius: '100px',
                   fontWeight: 600,
@@ -435,7 +435,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           marginBottom: '24px'
         }}>
           Deine Musikschule.<br />
-          <span style={{ color: '#137333' }}>In perfekter Harmonie.</span>
+          <span style={{ color: '#34a853' }}>In perfekter Harmonie.</span>
         </h1>
         
         <p style={{
@@ -466,8 +466,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             onChange={(e) => setEmail(e.target.value)}
             required
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#137333';
-              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(19, 115, 51, 0.2), inset 0 1px 2px rgba(0,0,0,0.02)';
+              e.currentTarget.style.borderColor = '#34a853';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.2), inset 0 1px 2px rgba(0,0,0,0.02)';
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = '#e8e8ed';
@@ -489,7 +489,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             type="submit"
             style={{
               flex: '0 0 auto',
-              backgroundColor: '#137333',
+              backgroundColor: '#34a853',
               color: '#ffffff',
               border: 'none',
               borderRadius: '100px',
@@ -497,15 +497,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               fontSize: '16px',
               padding: '16px 32px',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(19, 115, 51, 0.2)',
+              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
               transition: 'all 0.2s'
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#0f5b29';
+              e.currentTarget.style.backgroundColor = '#137333';
               e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#137333';
+              e.currentTarget.style.backgroundColor = '#34a853';
               e.currentTarget.style.transform = 'none';
             }}
           >
@@ -522,7 +522,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           lineHeight: 1.4,
           maxWidth: '540px'
         }}>
-          Mit Klick auf „Jetzt kostenlos starten“ stimmen Sie den <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('terms'); }} style={{ color: '#137333', textDecoration: 'underline', fontWeight: 700 }}>Nutzungsbedingungen</a> zu und bestätigen, die <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('privacy'); }} style={{ color: '#137333', textDecoration: 'underline', fontWeight: 700 }}>Datenschutzerklärung</a> zur Kenntnis genommen zu haben.
+          Mit Klick auf „Jetzt kostenlos starten“ stimmen Sie den <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('terms'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Nutzungsbedingungen</a> zu und bestätigen, die <a href="#" onClick={(e) => { e.preventDefault(); setActiveDocument('privacy'); }} style={{ color: '#34a853', textDecoration: 'underline', fontWeight: 700 }}>Datenschutzerklärung</a> zur Kenntnis genommen zu haben.
         </p>
 
         <p style={{
@@ -602,7 +602,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
-              color: '#137333',
+              color: '#34a853',
               backgroundColor: '#e6f4ea',
               padding: '6px 12px',
               borderRadius: '100px',
@@ -716,7 +716,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 justifyContent: 'center',
                 marginBottom: '24px'
               }}>
-                <Users size={24} style={{ color: '#137333' }} />
+                <Users size={24} style={{ color: '#34a853' }} />
               </div>
               <h3 style={{
                 fontFamily: 'Urbanist, sans-serif',
@@ -729,7 +729,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </h3>
 
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
                   Unterrichten mit Superkräften.
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
@@ -741,15 +741,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <h5 style={{ fontSize: '12px', fontWeight: 700, color: '#7d7d82', textTransform: 'uppercase', marginBottom: '16px' }}>Highlights:</h5>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
-                    <Check size={16} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Digitales Hausaufgabenheft:</strong> Wochenziele und Übungspfade direkt digital übermitteln.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
-                    <Check size={16} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Stundenplan &amp; Röntgen-Matrix:</strong> Wunsch- und Sperrzeiten beim Verschieben von Schülern sofort visualisieren.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
-                    <Check size={16} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Ensembles &amp; Probenplaner:</strong> Schüler-Bands anlegen und Probenzeiten automatisch abstimmen lassen.</span>
                   </li>
                 </ul>
@@ -778,7 +778,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 justifyContent: 'center',
                 marginBottom: '24px'
               }}>
-                <Sparkles size={24} style={{ color: '#137333' }} />
+                <Sparkles size={24} style={{ color: '#34a853' }} />
               </div>
               <h3 style={{
                 fontFamily: 'Urbanist, sans-serif',
@@ -791,7 +791,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </h3>
 
               <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
                   Der Grund, warum Kinder plötzlich freiwillig üben.
                 </h4>
                 <p style={{ fontSize: '14.5px', color: '#232326', lineHeight: 1.55, fontWeight: 550 }}>
@@ -803,15 +803,15 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <h5 style={{ fontSize: '12px', fontWeight: 700, color: '#7d7d82', textTransform: 'uppercase', marginBottom: '16px' }}>Highlights:</h5>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '12px', padding: 0, margin: 0 }}>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
-                    <Check size={16} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Fähigkeiten-Radar:</strong> Interaktive Visualisierung des Übungsfortschritts pro Instrument im Schülerprofil.</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
-                    <Check size={16} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Eltern-Direktlink:</strong> Wunschzeiten-Eingabe einfach per QR-Scan auf dem Smartphone der Eltern (ohne App).</span>
                   </li>
                   <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px', color: '#232326' }}>
-                    <Check size={16} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                    <Check size={16} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                     <span><strong>Handy-Detox-Modus:</strong> Smarte Sensorentechnik sperrt Ablenkungen während des Übens.</span>
                   </li>
                 </ul>
@@ -836,7 +836,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             fontWeight: 800,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            color: '#137333',
+            color: '#34a853',
             backgroundColor: '#e6f4ea',
             padding: '6px 12px',
             borderRadius: '100px',
@@ -936,7 +936,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               <p style={{
                 fontSize: '15px',
                 fontWeight: 700,
-                color: '#137333',
+                color: '#34a853',
                 marginBottom: '16px'
               }}>
                 {usps[activeTab].slogan}
@@ -1116,7 +1116,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   gap: '10px',
                   padding: '12px 20px',
                   borderRadius: '16px',
-                  background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.15) 0%, rgba(19, 115, 51, 0.25) 100%)',
+                  background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.15) 0%, rgba(52, 168, 83, 0.25) 100%)',
                   border: '1px solid rgba(52, 168, 83, 0.3)',
                   color: '#d1fae5',
                   cursor: 'pointer',
@@ -1235,7 +1235,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             fontWeight: 800,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
-            color: '#137333',
+            color: '#34a853',
             backgroundColor: '#e6f4ea',
             padding: '6px 12px',
             borderRadius: '100px',
@@ -1290,7 +1290,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <div style={{
               fontSize: '48px',
               fontWeight: 900,
-              color: '#137333',
+              color: '#34a853',
               marginBottom: '8px',
               letterSpacing: '-0.04em'
             }}>
@@ -1316,27 +1316,27 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               margin: '0 auto 40px auto'
             }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>Dauerhaft gratis Softwarelizenz:</strong> Die Nutzung von Campus-Groovelab ist und bleibt für alle kostenlos.</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>Kostenloses Hosting-Basis-Modul:</strong> Nur 7,99 €/Monat für die Bereitstellung des Campus-Moduls für deine gesamte Schule.</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Servicegebühren:</strong> Lehrkräfte für 0,49 €/Monat, aktive Schüler für 0,49 €/Monat (nur 5,39 €/Jahr dank jährlichem Gratis-Monat). Inaktive Schüler-Datensätze kosten nur 0,09 €/Monat.</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>Faire Laufzeiten:</strong> Keine Einrichtungsgebühr. Nach Ablauf des 1-monatigen Probemonats läuft der Vertrag flexibel bis zum jeweiligen Schuljahresende (August).</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>0,00 € Schul-Budget-Belastung:</strong> Nutze die Direktabrechnung mit den Eltern (0,49 €/Monat). Die Musikschule zahlt dann 0,00 € Schüler-Datenbankgebühren.</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <Check size={20} style={{ color: '#137333', marginTop: '2px', flexShrink: 0 }} />
+                <Check size={20} style={{ color: '#34a853', marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '15px', color: '#232326' }}><strong>Soziales Freikontingent (5%):</strong> Bei Eltern-Direktabrechnung erhält deine Schule automatisch 5 % Freilizenzen für Härtefälle (z. B. Geschwisterrabatte, Sozialtarife) zur freien Zuweisung.</span>
               </div>
             </div>
@@ -1367,7 +1367,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   alignItems: 'center',
                   gap: '8px',
                   background: calcCampus ? '#e6f4ea' : '#ffffff',
-                  border: calcCampus ? '1.5px solid #137333' : '1.5px solid #cbd5e1',
+                  border: calcCampus ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
                   padding: '10px 12px',
                   borderRadius: '12px',
                   cursor: 'pointer',
@@ -1380,7 +1380,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     type="checkbox"
                     checked={calcCampus}
                     onChange={(e) => setCalcCampus(e.target.checked)}
-                    style={{ accentColor: '#137333', cursor: 'pointer' }}
+                    style={{ accentColor: '#34a853', cursor: 'pointer' }}
                   />
                   Campus (7,99 €)
                 </label>
@@ -1390,7 +1390,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   alignItems: 'center',
                   gap: '8px',
                   background: calcGroovelab ? '#e6f4ea' : '#ffffff',
-                  border: calcGroovelab ? '1.5px solid #137333' : '1.5px solid #cbd5e1',
+                  border: calcGroovelab ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
                   padding: '10px 12px',
                   borderRadius: '12px',
                   cursor: 'pointer',
@@ -1403,7 +1403,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     type="checkbox"
                     checked={calcGroovelab}
                     onChange={(e) => setCalcGroovelab(e.target.checked)}
-                    style={{ accentColor: '#137333', cursor: 'pointer' }}
+                    style={{ accentColor: '#34a853', cursor: 'pointer' }}
                   />
                   GrooveLab (4,99 €)
                 </label>
@@ -1427,7 +1427,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     onClick={() => setCalcBillingModel('parent')}
                     style={{
                       background: calcBillingModel === 'parent' ? '#ffffff' : 'none',
-                      color: calcBillingModel === 'parent' ? '#137333' : '#475569',
+                      color: calcBillingModel === 'parent' ? '#34a853' : '#475569',
                       border: 'none',
                       padding: '8px 12px',
                       borderRadius: '10px',
@@ -1449,7 +1449,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     onClick={() => setCalcBillingModel('school')}
                     style={{
                       background: calcBillingModel === 'school' ? '#ffffff' : 'none',
-                      color: calcBillingModel === 'school' ? '#137333' : '#475569',
+                      color: calcBillingModel === 'school' ? '#34a853' : '#475569',
                       border: 'none',
                       padding: '8px 12px',
                       borderRadius: '10px',
@@ -1491,7 +1491,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                           border: '1px solid #cbd5e1',
                           textAlign: 'center',
                           fontWeight: 800,
-                          color: '#137333',
+                          color: '#34a853',
                           fontSize: '12px',
                           outline: 'none'
                         }}
@@ -1506,7 +1506,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     step="5"
                     value={Math.min(calcStudents, 2000)}
                     onChange={(e) => setCalcStudents(parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: '#137333', cursor: 'pointer' }}
+                    style={{ width: '100%', accentColor: '#34a853', cursor: 'pointer' }}
                   />
                 </div>
 
@@ -1530,7 +1530,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                           border: '1px solid #cbd5e1',
                           textAlign: 'center',
                           fontWeight: 800,
-                          color: '#137333',
+                          color: '#34a853',
                           fontSize: '12px',
                           outline: 'none'
                         }}
@@ -1545,7 +1545,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     step="1"
                     value={Math.min(calcTeachers, 150)}
                     onChange={(e) => setCalcTeachers(parseInt(e.target.value))}
-                    style={{ width: '100%', accentColor: '#137333', cursor: 'pointer' }}
+                    style={{ width: '100%', accentColor: '#34a853', cursor: 'pointer' }}
                   />
                 </div>
               </div>
@@ -1604,14 +1604,14 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569', fontWeight: 600 }}>
                       <span>Service-Gebühr Schüler ({calcStudents} Schüler):</span>
                       {calcBillingModel === 'parent' ? (
-                        <span style={{ fontWeight: 800, color: '#137333' }}>0,00 € (Direktabrechnung)</span>
+                        <span style={{ fontWeight: 800, color: '#34a853' }}>0,00 € (Direktabrechnung)</span>
                       ) : (
                         <span style={{ fontWeight: 800, color: '#0f172a' }}>{studentFee.toFixed(2).replace('.', ',')} €/Mo</span>
                       )}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #e2e8f0', paddingTop: '8px', fontWeight: 800, color: '#0f172a' }}>
                       <span>Regulärer Monatspreis für die Schule:</span>
-                      <span style={{ color: '#137333', fontSize: '14px' }}>{monthlyTotal.toFixed(2).replace('.', ',')} €/Mo</span>
+                      <span style={{ color: '#34a853', fontSize: '14px' }}>{monthlyTotal.toFixed(2).replace('.', ',')} €/Mo</span>
                     </div>
 
                     <div style={{
@@ -1619,16 +1619,16 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       background: '#e6f4ea',
                       borderRadius: '10px',
                       padding: '10px',
-                      borderLeft: '4px solid #137333',
+                      borderLeft: '4px solid #34a853',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '4px'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#137333', fontWeight: 900, fontSize: '13px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#34a853', fontWeight: 900, fontSize: '13px' }}>
                         <span>Kosten im 1. Schuljahr:</span>
                         <span>{totalYear.toFixed(2).replace('.', ',')} €</span>
                       </div>
-                      <div style={{ fontSize: '11px', color: '#137333', fontWeight: 650 }}>
+                      <div style={{ fontSize: '11px', color: '#34a853', fontWeight: 650 }}>
                         (Bestehend aus 1 Probemonat für 0,00 € + {paidM} Abrechnungsmonaten bis August. Du sparst {monthlyTotal.toFixed(2).replace('.', ',')} € im ersten Jahr gegenüber einem regulären 12-Monatstarif!)
                       </div>
                     </div>
@@ -1642,14 +1642,14 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               style={{
                 width: '100%',
                 padding: '16px 32px',
-                backgroundColor: '#137333',
+                backgroundColor: '#34a853',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '100px',
                 fontWeight: 600,
                 fontSize: '16px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(19, 115, 51, 0.15)',
+                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1823,7 +1823,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               <button
                 onClick={() => setActiveDocument('none')}
                 style={{
-                  background: '#137333',
+                  background: '#34a853',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '100px',
@@ -1831,7 +1831,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   fontSize: '0.85rem',
                   padding: '10px 24px',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(19, 115, 51, 0.15)',
+                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)',
                   outline: 'none'
                 }}
               >
@@ -1882,10 +1882,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               background: 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)'
             }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#137333', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   🛡️ Das Campus-Groovelab Sicherheitsversprechen
                 </h3>
-                <span style={{ fontSize: '0.72rem', color: '#137333', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   14-stufiges Sicherheits- & Datenschutzkonzept
                 </span>
               </div>
@@ -1920,7 +1920,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 gap: '8px',
                 textAlign: 'left'
               }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#137333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   💡 Datensparsamkeit als aktive Härtung (Warum wir weniger Daten speichern)
                 </span>
                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.5, opacity: 0.9 }}>
@@ -2004,7 +2004,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                       height: '28px',
                       borderRadius: '50%',
                       background: '#e6f4ea',
-                      color: '#137333',
+                      color: '#34a853',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -2039,7 +2039,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               <button
                 onClick={() => setShowPrivacyAudits(false)}
                 style={{
-                  background: '#137333',
+                  background: '#34a853',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '100px',
@@ -2047,7 +2047,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   fontSize: '0.85rem',
                   padding: '10px 24px',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(19, 115, 51, 0.15)',
+                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)',
                   outline: 'none'
                 }}
               >

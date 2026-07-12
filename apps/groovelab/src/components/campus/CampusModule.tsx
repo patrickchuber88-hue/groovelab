@@ -140,7 +140,7 @@ export const CampusModule: React.FC<CampusModuleProps> = (props) => {
                   onClick={() => props.setSelectedStudentForDetail(student)}
                   style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px' }}
                 >
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#e6f4ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
                     {student.first_name?.[0]}
                   </div>
                   <div>

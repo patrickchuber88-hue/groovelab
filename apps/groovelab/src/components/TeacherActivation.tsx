@@ -443,7 +443,7 @@ export function TeacherActivation({ onSuccess }: TeacherActivationProps) {
                 <CheckCircle size={32} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#137333' }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#34a853' }}>
                   Freischaltung erfolgreich!
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>

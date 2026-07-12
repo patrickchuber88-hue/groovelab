@@ -314,7 +314,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   }
 
   const lowerName = name.toLowerCase();
-  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#22c55e'; // Green
+  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#34a853'; // Green
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
@@ -576,7 +576,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   useEffect(() => {
     if (!kioskMapRef.current) return;
     const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         if (entry.contentRect.width) {
           setKioskMapWidth(entry.contentRect.width);
         }
@@ -859,11 +859,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           {onboardingStep === 3 && onboardCreatedUser && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e', marginBottom: '8px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', marginBottom: '8px' }}>
                 <Check size={36} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#16a34a' }}>Registrierung erfolgreich!</h3>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#137333' }}>Registrierung erfolgreich!</h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Die Schule „{onboardCreatedUser.schoolName}“ wurde erfolgreich angelegt.</p>
               </div>
 
@@ -1176,7 +1176,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         // Subdomain resolution logic
         const getSubdomain = () => {
-          let host = window.location.hostname;
+          const host = window.location.hostname;
           let sub = null;
           
           // If the hostname ends with the platform's main domain, strip it to isolate the subdomain
@@ -1351,27 +1351,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (!user.is_campus_active && !user.is_groovelab_active) {
             if (user.role === 'student') {
               alert("Dein Schüler-Profil ist noch inaktiv. Wir leiten dich jetzt zur Aktivierungsseite weiter...");
-              setVerifiedStudentId(user.id);
-              setVerifiedStudentDetails(user);
-              setParentFirstName(user.first_name || '');
-              setParentLastName(user.last_name || '');
-              setParentInstrument(user.instrument || '');
-              
-              // Load the day of birth if not loaded yet
-              const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
-              if (!user.school_id && userSchool?.id) {
-                user.school_id = userSchool.id;
-              }
-
-
-
-              if (user.role === 'student') {
-                const { data: actDay } = await supabase.from('activation_days').select('day_of_birth').eq('student_id', user.id).maybeSingle();
-                user.day_of_birth = actDay?.day_of_birth || null;
-              }
-              setParentDayOfBirth(String(user.day_of_birth || ''));
-              setParentOnboardingStep('email');
-              setExpandedSection('parentOnboarding');
+              navigate(`/qr/${user.qr_token}`);
               setLoading(false);
               return;
             } else {
@@ -1399,12 +1379,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               return;
             }
             localStorage.setItem('groovelab_active_platform', 'campus');
+            if (user.role === 'student' || user.role === 'teacher') {
+              localStorage.setItem('campus_active_tab', 'briefing');
+            }
           }
         } else {
           // Admins and secretaries bypass activation flags and always land in the administration module under briefing
           localStorage.setItem('groovelab_active_workspace', 'secretary');
           localStorage.setItem('groovelab_active_platform', 'campus');
-          localStorage.setItem('campus_active_tab', 'live');
+          localStorage.setItem('campus_active_tab', 'briefing');
+          if (user.role === 'secretary') {
+            localStorage.setItem('groovelab_secretary_subtab', 'briefing');
+          }
         }
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
@@ -2964,12 +2950,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           }}>
             <div style={{
               width: '64px', height: '64px', borderRadius: '50%', 
-              background: isSecretary ? '#fce8e6' : '#22c55e20',
+              background: isSecretary ? '#fce8e6' : '#34a85320',
               display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'
             }}>
-              <Check size={36} color={isSecretary ? '#ea4335' : '#22c55e'} strokeWidth={3} />
+              <Check size={36} color={isSecretary ? '#ea4335' : '#34a853'} strokeWidth={3} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#ea4335' : '#22c55e', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#ea4335' : '#34a853', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
               Registrierung erfolgreich!
             </h1>
             <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0', fontWeight: 600 }}>
@@ -3960,7 +3946,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                             borderRadius: '50%', 
                             background: isSelected
                               ? (isYellow ? '#09090b' : '#ffffff')
-                              : '#22c55e',
+                              : '#34a853',
                             border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
                             marginTop: '3px',
                             boxShadow: isSelected ? `0 0 6px ${isYellow ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.8)'}` : 'none'
@@ -4151,7 +4137,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         {/* Progress Bar & Steps */}
         <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', width: '100%', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
               <Calendar size={20} />
             </div>
             <div style={{ textAlign: 'left' }}>
@@ -4260,10 +4246,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={parentOnboardingLoading}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#10b981',
+                background: '#34a853',
                 color: '#ffffff',
                 fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', marginTop: '8px',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
               }}
             >
               {parentOnboardingLoading ? 'Prüfe Daten...' : 'Schüler verifizieren & fortfahren'}
@@ -4387,10 +4373,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }}
                 style={{
                   width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#10b981',
+                  background: '#34a853',
                   color: '#ffffff',
                   fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
                 }}
               >
                 PIN festlegen & Weiter zu Wunschzeiten
@@ -4456,10 +4442,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 disabled={parentOnboardingLoading}
                 style={{
                   width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#10b981',
+                  background: '#34a853',
                   color: '#ffffff',
                   fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
                 }}
               >
                 {parentOnboardingLoading ? 'Prüfe PIN...' : 'PIN bestätigen'}
@@ -4573,7 +4559,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       style={{
                         padding: '8px 14px',
                         borderRadius: '12px',
-                        border: activeParentChildIndex === index ? '1.5px solid #10b981' : '1.5px solid #e2e8f0',
+                        border: activeParentChildIndex === index ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
                         background: activeParentChildIndex === index ? '#ecfdf5' : '#ffffff',
                         color: activeParentChildIndex === index ? '#047857' : '#475569',
                         fontWeight: 800,
@@ -4642,7 +4628,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {showSiblingForm && (
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '16px', borderRadius: '16px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Users size={14} style={{ color: '#10b981' }} /> Geschwisterkind hinzufügen
+                  <Users size={14} style={{ color: '#34a853' }} /> Geschwisterkind hinzufügen
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
@@ -4724,7 +4710,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       setSibFirstName('');
                       setSibBirthDate('');
                     }}
-                    style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#34a853', color: '#fff', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Hinzufügen
                   </button>
@@ -4766,7 +4752,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                         padding: '8px 10px',
                         borderRadius: '9px',
                         border: 'none',
-                        background: preferenceMode === 'wunsch' ? '#10b981' : 'transparent',
+                        background: preferenceMode === 'wunsch' ? '#34a853' : 'transparent',
                         color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
                         fontWeight: 800,
                         fontSize: '12.5px',
@@ -4812,7 +4798,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       type="button"
                       onClick={() => setShowSaturday(!showSaturday)}
                       style={{
-                        background: showSaturday ? '#10b981' : '#cbd5e1',
+                        background: showSaturday ? '#34a853' : '#cbd5e1',
                         border: 'none',
                         padding: '4px 12px',
                         borderRadius: '100px',
@@ -4885,8 +4871,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           let labelColor = 'transparent';
                           
                           if (selection === 'wunsch') {
-                            bg = '#10b981';
-                            border = '1px solid #059669';
+                            bg = '#34a853';
+                            border = '1px solid #137333';
                             labelColor = '#ffffff';
                           } else if (selection === 'gesperrt') {
                             bg = '#ef4444';
@@ -4961,10 +4947,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 disabled={parentOnboardingLoading}
                 style={{
                   width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#10b981',
+                  background: '#34a853',
                   color: '#ffffff',
                   fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
                 }}
               >
                 {parentOnboardingLoading ? 'Speichere Präferenzen...' : 'Wunschtermine speichern'}
@@ -4983,7 +4969,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         {parentOnboardingStep === 'success' && verifiedStudentDetails && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.15)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', boxShadow: '0 8px 16px rgba(52, 168, 83, 0.15)' }}>
               <Check size={36} strokeWidth={3} />
             </div>
 
@@ -5022,7 +5008,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span style={{ color: '#64748b', fontWeight: 700 }}>Ausweis-Nr:</span>
-                <strong style={{ color: '#059669', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
+                <strong style={{ color: '#137333', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
               </div>
             </div>
 
@@ -5104,7 +5090,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 )}
 
                 {biometricsStatus === 'success' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#10b981', fontWeight: 800, padding: '8px 0 0 0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#34a853', fontWeight: 800, padding: '8px 0 0 0' }}>
                     <Check size={16} strokeWidth={3} />
                     Erfolgreich aktiviert!
                   </div>
@@ -5167,7 +5153,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }}>
           <div style={{ fontWeight: 900, marginBottom: '16px', color: '#eab308', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.05em' }}>
             <span>DIAGNOSE: GEOFENCING</span>
-            <span style={{ color: geoDebug.isWithinAnyRoom ? '#10b981' : '#ef4444' }}>{geoDebug.isWithinAnyRoom ? 'ERFOLGREICH' : 'FEHLGESCHLAGEN'}</span>
+            <span style={{ color: geoDebug.isWithinAnyRoom ? '#34a853' : '#ef4444' }}>{geoDebug.isWithinAnyRoom ? 'ERFOLGREICH' : 'FEHLGESCHLAGEN'}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
@@ -5184,7 +5170,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
               <span>Status Öffnungszeiten:</span>
-              <span style={{ fontWeight: 900, color: geoDebug.withinHours ? '#10b981' : '#ef4444' }}>{geoDebug.withinHours ? 'GEÖFFNET' : 'GESCHLOSSEN'}</span>
+              <span style={{ fontWeight: 900, color: geoDebug.withinHours ? '#34a853' : '#ef4444' }}>{geoDebug.withinHours ? 'GEÖFFNET' : 'GESCHLOSSEN'}</span>
             </div>
           </div>
           
@@ -5263,22 +5249,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               style={{
                 width: '100%',
                 padding: '16px',
-                background: 'rgba(16, 185, 129, 0.08)',
-                border: '2px solid rgba(16, 185, 129, 0.25)',
+                background: 'rgba(52, 168, 83, 0.08)',
+                border: '2px solid rgba(52, 168, 83, 0.25)',
                 borderRadius: '24px',
                 color: '#a7f3d0',
                 fontWeight: 800,
                 fontSize: '13px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(16,185,129,0.1)',
+                boxShadow: '0 4px 12px rgba(52,168,83,0.1)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.02em',
                 backdropFilter: 'blur(10px)',
                 WebkitBackdropFilter: 'blur(10px)',
                 transition: 'all 0.2s'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
             >
               🔓 BYPASS: PATRICK HUBER (LEHRER)
             </button>
@@ -5325,22 +5311,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               style={{
                 width: '100%',
                 padding: '16px',
-                background: 'rgba(19, 115, 51, 0.08)',
-                border: '2px solid rgba(19, 115, 51, 0.25)',
+                background: 'rgba(52, 168, 83, 0.08)',
+                border: '2px solid rgba(52, 168, 83, 0.25)',
                 borderRadius: '24px',
                 color: '#d1fae5',
                 fontWeight: 800,
                 fontSize: '13px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(19,115,51,0.1)',
+                boxShadow: '0 4px 12px rgba(52, 168, 83,0.1)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.02em',
                 backdropFilter: 'blur(10px)',
                 WebkitBackdropFilter: 'blur(10px)',
                 transition: 'all 0.2s'
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(19, 115, 51, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(19, 115, 51, 0.08)'; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
             >
               🔓 BYPASS: ELISABETH ZIMMERMAN (SCHÜLERIN)
             </button>
@@ -5569,7 +5555,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -5734,7 +5720,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -6459,11 +6445,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                background: 'linear-gradient(135deg, #d1fae5 0%, #bbf7d0 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#16a34a'
+                color: '#137333'
               }}>
                 <span style={{ fontSize: '28px' }}>👋</span>
               </div>
@@ -6505,7 +6491,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%',
                   padding: '16px',
                   borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                   color: '#ffffff',
                   border: 'none',
                   fontSize: '1rem',

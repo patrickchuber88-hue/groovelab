@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -7,10 +7,10 @@ import * as lamejs from '@breezystack/lamejs';
 
 export const ALL_STICKERS = [
   // Meilensteine / Üben
-  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', auto: true },
+  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
   { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 250 Minuten ausdauerndes Üben.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true },
   { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 1000 Minuten Übezeit!', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true },
-  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Für grandiose 2000 Minuten Übezeit!', color: '#137333', bg: 'rgba(19, 115, 51, 0.1)', auto: true },
+  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Für grandiose 2000 Minuten Übezeit!', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
 
   // XP
   { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP auf dem Profil gesammelt.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true },
@@ -195,6 +195,7 @@ export const getCleanPageNotes = (notes: any): string => {
 
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const displayedStudentName = useMemo(() => {
     return readOnly
@@ -842,7 +843,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           ...item,
           totalPages: item.total_pages || 50,
           emoji: item.emoji || '📖',
-          color: item.color || '#456355'
+          color: item.color || '#34a853'
         }));
         setGlobalLehrwerke(mapped);
       } else {
@@ -1137,7 +1138,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.translate(600, 600);
       ctx.rotate(-12 * Math.PI / 180);
       const gradient = ctx.createLinearGradient(-600, -600, 600, -200);
-      gradient.addColorStop(0, sticker.color ? `${sticker.color}45` : 'rgba(16, 185, 129, 0.45)');
+      gradient.addColorStop(0, sticker.color ? `${sticker.color}45` : 'rgba(52, 168, 83, 0.45)');
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
       ctx.fillRect(-800, -800, 1600, 600);
@@ -1148,7 +1149,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.translate(600, 600);
       ctx.rotate(-12 * Math.PI / 180);
       ctx.font = '900 130px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillStyle = sticker.color ? `${sticker.color}15` : 'rgba(16, 185, 129, 0.15)';
+      ctx.fillStyle = sticker.color ? `${sticker.color}15` : 'rgba(52, 168, 83, 0.15)';
       ctx.textAlign = 'center';
       ctx.fillText(sticker.title.toUpperCase(), 0, 20);
       ctx.restore();
@@ -1159,9 +1160,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       // 5. Draw glowing colored border matching sticker color
       ctx.save();
-      ctx.shadowColor = sticker.color || '#10b981';
+      ctx.shadowColor = sticker.color || '#34a853';
       ctx.shadowBlur = 40;
-      ctx.strokeStyle = sticker.color || '#10b981';
+      ctx.strokeStyle = sticker.color || '#34a853';
       ctx.lineWidth = 6;
       ctx.strokeRect(tX, tY, tW, tH);
       ctx.restore();
@@ -1170,7 +1171,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.save();
       ctx.translate(600, tY + 90);
       ctx.rotate(-2 * Math.PI / 180);
-      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.fillStyle = sticker.color || '#34a853';
       const pillText = 'GEMEISTERT!';
       ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
       const pillTextWidth = ctx.measureText(pillText).width;
@@ -1204,7 +1205,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       textY += 60;
-      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.fillStyle = sticker.color || '#34a853';
       ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
@@ -1241,7 +1242,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.textBaseline = 'alphabetic'; // reset
 
       // 9. Website URL footer (Dark Mode)
-      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.fillStyle = sticker.color || '#34a853';
       ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('campus-groovelab.de', 600, tY + 985);
@@ -1255,7 +1256,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.translate(600, 600);
       ctx.rotate(-12 * Math.PI / 180);
       const gradient = ctx.createLinearGradient(-600, -600, 600, -200);
-      gradient.addColorStop(0, sticker.color ? `${sticker.color}25` : 'rgba(16, 185, 129, 0.25)');
+      gradient.addColorStop(0, sticker.color ? `${sticker.color}25` : 'rgba(52, 168, 83, 0.25)');
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
       ctx.fillRect(-800, -800, 1600, 600);
@@ -1266,7 +1267,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.translate(600, 600);
       ctx.rotate(-12 * Math.PI / 180);
       ctx.font = '900 130px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillStyle = sticker.color ? `${sticker.color}10` : 'rgba(16, 185, 129, 0.10)';
+      ctx.fillStyle = sticker.color ? `${sticker.color}10` : 'rgba(52, 168, 83, 0.10)';
       ctx.textAlign = 'center';
       ctx.fillText(sticker.title.toUpperCase(), 0, 20);
       ctx.restore();
@@ -1277,9 +1278,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       // 5. Draw glowing colored border matching sticker color (light mode)
       ctx.save();
-      ctx.shadowColor = sticker.color || '#10b981';
+      ctx.shadowColor = sticker.color || '#34a853';
       ctx.shadowBlur = 30;
-      ctx.strokeStyle = sticker.color || '#10b981';
+      ctx.strokeStyle = sticker.color || '#34a853';
       ctx.lineWidth = 6;
       ctx.strokeRect(tX, tY, tW, tH);
       ctx.restore();
@@ -1288,7 +1289,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.save();
       ctx.translate(600, tY + 90);
       ctx.rotate(-2 * Math.PI / 180);
-      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.fillStyle = sticker.color || '#34a853';
       const pillText = 'GEMEISTERT!';
       ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
       const pillTextWidth = ctx.measureText(pillText).width;
@@ -1322,7 +1323,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       textY += 60;
-      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.fillStyle = sticker.color || '#34a853';
       ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
@@ -1359,7 +1360,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.textBaseline = 'alphabetic'; // reset
 
       // 9. Website URL footer (Light Mode)
-      ctx.fillStyle = sticker.color || '#10b981';
+      ctx.fillStyle = sticker.color || '#34a853';
       ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('campus-groovelab.de', 600, tY + 985);
@@ -1448,7 +1449,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     try {
       const stored = localStorage.getItem('student_lehrwerke_progress');
-      let parsed = stored ? JSON.parse(stored) : [];
+      const parsed = stored ? JSON.parse(stored) : [];
       let hasChanges = false;
 
       globalLehrwerke.forEach(book => {
@@ -1587,7 +1588,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     try {
       // If it's a textbook page, we update its status to 'IN_PROGRESS' in progress_matrix
       // to make it turn red (unbearbeitet/in progress) when removed from active homework.
-      let updatePayload: any = { is_current_homework: false };
+      const updatePayload: any = { is_current_homework: false };
       if (bookTitle && pageNum !== undefined) {
         updatePayload.status = 'IN_PROGRESS';
       }
@@ -2374,7 +2375,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Save to active song skills if active song selected
     if (activeInputTab === 'active_song' && selectedActiveSongId) {
       try {
-        let skillPercent = status === 'MASTERED' ? 100 : songProgressPercent;
+        const skillPercent = status === 'MASTERED' ? 100 : songProgressPercent;
         
         await supabase
           .from('user_song_skills')
@@ -2393,7 +2394,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const isLehrwerkPage = (activeInputTab === 'lehrwerk_page');
     const isSong = (activeInputTab === 'active_song');
 
-    let finalNotesList = [...homeworkNotesList];
+    const finalNotesList = [...homeworkNotesList];
     if (!isLehrwerkPage && !isSong && homeworkNotes.trim().length > 0) {
       finalNotesList.push(homeworkNotes.trim());
     }
@@ -2749,6 +2750,115 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ? getSongColor(activeSong.songs?.title || 'Song') 
       : null;
 
+  const renderArchivButton = (isMobile: boolean = false) => {
+    const isHistoryActive = activeSubView === 'history' && activeViewMode === 'document';
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          if (isHistoryActive) {
+            setActiveSubView('hub');
+          } else {
+            setActiveViewMode('document');
+            setActiveSubView('history');
+            const existingWeeks = progressItems
+              .filter(item => item.updated_at)
+              .map(item => getItemWeek(item))
+              .filter(Boolean);
+            let weeks: string[] = [];
+            if (existingWeeks.length > 0) {
+              const sortedExisting = [...existingWeeks].sort();
+              const earliestWeek = sortedExisting[0];
+              const currentWeek = getISOWeek();
+              const latestExisting = sortedExisting[sortedExisting.length - 1];
+              const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
+              weeks = getWeeksBetween(earliestWeek, endWeek);
+            } else {
+              weeks = [getISOWeek()];
+            }
+            if (weeks.length > 0) {
+              setSelectedHistoryWeek(weeks[0]);
+            }
+          }
+        }}
+        style={{
+          background: isHistoryActive ? '#137333' : 'rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          color: '#ffffff',
+          padding: '6px 12px',
+          borderRadius: '20px',
+          fontSize: '0.75rem',
+          fontWeight: 800,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          transition: 'all 0.2s ease',
+          marginRight: '4px',
+          flexShrink: 0
+        }}
+        className="hover-scale"
+      >
+        <History size={14} />
+        <span>Archiv</span>
+      </button>
+    );
+  };
+
+  const renderFullscreenButton = () => {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsFullscreen(!isFullscreen)}
+        title={isFullscreen ? "Vollbild beenden" : "Vollbild"}
+        style={{
+          background: 'rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '50%',
+          width: '30px',
+          height: '30px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: '#ffffff',
+          transition: 'all 0.18s ease',
+          flexShrink: 0,
+          marginRight: '4px'
+        }}
+        className="hover-scale"
+      >
+        {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+      </button>
+    );
+  };
+
+  const renderCloseButton = () => {
+    if (isEmbed) return null;
+    return (
+      <button
+        onClick={handleClose}
+        style={{
+          background: 'rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '50%',
+          width: '30px',
+          height: '30px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: '#ffffff',
+          transition: 'all 0.18s ease',
+          flexShrink: 0
+        }}
+        className="hover-scale"
+      >
+        <X size={13} />
+      </button>
+    );
+  };
+
   const content = (
     <div style={{
       background: useNotebookLayout 
@@ -2756,10 +2866,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
             : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
         : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
-      borderRadius: '32px',
+      borderRadius: isFullscreen ? '0' : '32px',
       width: '100%',
-      maxWidth: '1360px',
-      height: isEmbed ? '100%' : '92vh',
+      maxWidth: isFullscreen ? '100%' : '1360px',
+      height: isEmbed ? '100%' : (isFullscreen ? '100vh' : '92vh'),
       boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
       display: 'flex',
       flexDirection: 'column',
@@ -2770,63 +2880,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       padding: useNotebookLayout ? '6px' : '0',
       position: 'relative'
     }} className="animation-slide-up">
-        {/* Header - Apple-style compact redesign */}
+                {/* Header - Apple-style compact redesign */}
         <div style={{
           padding: '16px 20px',
-          background: '#456355',
+          background: '#34a853',
           backdropFilter: 'none',
-          borderBottom: '1px solid rgba(50, 72, 62, 0.8)',
+          borderBottom: '1px solid rgba(15, 89, 40, 0.8)',
           borderRadius: '0',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '16px',
+          flexDirection: 'column',
           zIndex: 50,
           boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
-        }}>
-          {/* Left: Avatar + Student Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-            <div 
-              onClick={() => onProfileClick && onProfileClick(student)}
-              title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                flexShrink: 0,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                border: '1.5px solid rgba(255, 213, 79, 0.2)',
-                cursor: onProfileClick ? 'pointer' : 'default',
-                transition: 'opacity 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (onProfileClick) e.currentTarget.style.opacity = '0.8';
-              }}
-              onMouseLeave={(e) => {
-                if (onProfileClick) e.currentTarget.style.opacity = '1';
-              }}
-            >
-              <img
-                src={getInstrumentAvatarUrl(studentInstrument)}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                alt=""
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-              <h2 
+        }} className="modal-header-container">
+          
+          {/* Top Row / Desktop Row */}
+          <div className="header-top-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: 0 }}>
+            {/* Left: Avatar + Student Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }} className="header-left-info">
+              <div 
                 onClick={() => onProfileClick && onProfileClick(student)}
                 title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
                 style={{
-                  margin: 0,
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1.2,
-                  whiteSpace: 'nowrap',
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  border: '1.5px solid rgba(255, 213, 79, 0.2)',
                   cursor: onProfileClick ? 'pointer' : 'default',
                   transition: 'opacity 0.2s'
                 }}
@@ -2837,28 +2918,79 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   if (onProfileClick) e.currentTarget.style.opacity = '1';
                 }}
               >
-                {displayedStudentName}
-              </h2>
-              <span style={{
-                fontSize: '0.68rem',
-                color: 'rgba(197,216,207,0.85)',
-                fontWeight: 500,
-                letterSpacing: '0.01em'
-              }}>
-                Schüler-Protokoll
-              </span>
+                <img
+                  src={getInstrumentAvatarUrl(studentInstrument)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  alt=""
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                <h2 
+                  onClick={() => onProfileClick && onProfileClick(student)}
+                  title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
+                  style={{
+                    margin: 0,
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.2,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    cursor: onProfileClick ? 'pointer' : 'default',
+                    transition: 'opacity 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (onProfileClick) e.currentTarget.style.opacity = '0.8';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (onProfileClick) e.currentTarget.style.opacity = '1';
+                  }}
+                >
+                  {displayedStudentName}
+                </h2>
+                <span style={{
+                  fontSize: '0.68rem',
+                  color: 'rgba(197,216,207,0.85)',
+                  fontWeight: 500,
+                  letterSpacing: '0.01em'
+                }}>
+                  Schüler-Protokoll
+                </span>
+              </div>
             </div>
-            
-            {/* Recordings Gallery & Loopstation Toggle Buttons */}
+
+            {/* Desktop Tabs */}
             {isCampusActive && (
-              <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode(activeViewMode === 'recordings' ? 'document' : 'recordings')}
+                  onClick={() => setActiveViewMode('document')}
                   style={{
-                    background: activeViewMode === 'recordings' 
-                      ? '#137333' 
-                      : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'document' ? '#137333' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <BookOpen size={14} />
+                  <span>Protokoll</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('recordings')}
+                  style={{
+                    background: activeViewMode === 'recordings' ? '#137333' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -2874,16 +3006,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   className="hover-scale"
                 >
                   <Mic size={14} />
-                  <span>{activeViewMode === 'recordings' ? 'Protokoll' : 'Aufnahmen'}</span>
+                  <span>Aufnahmen</span>
                 </button>
-
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode(activeViewMode === 'loopstation' ? 'document' : 'loopstation')}
+                  onClick={() => setActiveViewMode('loopstation')}
                   style={{
-                    background: activeViewMode === 'loopstation' 
-                      ? '#137333' 
-                      : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'loopstation' ? '#137333' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -2899,16 +3028,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   className="hover-scale"
                 >
                   <Sliders size={14} />
-                  <span>{activeViewMode === 'loopstation' ? 'Protokoll' : 'Loopstation'}</span>
+                  <span>Loopstation</span>
                 </button>
-
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode(activeViewMode === 'practice' ? 'document' : 'practice')}
+                  onClick={() => setActiveViewMode('practice')}
                   style={{
-                    background: activeViewMode === 'practice' 
-                      ? '#137333' 
-                      : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'practice' ? '#137333' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -2924,109 +3050,115 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   className="hover-scale"
                 >
                   <Music size={14} />
-                  <span>{activeViewMode === 'practice' ? 'Protokoll' : 'Übe-Begleiter'}</span>
+                  <span>Übe-Begleiter</span>
                 </button>
               </div>
             )}
+
+            {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
+              <div className="header-desktop-archiv" style={{ display: 'block' }}>
+                {renderArchivButton()}
+              </div>
+              {renderFullscreenButton()}
+              {renderCloseButton()}
+            </div>
           </div>
 
-          {/* Right: Close Button only */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {/* Archiv Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (activeSubView === 'history' && activeViewMode === 'document') {
-                  setActiveSubView('hub');
-                } else {
-                  setActiveViewMode('document');
-                  setActiveSubView('history');
-                  // Pre-select the most recent week if available
-                  const existingWeeks = progressItems
-                    .filter(item => item.updated_at)
-                    .map(item => getItemWeek(item))
-                    .filter(Boolean);
-                  let weeks: string[] = [];
-                  if (existingWeeks.length > 0) {
-                    const sortedExisting = [...existingWeeks].sort();
-                    const earliestWeek = sortedExisting[0];
-                    const currentWeek = getISOWeek();
-                    const latestExisting = sortedExisting[sortedExisting.length - 1];
-                    const endWeek = currentWeek > latestExisting ? currentWeek : latestExisting;
-                    weeks = getWeeksBetween(earliestWeek, endWeek);
-                  } else {
-                    weeks = [getISOWeek()];
-                  }
-                  if (weeks.length > 0) {
-                    setSelectedHistoryWeek(weeks[0]);
-                  }
-                }
-              }}
-              style={{
-                background: (activeSubView === 'history' && activeViewMode === 'document')
-                  ? '#137333'
-                  : 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: '#ffffff',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s ease',
-                marginRight: '4px'
-              }}
-              onMouseEnter={(e) => {
-                if (!(activeSubView === 'history' && activeViewMode === 'document')) {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!(activeSubView === 'history' && activeViewMode === 'document')) {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                }
-              }}
-              className="hover-scale"
-            >
-              <History size={14} />
-              <span>Archiv</span>
-            </button>
-
-            {/* Close Button */}
-            {!isEmbed && (
+          {/* Bottom Row (mobile/tablet only) - Wrapped cleanly in 2 rows, no horizontal scrolling cutoffs */}
+          {isCampusActive && (
+            <div className="header-mobile-menu-row" style={{
+              display: 'none',
+              flexWrap: 'wrap',
+              gap: '8px',
+              width: '100%',
+              marginTop: '12px',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}>
               <button
-                onClick={handleClose}
+                type="button"
+                onClick={() => setActiveViewMode('document')}
                 style={{
-                  background: 'rgba(255,255,255,0.15)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '50%',
-                  width: '30px',
-                  height: '30px',
+                  background: activeViewMode === 'document' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#ffffff',
-                  transition: 'all 0.18s ease',
-                  flexShrink: 0
+                  gap: '4px'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                  e.currentTarget.style.color = '#ffffff';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
-                  e.currentTarget.style.color = '#ffffff';
-                }}
-                className="hover-scale"
               >
-                <X size={13} />
+                <BookOpen size={12} />
+                <span>Protokoll</span>
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('recordings')}
+                style={{
+                  background: activeViewMode === 'recordings' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Mic size={12} />
+                <span>Aufnahmen</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('loopstation')}
+                style={{
+                  background: activeViewMode === 'loopstation' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Sliders size={12} />
+                <span>Loopstation</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('practice')}
+                style={{
+                  background: activeViewMode === 'practice' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Music size={12} />
+                <span>Übe-Begleiter</span>
+              </button>
+              {renderArchivButton(true)}
+            </div>
+          )}
         </div>
 
         {/* Modal Content - Side-by-side Columns or Logbook */}
@@ -3042,7 +3174,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             : 'transparent',
           padding: '0',
           position: 'relative'
-        }} className="flex-col lg:flex-row">
+        }} className="modal-content-container">
           {activeViewMode === 'loopstation' ? (
             <GrooveLoopstation
               student={student}
@@ -3100,7 +3232,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <h3 style={{
                   fontSize: '1rem',
                   fontWeight: 850,
-                  color: '#137333',
+                  color: '#34a853',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: '16px',
@@ -3205,7 +3337,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <h3 style={{
                   fontSize: '1rem',
                   fontWeight: 850,
-                  color: '#137333',
+                  color: '#34a853',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: '16px',
@@ -3269,7 +3401,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   onClick={startRecordingAudio}
                                   disabled={isUploadingAudio || isLimitReached}
                                   style={{
-                                    background: isLimitReached ? '#94a3b8' : '#137333',
+                                    background: isLimitReached ? '#94a3b8' : '#34a853',
                                     color: '#fff',
                                     border: 'none',
                                     padding: '6px 12px',
@@ -3421,6 +3553,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               from { transform: translateY(20px); opacity: 0; }
               to { transform: translateY(0); opacity: 1; }
             }
+            .modal-content-container {
+              display: flex !important;
+              flex-direction: row !important;
+            }
+            
+            @media (max-width: 900px) {
+              .modal-header-container {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                padding: 12px 16px !important;
+                gap: 12px !important;
+              }
+              .header-top-row {
+                width: 100% !important;
+              }
+              .header-tabs-desktop-container {
+                display: none !important;
+              }
+              .header-desktop-archiv {
+                display: none !important;
+              }
+              .header-mobile-menu-row {
+                display: flex !important;
+              }
+              .header-left-info {
+                flex-wrap: nowrap !important;
+                width: auto !important;
+                gap: 8px !important;
+              }
+              
+              /* Stack columns vertically on mobile and tablet viewport sizes */
+              .modal-content-container {
+                flex-direction: column !important;
+                overflow-y: auto !important;
+              }
+              .modal-content-container > div {
+                flex: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                border-right: none !important;
+                border-left: none !important;
+                padding: 16px !important;
+              }
+            }
           `}} />
           <div style={{
             flex: '1 1 0%',
@@ -3484,7 +3664,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </button>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                    📚 Hausaufgaben-Archiv
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><BookOpen size={18} style={{ color: '#34a853', verticalAlign: 'middle' }} /> Hausaufgaben-Archiv</span>
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
                     Hier findest du alle vergangenen, archivierten Hausaufgaben-Wochen.
@@ -3533,7 +3713,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           onClick={() => setSelectedHistoryWeek(wk)}
                           style={{
                             background: isSelected ? '#f1f5f9' : 'white',
-                            border: isSelected ? '1.5px solid #456355' : '1px solid #cbd5e1',
+                            border: isSelected ? '1.5px solid #34a853' : '1px solid #cbd5e1',
                             borderRadius: '16px',
                             padding: isCompact ? '10px 16px' : '16px',
                             cursor: 'pointer',
@@ -3546,10 +3726,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           className="hover-scale"
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isSelected ? '#456355' : '#0f172a' }}>
+                            <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isSelected ? '#34a853' : '#0f172a' }}>
                               KW {weekNum}
                             </span>
-                            <span style={{ fontSize: '0.68rem', background: isSelected ? '#456355' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
+                            <span style={{ fontSize: '0.68rem', background: isSelected ? '#34a853' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
                               {homeworkItemsCount} Aufgaben
                             </span>
                           </div>
@@ -3569,7 +3749,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="button"
                   onClick={() => setActiveSubView('hub')}
                   style={{
-                    background: '#456355',
+                    background: '#34a853',
                     color: 'white',
                     border: 'none',
                     padding: '12px',
@@ -3669,7 +3849,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           📖 {book.totalPages || 50} Seiten • {pct}% gemeistert
                         </span>
                         <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #059669)', transition: 'width 0.4s ease' }} />
+                          <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #137333)', transition: 'width 0.4s ease' }} />
                         </div>
                       </div>
                     </div>
@@ -3736,7 +3916,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           <button
                             type="button"
                             onClick={() => setShowAllPagesGrid(true)}
-                            style={{ background: 'transparent', border: 'none', color: '#10b981', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            style={{ background: 'transparent', border: 'none', color: '#34a853', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                             className="hover-scale"
                           >
                             Ganzes Lehrwerk anzeigen
@@ -3756,7 +3936,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   type="button"
                                   onClick={() => setPageChunk(idx)}
                                   style={{
-                                    background: isSelected ? '#456355' : '#f1f5f9',
+                                    background: isSelected ? '#34a853' : '#f1f5f9',
                                     color: isSelected ? 'white' : '#475569',
                                     border: 'none',
                                     padding: '6px 12px',
@@ -4101,7 +4281,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       transition: 'all 0.3s ease'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: songProgressPercent === 100 ? '#10b981' : '#0f172a', transition: 'color 0.3s ease' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: songProgressPercent === 100 ? '#34a853' : '#0f172a', transition: 'color 0.3s ease' }}>
                           Fortschritt: {songProgressPercent}%
                         </span>
                         
@@ -4555,12 +4735,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               <p style={{ margin: 0, fontSize: '0.7rem', color: '#7d7d82', fontWeight: 700 }}>
                                 {total} Seiten • {worked} gemeistert
                               </p>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 900, color: pct > 0 ? '#10b981' : '#7d7d82' }}>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 900, color: pct > 0 ? '#34a853' : '#7d7d82' }}>
                                 ({pct}%)
                               </span>
                             </div>
                             <div style={{ width: '100%', height: '6px', background: '#f3f3f6', borderRadius: '3px', overflow: 'hidden', marginTop: '6px' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #059669)', transition: 'width 0.3s ease' }} />
+                              <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #137333)', transition: 'width 0.3s ease' }} />
                             </div>
                           </div>
                         </div>
@@ -4916,7 +5096,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     onClick={() => setActiveModalTab('logbook')}
                     style={{
                       flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                      background: '#456355', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                      background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
                       boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
                       transition: 'all 0.15s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
@@ -5107,7 +5287,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', height: '100%' }}>
                     <div>
                       <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        🗓️ Details KW {weekNum}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Details KW {weekNum}</span>
                       </span>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
                         Hausaufgaben und Notizen aus dieser Woche (Schreibgeschützt).
@@ -5256,7 +5436,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       {/* Homework notes */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
-                          📝 Hausaufgaben-Bemerkungen
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FileText size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Hausaufgaben-Bemerkungen</span>
                         </label>
                         <div style={{
                           width: '100%', minHeight: '80px', padding: '12px 14px', borderRadius: '16px',
@@ -5268,7 +5448,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
 
                       {/* Internal teacher notes */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {!readOnly && (
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
                           🔒 Interne Notiz (nur für Lehrer)
                         </label>
@@ -5280,6 +5461,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           {weekTeacherNotes || 'Keine internen Notizen.'}
                         </div>
                       </div>
+)}
                     </div>
                   </div>
                 );
@@ -5370,7 +5552,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         transition: 'all 0.2s ease'
                       }}
                       onFocus={e => {
-                        e.currentTarget.style.borderColor = '#456355';
+                        e.currentTarget.style.borderColor = '#34a853';
                         e.currentTarget.style.boxShadow = '0 0 0 3px rgba(69, 99, 85, 0.15)';
                       }}
                       onBlur={e => {
@@ -5417,7 +5599,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         type="button"
                         onClick={() => handleSave(true)}
                         style={{
-                          background: '#456355',
+                          background: '#34a853',
                           color: 'white',
                           border: 'none',
                           padding: '6px 12px',
@@ -5512,7 +5694,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {!readOnly && (
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
                       🔒 Interne Notiz (nur für Lehrer)
                     </label>
@@ -5529,6 +5712,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       }}
                     />
                   </div>
+)}
 
                   <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                     <button
@@ -5539,8 +5723,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         setActivePageNumber(null);
                       }}
                       style={{
-                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #456355',
-                        background: 'white', color: '#456355', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                        flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #34a853',
+                        background: 'white', color: '#34a853', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
                       }}
                     >
                       Zurück
@@ -5550,7 +5734,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       disabled={saving}
                       style={{
                         flex: 2, padding: '12px', borderRadius: '12px', border: 'none',
-                        background: '#456355', color: 'white', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
+                        background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer'
                       }}
                     >
                       {saving ? 'Speichert...' : 'Seite speichern'}
@@ -5647,8 +5831,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             transition: 'all 0.2s ease'
                           }}
                           onFocus={e => {
-                            e.currentTarget.style.borderColor = 'var(--primary-color, #10b981)';
-                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.15)';
+                            e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
                           }}
                           onBlur={e => {
                             e.currentTarget.style.borderColor = '#cbd5e1';
@@ -5697,7 +5881,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {!readOnly && (
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           🔒 Interne Notiz (nur für Lehrer):
                         </label>
@@ -5725,8 +5910,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             transition: 'all 0.2s ease'
                           }}
                           onFocus={e => {
-                            e.currentTarget.style.borderColor = 'var(--primary-color, #10b981)';
-                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.15)';
+                            e.currentTarget.style.borderColor = 'var(--primary-color, #34a853)';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15)';
                           }}
                           onBlur={e => {
                             e.currentTarget.style.borderColor = '#cbd5e1';
@@ -5734,6 +5919,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                         />
                       </div>
+)}
 
 
 
@@ -5769,7 +5955,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             padding: '14px',
                             borderRadius: '14px',
                             border: 'none',
-                            background: '#456355',
+                            background: '#34a853',
                             color: 'white',
                             fontWeight: 800,
                             fontSize: '0.82rem',
@@ -6258,7 +6444,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                              📝 Zusätzliche Hausaufgaben-Bemerkungen
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FileText size={15} style={{ color: '#34a853', verticalAlign: 'middle', marginTop: '-2px' }} /> Zusätzliche Hausaufgaben-Bemerkungen</span>
                             </label>
                             {!readOnly && (
                               <button
@@ -6292,7 +6478,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 onClick={handleAddNote}
                                 disabled={saving || !homeworkNotes.trim()}
                                 style={{
-                                  background: homeworkNotes.trim() ? '#456355' : '#cbd5e1',
+                                  background: homeworkNotes.trim() ? '#34a853' : '#cbd5e1',
                                   color: homeworkNotes.trim() ? 'white' : '#94a3b8',
                                   border: 'none',
                                   padding: '5px 10px',
@@ -6689,7 +6875,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         )}
 
                       {/* Internal teacher notes */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                      {!readOnly && (
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>
                           🔒 Interne Notiz (nur für Lehrer)
                         </label>
@@ -6706,6 +6893,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                         />
                       </div>
+)}
                     </div>
                   </div>
 
@@ -6716,7 +6904,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       disabled={saving}
                       style={{
                         flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                        background: '#456355', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                        background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
                         boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
                         transition: 'all 0.15s ease'
                       }}
@@ -6808,7 +6996,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="checkbox"
                   checked={isDevSimulationActive}
                   onChange={(e) => setIsDevSimulationActive(e.target.checked)}
-                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#10b981' }}
+                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#34a853' }}
                 />
                 <span>Klick-Vergabe simulieren</span>
               </label>
@@ -6819,7 +7007,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="checkbox"
                   checked={isDemoMode}
                   onChange={(e) => setIsDemoMode(e.target.checked)}
-                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#10b981' }}
+                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#34a853' }}
                 />
                 <span>Demo-Limits</span>
               </label>
@@ -7188,7 +7376,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
 
                   <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#10b981' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#34a853' }}>
                       Sticker Details
                     </span>
                     <h3 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
@@ -7203,7 +7391,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       onClick={() => setShareCardLayout('dark')}
                       style={{
                         flex: 1,
-                        background: shareCardLayout === 'dark' ? '#10b981' : 'transparent',
+                        background: shareCardLayout === 'dark' ? '#34a853' : 'transparent',
                         color: 'white',
                         border: 'none',
                         borderRadius: '8px',
@@ -7221,7 +7409,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       onClick={() => setShareCardLayout('light')}
                       style={{
                         flex: 1,
-                        background: shareCardLayout === 'light' ? '#10b981' : 'transparent',
+                        background: shareCardLayout === 'light' ? '#34a853' : 'transparent',
                         color: 'white',
                         border: 'none',
                         borderRadius: '8px',
@@ -7266,7 +7454,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           left: '-150px',
                           width: '1500px',
                           height: '900px',
-                          background: `linear-gradient(135deg, ${(st.color || '#10b981')}45 0%, transparent 100%)`,
+                          background: `linear-gradient(135deg, ${(st.color || '#34a853')}45 0%, transparent 100%)`,
                           transform: 'rotate(-12deg)',
                           pointerEvents: 'none',
                           zIndex: 1
@@ -7279,7 +7467,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           left: '-100px',
                           fontSize: '130px',
                           fontWeight: 900,
-                          color: st.color || '#10b981',
+                          color: st.color || '#34a853',
                           opacity: 0.06,
                           transform: 'rotate(-12deg)',
                           whiteSpace: 'nowrap',
@@ -7299,8 +7487,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           width: '840px',
                           height: '1040px',
                           background: '#121216',
-                          border: `6px solid ${(st.color || '#10b981')}`,
-                          boxShadow: `0 8px 32px ${(st.color || '#10b981')}20`,
+                          border: `6px solid ${(st.color || '#34a853')}`,
+                          boxShadow: `0 8px 32px ${(st.color || '#34a853')}20`,
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -7321,7 +7509,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               fontSize: '28px', 
                               fontWeight: 900, 
                               color: '#ffffff', 
-                              background: st.color || '#10b981',
+                              background: st.color || '#34a853',
                               padding: '10px 30px',
                               borderRadius: '30px',
                               transform: 'rotate(-2deg) skewX(-6deg)',
@@ -7341,7 +7529,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               height: '360px',
                               borderRadius: '50%',
                               border: '6px solid #ffffff',
-                              boxShadow: `0 0 40px ${(st.color || '#10b981')}60`,
+                              boxShadow: `0 0 40px ${(st.color || '#34a853')}60`,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -7401,7 +7589,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               marginTop: studentInstrument ? '12px' : '20px',
                               fontSize: '48px', 
                               fontWeight: 900, 
-                              color: st.color || '#10b981', 
+                              color: st.color || '#34a853', 
                               fontFamily: '"Arial Black", sans-serif', 
                               textTransform: 'uppercase', 
                               textAlign: 'center',
@@ -7454,7 +7642,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <span style={{
                               fontSize: '24px',
                               fontWeight: 900,
-                              color: st.color || '#10b981',
+                              color: st.color || '#34a853',
                               letterSpacing: '0.06em',
                               textTransform: 'lowercase',
                               fontFamily: '"Arial Black", sans-serif'
@@ -7494,7 +7682,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           left: '-150px',
                           width: '1500px',
                           height: '900px',
-                          background: `linear-gradient(135deg, ${(st.color || '#10b981')}25 0%, transparent 100%)`,
+                          background: `linear-gradient(135deg, ${(st.color || '#34a853')}25 0%, transparent 100%)`,
                           transform: 'rotate(-12deg)',
                           pointerEvents: 'none',
                           zIndex: 1
@@ -7507,7 +7695,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           left: '-100px',
                           fontSize: '130px',
                           fontWeight: 900,
-                          color: st.color || '#10b981',
+                          color: st.color || '#34a853',
                           opacity: 0.05,
                           transform: 'rotate(-12deg)',
                           whiteSpace: 'nowrap',
@@ -7527,8 +7715,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           width: '840px',
                           height: '1040px',
                           background: 'rgba(250, 250, 250, 0.85)',
-                          border: `6px solid ${(st.color || '#10b981')}bb`,
-                          boxShadow: `0 8px 32px ${(st.color || '#10b981')}15`,
+                          border: `6px solid ${(st.color || '#34a853')}bb`,
+                          boxShadow: `0 8px 32px ${(st.color || '#34a853')}15`,
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -7549,7 +7737,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               fontSize: '28px', 
                               fontWeight: 900, 
                               color: '#ffffff', 
-                              background: st.color || '#10b981',
+                              background: st.color || '#34a853',
                               padding: '10px 30px',
                               borderRadius: '30px',
                               transform: 'rotate(-2deg) skewX(-6deg)',
@@ -7569,7 +7757,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               height: '360px',
                               borderRadius: '50%',
                               border: '6px solid #ffffff',
-                              boxShadow: `0 0 40px ${(st.color || '#10b981')}45`,
+                              boxShadow: `0 0 40px ${(st.color || '#34a853')}45`,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -7629,7 +7817,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               marginTop: studentInstrument ? '12px' : '20px',
                               fontSize: '48px', 
                               fontWeight: 900, 
-                              color: st.color || '#10b981', 
+                              color: st.color || '#34a853', 
                               fontFamily: '"Arial Black", sans-serif', 
                               textTransform: 'uppercase', 
                               textAlign: 'center',
@@ -7682,7 +7870,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             <span style={{
                               fontSize: '24px',
                               fontWeight: 900,
-                              color: st.color || '#10b981',
+                              color: st.color || '#34a853',
                               letterSpacing: '0.06em',
                               textTransform: 'lowercase',
                               fontFamily: '"Arial Black", sans-serif'
@@ -7710,7 +7898,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     onClick={() => downloadShareCard(st)}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '16px',
@@ -7718,7 +7906,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       fontSize: '0.86rem',
                       fontWeight: 900,
                       cursor: 'pointer',
-                      boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
+                      boxShadow: '0 8px 20px rgba(52, 168, 83, 0.25)',
                       transition: 'all 0.15s'
                     }}
                     className="hover-scale"
@@ -7774,7 +7962,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
                 }}
               >
-                <span style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.1em' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', letterSpacing: '0.1em' }}>
                   Sticker freigeschaltet!
                 </span>
                 <div style={{
@@ -7817,14 +8005,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <button
                   onClick={() => setAwardedStickerToAnimate(null)}
                   style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '14px',
                     padding: '12px 32px',
                     fontWeight: 900,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                     transition: 'all 0.15s'
                   }}
                   className="hover-scale"
@@ -7988,7 +8176,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <h3 style={{
                     fontSize: '1rem',
                     fontWeight: 800,
-                    color: useNotebookLayout ? '#456355' : '#475569',
+                    color: useNotebookLayout ? '#34a853' : '#475569',
                     borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
                     paddingBottom: '8px',
                     margin: 0,
@@ -8097,7 +8285,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <h3 style={{
                     fontSize: '1rem',
                     fontWeight: 800,
-                    color: useNotebookLayout ? '#456355' : '#475569',
+                    color: useNotebookLayout ? '#34a853' : '#475569',
                     borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
                     paddingBottom: '8px',
                     margin: 0,
@@ -8296,7 +8484,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       bg = '#fffbeb';
                       textColor = '#92400e';
                     } else if (status === 'mastered') {
-                      borderColor = '#10b981';
+                      borderColor = '#34a853';
                       bg = '#f0fdf4';
                       textColor = '#166534';
                     } else if (status === 'purple') {
@@ -8309,7 +8497,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     if (status === 'homework') {
                       solidActiveBg = '#eab308';
                     } else if (status === 'mastered') {
-                      solidActiveBg = '#10b981';
+                      solidActiveBg = '#34a853';
                     } else if (status === 'purple') {
                       solidActiveBg = '#af52de';
                     }
@@ -8410,12 +8598,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(9, 9, 11, 0.65)',
-        backdropFilter: 'blur(20px)',
+        background: isFullscreen ? '#09090b' : 'rgba(9, 9, 11, 0.65)',
+        backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: isFullscreen ? '0' : '20px',
         fontFamily: '"Inter", sans-serif'
       }}>
         {content}
@@ -10525,7 +10713,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     const sampleBlockSize = 1152;
     const int16Samples = new Int16Array(samples.length);
     for (let i = 0; i < samples.length; i++) {
-      let sample = Math.max(-1, Math.min(1, samples[i]));
+      const sample = Math.max(-1, Math.min(1, samples[i]));
       int16Samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
     }
     
@@ -10533,7 +10721,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const samples2 = buffer.getChannelData(1);
       const int16Samples2 = new Int16Array(samples2.length);
       for (let i = 0; i < samples2.length; i++) {
-        let sample = Math.max(-1, Math.min(1, samples2[i]));
+        const sample = Math.max(-1, Math.min(1, samples2[i]));
         int16Samples2[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
       }
       for (let i = 0; i < int16Samples.length; i += sampleBlockSize) {
@@ -10784,7 +10972,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const ringColor = (isAutoSequenceActive || isAnyTrackRecording)
     ? '#ea4335' // Red during the entire auto-sequence or individual track recording
     : isPlaying 
-      ? '#137333' // Green during playback
+      ? '#34a853' // Green during playback
       : '#e5e5e7'; // default/ready
 
   const savedLoops = homeworkNotesList
@@ -10831,9 +11019,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           100% { filter: drop-shadow(0 0 3px rgba(234, 67, 53, 0.3)); }
         }
         @keyframes glow-play {
-          0% { filter: drop-shadow(0 0 3px rgba(19, 115, 51, 0.25)); }
-          50% { filter: drop-shadow(0 0 10px rgba(19, 115, 51, 0.65)); }
-          100% { filter: drop-shadow(0 0 3px rgba(19, 115, 51, 0.25)); }
+          0% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); }
+          50% { filter: drop-shadow(0 0 10px rgba(52, 168, 83, 0.65)); }
+          100% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); }
         }
         .glow-record {
           animation: glow-record 2s infinite ease-in-out;
@@ -10868,7 +11056,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           width: 16px;
           height: 16px;
           border-radius: 50%;
-          background: #137333;
+          background: #34a853;
           border: 2.5px solid #ffffff;
           cursor: pointer;
           box-shadow: 0 2px 5px rgba(0,0,0,0.18);
@@ -11073,7 +11261,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             className="tactile-btn"
             style={{
               width: '100%',
-              background: isAutoSequenceActive ? '#ea4335' : '#137333',
+              background: isAutoSequenceActive ? '#ea4335' : '#34a853',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
@@ -11125,7 +11313,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             style={{
               width: '100%',
               background: useHeadphones ? 'rgba(230, 244, 234, 0.6)' : '#ffffff',
-              border: useHeadphones ? '1px solid rgba(19, 115, 51, 0.15)' : '1px solid #f1f3f5',
+              border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid #f1f3f5',
               borderRadius: '12px',
               padding: '10px 12px',
               cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
@@ -11135,7 +11323,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               gap: '10px',
               transition: 'all 0.2s ease',
               opacity: isAutoSequenceActive ? 0.6 : 1,
-              boxShadow: useHeadphones ? '0 4px 12px rgba(19, 115, 51, 0.03)' : 'none'
+              boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -11143,7 +11331,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                background: useHeadphones ? '#137333' : '#f5f5f7',
+                background: useHeadphones ? '#34a853' : '#f5f5f7',
                 color: useHeadphones ? '#ffffff' : '#86868b',
                 display: 'flex',
                 alignItems: 'center',
@@ -11153,7 +11341,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 <Headphones size={15} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: useHeadphones ? '#137333' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
                   Kopfhörer-Modus
                 </span>
                 <span style={{ fontSize: '0.54rem', color: '#86868b', fontWeight: 500 }}>
@@ -11166,7 +11354,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               width: '34px',
               height: '20px',
               borderRadius: '10px',
-              background: useHeadphones ? '#137333' : '#e5e5ea',
+              background: useHeadphones ? '#34a853' : '#e5e5ea',
               position: 'relative',
               transition: 'all 0.2s ease',
               padding: '2px'
@@ -11229,8 +11417,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             style={{
               flex: 2,
               background: isPlaying ? '#ea4335' : '#ffffff',
-              color: isPlaying ? '#ffffff' : '#137333',
-              border: isPlaying ? 'none' : '1px solid #137333',
+              color: isPlaying ? '#ffffff' : '#34a853',
+              border: isPlaying ? 'none' : '1px solid #34a853',
               borderRadius: '12px',
               height: '42px',
               fontSize: '0.74rem',
@@ -11316,7 +11504,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 onClick={() => setIsMetronomeActive(!isMetronomeActive)}
                 className="tactile-btn"
                 style={{
-                  background: isMetronomeActive ? '#137333' : '#f5f5f7',
+                  background: isMetronomeActive ? '#34a853' : '#f5f5f7',
                   border: 'none',
                   color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
                   fontSize: '0.55rem',
@@ -11382,7 +11570,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                   SYNC LATENCY
                 </span>
-                <span style={{ fontSize: '0.62rem', color: '#137333', fontWeight: 700, fontFamily: 'SF Mono, monospace' }}>
+                <span style={{ fontSize: '0.62rem', color: '#34a853', fontWeight: 700, fontFamily: 'SF Mono, monospace' }}>
                   {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
                 </span>
               </div>
@@ -11396,7 +11584,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     setSyncOffsetMs(parseInt(e.target.value));
                     isManualLatencyAdjustmentRef.current = true;
                   }} 
-                  style={{ flex: 1, accentColor: '#137333', height: '4px', cursor: 'pointer' }}
+                  style={{ flex: 1, accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
                 />
               </div>
               <button
@@ -11405,8 +11593,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 disabled={isCalibratingLatency}
                 className="tactile-btn"
                 style={{
-                  background: isCalibratingLatency ? '#e5e5ea' : 'rgba(19, 115, 51, 0.08)',
-                  color: isCalibratingLatency ? '#86868b' : '#137333',
+                  background: isCalibratingLatency ? '#e5e5ea' : 'rgba(52, 168, 83, 0.08)',
+                  color: isCalibratingLatency ? '#86868b' : '#34a853',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '6px 10px',
@@ -11435,7 +11623,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               disabled={isExporting}
               className="tactile-btn"
               style={{
-                background: '#137333',
+                background: '#34a853',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '12px',
@@ -11524,7 +11712,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   left: 0,
                   right: 0,
                   height: '3px',
-                  background: '#137333',
+                  background: '#34a853',
                   opacity: 0.8
                 }} />
               )}
@@ -11563,12 +11751,12 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                         ? '#fef3c7' 
                         : hasAudio 
                           ? '#f5f5f7' 
-                          : 'rgba(19, 115, 51, 0.06)',
+                          : 'rgba(52, 168, 83, 0.06)',
                       color: track.isWaiting 
                         ? '#d97706' 
                         : hasAudio 
                           ? '#86868b' 
-                          : '#137333',
+                          : '#34a853',
                       border: 'none',
                       borderRadius: '50%',
                       width: '40px',
@@ -11601,7 +11789,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                       : track.isWaiting 
                         ? '#d97706' 
                         : hasAudio 
-                          ? '#137333' 
+                          ? '#34a853' 
                           : '#cbd5e0',
                     transition: 'background 0.2s ease'
                   }} />
@@ -11646,7 +11834,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               }}>
                 {Array.from({ length: 8 }).map((_, idx) => {
                   const isActive = meterHeights[track.id] >= (8 - idx);
-                  const color = '#137333'; // Monochrome green
+                  const color = '#34a853'; // Monochrome green
                   return (
                     <div
                       key={idx}
@@ -11772,7 +11960,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                       onClick={() => handlePlaySavedLoop(loop.url)}
                       className="tactile-btn"
                       style={{
-                        background: '#137333',
+                        background: '#34a853',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '50%',
@@ -12102,10 +12290,10 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                     height: '16px',
                     borderRadius: '50%',
                     background: isActive 
-                      ? (idx === 0 ? '#ea4335' : '#137333') 
+                      ? (idx === 0 ? '#ea4335' : '#34a853') 
                       : '#e5e5e7',
                     boxShadow: isActive 
-                      ? `0 0 10px ${idx === 0 ? 'rgba(234, 67, 53, 0.6)' : 'rgba(19, 115, 51, 0.6)'}` 
+                      ? `0 0 10px ${idx === 0 ? 'rgba(234, 67, 53, 0.6)' : 'rgba(52, 168, 83, 0.6)'}` 
                       : 'none',
                     transition: 'all 0.08s ease'
                   }}
@@ -12240,7 +12428,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
             className="tactile-btn"
             style={{
               width: '100%',
-              background: isPlaying ? '#ea4335' : '#137333',
+              background: isPlaying ? '#ea4335' : '#34a853',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
@@ -12309,7 +12497,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                   onClick={() => setSelectedStyle(styleOpt.id as any)}
                   className="tactile-btn"
                   style={{
-                    background: isSelected ? '#137333' : '#f5f5f7',
+                    background: isSelected ? '#34a853' : '#f5f5f7',
                     color: isSelected ? '#ffffff' : '#1d1d1f',
                     border: 'none',
                     borderRadius: '12px',

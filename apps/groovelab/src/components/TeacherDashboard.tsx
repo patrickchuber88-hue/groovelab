@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2 } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -95,7 +95,7 @@ const INSTRUMENT_COLORS: Record<string, string> = {
   Bass: '#eab308', 
   Drums: '#3b82f6', 
   Keys: '#a855f7',
-  Vocals: '#10b981'
+  Vocals: '#34a853'
 };
 
 const normalizeInstrument = (name: string) => {
@@ -167,7 +167,7 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
     'linear-gradient(135deg, #6366f1, #a855f7)', // Indigo to Purple
     'linear-gradient(135deg, #ec4899, #f43f5e)', // Pink to Rose
     'linear-gradient(135deg, #3b82f6, #06b6d4)', // Blue to Cyan
-    'linear-gradient(135deg, #10b981, #3b82f6)', // Emerald to Blue
+    'linear-gradient(135deg, #34a853, #3b82f6)', // Emerald to Blue
     'linear-gradient(135deg, #f59e0b, #e11d48)'  // Amber to Rose
   ];
   
@@ -848,6 +848,7 @@ export function TeacherDashboard({
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
+  const [expandedResponseIds, setExpandedResponseIds] = useState<Record<string, boolean>>({});
   const [showAllSubmissions, setShowAllSubmissions] = useState(false);
   const [coaches, setCoaches] = useState<any[]>([]);
   const [ticker, setTicker] = useState(0);
@@ -1986,12 +1987,94 @@ export function TeacherDashboard({
       setRespondingToRequestId(null);
       setAdminFeedbackTab('done');
       alert('Rückmeldung erfolgreich übermittelt! Vielen Dank.');
+      await fetchData();
       setTicker(t => t + 1);
     } catch (err) {
       console.error(err);
       alert('Fehler beim Übermitteln der Rückmeldung.');
     } finally {
       setSubmittingFeedback(false);
+    }
+  };
+
+  const handleMarkRequestAsDone = async (requestId: string) => {
+    setSubmittingFeedback(true);
+    try {
+      const { error } = await supabase
+        .from('campus_feedback_responses')
+        .insert({
+          request_id: requestId,
+          teacher_id: userId,
+          response_text: 'Erledigt'
+        });
+
+      if (error) throw error;
+      
+      setRespondingToRequestId(null);
+      setAdminFeedbackTab('done');
+      alert('Aufgabe als erledigt markiert!');
+      await fetchData();
+      setTicker(t => t + 1);
+    } catch (err) {
+      console.error(err);
+      alert('Fehler beim Markieren als erledigt.');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
+  const handleReactToPost = async (postId: string, emoji: string, type: 'campus' | 'class' = 'campus') => {
+    try {
+      const list = type === 'campus' ? feedInteractions : classFeedInteractions;
+      const existing = list.find(i => i.post_id === postId && i.user_id === userId && i.emoji_unicode === emoji);
+      if (existing) {
+        await supabase
+          .from('feed_interactions')
+          .delete()
+          .eq('id', existing.id);
+      } else {
+        await supabase
+          .from('feed_interactions')
+          .insert({
+            post_type: type,
+            post_id: postId,
+            user_id: userId,
+            interaction_type: 'like',
+            emoji_unicode: emoji
+          });
+      }
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateClassPost = async () => {
+    if (!newPostTitle.trim() || !newPostContent.trim()) return;
+    setSubmittingClassPost(true);
+    try {
+      const { error } = await supabase
+        .from('class_feed_posts')
+        .insert({
+          teacher_id: userId,
+          title: newPostTitle.trim(),
+          content: newPostContent.trim(),
+          post_type: newPostType,
+          quiz_data: null,
+          attachment_url: null
+        });
+      if (error) throw error;
+      
+      setNewPostTitle('');
+      setNewPostContent('');
+      setNewPostType('announcement');
+      setShowClassPostForm(false);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Fehler beim Erstellen des Beitrags.');
+    } finally {
+      setSubmittingClassPost(false);
     }
   };
   
@@ -2143,7 +2226,7 @@ export function TeacherDashboard({
             return `${y}-${m}-${day}`;
           };
           
-          let end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
+          const end = ev.dtend ? new Date(ev.dtend) : new Date(ev.dtstart);
           if (ev.dtend && ev.isAllDay) {
             end.setDate(end.getDate() - 1);
           }
@@ -2267,6 +2350,15 @@ export function TeacherDashboard({
   const [adminFeedbackRequests, setAdminFeedbackRequests] = useState<any[]>([]);
   const [adminFeedbackResponses, setAdminFeedbackResponses] = useState<any[]>([]);
   const [campusFeedAnnouncements, setCampusFeedAnnouncements] = useState<any[]>([]);
+  const [feedInteractions, setFeedInteractions] = useState<any[]>([]);
+  const [teacherFeedTab, setTeacherFeedTab] = useState<'campus' | 'class'>('campus');
+  const [classFeedPosts, setClassFeedPosts] = useState<any[]>([]);
+  const [classFeedInteractions, setClassFeedInteractions] = useState<any[]>([]);
+  const [showClassPostForm, setShowClassPostForm] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostType, setNewPostType] = useState<'announcement' | 'homework'>('announcement');
+  const [submittingClassPost, setSubmittingClassPost] = useState(false);
   const [respondingToRequestId, setRespondingToRequestId] = useState<string | null>(null);
   const [responseTextInput, setResponseTextInput] = useState<string>('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
@@ -3075,7 +3167,7 @@ export function TeacherDashboard({
             .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
 
           // Format regular schedules
-          let timeline = (slots || []).map((slot: any) => {
+          const timeline = (slots || []).map((slot: any) => {
             const student = slot.student;
             const avatar = student?.avatars?.[0] || null;
             const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
@@ -3541,7 +3633,7 @@ export function TeacherDashboard({
         // Prepare Student Query depending on platform
         // For student viewMode: fetch all students in school (userId is the student's own ID, NOT a teacher_id)
         // For admin/teacher viewMode: fetch only the teacher's own students filtered by teacher_id
-        let studentQuery = viewMode === 'student'
+        const studentQuery = viewMode === 'student'
           ? supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student')
           : supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').eq('teacher_id', userId);
 
@@ -3822,7 +3914,7 @@ export function TeacherDashboard({
 
             // B. Add core band members using the smart vacant slot allocation logic
             const requiredInsts = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
-            let instCount: Record<string, number> = {};
+            const instCount: Record<string, number> = {};
             membersList.forEach((m: any) => {
               instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
             });
@@ -4033,7 +4125,7 @@ export function TeacherDashboard({
               });
 
               // 2. Add core band members who aren't in slots yet
-              let instCount: Record<string, number> = {};
+              const instCount: Record<string, number> = {};
               members.forEach((m: any) => {
                 instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
               });
@@ -4176,7 +4268,7 @@ export function TeacherDashboard({
             });
 
             // 2. Add core band members who aren't in slots yet
-            let instCount: Record<string, number> = {};
+            const instCount: Record<string, number> = {};
             members.forEach((m: any) => {
               instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
             });
@@ -4442,18 +4534,36 @@ export function TeacherDashboard({
 
           // 10. Fetch Live Campus Feed Announcements from campus_announcements table
           try {
-            const { data: annData, error: annErr } = await supabase
-              .from('campus_announcements')
-              .select('*, users(first_name, last_name, photo_url)')
-              .eq('school_id', tData.school_id)
-              .order('created_at', { ascending: false });
+            const [annDataRes, reactDataRes, classPostsRes, classReactRes] = await Promise.all([
+              supabase
+                .from('campus_announcements')
+                .select('*, users(first_name, last_name, photo_url)')
+                .eq('school_id', tData.school_id)
+                .order('created_at', { ascending: false }),
+              supabase
+                .from('feed_interactions')
+                .select('*')
+                .eq('post_type', 'campus'),
+              supabase
+                .from('class_feed_posts')
+                .select('*')
+                .eq('teacher_id', userId)
+                .order('created_at', { ascending: false }),
+              supabase
+                .from('feed_interactions')
+                .select('*')
+                .eq('post_type', 'class')
+            ]);
 
-            if (!annErr && annData) {
-              const parsed = annData.map(ann => ({
+            if (!annDataRes.error && annDataRes.data) {
+              const parsed = annDataRes.data.map(ann => ({
                 id: ann.id,
                 title: ann.title,
                 content: ann.message,
                 target_type: ann.target_type || 'all',
+                category: ann.category || 'general',
+                is_emergency: ann.is_emergency || false,
+                attachment_url: ann.attachment_url || null,
                 created_at: ann.created_at,
                 user: ann.users
               }));
@@ -4461,8 +4571,26 @@ export function TeacherDashboard({
             } else {
               setCampusFeedAnnouncements([]);
             }
+
+            if (!reactDataRes.error && reactDataRes.data) {
+              setFeedInteractions(reactDataRes.data);
+            } else {
+              setFeedInteractions([]);
+            }
+
+            if (!classPostsRes.error && classPostsRes.data) {
+              setClassFeedPosts(classPostsRes.data);
+            } else {
+              setClassFeedPosts([]);
+            }
+
+            if (!classReactRes.error && classReactRes.data) {
+              setClassFeedInteractions(classReactRes.data);
+            } else {
+              setClassFeedInteractions([]);
+            }
           } catch (aErr) {
-            console.error('Error fetching announcements:', aErr);
+            console.error('Error fetching announcements & interactions:', aErr);
           }
         }
       }
@@ -4574,7 +4702,7 @@ export function TeacherDashboard({
         insertData.external_name = extName;
       }
 
-      let { error } = await supabase.from('band_members').insert(insertData);
+      const { error } = await supabase.from('band_members').insert(insertData);
       if (error && error.message.includes('external_name')) {
         if (!uId) {
           throw new Error("Der Server unterstützt keine externen Mitglieder. Bitte führen Sie die SQL-Migration aus.");
@@ -4616,7 +4744,7 @@ export function TeacherDashboard({
             return slotObj;
          });
 
-         let { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);
+         const { error: slotErr } = await supabase.from('band_song_slots').insert(slotsToInsert);
          if (slotErr && slotErr.message.includes('external_name')) {
             if (!uId) {
                console.error("Failed to insert slots for external member:", slotErr);
@@ -4962,8 +5090,8 @@ export function TeacherDashboard({
           font-weight: 700;
         }
         .google-sidebar-item.active.live {
-          background: rgba(19, 115, 51, 0.08) !important;
-          color: #137333 !important;
+          background: rgba(52, 168, 83, 0.08) !important;
+          color: #34a853 !important;
           font-weight: 700;
         }
         .google-sidebar-item.active.bands {
@@ -5253,7 +5381,7 @@ export function TeacherDashboard({
                       </>
                     )}
                   </button>
-                  <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#137333', fontSize: '0.85rem', fontWeight: 800 }}>
+                  <div style={{ background: '#e6f4ea', padding: '8px 16px', borderRadius: '100px', border: '1px solid #34a853', color: '#34a853', fontSize: '0.85rem', fontWeight: 800 }}>
                     {activeSessions.filter(s => {
                       const u = s.users;
                       if (!u) return false;
@@ -5393,16 +5521,16 @@ export function TeacherDashboard({
                   {/* Holiday Banner */}
                   {isTodayHoliday && (
                     <div style={{
-                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%)',
+                      background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%)',
                       backdropFilter: 'blur(12px)',
                       WebkitBackdropFilter: 'blur(12px)',
-                      border: '1px solid rgba(16, 185, 129, 0.18)',
+                      border: '1px solid rgba(52, 168, 83, 0.18)',
                       padding: '18px 24px',
                       borderRadius: '16px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '16px',
-                      boxShadow: '0 8px 30px rgba(16, 185, 129, 0.04)',
+                      boxShadow: '0 8px 30px rgba(52, 168, 83, 0.04)',
                       position: 'relative',
                       overflow: 'hidden'
                     }}>
@@ -5412,13 +5540,13 @@ export function TeacherDashboard({
                         bottom: '-20px',
                         width: '100px',
                         height: '100px',
-                        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)',
+                        background: 'radial-gradient(circle, rgba(52, 168, 83, 0.1) 0%, transparent 70%)',
                         pointerEvents: 'none'
                       }} />
                       <div style={{
-                        background: 'rgba(16, 185, 129, 0.08)',
-                        border: '1.5px solid rgba(16, 185, 129, 0.12)',
-                        color: '#059669',
+                        background: 'rgba(52, 168, 83, 0.08)',
+                        border: '1.5px solid rgba(52, 168, 83, 0.12)',
+                        color: '#137333',
                         padding: '10px',
                         borderRadius: '12px',
                         display: 'flex',
@@ -5434,7 +5562,7 @@ export function TeacherDashboard({
                             fontSize: '0.62rem',
                             fontWeight: 900,
                             color: '#047857',
-                            background: 'rgba(16, 185, 129, 0.08)',
+                            background: 'rgba(52, 168, 83, 0.08)',
                             padding: '2px 6px',
                             borderRadius: '5px',
                             textTransform: 'uppercase',
@@ -5447,7 +5575,7 @@ export function TeacherDashboard({
                           </h4>
                         </div>
                         <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-                          Vom <strong style={{ color: '#059669', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#059669', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
+                          Vom <strong style={{ color: '#137333', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#137333', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
                         </p>
                       </div>
                     </div>
@@ -5642,7 +5770,7 @@ export function TeacherDashboard({
                         <button
                           onClick={handleEndSick}
                           style={{
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '12px 28px',
@@ -5650,7 +5778,7 @@ export function TeacherDashboard({
                             fontSize: '0.9rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                             transition: 'all 0.2s'
                           }}
                           onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
@@ -5691,8 +5819,8 @@ export function TeacherDashboard({
                       {/* Card 2: Ø Übe-Streak Heute (Green matching Songs) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                        borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.3)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '16px', boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -5828,7 +5956,7 @@ export function TeacherDashboard({
                                 marginBottom: '6px',
                                 flexShrink: 0
                               }}>
-                                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
                                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
                                   {currentTimeStr || '13:00'} UHR
                                 </span>
@@ -5875,7 +6003,7 @@ export function TeacherDashboard({
                           borderLeft: widgetState === 'VORBEREITUNG' 
                             ? '4px solid #fbbc05' 
                             : widgetState === 'ACTIVE' 
-                            ? '4px solid #10b981' 
+                            ? '4px solid #34a853' 
                             : widgetState === 'WEEKEND' 
                             ? '4px solid #8b5cf6' 
                             : '4px solid #f59e0b', 
@@ -6231,7 +6359,7 @@ export function TeacherDashboard({
                               return (
                                 <>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={{ background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                       <Award size={18} />
                                     </div>
                                     <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -6257,14 +6385,14 @@ export function TeacherDashboard({
                                         width: '42px',
                                         height: '42px',
                                         borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                                         color: 'white',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         fontSize: '1.1rem',
                                         fontWeight: 800,
-                                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)'
+                                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.15)'
                                       }}>
                                         {prep.studentName.charAt(0)}
                                       </div>
@@ -6322,8 +6450,8 @@ export function TeacherDashboard({
                                                   </div>
                                                   {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
                                                     <span style={{
-                                                      background: 'rgba(16, 185, 129, 0.08)',
-                                                      color: '#10b981',
+                                                      background: 'rgba(52, 168, 83, 0.08)',
+                                                      color: '#34a853',
                                                       fontSize: '0.64rem',
                                                       fontWeight: 800,
                                                       borderRadius: '100px',
@@ -6403,8 +6531,8 @@ export function TeacherDashboard({
                                                   </div>
                                                   {(item.status === 'MASTERED' || item.status === 'THEORY_DONE') && (
                                                     <span style={{
-                                                      background: 'rgba(16, 185, 129, 0.08)',
-                                                      color: '#10b981',
+                                                      background: 'rgba(52, 168, 83, 0.08)',
+                                                      color: '#34a853',
                                                       fontSize: '0.64rem',
                                                       fontWeight: 800,
                                                       borderRadius: '100px',
@@ -6424,7 +6552,7 @@ export function TeacherDashboard({
                                                 color: '#475569', 
                                                 fontWeight: 500, 
                                                 fontStyle: 'italic', 
-                                                borderLeft: '2.5px solid #10b981', 
+                                                borderLeft: '2.5px solid #34a853', 
                                                 paddingLeft: '8px', 
                                                 margin: '2px 4px',
                                                 lineHeight: 1.3
@@ -6474,7 +6602,7 @@ export function TeacherDashboard({
                                         }}
                                         style={{
                                           flex: 1,
-                                          background: '#10b981',
+                                          background: '#34a853',
                                           color: 'white',
                                           border: 'none',
                                           padding: '10px 14px',
@@ -6486,7 +6614,7 @@ export function TeacherDashboard({
                                           alignItems: 'center',
                                           justifyContent: 'center',
                                           gap: '6px',
-                                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+                                          boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
                                           transition: 'all 0.2s'
                                         }}
                                         className="hover-scale"
@@ -6768,12 +6896,12 @@ export function TeacherDashboard({
                                         background: dailyItem.type === 'joke' 
                                           ? 'rgba(239, 68, 68, 0.08)' 
                                           : dailyItem.type === 'fact'
-                                            ? 'rgba(16, 185, 129, 0.08)'
+                                            ? 'rgba(52, 168, 83, 0.08)'
                                             : 'rgba(99, 102, 241, 0.08)',
                                         color: dailyItem.type === 'joke' 
                                           ? '#ef4444' 
                                           : dailyItem.type === 'fact'
-                                            ? '#10b981'
+                                            ? '#34a853'
                                             : '#4f46e5',
                                         padding: '2px 8px',
                                         borderRadius: '100px',
@@ -7023,7 +7151,7 @@ export function TeacherDashboard({
                                   width: '20px',
                                   height: '20px',
                                   borderRadius: '50%',
-                                  border: '3px solid #137333',
+                                  border: '3px solid #34a853',
                                   background: '#ffffff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -7035,7 +7163,7 @@ export function TeacherDashboard({
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#137333'
+                                    background: '#34a853'
                                   }} />
                                 </div>
                               );
@@ -7293,7 +7421,7 @@ export function TeacherDashboard({
                                      borderLeft: slotBorderLeft,
                                      cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
                                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                     boxShadow: isCurrentSlot ? '0 8px 24px rgba(19, 115, 51, 0.12), 0 2px 6px rgba(19, 115, 51, 0.06)' : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
+                                     boxShadow: isCurrentSlot ? '0 8px 24px rgba(52, 168, 83, 0.12), 0 2px 6px rgba(52, 168, 83, 0.06)' : ((idx === prepIndex) ? (isRescheduledPending ? '0 6px 18px rgba(234, 179, 8, 0.08)' : '0 6px 18px rgba(59, 130, 246, 0.06)') : '0 4px 10px rgba(0, 0, 0, 0.02), 0 1px 3px rgba(0, 0, 0, 0.02)'),
                                      minWidth: 0,
                                      opacity: ((!slot.student && !slot.isGroup) || isCanceled) ? 0.75 : 1
                                    }}
@@ -7312,14 +7440,14 @@ export function TeacherDashboard({
                                       <div style={{
                                         fontSize: '0.8rem',
                                         fontWeight: 900,
-                                        color: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#137333' : '#0f172a',
+                                        color: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#34a853' : '#0f172a',
                                         fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         whiteSpace: 'nowrap',
                                         flexShrink: 0,
                                         background: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#ffffff' : 'transparent',
                                         padding: '4px 8px',
                                         borderRadius: '6px',
-                                        border: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '1.5px solid #137333' : 'none',
+                                        border: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '1.5px solid #34a853' : 'none',
                                         boxShadow: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '0 1px 3px rgba(19,115,51,0.08)' : 'none',
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -7331,7 +7459,7 @@ export function TeacherDashboard({
                                             width: '6px',
                                             height: '6px',
                                             borderRadius: '50%',
-                                            background: '#137333',
+                                            background: '#34a853',
                                             display: 'inline-block'
                                           }} />
                                         )}
@@ -7401,8 +7529,8 @@ export function TeacherDashboard({
                                                   fontSize: '0.72rem',
                                                   fontWeight: 700,
                                                   background: ack ? '#e6f4ea' : '#fef7e0',
-                                                  color: ack ? '#137333' : '#b45309',
-                                                  border: ack ? '1px solid rgba(19, 115, 51, 0.15)' : '1px solid rgba(245, 158, 11, 0.25)',
+                                                  color: ack ? '#34a853' : '#b45309',
+                                                  border: ack ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(245, 158, 11, 0.25)',
                                                   padding: '2px 8px',
                                                   borderRadius: '6px',
                                                   display: 'inline-flex',
@@ -8026,16 +8154,16 @@ export function TeacherDashboard({
                       const isPending = b.status === 'pending';
 
                       // Determine colors and labels based on status
-                      let cardBg = 'rgba(16, 185, 129, 0.06)'; // default scheduled
-                      let dateHeaderBg = '#10b981';
+                      let cardBg = 'rgba(52, 168, 83, 0.06)'; // default scheduled
+                      let dateHeaderBg = '#34a853';
                       let dateHeaderTextColor = '#ffffff';
                       let label = 'Gebucht';
                       let labelBg = '#000000';
                       let labelTextColor = '#ffffff';
                       let textColor = '#1e293b';
                       let subTextColor = '#64748b';
-                      let commentButtonBg = 'rgba(16, 185, 129, 0.08)';
-                      let commentButtonColor = '#10b981';
+                      let commentButtonBg = 'rgba(52, 168, 83, 0.08)';
+                      let commentButtonColor = '#34a853';
 
                       if (isCancelled) {
                         cardBg = 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
@@ -8206,16 +8334,16 @@ export function TeacherDashboard({
                       const isPending = b.status === 'pending';
 
                       // Determine colors and labels based on status
-                      let cardBg = 'rgba(16, 185, 129, 0.06)'; // default scheduled
-                      let dateHeaderBg = '#10b981';
+                      let cardBg = 'rgba(52, 168, 83, 0.06)'; // default scheduled
+                      let dateHeaderBg = '#34a853';
                       let dateHeaderTextColor = '#ffffff';
                       let label = 'Gebucht';
                       let labelBg = '#000000';
                       let labelTextColor = '#ffffff';
                       let textColor = '#1e293b';
                       let subTextColor = '#64748b';
-                      let commentButtonBg = 'rgba(16, 185, 129, 0.08)';
-                      let commentButtonColor = '#10b981';
+                      let commentButtonBg = 'rgba(52, 168, 83, 0.08)';
+                      let commentButtonColor = '#34a853';
 
                       if (isCancelled) {
                         cardBg = 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
@@ -8393,394 +8521,906 @@ export function TeacherDashboard({
                 <>
                   {/* INFOS DER VERWALTUNG */}
                   <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '24px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-              }}>
-                {/* Header row */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Bell size={18} color="#ef4444" />
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Infos der Verwaltung</h3>
-                  </div>
-                </div>
+                    background: '#ffffff', 
+                    borderRadius: '16px', 
+                    padding: '16px', 
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    {/* Header row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Bell size={16} color="#34a853" style={{ strokeWidth: 2.2 }} />
+                        <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>Infos der Verwaltung</h3>
+                      </div>
+                    </div>
 
-                {/* Offen / Erledigt Switch */}
-                <div style={{
-                  display: 'inline-flex',
-                  background: '#f1f5f9',
-                  borderRadius: '12px',
-                  padding: '3px',
-                  marginBottom: '16px',
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  {(['open', 'done'] as const).map(tab => {
-                    const isActive = adminFeedbackTab === tab;
-                    const feedbackCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
-                    const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
-                      pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
-                    );
-                    const openCount = feedbackCount + activePlanningEvents.length + pendingFeedbackPoints.length;
-                    const label = tab === 'open' ? `Offen${openCount > 0 ? ` (${openCount})` : ''}` : 'Erledigt';
-                    return (
-                      <button
-                        key={tab}
-                        onClick={() => setAdminFeedbackTab(tab)}
-                        style={{
-                          flex: 1,
-                          padding: '7px 0',
-                          borderRadius: '9px',
-                          border: 'none',
-                          fontWeight: 700,
-                          fontSize: '0.76rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          background: isActive ? '#ffffff' : 'transparent',
-                          color: isActive ? '#1e293b' : '#64748b',
-                          boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {(() => {
-                    const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
-                      pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
-                    );
-
-                    if (adminFeedbackRequests.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                          <Bell size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                            Keine neuen Mitteilungen oder Anfragen vorhanden.
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    if (adminFeedbackTab === 'open') {
-                      const openItems = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id));
-                      if (openItems.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
-                        return (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Alle Anfragen beantwortet!</span>
-                          </div>
+                    {/* Offen / Erledigt Switch */}
+                    <div style={{
+                      display: 'inline-flex',
+                      background: '#f1f5f9',
+                      borderRadius: '8px',
+                      padding: '3px',
+                      marginBottom: '14px',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}>
+                      {(['open', 'done'] as const).map(tab => {
+                        const isActive = adminFeedbackTab === tab;
+                        const feedbackCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
+                        const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
+                          pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
                         );
-                      }
-                      return (
-                        <>
-                          {pendingFeedbackPoints.map(pp => {
-                            const ev = planningEvents.find(e => e.id === pp.event_id);
-                            const evTitle = ev ? ev.title : 'Event';
+                        const openCount = feedbackCount + activePlanningEvents.length + pendingFeedbackPoints.length;
+                        const label = tab === 'open' ? `Offen${openCount > 0 ? ` (${openCount})` : ''}` : 'Erledigt';
+                        return (
+                          <button
+                            key={tab}
+                            onClick={() => setAdminFeedbackTab(tab)}
+                            style={{
+                              flex: 1,
+                              padding: '6px 0',
+                              borderRadius: '6px',
+                              border: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.76rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              background: isActive ? '#ffffff' : 'transparent',
+                              color: isActive ? '#0f172a' : '#64748b',
+                              boxShadow: isActive ? '0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)' : 'none',
+                            }}
+                            onMouseOver={e => {
+                              if (!isActive) e.currentTarget.style.color = '#0f172a';
+                            }}
+                            onMouseOut={e => {
+                              if (!isActive) e.currentTarget.style.color = '#64748b';
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {(() => {
+                        const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
+                          pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+                        );
+
+                        if (adminFeedbackRequests.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                              <Bell size={20} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+                                Keine neuen Mitteilungen oder Anfragen vorhanden.
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        if (adminFeedbackTab === 'open') {
+                          const openItems = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id));
+                          if (openItems.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
                             return (
-                              <div
-                                key={`feedback-card-${pp.id}`}
-                                style={{
-                                  background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)',
-                                  border: '1.5px solid #f59e0b',
-                                  borderRadius: '16px',
-                                  padding: '16px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '10px',
-                                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.08)',
-                                  marginBottom: '12px'
-                                }}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#d97706', background: '#fef3c7', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    ⚠️ Offene Rückfrage
-                                  </span>
-                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#b45309' }}>
-                                    Aktion erforderlich
-                                  </span>
-                                </div>
-                                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                                  {pp.name} ({evTitle})
-                                </h4>
-                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
-                                  Die Verwaltung hat eine Rückfrage zu deiner Einreichung gestellt.
-                                </p>
-                                <button
-                                  onClick={() => {
-                                    localStorage.setItem('groovelab_auto_submit_event_id', pp.event_id);
-                                    localStorage.setItem('groovelab_auto_submit_tab', 'feedback');
-                                    onTabChange?.('events');
-                                  }}
-                                  style={{
-                                    background: '#d97706',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    padding: '7px 12px',
-                                    borderRadius: '8px',
-                                    fontWeight: 700,
-                                    fontSize: '0.74rem',
-                                    cursor: 'pointer',
-                                    width: 'fit-content'
-                                  }}
-                                >
-                                  Jetzt beantworten
-                                </button>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '16px 0', textAlign: 'center' }}>
+                                <CheckCircle size={20} color="#34a853" style={{ strokeWidth: 1.5 }} />
+                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Alle Anfragen beantwortet!</span>
                               </div>
                             );
-                          })}
-                          {activePlanningEvents.map(ev => (
-                            <div
-                              key={`planning-card-${ev.id}`}
-                              style={{
-                                background: 'linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)',
-                                border: '1.5px solid #ffedd5',
-                                borderRadius: '16px',
-                                padding: '16px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '10px',
-                                boxShadow: '0 4px 14px rgba(251, 146, 60, 0.08)',
-                                marginBottom: '12px'
+                          }
+                          return (
+                            <>
+                              {pendingFeedbackPoints.map(pp => {
+                                const ev = planningEvents.find(e => e.id === pp.event_id);
+                                const evTitle = ev ? ev.title : 'Event';
+                                return (
+                                  <div
+                                    key={`feedback-card-${pp.id}`}
+                                    style={{
+                                      background: '#ffffff',
+                                      border: '1px solid #f1f5f9',
+                                      borderLeft: '4px solid #f59e0b',
+                                      borderRadius: '12px',
+                                      padding: '12px 14px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px',
+                                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 4px rgba(0, 0, 0, 0.01)',
+                                      marginBottom: '2px'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+                                          {pp.name} ({evTitle})
+                                        </h4>
+                                        <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
+                                          Die Verwaltung hat eine Rückfrage zu deiner Einreichung gestellt.
+                                        </p>
+                                      </div>
+                                      <span style={{ fontSize: '9px', fontWeight: 700, color: '#d97706', background: '#fef3c7', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                        <AlertTriangle size={11} /> Offene Rückfrage
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', flexWrap: 'wrap', gap: '8px' }}>
+                                      <span style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 600 }}>
+                                        Aktion erforderlich
+                                      </span>
+                                      <button
+                                        onClick={() => {
+                                          localStorage.setItem('groovelab_auto_submit_event_id', pp.event_id);
+                                          localStorage.setItem('groovelab_auto_submit_tab', 'feedback');
+                                          onTabChange?.('events');
+                                        }}
+                                        style={{
+                                          background: '#d97706',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          padding: '5px 12px',
+                                          borderRadius: '8px',
+                                          fontWeight: 600,
+                                          fontSize: '0.74rem',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <MessageSquare size={12} /> Jetzt beantworten
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {activePlanningEvents.map(ev => (
+                                <div
+                                  key={`planning-card-${ev.id}`}
+                                  style={{
+                                    background: '#ffffff',
+                                    border: '1px solid #f1f5f9',
+                                    borderLeft: '4px solid #f97316',
+                                    borderRadius: '12px',
+                                    padding: '12px 14px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 4px rgba(0, 0, 0, 0.01)',
+                                    marginBottom: '2px'
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+                                        {ev.title}
+                                      </h4>
+                                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
+                                        Bitte reiche dein Programm für diese Veranstaltung ein.
+                                      </p>
+                                    </div>
+                                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#ea580c', background: '#ffedd5', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                      <Calendar size={11} /> Programmeinreichung
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', flexWrap: 'wrap', gap: '8px' }}>
+                                    {ev.submission_deadline ? (
+                                      <span style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 600 }}>
+                                        {getCountdownString(ev.submission_deadline)}
+                                      </span>
+                                    ) : (
+                                      <span />
+                                    )}
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      <button
+                                        onClick={async () => {
+                                          if (confirm('Bist du sicher, dass du für diese Veranstaltung keine Beiträge einreichen möchtest?')) {
+                                            const currentIds = ev.no_submission_teacher_ids || [];
+                                            const { error } = await supabase
+                                              .from('campus_events')
+                                              .update({ no_submission_teacher_ids: [...currentIds, userId] })
+                                              .eq('id', ev.id);
+                                            if (!error) {
+                                              fetchData();
+                                            } else {
+                                              alert('Fehler beim Speichern: ' + error.message);
+                                            }
+                                          }
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          color: '#ea580c',
+                                          border: '1px solid #ea580c',
+                                          padding: '5px 12px',
+                                          borderRadius: '8px',
+                                          fontWeight: 600,
+                                          fontSize: '0.74rem',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <X size={12} /> Keine Beiträge
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          localStorage.setItem('groovelab_auto_submit_event_id', ev.id);
+                                          onTabChange?.('events');
+                                        }}
+                                        style={{
+                                          background: '#ea580c',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          padding: '5px 12px',
+                                          borderRadius: '8px',
+                                          fontWeight: 600,
+                                          fontSize: '0.74rem',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <Plus size={12} /> Jetzt Einreichen
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+
+                              {openItems.map((item, idx) => {
+                                const isResponding = respondingToRequestId === item.id;
+                                return (
+                                  <div 
+                                    key={item.id} 
+                                    style={{ 
+                                      display: 'flex', 
+                                      flexDirection: 'column', 
+                                      gap: '8px',
+                                      border: '1px solid #f1f5f9',
+                                      borderLeft: '4px solid #34a853',
+                                      background: '#ffffff',
+                                      borderRadius: '12px',
+                                      padding: '12px 14px',
+                                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 4px rgba(0, 0, 0, 0.01)',
+                                      marginBottom: '2px'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{item.title}</h4>
+                                        {item.description && (
+                                          <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
+                                            {item.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                                        <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#e6f4ea', color: '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
+                                          <AlertCircle size={11} /> Aktion erforderlich
+                                        </span>
+                                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500 }}>
+                                          {new Date(item.created_at).toLocaleDateString('de-DE')}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div style={{ marginTop: '2px' }}>
+                                      {isResponding ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <textarea
+                                            value={responseTextInput}
+                                            onChange={(e) => setResponseTextInput(e.target.value)}
+                                            placeholder="Schreibe deine Antwort an die Verwaltung..."
+                                            rows={2}
+                                            style={{
+                                              width: '100%',
+                                              padding: '8px 10px',
+                                              borderRadius: '8px',
+                                              border: '1px solid #cbd5e1',
+                                              fontSize: '0.76rem',
+                                              fontFamily: 'inherit',
+                                              outline: 'none',
+                                              resize: 'none',
+                                              boxSizing: 'border-box'
+                                            }}
+                                          />
+                                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                            <button
+                                              onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); }}
+                                              style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '5px 12px', borderRadius: '8px', fontWeight: 600, fontSize: '0.74rem', cursor: 'pointer' }}
+                                            >
+                                              Abbrechen
+                                            </button>
+                                            <button
+                                              onClick={() => handleSubmitFeedbackResponse(item.id)}
+                                              disabled={submittingFeedback || !responseTextInput.trim()}
+                                              style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '5px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.74rem', cursor: 'pointer' }}
+                                            >
+                                              Senden
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                          <button
+                                            onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); }}
+                                            style={{ 
+                                              background: '#e6f4ea', 
+                                              color: '#34a853', 
+                                              border: 'none', 
+                                              padding: '5px 12px', 
+                                              borderRadius: '8px', 
+                                              fontWeight: 600, 
+                                              fontSize: '0.74rem', 
+                                              cursor: 'pointer', 
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              transition: 'all 0.15s ease' 
+                                            }}
+                                            className="hover-scale"
+                                          >
+                                            <MessageSquare size={12} /> Rückmeldung geben
+                                          </button>
+                                          <button
+                                            onClick={() => handleMarkRequestAsDone(item.id)}
+                                            disabled={submittingFeedback}
+                                            style={{ 
+                                              background: '#34a853', 
+                                              color: '#ffffff', 
+                                              border: 'none', 
+                                              padding: '5px 12px', 
+                                              borderRadius: '8px', 
+                                              fontWeight: 600, 
+                                              fontSize: '0.74rem', 
+                                              cursor: 'pointer', 
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              transition: 'all 0.15s ease' 
+                                            }}
+                                            className="hover-scale"
+                                          >
+                                            <CheckCircle size={12} /> Erledigt
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </>
+                          );
+                        }
+
+                        // Erledigt tab – max 5 most recent
+                        const doneItems = adminFeedbackRequests
+                          .filter(r => adminFeedbackResponses.find(res => res.request_id === r.id))
+                          .slice(0, 5);
+                        if (doneItems.length === 0) {
+                          return (
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '12px 0', textAlign: 'center', display: 'block' }}>
+                              Noch keine erledigten Rückmeldungen.
+                            </span>
+                          );
+                        }
+                        return doneItems.map((item, idx) => {
+                          const response = adminFeedbackResponses.find(res => res.request_id === item.id);
+                          return (
+                            <div 
+                              key={item.id} 
+                              style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                gap: '8px',
+                                border: '1px solid #e2e8f0',
+                                borderLeft: '3px solid #34a853',
+                                background: '#ffffff',
+                                borderRadius: '12px',
+                                padding: '12px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
+                                marginBottom: '2px'
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#ea580c', background: '#ffedd5', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  Programmeinreichung
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#d1fae5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <CheckCircle size={11} /> Erledigt
                                 </span>
-                                {ev.submission_deadline && (
-                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#f97316' }}>
-                                    {getCountdownString(ev.submission_deadline)}
-                                  </span>
-                                )}
+                                <span style={{ fontSize: '10px', color: '#8e8e93', fontWeight: 500 }}>
+                                  {new Date(item.created_at).toLocaleDateString('de-DE')}
+                                </span>
                               </div>
-                              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
-                                {ev.title}
-                              </h4>
-                              <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
-                                Bitte reiche dein Programm für diese Veranstaltung ein.
-                              </p>
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button
-                                  onClick={() => {
-                                    localStorage.setItem('groovelab_auto_submit_event_id', ev.id);
-                                    onTabChange?.('events');
-                                  }}
-                                  style={{
-                                    background: '#ea580c',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    padding: '7px 12px',
-                                    borderRadius: '8px',
-                                    fontWeight: 700,
-                                    fontSize: '0.74rem',
-                                    cursor: 'pointer',
-                                    width: 'fit-content'
-                                  }}
-                                >
-                                  Jetzt Einreichen
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    if (confirm('Bist du sicher, dass du für diese Veranstaltung keine Beiträge einreichen möchtest?')) {
-                                      const currentIds = ev.no_submission_teacher_ids || [];
-                                      const { error } = await supabase
-                                        .from('campus_events')
-                                        .update({ no_submission_teacher_ids: [...currentIds, userId] })
-                                        .eq('id', ev.id);
-                                      if (!error) {
-                                        fetchData();
-                                      } else {
-                                        alert('Fehler beim Speichern: ' + error.message);
-                                      }
-                                    }
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    color: '#ea580c',
-                                    border: '1.5px solid #ea580c',
-                                    padding: '6px 12px',
-                                    borderRadius: '8px',
-                                    fontWeight: 700,
-                                    fontSize: '0.74rem',
-                                    cursor: 'pointer',
-                                    width: 'fit-content'
-                                  }}
-                                >
-                                  Keine Beiträge
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-
-                          {openItems.map((item, idx) => {
-                            const isResponding = respondingToRequestId === item.id;
-                            return (
-                              <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: '#fee2e2', color: '#991b1b' }}>
-                                    Aktion erforderlich
-                                  </span>
-                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
-                                    {new Date(item.created_at).toLocaleDateString('de-DE')}
-                                  </span>
-                                </div>
-                                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
-                                {item.description && (
-                                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>{item.description}</p>
-                                )}
+                              <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>{item.title}</h4>
+                              {response && (
                                 <div style={{ marginTop: '4px' }}>
-                                  {isResponding ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      <textarea
-                                        value={responseTextInput}
-                                        onChange={(e) => setResponseTextInput(e.target.value)}
-                                        placeholder="Schreibe deine Antwort an die Verwaltung..."
-                                        rows={2}
-                                        style={{
-                                          width: '100%',
-                                          padding: '8px 10px',
-                                          borderRadius: '10px',
-                                          border: '1px solid #cbd5e1',
-                                          fontSize: '0.78rem',
-                                          fontFamily: 'inherit',
-                                          outline: 'none',
-                                          resize: 'none',
-                                          boxSizing: 'border-box'
-                                        }}
-                                      />
-                                      <div style={{ display: 'flex', gap: '6px' }}>
-                                        <button
-                                          onClick={() => handleSubmitFeedbackResponse(item.id)}
-                                          disabled={submittingFeedback || !responseTextInput.trim()}
-                                          style={{ flex: 1, background: '#171717', color: '#ffffff', border: 'none', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
-                                        >
-                                          Senden
-                                        </button>
-                                        <button
-                                          onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); }}
-                                          style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '7px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer' }}
-                                        >
-                                          Abbrechen
-                                        </button>
-                                      </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedResponseIds(prev => ({
+                                      ...prev,
+                                      [response.id]: !prev[response.id]
+                                    }))}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      padding: 0,
+                                      color: '#34a853',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 750,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontFamily: 'inherit'
+                                    }}
+                                  >
+                                    {expandedResponseIds[response.id] ? '▲ Rückmeldung einklappen' : '▼ Deine Rückmeldung anzeigen'}
+                                  </button>
+
+                                  {expandedResponseIds[response.id] && (
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 10px', borderRadius: '8px', marginTop: '4px', textAlign: 'left' }}>
+                                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>Deine Rückmeldung:</div>
+                                      <div style={{ fontSize: '0.76rem', color: '#334155', fontStyle: 'italic', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{response.response_text}</div>
                                     </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); }}
-                                      style={{ background: 'transparent', color: '#0b57d0', border: '1px solid #0b57d0', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.74rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                                      className="hover-scale"
-                                    >
-                                      Rückmeldung geben
-                                    </button>
                                   )}
                                 </div>
-                                {idx < openItems.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '10px' }} />}
-                              </div>
-                            );
-                          })}
-                        </>
-                      );
-                    }
-
-                    // Erledigt tab – max 5 most recent
-                    const doneItems = adminFeedbackRequests
-                      .filter(r => adminFeedbackResponses.find(res => res.request_id === r.id))
-                      .slice(0, 5);
-                    if (doneItems.length === 0) {
-                      return (
-                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                          Noch keine erledigten Rückmeldungen.
-                        </span>
-                      );
-                    }
-                    return doneItems.map((item, idx) => {
-                      const response = adminFeedbackResponses.find(res => res.request_id === item.id);
-                      return (
-                        <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '2px 8px', borderRadius: '6px', background: '#d1fae5', color: '#065f46' }}>
-                              Erledigt
-                            </span>
-                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
-                              {new Date(item.created_at).toLocaleDateString('de-DE')}
-                            </span>
-                          </div>
-                          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>{item.title}</h4>
-                          {response && (
-                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: '10px', marginTop: '2px' }}>
-                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: '2px' }}>Deine Rückmeldung:</div>
-                              <div style={{ fontSize: '0.78rem', color: '#14532d', fontStyle: 'italic', fontWeight: 500 }}>{response.response_text}</div>
+                              )}
                             </div>
-                          )}
-                          {idx < doneItems.length - 1 && <div style={{ height: '1px', background: '#f1f5f9', marginTop: '10px' }} />}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
 
               {/* LIVE CAMPUS FEED */}
               <div style={{ 
                 background: '#ffffff', 
                 borderRadius: '24px', 
                 padding: '24px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                border: '1px solid #e2e8f0'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <Sparkles size={18} color="#eab308" />
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Campus Feed</h3>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilungen</h3>
+                </div>
+
+                {/* Campus / Klassen-Feed Switch */}
+                <div style={{
+                  display: 'inline-flex',
+                  background: '#f1f5f9',
+                  borderRadius: '8px',
+                  padding: '3px',
+                  marginBottom: '16px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  {([
+                    { id: 'campus', label: 'Campus', icon: <Building2 size={13} style={{ marginRight: '4px' }} /> },
+                    { id: 'class', label: 'Klassen-Feed', icon: <Users size={13} style={{ marginRight: '4px' }} /> }
+                  ] as const).map(t => {
+                    const isActive = teacherFeedTab === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setTeacherFeedTab(t.id)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 0',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontWeight: 600,
+                          fontSize: '0.76rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          background: isActive ? '#ffffff' : 'transparent',
+                          color: isActive ? '#0f172a' : '#64748b',
+                          boxShadow: isActive ? '0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)' : 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onMouseOver={e => {
+                          if (!isActive) e.currentTarget.style.color = '#0f172a';
+                        }}
+                        onMouseOut={e => {
+                          if (!isActive) e.currentTarget.style.color = '#64748b';
+                        }}
+                      >
+                        {t.icon}
+                        {t.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {campusFeedAnnouncements.length === 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                      <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                        Keine aktuellen Campus-Mitteilungen vorhanden.
-                      </span>
-                    </div>
+                  {teacherFeedTab === 'campus' ? (
+                    campusFeedAnnouncements.length === 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                        <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                          Keine aktuellen Campus-Mitteilungen vorhanden.
+                        </span>
+                      </div>
+                    ) : (
+                      campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
+                        const postReactions = feedInteractions.filter(i => i.post_id === item.id);
+                        const thumbsUpCount = postReactions.filter(i => i.emoji_unicode === '👍').length;
+                        const heartCount = postReactions.filter(i => i.emoji_unicode === '❤️').length;
+                        const userHasThumbsUp = postReactions.some(i => i.emoji_unicode === '👍' && i.user_id === userId);
+                        const userHasHeart = postReactions.some(i => i.emoji_unicode === '❤️' && i.user_id === userId);
+
+                        let categoryLabel = 'Info';
+                        let categoryBg = '#f1f5f9';
+                        let categoryColor = '#475569';
+                        if (item.category === 'announcement') {
+                          categoryLabel = 'Ankündigung';
+                        } else if (item.category === 'event') {
+                          categoryLabel = 'Event';
+                        } else if (item.category === 'holidays') {
+                          categoryLabel = 'Ferien';
+                        }
+
+                        if (item.is_emergency) {
+                          categoryColor = '#b91c1c';
+                          categoryBg = '#fce8e6';
+                        }
+
+                        return (
+                          <div key={item.id} style={{
+                            paddingBottom: idx === arr.length - 1 ? '0' : '16px',
+                            borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{
+                                  fontSize: '9px',
+                                  fontWeight: 800,
+                                  color: '#475569',
+                                  background: '#f1f5f9',
+                                  padding: '2px 8px',
+                                  borderRadius: '100px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em'
+                                }}>
+                                  {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
+                                </span>
+                                <span style={{
+                                  fontSize: '9px',
+                                  fontWeight: 800,
+                                  color: categoryColor,
+                                  background: categoryBg,
+                                  padding: '2px 8px',
+                                  borderRadius: '100px',
+                                  textTransform: 'uppercase',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  {item.is_emergency && <AlertTriangle size={9} color="#b91c1c" />}
+                                  {categoryLabel}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                                {new Date(item.created_at).toLocaleDateString('de-DE')}
+                              </span>
+                            </div>
+                            
+                            <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                              {item.title}
+                            </h5>
+                            
+                            <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                              {item.content}
+                            </p>
+
+                            {item.attachment_url && (
+                              <div style={{ marginTop: '4px' }}>
+                                {item.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                  <a href={item.attachment_url} target="_blank" rel="noreferrer">
+                                    <img 
+                                      src={item.attachment_url} 
+                                      alt="Anhang" 
+                                      style={{ maxWidth: '100%', maxHeight: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                                    />
+                                  </a>
+                                ) : (
+                                  <a 
+                                    href={item.attachment_url} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}
+                                  >
+                                    📄 Dokument öffnen
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Emoji Reactions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                              <button 
+                                onClick={() => handleReactToPost(item.id, '👍', 'campus')}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
+                                  border: '1px solid',
+                                  borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
+                                  color: userHasThumbsUp ? '#34a853' : '#64748b',
+                                  padding: '3px 8px',
+                                  borderRadius: '9999px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
+                                <span>{thumbsUpCount}</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )
                   ) : (
-                    campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
-                      return (
-                        <div key={item.id} style={{
-                          paddingBottom: idx === arr.length - 1 ? '0' : '16px',
-                          borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {/* Button / Form to create Class Feed Post */}
+                      {!showClassPostForm ? (
+                        <button
+                          onClick={() => setShowClassPostForm(true)}
+                          style={{
+                            background: '#e6f4ea',
+                            color: '#34a853',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            width: '100%',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Plus size={12} /> Beitrag erstellen
+                        </button>
+                      ) : (
+                        <div style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '12px',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '6px'
+                          gap: '8px'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{
-                              fontSize: '9px',
-                              fontWeight: 800,
-                              color: '#475569',
-                              background: '#f1f5f9',
-                              padding: '2px 8px',
-                              borderRadius: '100px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.04em'
-                            }}>
-                              {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
-                            </span>
-                            <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                              {new Date(item.created_at).toLocaleDateString('de-DE')}
-                            </span>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>Neuer Beitrag</span>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button
+                                onClick={() => setNewPostType('announcement')}
+                                style={{
+                                  background: newPostType === 'announcement' ? '#e6f4ea' : 'transparent',
+                                  color: newPostType === 'announcement' ? '#34a853' : '#64748b',
+                                  border: 'none',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Info
+                              </button>
+                              <button
+                                onClick={() => setNewPostType('homework')}
+                                style={{
+                                  background: newPostType === 'homework' ? '#fef3c7' : 'transparent',
+                                  color: newPostType === 'homework' ? '#b45309' : '#64748b',
+                                  border: 'none',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Hausaufgabe
+                              </button>
+                            </div>
                           </div>
-                          
-                          <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                            {item.title}
-                          </h5>
-                          
-                          <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                            {item.content}
-                          </p>
+
+                          <input
+                            type="text"
+                            value={newPostTitle}
+                            onChange={e => setNewPostTitle(e.target.value)}
+                            placeholder="Titel..."
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.74rem',
+                              fontFamily: 'inherit',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+
+                          <textarea
+                            value={newPostContent}
+                            onChange={e => setNewPostContent(e.target.value)}
+                            placeholder="Inhalt..."
+                            rows={3}
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.74rem',
+                              fontFamily: 'inherit',
+                              outline: 'none',
+                              resize: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => {
+                                setShowClassPostForm(false);
+                                setNewPostTitle('');
+                                setNewPostContent('');
+                              }}
+                              style={{
+                                background: 'transparent',
+                                color: '#64748b',
+                                border: 'none',
+                                padding: '4px 10px',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Abbrechen
+                            </button>
+                            <button
+                              onClick={handleCreateClassPost}
+                              disabled={submittingClassPost || !newPostTitle.trim() || !newPostContent.trim()}
+                              style={{
+                                background: '#34a853',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Veröffentlichen
+                            </button>
+                          </div>
                         </div>
-                      );
-                    })
+                      )}
+
+                      {classFeedPosts.length === 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
+                          <Users size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
+                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                            Keine Beiträge im Klassen-Feed vorhanden.
+                          </span>
+                        </div>
+                      ) : (
+                        classFeedPosts.slice(0, 5).map((item, idx, arr) => {
+                          const postReactions = classFeedInteractions.filter(i => i.post_id === item.id);
+                          const thumbsUpCount = postReactions.filter(i => i.emoji_unicode === '👍').length;
+                          const heartCount = postReactions.filter(i => i.emoji_unicode === '❤️').length;
+                          const userHasThumbsUp = postReactions.some(i => i.emoji_unicode === '👍' && i.user_id === userId);
+                          const userHasHeart = postReactions.some(i => i.emoji_unicode === '❤️' && i.user_id === userId);
+
+                          let badgeLabel = 'Mitteilung';
+                          let badgeBg = '#e6f4ea';
+                          let badgeColor = '#34a853';
+                          if (item.post_type === 'homework') {
+                            badgeLabel = 'Hausaufgabe';
+                            badgeBg = '#fef3c7';
+                            badgeColor = '#b45309';
+                          }
+
+                          return (
+                            <div key={item.id} style={{
+                              paddingBottom: idx === arr.length - 1 ? '0' : '16px',
+                              borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 800, color: badgeColor, background: badgeBg, padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>
+                                  {badgeLabel}
+                                </span>
+                                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                                  {new Date(item.created_at).toLocaleDateString('de-DE')}
+                                </span>
+                              </div>
+                              
+                              <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                                {item.title}
+                              </h5>
+                              
+                              <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
+                                {item.content}
+                              </p>
+
+                              {/* Emoji Reactions */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                <button 
+                                  onClick={() => handleReactToPost(item.id, '👍', 'class')}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
+                                    border: '1px solid',
+                                    borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
+                                    color: userHasThumbsUp ? '#34a853' : '#64748b',
+                                    padding: '3px 8px',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
+                                  <span>{thumbsUpCount}</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleReactToPost(item.id, '❤️', 'class')}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: userHasHeart ? '#fce8e6' : 'transparent',
+                                    border: '1px solid',
+                                    borderColor: userHasHeart ? '#ea4335' : '#e2e8f0',
+                                    color: userHasHeart ? '#ea4335' : '#64748b',
+                                    padding: '3px 8px',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <Heart size={11} color={userHasHeart ? '#ea4335' : '#64748b'} fill={userHasHeart ? '#ea4335' : 'transparent'} />
+                                  <span>{heartCount}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -9805,7 +10445,7 @@ export function TeacherDashboard({
                                   return normM === normTarget && mPart === part;
                                 });
                                 
-                                const color = colors[inst] || '#10b981';
+                                const color = colors[inst] || '#34a853';
                                 
                                 return (
                                   <div key={idx} style={{ 
@@ -9857,7 +10497,7 @@ export function TeacherDashboard({
                                      className="hero-cta-artistic"
                                      style={{
                                        width: '100%',
-                                       background: 'linear-gradient(135deg, #10b981, #059669)',
+                                       background: 'linear-gradient(135deg, #34a853, #137333)',
                                        border: 'none',
                                        padding: '12px 18px',
                                        borderRadius: '14px',
@@ -9869,7 +10509,7 @@ export function TeacherDashboard({
                                        alignItems: 'center',
                                        justifyContent: 'center',
                                        gap: '6px',
-                                       boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                                       boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                                        transition: 'all 0.2s',
                                        marginTop: '8px'
                                      }}
@@ -11141,7 +11781,7 @@ export function TeacherDashboard({
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {student.first_name} {student.last_name}
+                              {student.first_name} {student.last_name ? student.last_name.charAt(0) + '.' : ''}
                             </div>
                           </div>
                         </div>
@@ -12155,7 +12795,7 @@ export function TeacherDashboard({
                     background: 'white', 
                     padding: '24px', 
                     borderRadius: '32px', 
-                    border: `2px solid ${isInLab ? '#10b981' : '#ef4444'}`,
+                    border: `2px solid ${isInLab ? '#34a853' : '#ef4444'}`,
                     boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
                     display: 'flex',
                     flexDirection: 'column',
@@ -12167,7 +12807,7 @@ export function TeacherDashboard({
                       position: 'absolute',
                       top: '12px',
                       right: '12px',
-                      background: isInLab ? '#10b981' : '#ef4444',
+                      background: isInLab ? '#34a853' : '#ef4444',
                       color: 'white',
                       padding: '4px 10px',
                       borderRadius: '10px',
@@ -12218,7 +12858,7 @@ export function TeacherDashboard({
                    <div style={{ display: 'flex', gap: '12px' }}>
                      <button 
                        onClick={() => handleApproveSubmission(sub.id)}
-                       style={{ flex: 2, background: '#10b981', color: 'white', border: 'none', padding: '12px', borderRadius: '16px', fontWeight: 1000, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(16, 185, 129, 0.2)' }}
+                       style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '12px', borderRadius: '16px', fontWeight: 1000, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 20px rgba(52, 168, 83, 0.2)' }}
                      >
                        BESTÄTIGEN
                      </button>
@@ -12340,7 +12980,7 @@ export function TeacherDashboard({
 
                   const studentName = n.student_name || (() => {
                     const student = allStudents.find(s => s.id === n.student_id);
-                    return student ? `${student.first_name} ${student.last_name}` : `Schüler: ${n.student_id?.substring(0, 8)}…`;
+                    return student ? `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
                   })();
 
                   return (

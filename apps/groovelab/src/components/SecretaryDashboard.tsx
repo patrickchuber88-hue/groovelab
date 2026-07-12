@@ -19,6 +19,7 @@ import { CampusTeacherDashboard } from './CampusTeacherDashboard';
 import QRCode from 'react-qr-code';
 import { QRCodeModal } from './QRCodeModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -672,15 +673,15 @@ function TeacherCard({
           <span style={{
             fontSize: '11px',
             fontWeight: 600,
-            color: '#10b981',
-            background: 'rgba(16, 185, 129, 0.08)',
+            color: '#34a853',
+            background: 'rgba(52, 168, 83, 0.08)',
             padding: '4px 10px',
             borderRadius: '100px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px'
           }}>
-            <GraduationCap size={12} style={{ color: '#10b981' }} />
+            <GraduationCap size={12} style={{ color: '#34a853' }} />
             Campus
           </span>
         )}
@@ -1122,9 +1123,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
     return 'secretary';
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit'>(() => {
+  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit' | 'duties'>(() => {
     const saved = localStorage.getItem('groovelab_secretary_subtab');
-    const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit'];
+    const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit', 'duties'];
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
   });
@@ -1138,6 +1139,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
   });
+  // Administrative Duties (Infos der Verwaltung)
+  const [dutiesList, setDutiesList] = useState<any[]>([]);
+  const [dutiesLoading, setDutiesLoading] = useState<boolean>(false);
+  const [newDutyTitle, setNewDutyTitle] = useState('');
+  const [newDutyDescription, setNewDutyDescription] = useState('');
+  const [newDutyType, setNewDutyType] = useState<'todo' | 'questionnaire'>('todo');
+  const [newDutyQuestions, setNewDutyQuestions] = useState<string[]>([]);
+  const [newDutyPriority, setNewDutyPriority] = useState<'standard' | 'critical'>('standard');
+  const [newDutyTargetType, setNewDutyTargetType] = useState<'all' | 'group' | 'individual'>('all');
+  const [newDutyTargetGroup, setNewDutyTargetGroup] = useState('guitar');
+  const [newDutyTargetTeacherId, setNewDutyTargetTeacherId] = useState('');
+  const [newDutyDueDate, setNewDutyDueDate] = useState('');
+  const [newDutyRecurrence, setNewDutyRecurrence] = useState<'none' | 'monthly' | 'half_yearly'>('none');
+  const [newDutyAttachmentUrl, setNewDutyAttachmentUrl] = useState('');
+  const [isUploadingDutyAttachment, setIsUploadingDutyAttachment] = useState(false);
+  const [selectedDutyForStats, setSelectedDutyForStats] = useState<any>(null);
+  const [dutyResponsesList, setDutyResponsesList] = useState<any[]>([]);
+  const [newDutyQuestionInput, setNewDutyQuestionInput] = useState('');
+  const [editingDutyId, setEditingDutyId] = useState<string | null>(null);
+  const [expandedResponseIds, setExpandedResponseIds] = useState<Record<string, boolean>>({});
+
   const [enabledCampusSubjects, setEnabledCampusSubjects] = useState<boolean>(() => {
     const saved = localStorage.getItem('gl_setting_subjects');
     return saved !== 'false';
@@ -1201,6 +1223,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [newEventTitle, setNewEventTitle] = useState<string>('');
   const [newEventDesc, setNewEventDesc] = useState<string>('');
   const [newEventTarget, setNewEventTarget] = useState<'all' | 'students' | 'teachers'>('all');
+  const [newEventCategory, setNewEventCategory] = useState<'general' | 'announcement' | 'event' | 'holidays'>('general');
+  const [newEventIsEmergency, setNewEventIsEmergency] = useState<boolean>(false);
+  const [newEventPublishedAt, setNewEventPublishedAt] = useState<string>('');
+  const [newEventExpiresAt, setNewEventExpiresAt] = useState<string>('');
+  const [newEventAttachmentUrl, setNewEventAttachmentUrl] = useState<string>('');
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
   const [manageTeacher, setManageTeacher] = useState<any | null>(null);
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [crisisTabMode, setCrisisTabMode] = useState<'live' | 'history'>('live');
@@ -2011,7 +2039,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [showAddSubjectModal, setShowAddSubjectModal] = useState<boolean>(false);
   const [newSubjectName, setNewSubjectName] = useState<string>('');
   const [newSubjectDescription, setNewSubjectDescription] = useState<string>('');
-  const [newSubjectCategory, setNewSubjectCategory] = useState<string>('Allgemein');
+  const [newSubjectCategory, setNewSubjectCategory] = useState<string>('guitar');
   const [isSubjectCsvExpanded, setIsSubjectCsvExpanded] = useState<boolean>(false);
   const [subjectCsvText, setSubjectCsvText] = useState<string>('');
 
@@ -3237,7 +3265,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
 
       let draft = 0;
-      let readyForReview = mappedSchedules.length;
+      const readyForReview = mappedSchedules.length;
       let approved = 0;
       if (allScheds) {
         allScheds.forEach(s => {
@@ -3299,7 +3327,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       }
 
       // Fetch subjects
-      let { data: subjectsData } = await supabase
+      const { data: subjectsData } = await supabase
         .from('subjects')
         .select('*')
         .eq('school_id', schoolId)
@@ -3367,10 +3395,141 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         setSchoolEvents([]);
       }
 
+      await fetchDuties();
     } catch (err: any) {
       console.error('Error fetching secretary dashboard data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDuties = async () => {
+    try {
+      setDutiesLoading(true);
+      const { data, error } = await supabase
+        .from('campus_feedback_requests')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setDutiesList(data || []);
+    } catch (err: any) {
+      console.error('Error fetching duties:', err);
+    } finally {
+      setDutiesLoading(false);
+    }
+  };
+
+  const handleUploadDutyAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingDutyAttachment(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `duty_${Date.now()}.${fileExt}`;
+      const filePath = `feed-attachments/${fileName}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('campus-assets')
+        .upload(filePath, file);
+      if (uploadErr) throw uploadErr;
+      
+      const { data: urlData } = supabase.storage
+        .from('campus-assets')
+        .getPublicUrl(filePath);
+      setNewDutyAttachmentUrl(urlData.publicUrl);
+    } catch (err: any) {
+      alert('Upload fehlgeschlagen: ' + err.message);
+    } finally {
+      setIsUploadingDutyAttachment(false);
+    }
+  };
+
+  const handleCreateDuty = async () => {
+    if (!newDutyTitle.trim()) {
+      alert('Bitte einen Titel eingeben.');
+      return;
+    }
+    try {
+      const currentUserName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung';
+      const currentUserRole = currentUserProfile?.role === 'admin' ? 'Administration' : 'Sekretariat';
+
+      const payload: any = {
+        title: newDutyTitle.trim(),
+        description: newDutyDescription.trim(),
+        questions: newDutyType === 'questionnaire' ? newDutyQuestions : null,
+        due_date: newDutyDueDate ? newDutyDueDate + (newDutyDueDate.includes('T') ? '' : 'T23:59:59Z') : null,
+        priority: newDutyPriority,
+        target_type: newDutyTargetType,
+        target_group: newDutyTargetType === 'group' ? newDutyTargetGroup : null,
+        target_teacher_id: newDutyTargetType === 'individual' ? newDutyTargetTeacherId : null,
+        recurrence: newDutyRecurrence,
+        attachment_url: newDutyAttachmentUrl || null
+      };
+
+      if (editingDutyId) {
+        const { error } = await supabase
+          .from('campus_feedback_requests')
+          .update(payload)
+          .eq('id', editingDutyId);
+
+        if (error) throw error;
+        alert('Pflichtaufgabe erfolgreich aktualisiert!');
+        setEditingDutyId(null);
+      } else {
+        payload.school_id = schoolId;
+        payload.created_by_name = currentUserName;
+        payload.created_by_role = currentUserRole;
+
+        const { error } = await supabase
+          .from('campus_feedback_requests')
+          .insert(payload);
+
+        if (error) throw error;
+        alert('Pflichtaufgabe erfolgreich erstellt!');
+      }
+
+      setNewDutyTitle('');
+      setNewDutyDescription('');
+      setNewDutyType('todo');
+      setNewDutyQuestions([]);
+      setNewDutyPriority('standard');
+      setNewDutyTargetType('all');
+      setNewDutyDueDate('');
+      setNewDutyRecurrence('none');
+      setNewDutyAttachmentUrl('');
+      
+      fetchDuties();
+    } catch (err: any) {
+      alert('Speichern fehlgeschlagen: ' + err.message);
+    }
+  };
+
+  const handleDeleteDuty = async (id: string) => {
+    if (!confirm('Möchtest du diese Pflichtaufgabe wirklich löschen? Alle Antworten von Lehrkräften werden ebenfalls gelöscht.')) return;
+    try {
+      const { error } = await supabase
+        .from('campus_feedback_requests')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      alert('Aufgabe gelöscht.');
+      fetchDuties();
+    } catch (err: any) {
+      alert('Löschen fehlgeschlagen: ' + err.message);
+    }
+  };
+
+  const fetchDutyStats = async (duty: any) => {
+    try {
+      setSelectedDutyForStats(duty);
+      const { data, error } = await supabase
+        .from('campus_feedback_responses')
+        .select('*')
+        .eq('request_id', duty.id);
+      if (error) throw error;
+      setDutyResponsesList(data || []);
+    } catch (err: any) {
+      console.error('Error fetching duty stats:', err);
     }
   };
 
@@ -4303,7 +4462,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         .single();
       if (fetchErr) throw fetchErr;
 
-      let newRoles = Array.isArray(user?.roles) ? [...user.roles] : [user?.role || 'secretary'];
+      const newRoles = Array.isArray(user?.roles) ? [...user.roles] : [user?.role || 'secretary'];
       if (!newRoles.includes(newRole)) {
         newRoles.push(newRole);
       }
@@ -4864,6 +5023,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     }
   };
 
+  const FACHGRUPPEN_MAP: Record<string, string> = {
+    guitar: 'Gitarre & Bass',
+    piano: 'Klavier, Keyboard & Tasten',
+    vocals: 'Gesang & Stimme',
+    drums: 'Schlagzeug & Rhythmus',
+    strings: 'Streichinstrumente',
+    winds: 'Blasinstrumente',
+    early_education: 'Früherziehung & Grundfächer',
+    other: 'Sonstige Instrumente / Theorie & Ensemble',
+    Allgemein: 'Allgemein'
+  };
+
+  const getCategoryLabel = (cat: string) => {
+    return FACHGRUPPEN_MAP[cat] || cat || 'Allgemein';
+  };
+
   const renderSubjectsBoard = () => {
     const nonPlaceholderSubjects = subjects.filter(s => {
       const name = (s.name || '').toLowerCase().trim();
@@ -4947,7 +5122,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   border: 'none',
                   cursor: 'pointer',
                   fontFamily: 'Urbanist',
-                  boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                  boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)',
                   transition: 'all 0.2s'
                 }}
               >
@@ -5059,7 +5234,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             >
               <option value="All">Alle Kategorien ({nonPlaceholderSubjects.length})</option>
               {uniqueCategories.map(cat => (
-                <option key={cat} value={cat}>{cat} ({nonPlaceholderSubjects.filter(s => s.category === cat).length})</option>
+                <option key={cat} value={cat}>{getCategoryLabel(cat)} ({nonPlaceholderSubjects.filter(s => s.category === cat).length})</option>
               ))}
             </select>
           </div>
@@ -5114,6 +5289,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {s.name}
                         </span>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                          Kategorie: {getCategoryLabel(s.category)}
+                        </span>
                       </div>
                     </div>
 
@@ -5128,7 +5306,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             border: 'none',
                             background: 'transparent',
                             cursor: 'pointer',
-                            color: '#137333',
+                            color: '#34a853',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
@@ -5196,19 +5374,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     onChange={(e) => setNewSubjectCategory(e.target.value)}
                     style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
                   >
-                    <option value="Allgemein">Allgemein</option>
-                    <option value="Saiteninstrumente">Saiteninstrumente</option>
-                    <option value="Tasteninstrumente">Tasteninstrumente</option>
-                    <option value="Schlagwerk">Schlagwerk</option>
-                    <option value="Blasinstrumente">Blasinstrumente</option>
-                    <option value="Gesang">Gesang</option>
-                    <option value="Theorie & Ensemble">Theorie & Ensemble</option>
+                    <option value="guitar">Gitarre & Bass</option>
+                    <option value="piano">Klavier, Keyboard & Tasten</option>
+                    <option value="vocals">Gesang & Stimme</option>
+                    <option value="drums">Schlagzeug & Rhythmus</option>
+                    <option value="strings">Streichinstrumente (Geige, Cello, Kontrabass etc.)</option>
+                    <option value="winds">Blasinstrumente (Flöte, Trompete, Klarinette etc.)</option>
+                    <option value="early_education">Früherziehung & Grundfächer</option>
+                    <option value="other">Sonstige Instrumente / Theorie & Ensemble</option>
                   </select>
                 </div>
 
                 <button
                   type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
                 >
                   Fach anlegen
                 </button>
@@ -5322,7 +5501,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   border: 'none',
                   cursor: 'pointer',
                   fontFamily: 'Urbanist',
-                  boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                  boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)',
                   transition: 'all 0.2s'
                 }}
               >
@@ -5708,7 +5887,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           borderRadius: '10px', 
                           fontSize: '0.72rem', 
                           fontWeight: 800, 
-                          color: c.status === 'active' ? '#137333' : c.status === 'pending' ? '#b45309' : '#86868b',
+                          color: c.status === 'active' ? '#34a853' : c.status === 'pending' ? '#b45309' : '#86868b',
                           background: c.status === 'active' ? '#e2f6ea' : c.status === 'pending' ? '#fffbeb' : '#f5f5f7',
                           border: 'none',
                           outline: 'none',
@@ -5949,7 +6128,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                 <button
                   type="submit"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52,168,83,0.15)' }}
+                  style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '8px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', marginTop: '8px', boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)' }}
                 >
                   Kooperation anlegen
                 </button>
@@ -5957,6 +6136,682 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             </div>
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderDutiesBoard = () => {
+    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+      if (!acc.some(existing => existing.id === t.id)) {
+        acc.push(t);
+      }
+      return acc;
+    }, []);
+
+    // Get list of teachers targeted by a duty for stats rendering
+    const getTargetedTeachers = (duty: any) => {
+      if (duty.target_type === 'all') return allUniqueTeachers;
+      if (duty.target_type === 'individual') {
+        const found = allUniqueTeachers.find(t => t.id === duty.target_teacher_id);
+        return found ? [found] : [];
+      }
+      if (duty.target_type === 'group') {
+        return allUniqueTeachers.filter(t => {
+          const inst = (t.instrument || '').toLowerCase();
+          const targetGrp = (duty.target_group || '').toLowerCase();
+          if (targetGrp === 'guitar') return inst.includes('gitarre') || inst.includes('guitar') || inst.includes('bass');
+          if (targetGrp === 'piano') return inst.includes('klavier') || inst.includes('piano') || inst.includes('keyboard') || inst.includes('keys');
+          if (targetGrp === 'vocals') return inst.includes('gesang') || inst.includes('vocal') || inst.includes('sing');
+          if (targetGrp === 'drums') return inst.includes('schlagzeug') || inst.includes('drum');
+          return inst.includes(targetGrp);
+        });
+      }
+      return [];
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', fontFamily: 'Inter, sans-serif' }}>
+        
+        {/* Apple Style Header Card */}
+        <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.5rem' }}>📋</span>
+            <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
+              Dienstliche Aufgaben (Infos & To-Dos der Verwaltung)
+            </h3>
+          </div>
+          <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: '1.5' }}>
+            Hier erstellst und verwaltest du Pflichtaufgaben, Arbeitsanweisungen und Fragebögen für deine Lehrkräfte. Wichtige Angelegenheiten können mit kritischer Priorität versehen werden, um das Dashboard der Lehrkraft bis zur Erledigung zu blockieren.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '24px', alignItems: 'start' }}>
+          
+          {/* LEFT COLUMN: CREATE FORM */}
+          <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
+              {editingDutyId ? 'Aufgabe bearbeiten' : 'Aufgabe anlegen'}
+            </h4>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Titel der Aufgabe *</label>
+              <input
+                type="text"
+                value={newDutyTitle}
+                onChange={(e) => setNewDutyTitle(e.target.value)}
+                placeholder="z. B. Stundenzettel Juni einreichen"
+                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Anweisung / Beschreibung</label>
+              <textarea
+                value={newDutyDescription}
+                onChange={(e) => setNewDutyDescription(e.target.value)}
+                placeholder="Detaillierte Beschreibung der Aufgabe..."
+                rows={3}
+                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Aufgabentyp</label>
+                <select
+                  value={newDutyType}
+                  onChange={(e) => {
+                    setNewDutyType(e.target.value as any);
+                    setNewDutyQuestions([]);
+                  }}
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                >
+                  <option value="todo">To-Do (einfaches Abhaken)</option>
+                  <option value="questionnaire">Fragebogen / Feedback</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Priorität</label>
+                <select
+                  value={newDutyPriority}
+                  onChange={(e) => setNewDutyPriority(e.target.value as any)}
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                >
+                  <option value="standard">Standard (normaler Feed)</option>
+                  <option value="critical">🚨 Kritisch (Dashboard blockierend)</option>
+                </select>
+              </div>
+            </div>
+
+            {newDutyType === 'questionnaire' && (
+              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Fragen im Fragebogen ({newDutyQuestions.length})</label>
+                {newDutyQuestions.map((q, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#334155', flex: 1 }}>{q}</span>
+                    <button 
+                      type="button"
+                      onClick={() => setNewDutyQuestions(newDutyQuestions.filter((_, qIdx) => qIdx !== idx))}
+                      style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <input
+                    type="text"
+                    value={newDutyQuestionInput}
+                    onChange={(e) => setNewDutyQuestionInput(e.target.value)}
+                    placeholder="Neue Frage hinzufügen..."
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.8rem', outline: 'none' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newDutyQuestionInput.trim()) {
+                          setNewDutyQuestions([...newDutyQuestions, newDutyQuestionInput.trim()]);
+                          setNewDutyQuestionInput('');
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newDutyQuestionInput.trim()) {
+                        setNewDutyQuestions([...newDutyQuestions, newDutyQuestionInput.trim()]);
+                        setNewDutyQuestionInput('');
+                      }
+                    }}
+                    style={{ background: '#ea4335', color: 'white', border: 'none', borderRadius: '10px', padding: '0 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Empfänger-Gruppe</label>
+              <select
+                value={newDutyTargetType}
+                onChange={(e) => setNewDutyTargetType(e.target.value as any)}
+                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+              >
+                <option value="all">Alle Lehrkräfte</option>
+                <option value="group">Instrumenten-Fachgruppe</option>
+                <option value="individual">Einzelne Lehrkraft</option>
+              </select>
+            </div>
+
+            {newDutyTargetType === 'group' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Fachgruppe auswählen</label>
+                <select
+                  value={newDutyTargetGroup}
+                  onChange={(e) => setNewDutyTargetGroup(e.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                >
+                  <option value="guitar">Gitarre & Bass</option>
+                  <option value="piano">Klavier, Keyboard & Tasten</option>
+                  <option value="vocals">Gesang & Stimme</option>
+                  <option value="drums">Schlagzeug & Rhythmus</option>
+                  <option value="strings">Streichinstrumente (Geige, Cello, Kontrabass etc.)</option>
+                  <option value="winds">Blasinstrumente (Flöte, Trompete, Klarinette etc.)</option>
+                  <option value="early_education">Früherziehung & Grundfächer</option>
+                  <option value="other">Sonstige Instrumente / Theorie & Ensemble</option>
+                </select>
+              </div>
+            )}
+
+            {newDutyTargetType === 'individual' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Lehrkraft auswählen</label>
+                <select
+                  value={newDutyTargetTeacherId}
+                  onChange={(e) => setNewDutyTargetTeacherId(e.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                >
+                  <option value="">Lehrkraft wählen...</option>
+                  {allUniqueTeachers.map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Fälligkeitsdatum</label>
+                <input
+                  type="date"
+                  value={newDutyDueDate}
+                  onChange={(e) => setNewDutyDueDate(e.target.value)}
+                  style={{ padding: '9px 12px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Wiederholung</label>
+                <select
+                  value={newDutyRecurrence}
+                  onChange={(e) => setNewDutyRecurrence(e.target.value as any)}
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                >
+                  <option value="none">Einmalig</option>
+                  <option value="monthly">Monatlich</option>
+                  <option value="half_yearly">Halbjährlich</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Anhang (PDF, Bild)</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="file"
+                  id="duty-file-upload"
+                  onChange={handleUploadDutyAttachment}
+                  style={{ display: 'none' }}
+                  accept=".pdf,image/*"
+                />
+                <label
+                  htmlFor="duty-file-upload"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: '1.5px dashed #cbd5e1',
+                    background: '#f8fafc',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#64748b',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Upload size={16} />
+                  {isUploadingDutyAttachment ? 'Wird hochgeladen...' : (newDutyAttachmentUrl ? 'Anhang hochgeladen ✓' : 'Datei auswählen')}
+                </label>
+                {newDutyAttachmentUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setNewDutyAttachmentUrl('')}
+                    style={{ border: 'none', background: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+              <button
+                onClick={handleCreateDuty}
+                disabled={isUploadingDutyAttachment}
+                style={{
+                  background: '#ea4335',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(234, 67, 53, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'background 0.2s',
+                  width: '100%'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#d63022'}
+                onMouseOut={e => e.currentTarget.style.background = '#ea4335'}
+              >
+                {editingDutyId ? <CheckIcon size={16} /> : <Plus size={16} />}
+                {editingDutyId ? 'Aufgabe aktualisieren' : 'Aufgabe veröffentlichen'}
+              </button>
+
+              {editingDutyId && (
+                <button
+                  onClick={() => {
+                    setEditingDutyId(null);
+                    setNewDutyTitle('');
+                    setNewDutyDescription('');
+                    setNewDutyType('todo');
+                    setNewDutyQuestions([]);
+                    setNewDutyPriority('standard');
+                    setNewDutyTargetType('all');
+                    setNewDutyDueDate('');
+                    setNewDutyRecurrence('none');
+                    setNewDutyAttachmentUrl('');
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '10px',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'background 0.2s',
+                    width: '100%'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                  onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+                >
+                  <X size={16} /> Bearbeiten abbrechen
+                </button>
+              )}
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN: ACTIVE DUTIES LIST */}
+          <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>
+              Aufgaben verwalten ({dutiesList.length})
+            </h4>
+
+            {dutiesLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>Wird geladen...</div>
+            ) : dutiesList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', background: '#f8fafc', borderRadius: '16px', border: '1.5px dashed #cbd5e1' }}>
+                <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '8px' }}>
+                  <Mail size={24} color="#64748b" style={{ margin: '0 auto', display: 'block' }} />
+                </span>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Keine Aufgaben vorhanden.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {dutiesList.map(duty => {
+                  const targeted = getTargetedTeachers(duty);
+                  const isCritical = duty.priority === 'critical';
+                  const hasDueDate = !!duty.due_date;
+                  const isOverdue = hasDueDate && new Date(duty.due_date).getTime() < Date.now();
+
+                  return (
+                    <div 
+                      key={duty.id} 
+                      style={{ 
+                        border: isCritical ? '1.5px solid #fecaca' : '1px solid #e2e8f0', 
+                        background: isCritical ? '#fff5f5' : '#ffffff', 
+                        borderRadius: '16px', 
+                        padding: '16px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '12px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                            {isCritical && (
+                              <span style={{ background: '#ef4444', color: 'white', fontSize: '0.62rem', fontWeight: 900, padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <AlertCircle size={10} color="#ffffff" /> Kritisch
+                              </span>
+                            )}
+                            <span style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.62rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                              {duty.questions ? 'Fragebogen' : 'To-Do'}
+                            </span>
+                            {duty.recurrence !== 'none' && (
+                              <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.62rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <RefreshCw size={10} color="#0369a1" /> {duty.recurrence === 'monthly' ? 'Monatlich' : 'Halbjährlich'}
+                              </span>
+                            )}
+                          </div>
+                          <h5 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>{duty.title}</h5>
+                          {(duty.description || duty.message) && (
+                            <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>{duty.description || duty.message}</p>
+                          )}
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '6px', fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
+                            {hasDueDate && (
+                              <span style={{ color: isOverdue ? '#ef4444' : '#64748b', fontWeight: isOverdue ? 800 : 550, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Calendar size={12} /> Fällig: {new Date(duty.due_date).toLocaleDateString('de-DE')}
+                              </span>
+                            )}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Users size={12} /> Empfänger: {duty.target_type === 'all' ? 'Alle' : (duty.target_type === 'group' ? `Fachgruppe: ${duty.target_group}` : 'Einzelperson')} ({targeted.length})
+                            </span>
+                            {duty.created_by_name && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <User size={12} /> Von: {duty.created_by_name} ({duty.created_by_role})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={() => {
+                              setEditingDutyId(duty.id);
+                              setNewDutyTitle(duty.title);
+                              setNewDutyDescription(duty.description || duty.message || '');
+                              setNewDutyType(duty.questions ? 'questionnaire' : 'todo');
+                              setNewDutyQuestions(duty.questions || []);
+                              setNewDutyPriority(duty.priority);
+                              setNewDutyTargetType(duty.target_type);
+                              setNewDutyTargetGroup(duty.target_group || 'guitar');
+                              setNewDutyTargetTeacherId(duty.target_teacher_id || '');
+                              setNewDutyDueDate(duty.due_date ? duty.due_date.split('T')[0] : '');
+                              setNewDutyRecurrence(duty.recurrence);
+                              setNewDutyAttachmentUrl(duty.attachment_url || '');
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '4px', borderRadius: '8px', transition: 'all 0.15s' }}
+                            onMouseOver={e => e.currentTarget.style.color = '#3b82f6'}
+                            onMouseOut={e => e.currentTarget.style.color = '#cbd5e1'}
+                            title="Aufgabe bearbeiten"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDuty(duty.id)}
+                            style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', padding: '4px', borderRadius: '8px', transition: 'all 0.15s' }}
+                            onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+                            onMouseOut={e => e.currentTarget.style.color = '#cbd5e1'}
+                            title="Aufgabe löschen"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px', justifyContent: 'space-between', alignItems: 'center' }}>
+                        {duty.attachment_url ? (
+                          <a 
+                            href={duty.attachment_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: '#3b82f6', textDecoration: 'none' }}
+                          >
+                            <Download size={12} /> Anhang herunterladen
+                          </a>
+                        ) : <div />}
+
+                        <button
+                          onClick={() => fetchDutyStats(duty)}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '6px 12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+                          onMouseOut={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        >
+                          Auswertung & Details
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* DETAILS & STATS MODAL */}
+        {selectedDutyForStats && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '650px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden'
+            }}>
+              
+              {/* Modal Header */}
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Aufgaben-Auswertung</h4>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>{selectedDutyForStats.title}</span>
+                </div>
+                <button
+                  onClick={() => setSelectedDutyForStats(null)}
+                  style={{ border: 'none', background: '#f1f5f9', color: '#475569', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* Stats Summary Card */}
+                {(() => {
+                  const targeted = getTargetedTeachers(selectedDutyForStats);
+                  const completed = targeted.filter(t => dutyResponsesList.some(res => res.teacher_id === t.id));
+                  const percentage = targeted.length > 0 ? Math.round((completed.length / targeted.length) * 100) : 0;
+                  
+                  return (
+                    <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', gap: '24px', alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>Abschlussquote</div>
+                        <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                          {percentage}%
+                          <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>({completed.length} von {targeted.length} Lehrkräften)</span>
+                        </div>
+                      </div>
+                      <div style={{ width: '80px', height: '80px', position: 'relative', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={[
+                                { value: completed.length, color: '#34a853' },
+                                { value: Math.max(0, targeted.length - completed.length), color: '#e2e8f0' }
+                              ]}
+                              dataKey="value"
+                              innerRadius={24}
+                              outerRadius={32}
+                              startAngle={90}
+                              endAngle={-270}
+                            >
+                              <Cell fill="#34a853" />
+                              <Cell fill="#e2e8f0" />
+                            </Pie>
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* List of targeted teachers */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>Detaillierter Status</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {getTargetedTeachers(selectedDutyForStats).map((t: any) => {
+                      const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+                      const hasCompleted = !!response;
+
+                      return (
+                        <div key={t.id} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'flex-start', gap: '12px', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifySelf: 'flex-start', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>
+                              {(t.firstName || t.first_name || 'U')?.[0]}
+                            </span>
+                          </div>
+                          
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                              {t.firstName || t.first_name} {t.lastName || t.last_name}
+                            </div>
+                            {t.instrument && (
+                              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{t.instrument}</div>
+                            )}
+                            {hasCompleted && response.response_text && (
+                              <div style={{ marginTop: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedResponseIds(prev => ({
+                                    ...prev,
+                                    [response.id]: !prev[response.id]
+                                  }))}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    padding: 0,
+                                    color: '#ea4335',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontFamily: 'inherit'
+                                  }}
+                                >
+                                  {expandedResponseIds[response.id] ? '▲ Rückmeldung einklappen' : '▼ Rückmeldung ausklappen'}
+                                </button>
+                                
+                                {expandedResponseIds[response.id] && (
+                                  <div style={{ 
+                                    marginTop: '6px', 
+                                    background: '#f8fafc', 
+                                    padding: '8px 12px', 
+                                    borderRadius: '8px', 
+                                    border: '1px solid #e2e8f0', 
+                                    fontSize: '0.78rem', 
+                                    color: '#334155',
+                                    fontStyle: 'italic',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '2px',
+                                    whiteSpace: 'pre-wrap',
+                                    textAlign: 'left'
+                                  }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', fontStyle: 'normal' }}>Rückmeldung:</span>
+                                    <span>{response.response_text}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            {hasCompleted ? (
+                              <>
+                                <span style={{ background: '#ecfdf5', color: '#047857', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>✓ Erledigt</span>
+                                <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '4px' }}>
+                                  {new Date(response.created_at).toLocaleDateString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ background: '#fef2f2', color: '#b91c1c', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>Ausstehend</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </div>
     );
   };
@@ -6036,7 +6891,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     fontWeight: 800,
                     background: copiedStudentId === 'general-onboarding' ? '#ecfdf5' : '#ffffff',
                     border: copiedStudentId === 'general-onboarding' ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
-                    color: copiedStudentId === 'general-onboarding' ? '#059669' : '#0f172a',
+                    color: copiedStudentId === 'general-onboarding' ? '#137333' : '#0f172a',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
                     transition: 'all 0.2s',
@@ -6083,7 +6938,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
-                    boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
+                    boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)',
                     transition: 'all 0.2s'
                   }}
                 >
@@ -6278,8 +7133,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               {/* Card 2: Campus Aktiv */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.25)',
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.25)',
                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
                 padding: '16px', boxSizing: 'border-box',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -6650,7 +7505,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             fontWeight: 800,
                             cursor: 'pointer',
                             background: student.is_campus_active ? '#e2f6ea' : '#f5f5f7',
-                            color: student.is_campus_active ? '#137333' : '#86868b',
+                            color: student.is_campus_active ? '#34a853' : '#86868b',
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
@@ -6749,7 +7604,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   padding: '4px 10px',
                                   borderRadius: '20px',
                                   background: '#e2f6ea',
-                                  color: '#137333',
+                                  color: '#34a853',
                                   fontSize: '0.7rem',
                                   fontWeight: 800,
                                   textTransform: 'uppercase',
@@ -7304,7 +8159,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           school_id: schoolId,
           name: newSubjectName.trim(),
           description: newSubjectDescription.trim() || null,
-          category: newSubjectCategory || 'Allgemein'
+          category: newSubjectCategory || 'guitar'
         });
 
       if (error) throw error;
@@ -7312,7 +8167,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
       alert(`Fach "${newSubjectName}" wurde erfolgreich angelegt.`);
       setNewSubjectName('');
       setNewSubjectDescription('');
-      setNewSubjectCategory('Allgemein');
+      setNewSubjectCategory('guitar');
       setShowAddSubjectModal(false);
       fetchDashboardData();
     } catch (err: any) {
@@ -7359,7 +8214,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     let failCount = 0;
     const errors: string[] = [];
 
-    for (let line of lines) {
+    for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
@@ -9064,13 +9919,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 width: '100%',
                 padding: '16px 24px',
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                 border: 'none',
                 color: '#ffffff',
                 fontWeight: 900,
                 fontSize: '1rem',
                 cursor: 'pointer',
-                boxShadow: '0 10px 20px rgba(16, 185, 129, 0.18)',
+                boxShadow: '0 10px 20px rgba(52, 168, 83, 0.18)',
                 transition: 'all 0.2s',
                 outline: 'none'
               }}
@@ -9533,7 +10388,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <button
                                   onClick={() => handleConfirmLogbookBooking(b.id)}
                                   style={{
-                                    background: '#10b981',
+                                    background: '#34a853',
                                     border: 'none',
                                     color: '#ffffff',
                                     padding: '8px 14px',
@@ -9543,8 +10398,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     cursor: 'pointer',
                                     transition: 'all 0.15s'
                                   }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                                  onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#137333'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = '#34a853'}
                                 >
                                   Bestätigen
                                 </button>
@@ -9637,7 +10492,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             {/* Modal Header */}
             <div style={{ padding: '24px', borderBottom: '1.5px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ClipboardList size={22} color="#10b981" />
+                <ClipboardList size={22} color="#34a853" />
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Probezeit- & Freischaltungs-Logbuch</h3>
               </div>
               <button
@@ -9836,6 +10691,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 }).length;
               })()
             },
+            { id: 'duties', label: 'Dienstliche Aufgaben', icon: FileText },
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
             { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
@@ -9915,8 +10771,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           {activeTab === 'groovelab' && [
             { id: 'live', label: 'Live Lab', icon: Monitor },
             { id: 'coaches', label: 'Lehrer', icon: GraduationCap },
-            { id: 'students', label: 'Schüler', icon: Users },
-            { id: 'kiosk', label: 'Einstellungen', icon: Sliders }
+            { id: 'students', label: 'Schüler', icon: Users }
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = groovelabSubTab === item.id;
@@ -10425,9 +11280,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              {activeTab !== 'groovelab' && !((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
+              {activeTab !== 'groovelab' && !((activeTab as any) === 'campus') && !((activeTab as any) === 'campus' && (campusSubTab === 'onboarding' || campusSubTab === 'schedules')) && !(activeTab === 'secretary' && (secretarySubTab === 'crisis' || secretarySubTab === 'rooms' || secretarySubTab === 'briefing' || secretarySubTab === 'duties' || secretarySubTab === 'audit' || secretarySubTab === 'equipment' || secretarySubTab === 'employees' || secretarySubTab === 'licenses' || secretarySubTab === 'setup')) && (
                 <>
-                  <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#10b981' : '#f59e0b' }}>
+                  <h2 className="swiss-h1" style={{ margin: 0, color: (activeTab as any) === 'campus' ? '#34a853' : '#f59e0b' }}>
                     {getTabTitle()}
                   </h2>
                   <p style={{ color: (activeTab as any) === 'campus' ? '#64748b' : '#a1a1aa', fontWeight: 500, fontSize: '0.85rem', marginTop: '4px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -10690,8 +11545,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.3)',
+                      background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.3)',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
                       padding: '16px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -10825,7 +11680,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           marginBottom: '6px',
                           flexShrink: 0
                         }}>
-                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />
+                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
                           <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
                             {new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} UHR
                           </span>
@@ -10917,8 +11772,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                     {pendingBookings.length === 0 ? (
                       <div style={{
-                        background: 'rgba(16, 185, 129, 0.04)',
-                        border: '1px solid rgba(16, 185, 129, 0.1)',
+                        background: 'rgba(52, 168, 83, 0.04)',
+                        border: '1px solid rgba(52, 168, 83, 0.1)',
                         color: '#065f46',
                         borderRadius: '16px',
                         padding: '16px 20px',
@@ -10926,7 +11781,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         alignItems: 'center',
                         gap: '12px'
                       }}>
-                        <CheckCircle size={20} color="#10b981" />
+                        <CheckCircle size={20} color="#34a853" />
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Keine ausstehenden Raumbuchungen</strong>
                           <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Aktuell gibt es keine vorläufigen Raumbuchungen von Lehrkräften, die bestätigt werden müssen.</span>
@@ -10967,7 +11822,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <button
                                   onClick={() => handleConfirmBooking(b.id)}
                                   style={{
-                                    background: '#10b981',
+                                    background: '#34a853',
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '8px',
@@ -10976,10 +11831,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     fontWeight: 800,
                                     cursor: 'pointer',
                                     transition: 'all 0.15s ease',
-                                    boxShadow: '0 1px 2px rgba(16, 185, 129, 0.2)'
+                                    boxShadow: '0 1px 2px rgba(52, 168, 83, 0.2)'
                                   }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                                  onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#137333'}
+                                  onMouseLeave={(e) => e.currentTarget.style.background = '#34a853'}
                                 >
                                   Bestätigen
                                 </button>
@@ -11087,8 +11942,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {pendingSchedules.length === 0 ? (
                         <div style={{
-                          background: 'rgba(16, 185, 129, 0.04)',
-                          border: '1px solid rgba(16, 185, 129, 0.1)',
+                          background: 'rgba(52, 168, 83, 0.04)',
+                          border: '1px solid rgba(52, 168, 83, 0.1)',
                           color: '#065f46',
                           borderRadius: '16px',
                           padding: '16px',
@@ -11213,8 +12068,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                     {activeSickTeachers.length === 0 ? (
                       <div style={{
-                        background: 'rgba(16, 185, 129, 0.04)',
-                        border: '1px solid rgba(16, 185, 129, 0.1)',
+                        background: 'rgba(52, 168, 83, 0.04)',
+                        border: '1px solid rgba(52, 168, 83, 0.1)',
                         color: '#065f46',
                         borderRadius: '16px',
                         padding: '16px',
@@ -11305,11 +12160,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               user_id: userId,
                               title: newEventTitle,
                               message: newEventDesc,
-                              target_type: newEventTarget
+                              target_type: newEventTarget,
+                              category: newEventCategory,
+                              is_emergency: newEventIsEmergency,
+                              published_at: newEventPublishedAt ? new Date(newEventPublishedAt).toISOString() : new Date().toISOString(),
+                              expires_at: newEventExpiresAt ? new Date(newEventExpiresAt).toISOString() : null,
+                              attachment_url: newEventAttachmentUrl || null
                             });
                           if (!error) {
                             setNewEventTitle('');
                             setNewEventDesc('');
+                            setNewEventCategory('general');
+                            setNewEventIsEmergency(false);
+                            setNewEventPublishedAt('');
+                            setNewEventExpiresAt('');
+                            setNewEventAttachmentUrl('');
                             setShowAddEventModal(false);
                             fetchDashboardData();
                           }
@@ -11319,7 +12184,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       }} style={{
                         background: '#f8fafc',
                         border: '1px solid #e2e8f0',
-                        padding: '16px',
+                        padding: '18px',
                         borderRadius: '16px',
                         marginBottom: '20px',
                         display: 'flex',
@@ -11358,36 +12223,123 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             boxSizing: 'border-box'
                           }}
                         />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <select 
-                            value={newEventTarget} 
-                            onChange={(e: any) => setNewEventTarget(e.target.value)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '8px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '0.74rem',
-                              background: '#ffffff',
-                              fontFamily: 'inherit'
-                            }}
-                          >
-                            <option value="all">Sichtbar für alle</option>
-                            <option value="teachers">Nur Lehrkräfte</option>
-                            <option value="students">Nur Schüler</option>
-                          </select>
+                        
+                        {/* Advanced Settings Row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Kategorie</label>
+                            <select 
+                              value={newEventCategory} 
+                              onChange={(e: any) => setNewEventCategory(e.target.value)}
+                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', background: '#ffffff', fontFamily: 'inherit' }}
+                            >
+                              <option value="general">Allgemeine Info</option>
+                              <option value="announcement">Wichtige Ankündigung</option>
+                              <option value="event">Konzert & Event</option>
+                              <option value="holidays">Ferien & Schließzeit</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Zielgruppe</label>
+                            <select 
+                              value={newEventTarget} 
+                              onChange={(e: any) => setNewEventTarget(e.target.value)}
+                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', background: '#ffffff', fontFamily: 'inherit' }}
+                            >
+                              <option value="all">Sichtbar für alle</option>
+                              <option value="teachers">Nur Lehrkräfte</option>
+                              <option value="students">Nur Schüler</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Veröffentlichen am</label>
+                            <input 
+                              type="datetime-local" 
+                              value={newEventPublishedAt} 
+                              onChange={(e) => setNewEventPublishedAt(e.target.value)}
+                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', fontFamily: 'inherit' }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>Ablaufdatum (Optional)</label>
+                            <input 
+                              type="datetime-local" 
+                              value={newEventExpiresAt} 
+                              onChange={(e) => setNewEventExpiresAt(e.target.value)}
+                              style={{ padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.74rem', width: '100%', fontFamily: 'inherit' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* File Upload / Attachments */}
+                        <div style={{ background: '#f1f5f9', padding: '10px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Anhang (PDF / Bild)</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input 
+                              type="file" 
+                              accept="image/*,application/pdf"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  setIsUploadingAttachment(true);
+                                  const fileExt = file.name.split('.').pop();
+                                  const fileName = `announcement_${Date.now()}.${fileExt}`;
+                                  const filePath = `feed-attachments/${fileName}`;
+                                  const { error: uploadErr } = await supabase.storage
+                                    .from('groovelab-assets')
+                                    .upload(filePath, file);
+                                  if (uploadErr) throw uploadErr;
+                                  
+                                  const { data: urlData } = supabase.storage
+                                    .from('groovelab-assets')
+                                    .getPublicUrl(filePath);
+                                  setNewEventAttachmentUrl(urlData.publicUrl);
+                                } catch (err: any) {
+                                  alert('Upload fehlgeschlagen: ' + err.message);
+                                } finally {
+                                  setIsUploadingAttachment(false);
+                                }
+                              }}
+                              style={{ fontSize: '0.72rem' }}
+                            />
+                            {isUploadingAttachment && <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Lädt hoch...</span>}
+                          </div>
+                          {newEventAttachmentUrl && (
+                            <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
+                              ✓ Datei verknüpft: {newEventAttachmentUrl.substring(newEventAttachmentUrl.lastIndexOf('/') + 1)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Emergency Toggle */}
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, color: '#b91c1c' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={newEventIsEmergency} 
+                            onChange={(e) => setNewEventIsEmergency(e.target.checked)} 
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Sehr wichtig (Rotes Banner oben auf dem Dashboard einblenden)
+                        </label>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
                           <button type="submit" style={{
-                            background: '#1c1c1e',
+                            background: '#ea4335',
                             color: '#ffffff',
                             border: 'none',
                             borderRadius: '9999px',
-                            padding: '8px 16px',
+                            padding: '8px 20px',
                             fontSize: '0.78rem',
-                            fontWeight: 600,
+                            fontWeight: 700,
                             cursor: 'pointer',
                             transition: 'background 0.2s'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#2c2c2e'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#1c1c1e'}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#d93025'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#ea4335'}
                           >
                             Speichern
                           </button>
@@ -11424,12 +12376,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           let targetColor = '#475569';
                           if (evt.target_type === 'teachers') {
                             targetLabel = 'LEHRKRÄFTE';
-                            targetBg = '#fef3c7';
-                            targetColor = '#b45309';
+                            targetBg = '#fce8e6';
+                            targetColor = '#ea4335';
                           } else if (evt.target_type === 'students') {
                             targetLabel = 'SCHÜLER';
-                            targetBg = '#e0f2fe';
-                            targetColor = '#0369a1';
+                            targetBg = '#e8f0fe';
+                            targetColor = '#1a73e8';
+                          }
+
+                          let categoryLabel = 'Info';
+                          let categoryBg = '#fef3c7';
+                          let categoryColor = '#b45309';
+                          if (evt.category === 'announcement') {
+                            categoryLabel = 'Ankündigung';
+                            categoryBg = '#fce8e6';
+                            categoryColor = '#ea4335';
+                          } else if (evt.category === 'event') {
+                            categoryLabel = 'Event';
+                            categoryBg = '#e0f2fe';
+                            categoryColor = '#0369a1';
+                          } else if (evt.category === 'holidays') {
+                            categoryLabel = 'Ferien';
+                            categoryBg = '#e6f4ea';
+                            categoryColor = '#34a853';
                           }
 
                           return (
@@ -11446,17 +12415,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{
-                                  background: targetBg,
-                                  color: targetColor,
-                                  padding: '4px 10px',
-                                  borderRadius: '9999px',
-                                  fontSize: '0.64rem',
-                                  fontWeight: 800,
-                                  letterSpacing: '0.02em'
-                                }}>
-                                  {targetLabel}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{
+                                    background: targetBg,
+                                    color: targetColor,
+                                    padding: '4px 10px',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 800,
+                                    letterSpacing: '0.02em'
+                                  }}>
+                                    {targetLabel}
+                                  </span>
+                                  <span style={{
+                                    background: evt.is_emergency ? '#fce8e6' : categoryBg,
+                                    color: evt.is_emergency ? '#ea4335' : categoryColor,
+                                    padding: '4px 10px',
+                                    borderRadius: '9999px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 800
+                                  }}>
+                                    {categoryLabel} {evt.is_emergency && '⚠️ Wichtig'}
+                                  </span>
+                                </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span style={{ fontSize: '0.74rem', color: '#86868b', fontWeight: 600 }}>
                                     {formattedDate}
@@ -11495,7 +12476,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </button>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <strong style={{
                                   fontSize: '0.96rem',
                                   color: '#1a253c',
@@ -11513,6 +12494,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 }}>
                                   {evt.message}
                                 </p>
+                                
+                                {evt.attachment_url && (
+                                  <div style={{ marginTop: '6px' }}>
+                                    {evt.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                      <a href={evt.attachment_url} target="_blank" rel="noreferrer">
+                                        <img 
+                                          src={evt.attachment_url} 
+                                          alt="Anhang" 
+                                          style={{ maxWidth: '100%', maxHeight: '120px', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'zoom-in' }}
+                                        />
+                                      </a>
+                                    ) : (
+                                      <a 
+                                        href={evt.attachment_url} 
+                                        target="_blank" 
+                                        rel="noreferrer" 
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#ea4335', textDecoration: 'none', fontWeight: 650 }}
+                                      >
+                                        📄 Dokument öffnen
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
@@ -11626,7 +12630,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             const urgencyMeta = {
               RED:    { leftBar: '#ef4444', bg: 'linear-gradient(135deg, rgba(254, 242, 242, 0.75) 0%, rgba(254, 226, 226, 0.45) 100%)', border: 'rgba(239, 68, 68, 0.25)', badge: '#ef4444', badgeText: 'white', badgeLabel: '🚨 Akuter Ausfall', dot: '#ef4444' },
               YELLOW: { leftBar: '#f59e0b', bg: 'linear-gradient(135deg, rgba(255, 251, 235, 0.75) 0%, rgba(254, 243, 199, 0.45) 100%)', border: 'rgba(245, 158, 11, 0.25)', badge: '#f59e0b', badgeText: 'white', badgeLabel: '⏳ Ausstehend', dot: '#f59e0b' },
-              GREEN:  { leftBar: '#10b981', bg: 'linear-gradient(135deg, rgba(240, 253, 244, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(16, 185, 129, 0.25)', badge: '#10b981', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#10b981' },
+              GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(240, 253, 244, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#34a853' },
             };
             const m = urgencyMeta[urgency] || urgencyMeta['GREEN'];
 
@@ -11706,15 +12710,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         onClick={() => handleMarkAsNotified(t.id)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '6px',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                           border: 'none',
                           color: 'white', borderRadius: '12px', padding: '8px 14px',
                           fontSize: '0.75rem', fontWeight: 900, cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(16,185,129,0.2)',
+                          boxShadow: '0 4px 12px rgba(52,168,83,0.2)',
                           transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16,185,129,0.3)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16,185,129,0.2)'; }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(52,168,83,0.3)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(52,168,83,0.2)'; }}
                       >
                         <CheckCircle size={14} /> Manuell grün melden
                       </button>
@@ -11799,10 +12803,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                 {/* KPI 3: Erfolgreich informiert - Green */}
                 <div style={{
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+                  background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.95) 0%, rgba(19, 115, 51, 0.95) 100%)',
                   color: 'white', borderRadius: '24px', padding: '22px',
                   display: 'flex', flexDirection: 'column', gap: '8px',
-                  boxShadow: '0 12px 30px -5px rgba(16, 185, 129, 0.3)',
+                  boxShadow: '0 12px 30px -5px rgba(52, 168, 83, 0.3)',
                   border: '1px solid rgba(255,255,255,0.2)',
                   backdropFilter: 'blur(20px)',
                 }}>
@@ -11895,13 +12899,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           }}
                           style={{
                             display: 'flex', alignItems: 'center', gap: '6px',
-                            background: 'rgba(16, 185, 129, 0.08)', border: '1.5px solid rgba(16, 185, 129, 0.25)',
-                            color: '#10b981', borderRadius: '14px', padding: '8px 16px',
+                            background: 'rgba(52, 168, 83, 0.08)', border: '1.5px solid rgba(52, 168, 83, 0.25)',
+                            color: '#34a853', borderRadius: '14px', padding: '8px 16px',
                             fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
                             fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)'; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
                         >
                           🧹 {liveTickets.filter(n => getUrgency(n) === 'GREEN').length} erledigte Ausfälle archivieren
                         </button>
@@ -11945,7 +12949,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                            <CheckCircle size={56} color="#10b981" strokeWidth={1.5} />
+                            <CheckCircle size={56} color="#34a853" strokeWidth={1.5} />
                           </div>
                           <strong style={{ display: 'block', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: '8px' }}>
                             Keine akuten Krankmeldungen
@@ -12066,7 +13070,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 </div>
                                 
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '0.78rem', background: pendingCount > 0 ? (isToday ? '#fee2e2' : '#f1f5f9') : '#e6f4ea', color: pendingCount > 0 ? '#dc2626' : '#137333', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
+                                  <span style={{ fontSize: '0.78rem', background: pendingCount > 0 ? (isToday ? '#fee2e2' : '#f1f5f9') : '#e6f4ea', color: pendingCount > 0 ? '#dc2626' : '#34a853', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
                                     {pendingCount > 0 ? `${pendingCount} Ausstehend` : 'Alle informiert'}
                                   </span>
                                   {doneCount > 0 && (
@@ -12179,7 +13183,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
+                                  <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
                                     ✓ {successCount} Schüler erreicht
                                   </span>
                                   <span style={{ fontSize: '0.78rem', background: failedCount > 0 ? '#fce8e6' : '#f1f5f9', color: failedCount > 0 ? '#c5221f' : '#64748b', padding: '4px 10px', borderRadius: '100px', fontWeight: 800 }}>
@@ -12432,7 +13436,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       {[
                         { icon: <AlertCircle size={14} color="#ef4444" />, title: 'Rot (Akut)', text: 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt dringend empfohlen!', bg: '#fee2e2' },
                         { icon: <Clock size={14} color="#f59e0b" />, title: 'Gelb (Offen)', text: 'Schüler wurde digital benachrichtigt. Rückmeldung steht noch aus.', bg: '#fef3c7' },
-                        { icon: <CheckCircle size={14} color="#10b981" />, title: 'Grün (Erledigt)', text: 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).', bg: '#dcfce7' },
+                        { icon: <CheckCircle size={14} color="#34a853" />, title: 'Grün (Erledigt)', text: 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).', bg: '#dcfce7' },
                       ].map((item) => (
                         <div key={item.title} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                           <div style={{ background: item.bg, borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
@@ -12932,7 +13936,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 padding: '5px 12px',
                                 borderRadius: '10px',
                                 background: isActive ? '#e2f6ea' : '#f5f5f7',
-                                color: isActive ? '#137333' : '#86868b',
+                                color: isActive ? '#34a853' : '#86868b',
                                 fontSize: '0.74rem',
                                 fontWeight: 700,
                                 minWidth: '55px',
@@ -13833,12 +14837,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           {/* Left Column: Notices */}
                           <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <ClipboardList size={18} style={{ color: '#137333' }} />
+                              <ClipboardList size={18} style={{ color: '#34a853' }} />
                               Wichtige Hinweise &amp; Aufgaben
                             </h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
-                                <AlertCircle size={20} style={{ color: '#137333', flexShrink: 0 }} />
+                                <AlertCircle size={20} style={{ color: '#34a853', flexShrink: 0 }} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>Stundenplan-Reviews:</strong>
                                   <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'Inter', lineHeight: '1.4' }}>
@@ -13848,7 +14852,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               </div>
 
                               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '12px', borderRadius: '16px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
-                                <Key size={20} style={{ color: '#137333', flexShrink: 0 }} />
+                                <Key size={20} style={{ color: '#34a853', flexShrink: 0 }} />
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 800, fontFamily: 'Urbanist' }}>Lehrer-Bypass:</strong>
                                   <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'Inter', lineHeight: '1.4' }}>
@@ -14158,7 +15162,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         }
                         .status-toggle-btn.campus-active {
                           background: #e2f6ea;
-                          color: #137333;
+                          color: #34a853;
                           box-shadow: 0 2px 8px rgba(34,197,94,0.12);
                         }
                         .status-toggle-btn.campus-active:hover {
@@ -14337,7 +15341,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   style={{
                                     background: 'transparent',
                                     border: 'none',
-                                    color: '#137333',
+                                    color: '#34a853',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -14448,7 +15452,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               <button
                                 type="submit"
                                 className="google-btn-primary"
-                                style={{ background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700 }}
+                                style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700 }}
                               >
                                 Lehrkraft anlegen
                               </button>
@@ -14579,14 +15583,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             }}
                             style={{ flex: 1, background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
-                            🔄 Zurücksetzen
+                            Zurücksetzen
                           </button>
                           <button
                             type="button"
                             onClick={handleSaveAndApproveAll}
-                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(16,185,129,0.15)', whiteSpace: 'nowrap' }}
+                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(52,168,83,0.15)', whiteSpace: 'nowrap' }}
                           >
-                            💾 Speichern & Freigeben
+                            Speichern & Freigeben
                           </button>
                         </>
                       )}
@@ -14834,9 +15838,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         );
 
                                         // Beautiful pastel coloring replaced with uniform green
-                                        let themeBg = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
-                                        let themeBorder = '#10b981';
-                                        let themeText = '#065f46';
+                                        const themeBg = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
+                                        const themeBorder = '#34a853';
+                                        const themeText = '#065f46';
 
                                         return (
                                           <div
@@ -15127,14 +16131,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
                                             
                                             // Dynamic instrument-based pastel coloring replaced with uniform green
-                                            let themeBg = 'rgba(220, 252, 231, 0.45)'; // default green
+                                            const themeBg = 'rgba(220, 252, 231, 0.45)'; // default green
                                             let themeBorder = '1px solid #e2e8f0';
-                                            let themeBorderLeft = '4px solid #10b981';
-                                            let themeText = '#0f172a';
-                                            let timeText = '#059669';
+                                            const themeBorderLeft = '4px solid #34a853';
+                                            const themeText = '#0f172a';
+                                            const timeText = '#137333';
 
                                             if (hasOverlap) {
-                                              themeBorder = '2px dashed #10b981';
+                                              themeBorder = '2px dashed #34a853';
                                             }
 
                                             return (
@@ -15156,7 +16160,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                   {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
                                                 </div>
                                                 <span style={{ pointerEvents: 'none', fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
-                                                <span style={{ pointerEvents: 'none', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#059669' }}>
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : '#137333' }}>
                                                   ⏱ {plan.startTime}–{plan.endTime}
                                                 </span>
                                                 {(() => {
@@ -15207,7 +16211,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                           // Compute end time: startTime (e.g. "14:15") + duration (minutes)
                           const [h, m] = adHocStartTime.split(':').map(Number);
-                          let totalMins = h * 60 + m + adHocDuration;
+                          const totalMins = h * 60 + m + adHocDuration;
                           const endH = Math.floor(totalMins / 60) % 24;
                           const endM = totalMins % 60;
                           const endTimeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
@@ -15308,7 +16312,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                           <button
                             type="submit"
-                            style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(52,168,83,0.2)' }}
+                            style={{ flex: 2, background: '#34a853', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(52, 168, 83,0.2)' }}
                           >
                             Einbuchen & Reservieren
                           </button>
@@ -15386,7 +16390,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               {isAlreadySplit && (
                                 <button
                                   onClick={() => handleMergePlans(selectedDayPlan)}
-                                  style={{ background: 'rgba(16,185,129,0.05)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                  style={{ background: 'rgba(52,168,83,0.05)', color: '#34a853', border: '1px solid rgba(52,168,83,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                                 >
                                   🔗 Aufteilung aufheben (Zusammenfügen)
                                 </button>
@@ -15582,7 +16586,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         transition: 'background-color 0.2s ease'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)' }}>
                             <Users size={20} />
                           </div>
                           <div>
@@ -16053,7 +17057,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 height: '36px',
                                 borderRadius: '50%',
                                 background: '#e2f6ea',
-                                color: '#137333',
+                                color: '#34a853',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -16284,7 +17288,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     gap: '16px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <ShieldCheck size={20} style={{ color: '#137333' }} />
+                      <ShieldCheck size={20} style={{ color: '#34a853' }} />
                       <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                         Datenschutz-Cockpit
                       </h3>
@@ -16315,7 +17319,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               fontSize: '0.68rem',
                               fontWeight: 900,
-                              color: '#137333',
+                              color: '#34a853',
                               background: '#e6f4ea',
                               padding: '2px 8px',
                               borderRadius: '20px',
@@ -16935,9 +17939,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         <div style={{
                                           padding: '12px 10px',
                                           borderRadius: '8px',
-                                          border: '1px dashed rgba(16, 185, 129, 0.3)',
-                                          background: 'rgba(16, 185, 129, 0.05)',
-                                          color: '#059669',
+                                          border: '1px dashed rgba(52, 168, 83, 0.3)',
+                                          background: 'rgba(52, 168, 83, 0.05)',
+                                          color: '#137333',
                                           fontSize: '0.72rem',
                                           fontWeight: 600,
                                           textAlign: 'center'
@@ -19022,9 +20026,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       justifyContent: 'center',
                                       fontSize: '0.74rem',
                                       fontWeight: 900,
-                                      background: isCurrent ? 'linear-gradient(135deg, #10b981 0%, #eab308 100%)' : isPassed ? '#10b981' : '#e2e8f0',
+                                      background: isCurrent ? 'linear-gradient(135deg, #34a853 0%, #eab308 100%)' : isPassed ? '#34a853' : '#e2e8f0',
                                       color: isCurrent || isPassed ? '#ffffff' : '#64748b',
-                                      boxShadow: isCurrent ? '0 4px 10px rgba(16, 185, 129, 0.2)' : 'none',
+                                      boxShadow: isCurrent ? '0 4px 10px rgba(52, 168, 83, 0.2)' : 'none',
                                       transition: 'all 0.25s ease'
                                     }}>
                                       {isPassed ? (
@@ -19034,7 +20038,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     <span style={{ 
                                       fontSize: '0.78rem', 
                                       fontWeight: isCurrent ? 900 : 700, 
-                                      color: isCurrent ? '#1e293b' : isPassed ? '#10b981' : '#94a3b8',
+                                      color: isCurrent ? '#1e293b' : isPassed ? '#34a853' : '#94a3b8',
                                       fontFamily: 'Urbanist, sans-serif'
                                     }}>
                                       {s.label}
@@ -19044,7 +20048,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     <div style={{ 
                                       flex: 1, 
                                       height: '3px', 
-                                      background: isPassed ? '#10b981' : '#e2e8f0', 
+                                      background: isPassed ? '#34a853' : '#e2e8f0', 
                                       margin: '0 16px', 
                                       borderRadius: '9999px',
                                       transition: 'all 0.25s ease' 
@@ -19099,8 +20103,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     borderRadius: '20px',
                                     border: '2px solid',
                                     background: '#ffffff',
-                                    borderColor: hasCampusSub ? '#10b981' : 'rgba(0,0,0,0.06)',
-                                    boxShadow: hasCampusSub ? '0 10px 25px rgba(16, 185, 129, 0.05)' : 'none',
+                                    borderColor: hasCampusSub ? '#34a853' : 'rgba(0,0,0,0.06)',
+                                    boxShadow: hasCampusSub ? '0 10px 25px rgba(52, 168, 83, 0.05)' : 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -19109,7 +20113,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                       <strong style={{ fontSize: '0.9rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34a853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
                                         Campus
                                       </strong>
                                       <span style={{
@@ -19117,8 +20121,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         height: '18px',
                                         borderRadius: '50%',
                                         border: '2px solid',
-                                        borderColor: hasCampusSub ? '#10b981' : '#cbd5e1',
-                                        background: hasCampusSub ? '#10b981' : 'transparent',
+                                        borderColor: hasCampusSub ? '#34a853' : '#cbd5e1',
+                                        background: hasCampusSub ? '#34a853' : 'transparent',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -19129,10 +20133,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       </span>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Stundenpläne &amp; Raumbelegungspläne</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Hausaufgabenheft &amp; Krankheits-Cockpit</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Messenger &amp; Campus Live-Feed</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#10b981' }}>•</span> Übestreaks sowie Performance &amp; Highlights</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Stundenpläne &amp; Raumbelegungspläne</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Hausaufgabenheft &amp; Krankheits-Cockpit</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Messenger &amp; Campus Live-Feed</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#34a853' }}>•</span> Übestreaks sowie Performance &amp; Highlights</span>
                                      </div>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
@@ -19211,12 +20215,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     padding: '12px 24px',
                                     borderRadius: '12px',
                                     border: 'none',
-                                    background: (!hasCampusSub && !hasGroovelabSub) ? '#cbd5e1' : '#10b981',
+                                    background: (!hasCampusSub && !hasGroovelabSub) ? '#cbd5e1' : '#34a853',
                                     color: '#ffffff',
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: (!hasCampusSub && !hasGroovelabSub) ? 'not-allowed' : 'pointer',
-                                    boxShadow: (!hasCampusSub && !hasGroovelabSub) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.15)',
+                                    boxShadow: (!hasCampusSub && !hasGroovelabSub) ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.15)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -19259,8 +20263,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     borderRadius: '20px',
                                     border: '2px solid',
                                     background: '#ffffff',
-                                    borderColor: billingPayer === 'school' ? '#10b981' : 'rgba(0,0,0,0.06)',
-                                    boxShadow: billingPayer === 'school' ? '0 10px 25px rgba(16, 185, 129, 0.05)' : 'none',
+                                    borderColor: billingPayer === 'school' ? '#34a853' : 'rgba(0,0,0,0.06)',
+                                    boxShadow: billingPayer === 'school' ? '0 10px 25px rgba(52, 168, 83, 0.05)' : 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -19276,8 +20280,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         height: '18px',
                                         borderRadius: '50%',
                                         border: '2px solid',
-                                        borderColor: billingPayer === 'school' ? '#10b981' : '#cbd5e1',
-                                        background: billingPayer === 'school' ? '#10b981' : 'transparent',
+                                        borderColor: billingPayer === 'school' ? '#34a853' : '#cbd5e1',
+                                        background: billingPayer === 'school' ? '#34a853' : 'transparent',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -19291,7 +20295,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       Die Musikschule übernimmt alle Gebühren gesammelt. Für Eltern und Schüler ist die Nutzung komplett kostenfrei. Keine Direktabrechnung erforderlich.
                                     </span>
                                   </div>
-                                  <div style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
+                                  <div style={{ fontSize: '0.74rem', color: '#34a853', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
                                     {billingPayer === 'school' ? 'Ausgewählt' : 'Auswählen'}
                                   </div>
                                 </div>
@@ -19353,7 +20357,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               {billingPayer === 'school' && (
                                 <div style={{
                                   background: '#f0fdf4',
-                                  border: '1.5px solid #10b981',
+                                  border: '1.5px solid #34a853',
                                   borderRadius: '20px',
                                   padding: '20px',
                                   marginTop: '8px',
@@ -19374,18 +20378,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       cursor: 'pointer',
                                       background: '#ffffff',
                                       border: '1.5px solid',
-                                      borderColor: studentBillingOption === 'option2' ? '#10b981' : '#e2e8f0',
+                                      borderColor: studentBillingOption === 'option2' ? '#34a853' : '#e2e8f0',
                                       borderRadius: '12px',
                                       padding: '12px',
                                       transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'option2' ? '0 4px 12px rgba(16, 185, 129, 0.04)' : 'none'
+                                      boxShadow: studentBillingOption === 'option2' ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
                                     }}>
                                       <input
                                         type="radio"
                                         name="schoolStudentBillingOption"
                                         checked={studentBillingOption === 'option2'}
                                         onChange={() => setStudentBillingOption('option2')}
-                                        style={{ marginTop: '3px', accentColor: '#10b981' }}
+                                        style={{ marginTop: '3px', accentColor: '#34a853' }}
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
@@ -19405,18 +20409,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       cursor: 'pointer',
                                       background: '#ffffff',
                                       border: '1.5px solid',
-                                      borderColor: studentBillingOption === 'option3_2' ? '#10b981' : '#e2e8f0',
+                                      borderColor: studentBillingOption === 'option3_2' ? '#34a853' : '#e2e8f0',
                                       borderRadius: '12px',
                                       padding: '12px',
                                       transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'option3_2' ? '0 4px 12px rgba(16, 185, 129, 0.04)' : 'none'
+                                      boxShadow: studentBillingOption === 'option3_2' ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
                                     }}>
                                       <input
                                         type="radio"
                                         name="schoolStudentBillingOption"
                                         checked={studentBillingOption === 'option3_2'}
                                         onChange={() => setStudentBillingOption('option3_2')}
-                                        style={{ marginTop: '3px', accentColor: '#10b981' }}
+                                        style={{ marginTop: '3px', accentColor: '#34a853' }}
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -19436,18 +20440,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       cursor: 'pointer',
                                       background: '#ffffff',
                                       border: '1.5px solid',
-                                      borderColor: studentBillingOption === 'option3_3' ? '#10b981' : '#e2e8f0',
+                                      borderColor: studentBillingOption === 'option3_3' ? '#34a853' : '#e2e8f0',
                                       borderRadius: '12px',
                                       padding: '12px',
                                       transition: 'all 0.2s',
-                                      boxShadow: studentBillingOption === 'option3_3' ? '0 4px 12px rgba(16, 185, 129, 0.04)' : 'none'
+                                      boxShadow: studentBillingOption === 'option3_3' ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
                                     }}>
                                       <input
                                         type="radio"
                                         name="schoolStudentBillingOption"
                                         checked={studentBillingOption === 'option3_3'}
                                         onChange={() => setStudentBillingOption('option3_3')}
-                                        style={{ marginTop: '3px', accentColor: '#10b981' }}
+                                        style={{ marginTop: '3px', accentColor: '#34a853' }}
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -19585,12 +20589,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     padding: '12px 24px',
                                     borderRadius: '12px',
                                     border: 'none',
-                                    background: '#10b981',
+                                    background: '#34a853',
                                     color: '#ffffff',
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+                                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -19633,7 +20637,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         type="checkbox"
                                         checked={hasCustomActivationBillingAddress}
                                         onChange={(e) => setHasCustomActivationBillingAddress(e.target.checked)}
-                                        style={{ width: '15px', height: '15px', accentColor: '#10b981' }}
+                                        style={{ width: '15px', height: '15px', accentColor: '#34a853' }}
                                       />
                                       Abweichende Rechnungsadresse hinterlegen (z.B. Förderverein / Sponsor)
                                     </label>
@@ -19752,12 +20756,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     padding: '12px 24px',
                                     borderRadius: '12px',
                                     border: 'none',
-                                    background: '#10b981',
+                                    background: '#34a853',
                                     color: '#ffffff',
                                     fontSize: '0.8rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+                                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '8px',
@@ -19834,7 +20838,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                   {/* Invoice A Block */}
                                   <div style={{
-                                    border: '1.5px solid #10b981',
+                                    border: '1.5px solid #34a853',
                                     borderRadius: '16px',
                                     background: '#f0fdf4',
                                     padding: '16px',
@@ -19864,7 +20868,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         <strong>{(passiveStudentCost).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </div>
-                                    <div style={{ borderTop: '1px dotted #10b981', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#065f46' }}>
+                                    <div style={{ borderTop: '1px dotted #34a853', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#065f46' }}>
                                       <span>Monatlicher Betrag (Rechnung A):</span>
                                       <strong>{finalInvoiceA_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
@@ -20008,7 +21012,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   )}
                                   
                                   {isCouponApplied && (
-                                    <div style={{ color: '#10b981', fontSize: '0.7rem', fontWeight: 700, marginTop: '6px' }}>
+                                    <div style={{ color: '#34a853', fontSize: '0.7rem', fontWeight: 700, marginTop: '6px' }}>
                                       ✓ Gutscheincode active: {couponDiscount}% Rabatt auf Rechnung A (System &amp; Infrastruktur) angewendet!
                                     </div>
                                   )}
@@ -20021,7 +21025,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       type="checkbox"
                                       checked={agreedToTerms}
                                       onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                      style={{ width: '16px', height: '16px', accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
+                                      style={{ width: '16px', height: '16px', accentColor: '#34a853', marginTop: '2px', cursor: 'pointer' }}
                                     />
                                     <span style={{ fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
                                       Ich akzeptiere die <strong>AGB</strong> und die <strong>Datenschutzerklärung für Musikschulen</strong>.
@@ -20033,7 +21037,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       type="checkbox"
                                       checked={agreedToSepa}
                                       onChange={(e) => setAgreedToSepa(e.target.checked)}
-                                      style={{ width: '16px', height: '16px', accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
+                                      style={{ width: '16px', height: '16px', accentColor: '#34a853', marginTop: '2px', cursor: 'pointer' }}
                                     />
                                     <span style={{ fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
                                       Hiermit bestätige ich die kostenpflichtige Buchung per Rechnung (Zahlungsziel: 14 Tage). Ich stimme zu, dass Rechnungen an die angegebene Rechnungsadresse gesendet werden.
@@ -20107,12 +21111,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       padding: '12px 24px',
                                       borderRadius: '12px',
                                       border: 'none',
-                                      background: (!agreedToSepa || !agreedToTerms) ? '#cbd5e1' : '#10b981',
+                                      background: (!agreedToSepa || !agreedToTerms) ? '#cbd5e1' : '#34a853',
                                       color: '#ffffff',
                                       fontSize: '0.8rem',
                                       fontWeight: 800,
                                       cursor: (!agreedToSepa || !agreedToTerms) ? 'not-allowed' : 'pointer',
-                                      boxShadow: (!agreedToSepa || !agreedToTerms) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.15)',
+                                      boxShadow: (!agreedToSepa || !agreedToTerms) ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.15)',
                                       display: 'flex',
                                       alignItems: 'center',
                                       gap: '8px',
@@ -20145,7 +21149,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             {activeStudentsCount_global > 0 && billingPayer === 'student' && studentBillingOption === 'student_full' && (
                               <div style={{
                                 background: '#f0fdf4',
-                                border: '1px solid #10b981',
+                                border: '1px solid #34a853',
                                 borderRadius: '12px',
                                 padding: '10px 12px',
                                 fontSize: '0.7rem',
@@ -20165,7 +21169,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                 <span>Software-Lizenz:</span>
-                                <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
+                                <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                               </div>
 
                               {hasCampusSub && (
@@ -20290,7 +21294,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       }}>
                         <div className="glass-panel" style={{
                           background: '#ffffff',
-                          border: '2px solid #10b981',
+                          border: '2px solid #34a853',
                           borderRadius: '24px',
                           padding: '40px 32px',
                           maxWidth: '480px',
@@ -20310,10 +21314,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#10b981',
+                            color: '#34a853',
                             fontSize: '2.5rem',
                             fontWeight: 900,
-                            boxShadow: '0 10px 20px rgba(16, 185, 129, 0.15)'
+                            boxShadow: '0 10px 20px rgba(52, 168, 83, 0.15)'
                           }}>
                             ✓
                           </div>
@@ -20332,12 +21336,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '14px 24px',
                               borderRadius: '12px',
                               border: 'none',
-                              background: '#10b981',
+                              background: '#34a853',
                               color: '#ffffff',
                               fontSize: '0.86rem',
                               fontWeight: 800,
                               cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                               transition: 'all 0.2s'
                             }}
                           >
@@ -20595,7 +21599,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         
                                         {/* Progress Bar showing active vs total students */}
                                         <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '9999px', overflow: 'hidden', margin: '8px 0' }}>
-                                          <div className="progress-bar-fill" style={{ width: (students.length > 0 ? Math.min(100, (activeStudentsCount_global / students.length) * 100) : 0) + '%', background: 'linear-gradient(90deg, #10b981 0%, #eab308 100%)', height: '100%' }} />
+                                          <div className="progress-bar-fill" style={{ width: (students.length > 0 ? Math.min(100, (activeStudentsCount_global / students.length) * 100) : 0) + '%', background: 'linear-gradient(90deg, #34a853 0%, #eab308 100%)', height: '100%' }} />
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
                                           <span>0 Aktiv</span>
@@ -20607,7 +21611,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       {(billingPayer === 'student' || studentBillingOption === 'cash') && (
                                         <div style={{
                                           background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
-                                          border: '1px solid #10b981',
+                                          border: '1px solid #34a853',
                                           borderRadius: '16px',
                                           padding: '14px 16px',
                                           marginTop: '12px',
@@ -20621,15 +21625,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             <strong style={{ fontSize: '0.8rem', color: '#065f46' }}>Kostenersparnis durch aktive Profile</strong>
                                           </div>
                                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
-                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(52,168,83,0.15)' }}>
                                               <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Monatlich gespart:</span>
-                                              <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
+                                              <strong style={{ fontSize: '1rem', color: '#34a853', fontWeight: 800 }}>
                                                 {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global).toFixed(2).replace('.', ',')} €
                                               </strong>
                                             </div>
-                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(16,185,129,0.15)' }}>
+                                            <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(52,168,83,0.15)' }}>
                                               <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block' }}>Jährlich gespart:</span>
-                                              <strong style={{ fontSize: '1rem', color: '#10b981', fontWeight: 800 }}>
+                                              <strong style={{ fontSize: '1rem', color: '#34a853', fontWeight: 800 }}>
                                                 {(((billingPayer === 'student' || studentBillingOption === 'cash') ? 0.49 : 0.09) * activeStudentsCount_global * 12).toFixed(2).replace('.', ',')} €
                                               </strong>
                                             </div>
@@ -20649,11 +21653,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         gap: '12px',
                                         alignItems: 'flex-start',
                                         background: '#f0fdf4',
-                                        border: '1.5px dashed #10b981',
+                                        border: '1.5px dashed #34a853',
                                         borderRadius: '16px',
                                         padding: '16px'
                                       }}>
-                                        <Users size={18} style={{ color: '#10b981', verticalAlign: 'middle', marginRight: '6px' }} />
+                                        <Users size={18} style={{ color: '#34a853', verticalAlign: 'middle', marginRight: '6px' }} />
                                         <div>
                                           <strong style={{ display: 'block', fontSize: '0.78rem', color: '#1e293b', marginBottom: '4px' }}>Neue Schüler hinzufügen &amp; aktivieren</strong>
                                           <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: '1.4' }}>
@@ -20698,7 +21702,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.74rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                               <span>Software-Infrastruktur:</span>
-                                              <strong style={{ color: '#10b981' }}>100% kostenlos</strong>
+                                              <strong style={{ color: '#34a853' }}>100% kostenlos</strong>
                                             </div>
 
                                             {hasCampusSub && hasGroovelabSub ? (
@@ -21376,7 +22380,7 @@ status: status,
             [1,2,3,4,5].filter(d => matrixAllocations.some(p => p.roomId === roomId && p.dayOfWeek === d));
           
           const INSTRUMENT_COLOR: Record<string, string> = {
-            Schlagzeug: '#ef4444', Piano: '#3b82f6', Gitarre: '#10b981',
+            Schlagzeug: '#ef4444', Piano: '#3b82f6', Gitarre: '#34a853',
             Gesang: '#8b5cf6', Geige: '#f59e0b', Querflöte: '#06b6d4',
             Saxophon: '#f97316', Bass: '#64748b', Keyboard: '#ec4899', Trompete: '#eab308',
           };
@@ -21553,7 +22557,7 @@ status: status,
                               transition: 'all 0.2s'
                             }}
                           >
-                            ➕ Raum anlegen
+                            Raum anlegen
                           </button>
                         </>
                       )}
@@ -21690,10 +22694,10 @@ status: status,
 
                     {/* Campus Aktiv */}
                     <div style={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white',
+                      background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
                       borderRadius: '16px', padding: '12px 16px',
                       display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: '0 8px 20px -5px rgba(16, 185, 129, 0.3)',
+                      boxShadow: '0 8px 20px -5px rgba(52, 168, 83, 0.3)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       transition: 'all 0.2s ease'
                     }} className="hover-scale">
@@ -21970,7 +22974,7 @@ status: status,
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                               🏢
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -22172,7 +23176,7 @@ status: status,
                             onChange={(e) => setRoomFilterFloor(e.target.value)}
                             style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
                           >
-                            <option value="All">🏢 Alle Stockwerke</option>
+                            <option value="All">Alle Stockwerke</option>
                             {allFloorsList.map(fl => (
                               <option key={fl} value={fl}>{fl}</option>
                             ))}
@@ -22238,7 +23242,7 @@ status: status,
                               }}
                               className="hover-scale"
                             >
-                              ➕ Raum anlegen
+                              Raum anlegen
                             </button>
                           </div>
                         ) : (
@@ -22367,7 +23371,7 @@ status: status,
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         background: room.is_campus_active !== false ? '#e6f4ea' : '#f1f5f9',
-                                        color: room.is_campus_active !== false ? '#137333' : '#86868b',
+                                        color: room.is_campus_active !== false ? '#34a853' : '#86868b',
                                         transition: 'all 0.15s ease',
                                         fontFamily: 'Urbanist'
                                       }}
@@ -22568,7 +23572,7 @@ status: status,
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                                   🏢
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -24682,7 +25686,9 @@ status: status,
               )}
             </div>
           </div>
-        )}        {activeTab === 'secretary' && secretarySubTab === 'audit' && (
+        )}
+        {activeTab === 'secretary' && secretarySubTab === 'duties' && renderDutiesBoard()}
+        {activeTab === 'secretary' && secretarySubTab === 'audit' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
             <style>{`
               @media print {
@@ -24821,7 +25827,7 @@ status: status,
                         });
 
                         let badgeBg = '#e6f4ea';
-                        let badgeColor = '#137333';
+                        let badgeColor = '#34a853';
                         if (log.action === 'UPDATE') {
                           badgeBg = '#fef7e0';
                           badgeColor = '#b06000';
@@ -24941,7 +25947,7 @@ status: status,
         const isCampus = manageTeacher.isCampusActive || manageTeacher.is_campus_active;
         const isActive = manageTeacher.isActive ?? manageTeacher.is_active;
         const avatarBgColor = activeTab === 'campus' ? '#e6f4ea' : '#fef3c7';
-        const avatarTextColor = activeTab === 'campus' ? '#137333' : '#b45309';
+        const avatarTextColor = activeTab === 'campus' ? '#34a853' : '#b45309';
 
         return (
           <div style={{
@@ -25011,7 +26017,7 @@ status: status,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = '#e6f4ea';
-                  e.currentTarget.style.color = '#137333';
+                  e.currentTarget.style.color = '#34a853';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = '#ffffff';
@@ -25110,9 +26116,9 @@ status: status,
                           style={{
                             padding: '6px 12px',
                             borderRadius: '20px',
-                            border: `1px solid ${active ? '#137333' : '#e2e8f0'}`,
+                            border: `1px solid ${active ? '#34a853' : '#e2e8f0'}`,
                             background: active ? '#e6f4ea' : 'white',
-                            color: active ? '#137333' : '#64748b',
+                            color: active ? '#34a853' : '#64748b',
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             cursor: 'pointer'
@@ -25251,7 +26257,7 @@ status: status,
                     style={{
                       width: '18px',
                       height: '18px',
-                      accentColor: '#10b981',
+                      accentColor: '#34a853',
                       cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
                     }}
                   />
@@ -25295,7 +26301,7 @@ status: status,
                     style={{
                       width: '18px',
                       height: '18px',
-                      accentColor: '#137333',
+                      accentColor: '#34a853',
                       cursor: 'pointer'
                     }}
                   />
@@ -25360,7 +26366,7 @@ status: status,
               <button 
                 onClick={() => handleUpdateTeacher(manageTeacher)}
                 className="google-btn-primary"
-                style={{ background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700 }}
+                style={{ background: '#34a853', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 700 }}
               >
                 Speichern
               </button>
