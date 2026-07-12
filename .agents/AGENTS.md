@@ -17,6 +17,7 @@
   - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 9,99 € / Mo. (fixed server-hosting flat rate per music school, saving 2,99 € / Mo. compared to 12,98 € / Mo.).
   - **Service Fee (Lehrer & Verwaltung)**: 0,49 € / Mo. per active administrator/teacher profile.
 - **Billing Methods for Student Activations (Schüleraktivierungen)**:
+  - Only students who consciously activate their profile/access via the platform are subject to billing (inactive/unregistered profiles in the database are not billed).
   - **Musikschule übernimmt alle Kosten (Sammelzahler)** (Music school covers all fees, making it completely free for students/parents):
     - *Variable monatliche Abrechnung*: Base price remains same; variable billing of 0,49 € / active student / Mo.
     - *Jahresbeitrag bei Aktivierung (10% Rabatt)*: Active students billed as an annual fee in a separate monthly bill, offering a 10% discount.
