@@ -12,9 +12,9 @@
 - **Software License**: The base software license for **Campus-Groovelab** is always 100% free of charge ("100% kostenlos").
 - Only server hosting/service fees, team members, and pupil activation fees are subject to charge.
 - **Module Pricing & Bundles**:
-  - **Campus Module**: Base price is 7,99 € / Mo.
-  - **GrooveLab Module**: Base price is 4,99 € / Mo.
-  - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 9,99 € / Mo. (saving 2,99 € / Mo. compared to 12,98 € / Mo.).
+  - **Campus Module**: Base price is 7,99 € / Mo. (fixed server-hosting flat rate per music school).
+  - **GrooveLab Module**: Base price is 4,99 € / Mo. (fixed server-hosting flat rate per music school).
+  - **Kombi-Vorteil Bundle**: If both Campus and GrooveLab are booked together, the bundle price is 9,99 € / Mo. (fixed server-hosting flat rate per music school, saving 2,99 € / Mo. compared to 12,98 € / Mo.).
   - **Service Fee (Lehrer & Verwaltung)**: 0,49 € / Mo. per active administrator/teacher profile.
 - **Billing Methods for Student Activations (Schüleraktivierungen)**:
   - **Musikschule übernimmt alle Kosten (Sammelzahler)** (Music school covers all fees, making it completely free for students/parents):
@@ -25,6 +25,9 @@
     - *Vollständige Direktabrechnung*: Student/parent pays the full amount of 0,49 € / Mo. (annual fee: 5,88 €). School is relieved of the passive database fee (school pays 0,00 €).
     - *Teilweise Direktabrechnung*: Student/parent pays 0,40 € / Mo. (annual fee: 4,80 €). School covers the passive database fee of 0,09 € / Mo. per student.
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
+- **Student Deactivation (Deaktivierung von Schülern)**:
+  - *Monatliche Abrechnung*: Bei Deaktivierung eines Schülers entfällt die Aktivierungsgebühr am Ende des laufenden Monats.
+  - *Jährliche Abrechnung (vorab bezahlt)*: Wurde der Jahresbeitrag bereits vorab entrichtet, bleiben das Profil und alle Funktionen des Schülers bis zum Ende des Schuljahres aktiv (da bereits bezahlt), und das Profil wird erst zum Schuljahreswechsel inaktiviert.
 
 ## Module Feature Inclusions (Leistungsumfang der Module)
 - **Verwaltungs- und Sekretariats-Nutzer**: Administrations- und Sekretariats-Benutzer (Rollen `admin` und `secretary`) sind in den Lizenzen für das **Campus-Modul** und das **GrooveLab-Modul** vollständig inklusive und verursachen keine zusätzlichen Lizenzgebühren.
