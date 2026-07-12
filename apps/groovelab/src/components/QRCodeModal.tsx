@@ -331,7 +331,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       const { toJpeg } = await import('html-to-image');
       const dataUrl = await toJpeg(cardRef.current, { 
         quality: 0.95,
-        backgroundColor: activePlatform === 'campus' ? (isAdminOrSecretary ? '#7f1d1d' : '#064e3b') : '#ffffff',
+        backgroundColor: activePlatform === 'campus' ? (isAdminOrSecretary ? '#7f1d1d' : '#137333') : '#ffffff',
         cacheBust: true,
         pixelRatio: 2
       });
@@ -354,7 +354,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       logoText: "Campus-Groovelab",
       foregroundColor: "rgb(255, 255, 255)",
       backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
-      labelColor: "rgb(167, 243, 208)",
+      labelColor: "rgb(230, 244, 234)",
       studentName: `${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`,
       instrument: user.instrument || (user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
       qrToken: user.qr_token || user.teacher_qr_token
@@ -457,7 +457,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           <div 
             ref={cardRef} 
             style={{
-              background: isAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)', 
+              background: isAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
@@ -508,7 +508,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                    height: '92px', 
                    borderRadius: '22px', 
                    objectFit: 'cover',
-                   border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(34, 197, 94, 0.75)',
+                   border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(52, 168, 83, 0.75)',
                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
                    flexShrink: 0,
                    marginTop: '2px'

@@ -45,7 +45,7 @@ const INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
   "Bass": "#eab308", "E-Bass": "#eab308", 
   "Drums": "#3b82f6", "E-Drums": "#3b82f6", 
-  "Vocals": "#22c55e", 
+  "Vocals": "#34a853", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
 
@@ -192,7 +192,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
     }
   }
 
-  if (name.toLowerCase().includes('lehrer')) return '#22c55e'; // Green
+  if (name.toLowerCase().includes('lehrer')) return '#34a853'; // Green
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
@@ -1490,7 +1490,7 @@ export function AdminDashboard({
           const { data, error } = await supabase.from('stations').insert({
             room_id: customizingRoom.id,
             name: 'Lehrer iPad',
-            color: '#22c55e',
+            color: '#34a853',
             instrument: 'Tablet',
             pos_x: 50,
             pos_y: 50
@@ -2236,7 +2236,7 @@ export function AdminDashboard({
               missingLehrerInserts.push({
                 room_id: room.id,
                 name: 'Lehrer iPad',
-                color: '#22c55e'
+                color: '#34a853'
               });
             }
           }
@@ -3348,7 +3348,7 @@ export function AdminDashboard({
       stationsToInsert.push({
         room_id: roomData.id,
         name: 'Lehrer iPad',
-        color: '#22c55e',
+        color: '#34a853',
         instrument: 'Tablet',
         pos_x: 50,
         pos_y: 50
@@ -4976,8 +4976,8 @@ export function AdminDashboard({
           )}
 
           {editingStudent && (
-            <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f0fdf4', border: `1px solid #bbf7d0`, borderRadius: '20px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#15803d' }}>Schüler bearbeiten</h3>
+            <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#e6f4ea', border: `1px solid #e6f4ea`, borderRadius: '20px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#137333' }}>Schüler bearbeiten</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                 <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
@@ -5014,7 +5014,7 @@ export function AdminDashboard({
                       style={{
                         flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
                         background: (editingStudent.status || 'active') === 'active' ? '#ffffff' : 'transparent',
-                        color: (editingStudent.status || 'active') === 'active' ? '#16a34a' : '#64748b',
+                        color: (editingStudent.status || 'active') === 'active' ? '#34a853' : '#64748b',
                         fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
                         boxShadow: (editingStudent.status || 'active') === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                       }}
@@ -7847,11 +7847,11 @@ export function AdminDashboard({
                                     }
                                   } else if (isSchedule) {
                                     if (b.isApproved) {
-                                      bg = 'rgba(52, 199, 89, 0.12)';
+                                      bg = 'rgba(52, 168, 83, 0.12)';
                                       textColor = '#1e7a44';
                                       leftAccentColor = '#34c759';
                                     } else {
-                                      bg = 'rgba(52, 199, 89, 0.12)';
+                                      bg = 'rgba(52, 168, 83, 0.12)';
                                       textColor = '#1e7a44';
                                       leftAccentColor = '#34c759';
                                     }
@@ -7912,7 +7912,7 @@ export function AdminDashboard({
                                         background: b.isPreview 
                                           ? '#f0f9ff' 
                                           : (isUnapprovedSchedule
-                                            ? `repeating-linear-gradient(-45deg, rgba(52, 199, 89, 0.18) 0px, rgba(52, 199, 89, 0.18) 8px, #ffffff 8px, #ffffff 16px)`
+                                            ? `repeating-linear-gradient(-45deg, rgba(52, 168, 83, 0.18) 0px, rgba(52, 168, 83, 0.18) 8px, #ffffff 8px, #ffffff 16px)`
                                             : (isPending 
                                               ? `repeating-linear-gradient(-45deg, rgba(175, 82, 222, 0.14) 0px, rgba(175, 82, 222, 0.14) 8px, #ffffff 8px, #ffffff 16px)`
                                               : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg))),
@@ -10362,10 +10362,10 @@ export function AdminDashboard({
                     key={tb.id} 
                     onClick={handleCardClick}
                     style={{ 
-                      border: isCopied ? '1.5px solid #22c55e' : '1px solid #e2e8f0', 
+                      border: isCopied ? '1.5px solid #34a853' : '1px solid #e2e8f0', 
                       borderRadius: '12px', 
                       padding: '10px 8px', 
-                      background: isCopied ? '#f0fdf4' : 'white',
+                      background: isCopied ? '#e6f4ea' : 'white',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -10373,7 +10373,7 @@ export function AdminDashboard({
                       textAlign: 'center',
                       gap: '6px',
                       opacity: tb.active ? 1 : 0.55,
-                      boxShadow: isCopied ? '0 4px 10px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.01)',
+                      boxShadow: isCopied ? '0 4px 10px rgba(52, 168, 83, 0.15)' : '0 1px 2px rgba(0,0,0,0.01)',
                       minHeight: '110px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
@@ -10388,7 +10388,7 @@ export function AdminDashboard({
                     <span style={{ 
                       fontSize: '0.72rem', 
                       fontWeight: 800, 
-                      color: isCopied ? '#15803d' : '#1e293b', 
+                      color: isCopied ? '#137333' : '#1e293b', 
                       display: '-webkit-box', 
                       WebkitLineClamp: 2, 
                       WebkitBoxOrient: 'vertical', 
@@ -10408,9 +10408,9 @@ export function AdminDashboard({
                         handleToggleTextbausteinActive(tb.id);
                       }}
                       style={{
-                        background: tb.active ? '#f0fdf4' : '#f1f5f9',
-                        color: tb.active ? '#16a34a' : '#64748b',
-                        border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                        background: tb.active ? '#e6f4ea' : '#f1f5f9',
+                        color: tb.active ? '#34a853' : '#64748b',
+                        border: tb.active ? '1px solid #e6f4ea' : '1px solid #e2e8f0',
                         padding: '3px 8px',
                         borderRadius: '9999px',
                         fontSize: '0.62rem',
@@ -10555,9 +10555,9 @@ export function AdminDashboard({
                 {[
                   { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: `${brandColor}08` },
                   { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
-                  { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#34a853', bg: '#f0fdf4' },
+                  { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: '#34a853', bg: '#e6f4ea' },
                   { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: '#6366f1', bg: '#f5f3ff' },
-                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ef4444', bg: momPercent >= 0 ? '#f0fdf4' : '#fef2f2' },
+                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ef4444', bg: momPercent >= 0 ? '#e6f4ea' : '#fef2f2' },
                   { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: '#ec4899', bg: '#fdf2f8' },
                   { label: 'Ø Zeit / Kopf (Woche)', value: formatMins(classCount > 0 ? Math.round(classWeeklyMins / classCount) : 0), icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
                   { label: 'Ø Zeit / Kopf (Monat)', value: formatMins(classCount > 0 ? Math.round(currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: `${brandColor}08` }
@@ -10794,7 +10794,7 @@ export function AdminDashboard({
                                 </span>
                                 <span style={{
                                   fontWeight: 700,
-                                  color: isAchieved ? '#a7f3d0' : 'rgba(255, 255, 255, 0.8)',
+                                  color: isAchieved ? '#e6f4ea' : 'rgba(255, 255, 255, 0.8)',
                                   whiteSpace: 'normal',
                                   textAlign: 'right'
                                 }}>
@@ -10871,7 +10871,7 @@ export function AdminDashboard({
             {/* Column 3: Jahresstatistik */}
             <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
-                <div style={{ background: '#ecfdf5', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
+                <div style={{ background: '#e6f4ea', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
                   <Calendar size={18} />
                 </div>
                 <div>
@@ -10932,28 +10932,28 @@ export function AdminDashboard({
 
                         if (minutes > 0) {
                           if (minutes <= 15) {
-                            bg = 'linear-gradient(135deg, #f0fdf4 0%, #e6fbf0 100%)';
-                            border = '1px solid #dcfce7';
-                            labelColor = '#166534';
-                            textColor = '#15803d';
-                            numColor = '#166534';
-                            shadow = '0 2px 6px rgba(22, 163, 74, 0.04)';
+                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
+                            border = '1px solid #e6f4ea';
+                            labelColor = '#137333';
+                            textColor = '#137333';
+                            numColor = '#137333';
+                            shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                           } else if (minutes <= 60) {
-                            bg = 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)';
-                            border = '1px solid #bbf7d0';
-                            labelColor = '#14532d';
-                            textColor = '#166534';
-                            numColor = '#14532d';
-                            shadow = '0 3px 8px rgba(22, 163, 74, 0.07)';
+                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
+                            border = '1px solid #e6f4ea';
+                            labelColor = '#137333';
+                            textColor = '#137333';
+                            numColor = '#137333';
+                            shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                           } else if (minutes <= 180) {
-                            bg = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
-                            border = '1px solid #86efac';
-                            labelColor = '#14532d';
-                            textColor = '#14532d';
-                            numColor = '#14532d';
-                            shadow = '0 4px 12px rgba(22, 163, 74, 0.12)';
+                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
+                            border = '1px solid #e6f4ea';
+                            labelColor = '#137333';
+                            textColor = '#137333';
+                            numColor = '#137333';
+                            shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                           } else {
-                            bg = 'linear-gradient(135deg, #34a853 0%, #047857 100%)';
+                            bg = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
                             border = '1px solid #137333';
                             labelColor = 'rgba(255, 255, 255, 0.8)';
                             textColor = 'rgba(255, 255, 255, 0.9)';
@@ -10997,9 +10997,9 @@ export function AdminDashboard({
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Heatmap:</span>
                       {[
                         { color: '#f8fafc', label: '0m', border: '#e2e8f0' },
-                        { color: '#f0fdf4', label: '<15m', border: '#dcfce7' },
-                        { color: '#dcfce7', label: '<1h', border: '#bbf7d0' },
-                        { color: '#bbf7d0', label: '<3h', border: '#86efac' },
+                        { color: '#e6f4ea', label: '<15m', border: '#e6f4ea' },
+                        { color: '#e6f4ea', label: '<1h', border: '#e6f4ea' },
+                        { color: '#e6f4ea', label: '<3h', border: '#e6f4ea' },
                         { color: '#34a853', label: '3h+', border: '#137333' }
                       ].map(pill => (
                         <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -11034,7 +11034,7 @@ export function AdminDashboard({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
             {[
-              { label: 'Schüler Gesamt', value: stats.studentCount, icon: Users, color: '#34a853', bg: '#f0fdf4' },
+              { label: 'Schüler Gesamt', value: stats.studentCount, icon: Users, color: '#34a853', bg: '#e6f4ea' },
               { label: 'Songs in Library', value: stats.songCount, icon: Music, color: '#3b82f6', bg: '#eff6ff' },
               { label: 'Team-Mitglieder', value: teachers.length, icon: Shield, color: '#8b5cf6', bg: '#f5f3ff' },
               { 
@@ -11573,9 +11573,9 @@ export function AdminDashboard({
                                 <button
                                   onClick={() => handleGeneratePin(student.id, progress.current_level)}
                                   style={{
-                                    background: '#ecfdf5',
-                                    color: '#065f46',
-                                    border: '1.5px solid #a7f3d0',
+                                    background: '#e6f4ea',
+                                    color: '#137333',
+                                    border: '1.5px solid #e6f4ea',
                                     padding: '6px 12px',
                                     borderRadius: '10px',
                                     fontSize: '0.75rem',
@@ -11843,7 +11843,7 @@ export function AdminDashboard({
                   alignItems: 'center',
                   gap: '12px'
                 }}>
-                  <div style={{ background: '#ecfdf5', color: '#16a34a', padding: '12px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: '#e6f4ea', color: '#34a853', padding: '12px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Award size={24} />
                   </div>
                   <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b' }}>
@@ -11876,8 +11876,8 @@ export function AdminDashboard({
                             position: 'absolute',
                             top: '16px',
                             right: '16px',
-                            background: isInLab ? '#d1fae5' : '#f1f5f9',
-                            color: isInLab ? '#065f46' : '#64748b',
+                            background: isInLab ? '#e6f4ea' : '#f1f5f9',
+                            color: isInLab ? '#137333' : '#64748b',
                             padding: '4px 10px',
                             borderRadius: '8px',
                             fontSize: '0.65rem',
@@ -11928,7 +11928,7 @@ export function AdminDashboard({
                             <span style={{ background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#475569' }}>
                               {sub.difficulty_level === 'original' ? '⚡ PRO' : '🚀 STARTER'}
                             </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#34a853' }}>
                               {sub.progress_percent || 100}% bereit
                             </span>
                           </div>
@@ -11977,8 +11977,8 @@ export function AdminDashboard({
                             justifyContent: 'center', 
                             gap: '6px', 
                             padding: '8px', 
-                            background: '#f0fdf4', 
-                            color: '#16a34a', 
+                            background: '#e6f4ea', 
+                            color: '#34a853', 
                             borderRadius: '12px', 
                             fontSize: '0.75rem', 
                             fontWeight: 850 
@@ -12212,7 +12212,7 @@ export function AdminDashboard({
         const dataUrl = await toJpeg(qrCardRef.current, { 
           quality: 0.95, 
           backgroundColor: (selectedQRUser.role === 'student' || isQRAdminOrSecretary) 
-            ? (isQRAdminOrSecretary ? '#7f1d1d' : '#064e3b') 
+            ? (isQRAdminOrSecretary ? '#7f1d1d' : '#137333') 
             : '#ffffff',
           cacheBust: true,
           pixelRatio: 2,
@@ -12241,7 +12241,7 @@ export function AdminDashboard({
           <div 
             ref={qrCardRef}
             style={(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? {
-              background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)', 
+              background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
@@ -12304,7 +12304,7 @@ export function AdminDashboard({
                        height: '92px', 
                        borderRadius: '22px', 
                        objectFit: 'cover',
-                       border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(34, 197, 94, 0.75)',
+                       border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(52, 168, 83, 0.75)',
                        boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
                        flexShrink: 0,
                        marginTop: '2px'
@@ -12880,7 +12880,7 @@ export function AdminDashboard({
                         { hex: '#3b82f6', label: 'Blau' },
                         { hex: '#eab308', label: 'Gelb' },
                         { hex: '#64748b', label: 'Grau' },
-                        { hex: '#22c55e', label: 'Grün' },
+                        { hex: '#34a853', label: 'Grün' },
                         { hex: '#a855f7', label: 'Lila' },
                         { hex: '#ef4444', label: 'Rot' }
                       ].map(colorOpt => {
@@ -13036,7 +13036,7 @@ export function AdminDashboard({
           <div style={{ display: 'flex', gap: '20px', background: '#ffffff', padding: '12px 20px', borderRadius: '18px', border: '1.5px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.01)', flexWrap: 'wrap' }}>
             {[
               { label: 'Lehrkräfte', cur: teachers.length, max: (admin as any).schools.max_teachers ?? 2, color: '#3b82f6' },
-              { label: 'Schüler', cur: students.length, max: (admin as any).schools.max_students ?? 6, color: '#22c55e' }
+              { label: 'Schüler', cur: students.length, max: (admin as any).schools.max_students ?? 6, color: '#34a853' }
             ].map((item, i) => {
               const pct = Math.min(100, (item.cur / item.max) * 100);
               const isClose = pct >= 90;
@@ -15616,9 +15616,9 @@ export function AdminDashboard({
                                 handleToggleTextbausteinActive(tb.id);
                               }}
                               style={{
-                                background: tb.active ? '#f0fdf4' : '#f1f5f9',
-                                color: tb.active ? '#16a34a' : '#64748b',
-                                border: tb.active ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                background: tb.active ? '#e6f4ea' : '#f1f5f9',
+                                color: tb.active ? '#34a853' : '#64748b',
+                                border: tb.active ? '1px solid #e6f4ea' : '1px solid #e2e8f0',
                                 padding: '6px 12px',
                                 borderRadius: '9999px',
                                 fontSize: '0.72rem',
@@ -16388,7 +16388,7 @@ function DeviceSetupScreen({
               fontSize: '0.65rem',
               fontWeight: 800,
               color: activeSession ? '#34a853' : '#64748b',
-              background: activeSession ? '#d1fae5' : '#f1f5f9',
+              background: activeSession ? '#e6f4ea' : '#f1f5f9',
               padding: '2px 8px',
               borderRadius: '12px'
             }}>
@@ -16850,7 +16850,7 @@ function DeviceSetupScreen({
                             fontSize: '0.7rem',
                             fontWeight: 800,
                             letterSpacing: '0.05em',
-                            color: isActive ? '#16a34a' : '#ef4444',
+                            color: isActive ? '#34a853' : '#ef4444',
                             minWidth: '42px',
                             textAlign: 'right'
                           }}>
@@ -16864,13 +16864,13 @@ function DeviceSetupScreen({
                               height: '26px',
                               borderRadius: '13px',
                               border: 'none',
-                              background: isActive ? '#22c55e' : '#e2e8f0',
+                              background: isActive ? '#34a853' : '#e2e8f0',
                               cursor: 'pointer',
                               transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                               flexShrink: 0,
                               padding: 0,
                               outline: 'none',
-                              boxShadow: isActive ? '0 0 0 2px #bbf7d0' : 'none'
+                              boxShadow: isActive ? '0 0 0 2px #e6f4ea' : 'none'
                             }}
                             aria-label={isActive ? 'Tag schließen' : 'Tag öffnen'}
                           >

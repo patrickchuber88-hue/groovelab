@@ -2777,7 +2777,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         <>
           {showCelebration ? (
         <div className="animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(30px) saturate(190%)', WebkitBackdropFilter: 'blur(30px) saturate(190%)', borderRadius: '28px', padding: '40px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.5)', boxShadow: '0 20px 50px rgba(0,0,0,0.04)', maxWidth: '480px', margin: '40px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 211, 153, 0.15)', border: '1px solid rgba(52, 211, 153, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: '1px solid rgba(52, 168, 83, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
@@ -2869,7 +2869,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
               {hasSubmittedSchedule && scheduleStatus === 'approved' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(209, 250, 229, 0.5)', border: '1px solid rgba(52, 168, 83, 0.15)', color: '#065f46', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.5)', border: '1px solid rgba(52, 168, 83, 0.15)', color: '#137333', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
                   <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span> 
                   <span>Freigegeben</span>
                 </div>
@@ -3702,17 +3702,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBg = hasConflict
                           ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
                           : (isInsideWunsch
-                              ? '#064e3b'
+                              ? '#137333'
                               : (isSelected 
                                   ? (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
                                   : (isSubmitted 
-                                      ? 'rgba(220, 252, 231, 0.5)' 
+                                      ? 'rgba(230, 244, 234, 0.5)' 
                                       : (isCampus ? campusBg : 'rgba(219, 234, 254, 0.65)'))));
 
                         const cardBorder = hasConflict
                           ? '1.5px solid #ef4444'
                           : (isInsideWunsch
-                              ? '1px solid #047857'
+                              ? '1px solid #137333'
                               : (isSelected 
                                   ? (isCampus ? `1.5px solid ${campusPrimary}` : '1.5px solid #007aff') 
                                   : (isSubmitted 
@@ -3733,7 +3733,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               ? '#ffffff'
                               : (isSelected 
                                   ? (isCampus ? campusText : '#007aff') 
-                                  : (isSubmitted ? '#065f46' : (isCampus ? campusText : '#1e3a8a'))));
+                                  : (isSubmitted ? '#137333' : (isCampus ? campusText : '#1e3a8a'))));
 
                         const badgeBg = hasConflict
                           ? 'rgba(239, 68, 68, 0.1)'
@@ -3749,7 +3749,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               ? '#ffffff'
                               : (isSelected 
                                   ? (isCampus ? campusText : '#007aff') 
-                                  : (isSubmitted ? '#047857' : (isCampus ? campusText : '#1d4ed8'))));
+                                  : (isSubmitted ? '#137333' : (isCampus ? campusText : '#1d4ed8'))));
 
                         const shadowColor = isSubmitted 
                           ? 'rgba(52,168,83,0.06)' 
@@ -3953,7 +3953,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {bs.first_name} {maskLastName(bs.last_name)}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#065f46' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#137333' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                           )}
                         </div>
                       );
@@ -4173,7 +4173,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         {s.status === 'ausstehend' ? (
                           <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ausstehend</span>
                         ) : (
-                          <span style={{ height: '5px', width: '5px', borderRadius: '50%', background: isAssigned ? '#34d399' : '#d1d1d6', flexShrink: 0 }}></span>
+                          <span style={{ height: '5px', width: '5px', borderRadius: '50%', background: isAssigned ? '#34a853' : '#d1d1d6', flexShrink: 0 }}></span>
                         )}
                       </div>
 
@@ -4183,7 +4183,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </span>
 
                         {isAssigned && (
-                          <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#15803d', background: 'rgba(220, 252, 231, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>
+                          <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#137333', background: 'rgba(230, 244, 234, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>
                             {assignedDayLabel} {s.assignedTime}
                           </span>
                         )}

@@ -27,8 +27,8 @@ export const ALL_STICKERS = [
   // Songs
   { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true },
   { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
-  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', auto: true },
-  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#0f766e', bg: 'rgba(15, 118, 110, 0.1)', auto: true },
+  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
+  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#137333', bg: 'rgba(19, 115, 51, 0.1)', auto: true },
 
   // Manuell
   { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false },
@@ -2885,7 +2885,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           padding: '16px 20px',
           background: '#34a853',
           backdropFilter: 'none',
-          borderBottom: '1px solid rgba(15, 89, 40, 0.8)',
+          borderBottom: '1px solid rgba(19, 115, 51, 0.8)',
           borderRadius: '0',
           display: 'flex',
           flexDirection: 'column',
@@ -2952,7 +2952,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </h2>
                 <span style={{
                   fontSize: '0.68rem',
-                  color: 'rgba(197,216,207,0.85)',
+                  color: 'rgba(230, 244, 234, 0.85)',
                   fontWeight: 500,
                   letterSpacing: '0.01em'
                 }}>
@@ -3721,7 +3721,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             display: 'flex',
                             flexDirection: 'column',
                             gap: isCompact ? '0px' : '4px',
-                            boxShadow: isSelected ? '0 4px 12px rgba(69, 99, 85, 0.08)' : '0 2px 4px rgba(0,0,0,0.01)'
+                            boxShadow: isSelected ? '0 4px 12px rgba(19, 115, 51, 0.08)' : '0 2px 4px rgba(0,0,0,0.01)'
                           }}
                           className="hover-scale"
                         >
@@ -3757,7 +3757,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     fontSize: '0.8rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
+                    boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
                     transition: 'all 0.15s ease',
                     width: '100%',
                     textAlign: 'center'
@@ -3945,7 +3945,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     fontWeight: 800,
                                     cursor: 'pointer',
                                     transition: 'all 0.15s ease',
-                                    boxShadow: isSelected ? '0 2px 6px rgba(69, 99, 85, 0.2)' : 'none'
+                                    boxShadow: isSelected ? '0 2px 6px rgba(19, 115, 51, 0.2)' : 'none'
                                   }}
                                   className="hover-scale"
                                 >
@@ -5097,7 +5097,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     style={{
                       flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
                       background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
+                      boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
                       transition: 'all 0.15s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                     }}
@@ -5553,7 +5553,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       }}
                       onFocus={e => {
                         e.currentTarget.style.borderColor = '#34a853';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(69, 99, 85, 0.15)';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(19, 115, 51, 0.15)';
                       }}
                       onBlur={e => {
                         e.currentTarget.style.borderColor = '#cbd5e1';
@@ -5960,7 +5960,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             fontWeight: 800,
                             fontSize: '0.82rem',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
+                            boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
                             transition: 'all 0.15s ease'
                           }}
                           className="hover-scale"
@@ -6486,7 +6486,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   fontSize: '0.68rem',
                                   fontWeight: 800,
                                   cursor: homeworkNotes.trim() ? 'pointer' : 'not-allowed',
-                                  boxShadow: homeworkNotes.trim() ? '0 2px 6px rgba(69, 99, 85, 0.15)' : 'none',
+                                  boxShadow: homeworkNotes.trim() ? '0 2px 6px rgba(19, 115, 51, 0.15)' : 'none',
                                   transition: 'all 0.15s'
                                 }}
                                 className="hover-scale save-note-btn"
@@ -6905,7 +6905,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       style={{
                         flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
                         background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
-                        boxShadow: '0 4px 10px rgba(69, 99, 85, 0.2)',
+                        boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
                         transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
@@ -8485,8 +8485,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       textColor = '#92400e';
                     } else if (status === 'mastered') {
                       borderColor = '#34a853';
-                      bg = '#f0fdf4';
-                      textColor = '#166534';
+                      bg = '#e6f4ea';
+                      textColor = '#137333';
                     } else if (status === 'purple') {
                       borderColor = '#af52de';
                       bg = '#f5f3ff';

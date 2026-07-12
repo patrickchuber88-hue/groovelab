@@ -137,7 +137,7 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
               </div>
               <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Auslastungs-Limits</span>
-                <strong style={{ display: 'block', fontSize: '1.8rem', color: props.limitsEnabled ? '#22c55e' : '#64748b', marginTop: '4px' }}>
+                <strong style={{ display: 'block', fontSize: '1.8rem', color: props.limitsEnabled ? '#34a853' : '#64748b', marginTop: '4px' }}>
                   {props.limitsEnabled ? 'AKTIV' : 'BYPASS'}
                 </strong>
               </div>

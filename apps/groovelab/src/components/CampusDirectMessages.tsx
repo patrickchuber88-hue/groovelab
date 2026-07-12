@@ -371,7 +371,7 @@ export default function CampusDirectMessages({
                     width: '100%',
                     padding: '14px 16px',
                     borderRadius: '16px',
-                    background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #d1fae5)' : 'transparent',
+                    background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
                     border: '1px solid transparent',
                     cursor: 'pointer',
                     marginBottom: '6px',

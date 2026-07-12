@@ -397,7 +397,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   }
 
   const lowerName = name.toLowerCase();
-  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#22c55e'; // Green
+  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#34a853'; // Green
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
@@ -665,8 +665,8 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
 const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 12px #22c55e' }}></span>
+      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 12px #34a853' }}></span>
         Coaches vor Ort
       </div>
       <div style={{ 
@@ -703,7 +703,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
             >
               <div 
                 onClick={() => c.users && onProfileSelect(c.users)}
-                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #22c55e' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(34,197,94,0.25)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+                style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #34a853' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(52,168,83,0.25)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
@@ -5226,17 +5226,17 @@ export function TeacherDashboard({
               </form>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: '#e6f4ea', border: '1.5px solid #e6f4ea', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '36px', height: '36px', background: '#22c55e', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '36px', height: '36px', background: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ color: 'white', fontSize: '1rem' }}>✓</span>
                     </div>
                     <div>
-                      <div style={{ fontWeight: 900, color: '#15803d' }}>Profil angelegt!</div>
-                      <div style={{ fontSize: '0.78rem', color: '#4ade80' }}>Teile den Link mit dem Schüler</div>
+                      <div style={{ fontWeight: 900, color: '#137333' }}>Profil angelegt!</div>
+                      <div style={{ fontSize: '0.78rem', color: '#34a853' }}>Teile den Link mit dem Schüler</div>
                     </div>
                   </div>
-                  <div style={{ background: 'white', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '12px 16px', wordBreak: 'break-all', fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>
+                  <div style={{ background: 'white', border: '1px solid #e6f4ea', borderRadius: '12px', padding: '12px 16px', wordBreak: 'break-all', fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>
                     {inviteLink}
                   </div>
                 </div>
@@ -5561,7 +5561,7 @@ export function TeacherDashboard({
                           <span style={{
                             fontSize: '0.62rem',
                             fontWeight: 900,
-                            color: '#047857',
+                            color: '#137333',
                             background: 'rgba(52, 168, 83, 0.08)',
                             padding: '2px 6px',
                             borderRadius: '5px',
@@ -6157,8 +6157,8 @@ export function TeacherDashboard({
                                       </div>
                                     ) : (
                                       <div style={{
-                                        background: 'rgba(52, 199, 89, 0.05)',
-                                        border: '1px solid rgba(52, 199, 89, 0.15)',
+                                        background: 'rgba(52, 168, 83, 0.05)',
+                                        border: '1px solid rgba(52, 168, 83, 0.15)',
                                         borderRadius: '16px',
                                         padding: '12px 16px',
                                         display: 'flex',
@@ -6169,7 +6169,7 @@ export function TeacherDashboard({
                                         fontWeight: 600
                                       }}>
                                         <div style={{
-                                          background: 'rgba(52, 199, 89, 0.12)',
+                                          background: 'rgba(52, 168, 83, 0.12)',
                                           width: '26px',
                                           height: '26px',
                                           borderRadius: '50%',
@@ -7142,9 +7142,9 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isCurrentSlot && !isFinished) {
-                              slotBg = '#f0fdf4';
-                              slotBorder = '1.5px solid #bbf7d0';
-                              slotBorderLeft = '5px solid #22c55e';
+                              slotBg = '#e6f4ea';
+                              slotBorder = '1.5px solid #e6f4ea';
+                              slotBorderLeft = '5px solid #34a853';
                               titleColor = '#0f172a';
                               dotComponent = (
                                 <div style={{
@@ -7170,15 +7170,15 @@ export function TeacherDashboard({
                             } else if (isFinished) {
                               slotBg = '#ffffff';
                               slotBorder = '1.5px solid #e6f4ea';
-                              slotBorderLeft = '5px solid #22c55e';
+                              slotBorderLeft = '5px solid #34a853';
                               titleColor = '#94a3b8';
                               dotComponent = (
                                 <div style={{
                                   width: '12px',
                                   height: '12px',
                                   borderRadius: '50%',
-                                  border: '3px solid #22c55e',
-                                  background: '#22c55e',
+                                  border: '3px solid #34a853',
+                                  background: '#34a853',
                                   boxSizing: 'border-box'
                                 }} />
                               );
@@ -7415,7 +7415,7 @@ export function TeacherDashboard({
                                      alignItems: 'center',
                                      gap: '12px',
                                      padding: '12px 16px',
-                                     background: isCurrentSlot ? '#f0fdf4' : slotBg,
+                                     background: isCurrentSlot ? '#e6f4ea' : slotBg,
                                      borderRadius: '12px',
                                      border: slotBorder,
                                      borderLeft: slotBorderLeft,
@@ -7473,7 +7473,7 @@ export function TeacherDashboard({
                                       {slot.isGroup ? (
                                         <span style={{ 
                                           fontWeight: 900, 
-                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#15803d' : '#0f172a'), 
+                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#137333' : '#0f172a'), 
                                           fontSize: '0.9rem', 
                                           whiteSpace: 'nowrap',
                                           marginRight: '12px'
@@ -7483,7 +7483,7 @@ export function TeacherDashboard({
                                       ) : slot.student ? (
                                         <span style={{ 
                                           fontWeight: 900, 
-                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#15803d' : '#0f172a'), 
+                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#137333' : '#0f172a'), 
                                           fontSize: '0.9rem', 
                                           width: (isCanceled || isRescheduledAway) ? 'auto' : '140px',
                                           maxWidth: (isCanceled || isRescheduledAway) ? '120px' : '140px',
@@ -7649,16 +7649,16 @@ export function TeacherDashboard({
                                   {/* Bestätigt Badge (on the right) */}
                                   {!slot.isGroup && isRescheduledConfirmed && (
                                     <span style={{
-                                      background: '#f0fdf4',
-                                      color: '#16a34a',
-                                      border: '1px solid #bbf7d0',
+                                      background: '#e6f4ea',
+                                      color: '#34a853',
+                                      border: '1px solid #e6f4ea',
                                       padding: '4px 6px',
                                       borderRadius: '50%',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       flexShrink: 0,
-                                      boxShadow: '0 1px 2px rgba(22, 163, 74, 0.04)'
+                                      boxShadow: '0 1px 2px rgba(52, 168, 83, 0.04)'
                                     }}>
                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="20 6 9 17 4 12" />
@@ -7913,7 +7913,7 @@ export function TeacherDashboard({
                           }}
                           disabled={reportingSick}
                           style={{
-                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                             color: '#ffffff',
                             border: 'none',
                             padding: '8px 16px',
@@ -7923,7 +7923,7 @@ export function TeacherDashboard({
                             cursor: reportingSick ? 'not-allowed' : 'pointer',
                             transition: 'all 0.2s',
                             width: '100%',
-                            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+                            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.35)',
                             marginTop: '6px',
                             display: 'flex',
                             alignItems: 'center',
@@ -8101,7 +8101,7 @@ export function TeacherDashboard({
                               onClick={handleEndSick}
                               disabled={reportingSick}
                               style={{
-                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                                 color: '#ffffff',
                                 border: 'none',
                                 padding: '12px 14px',
@@ -8114,7 +8114,7 @@ export function TeacherDashboard({
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
-                                boxShadow: '0 6px 18px rgba(22, 163, 74, 0.4)',
+                                boxShadow: '0 6px 18px rgba(52, 168, 83, 0.4)',
                                 opacity: reportingSick ? 0.7 : 1,
                                 letterSpacing: '-0.01em'
                               }}
@@ -8931,7 +8931,7 @@ export function TeacherDashboard({
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#d1fae5', color: '#065f46', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#e6f4ea', color: '#137333', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                   <CheckCircle size={11} /> Erledigt
                                 </span>
                                 <span style={{ fontSize: '10px', color: '#8e8e93', fontWeight: 500 }}>
@@ -10284,16 +10284,16 @@ export function TeacherDashboard({
             {rehearsalSuggestions.length > 0 && (
               <div className="card" style={{ 
                 padding: '24px', 
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #f0fdfa 100%)', 
-                border: '1px solid #dcfce7',
+                background: 'linear-gradient(135deg, #e6f4ea 0%, #f0fdfa 100%)', 
+                border: '1px solid #e6f4ea',
                 borderRadius: '32px',
-                boxShadow: '0 10px 30px rgba(22, 163, 74, 0.05)'
+                boxShadow: '0 10px 30px rgba(52, 168, 83, 0.05)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <div style={{ background: '#22c55e', color: 'white', padding: '8px', borderRadius: '10px' }}>
+                  <div style={{ background: '#34a853', color: 'white', padding: '8px', borderRadius: '10px' }}>
                     <Clock size={18} />
                   </div>
-                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -10302,19 +10302,19 @@ export function TeacherDashboard({
                       background: 'rgba(255,255,255,0.6)', 
                       padding: '8px 12px', 
                       borderRadius: '12px', 
-                      border: '1px solid rgba(34, 197, 94, 0.1)',
+                      border: '1px solid rgba(52, 168, 83, 0.1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '12px'
                     }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#137333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ 
                           fontSize: '0.62rem', 
                           fontWeight: 950, 
-                          color: s.count === (s.totalMembers || s.count) ? '#15803d' : '#a16207',
-                          background: s.count === (s.totalMembers || s.count) ? '#dcfce7' : '#fef9c3',
+                          color: s.count === (s.totalMembers || s.count) ? '#137333' : '#a16207',
+                          background: s.count === (s.totalMembers || s.count) ? '#e6f4ea' : '#fef9c3',
                           padding: '2px 6px',
                           borderRadius: '6px',
                           display: 'inline-block'
@@ -10522,7 +10522,7 @@ export function TeacherDashboard({
                                  <div style={{ 
                                    fontSize: '0.75rem', 
                                    fontWeight: 1000, 
-                                   color: '#166534', 
+                                   color: '#137333', 
                                    textTransform: 'uppercase',
                                    letterSpacing: '0.08em',
                                    display: 'flex',
@@ -10815,7 +10815,7 @@ export function TeacherDashboard({
                             onClick={() => handleApproveSubmission(sub.id)}
                             style={{ 
                               flex: 1,
-                              background: '#22c55e', 
+                              background: '#34a853', 
                               color: 'white', 
                               border: 'none', 
                               padding: '12px', 
@@ -10825,7 +10825,7 @@ export function TeacherDashboard({
                               textTransform: 'uppercase',
                               letterSpacing: '0.05em',
                               cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                               transition: 'all 0.2s'
                             }}
                             
@@ -11142,7 +11142,7 @@ export function TeacherDashboard({
                               width: '6px', 
                               height: '6px', 
                               borderRadius: '50%', 
-                              background: '#22c55e',
+                              background: '#34a853',
                               border: '1px solid rgba(255,255,255,0.2)',
                               marginTop: '3px'
                             }} />
@@ -11631,7 +11631,7 @@ export function TeacherDashboard({
                                                     alt="" 
                                                   />
                                                   {member.isMastered && (
-                                                    <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                    <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
                                                       <Check size={12} strokeWidth={4} />
                                                     </div>
                                                   )}
@@ -11770,7 +11770,7 @@ export function TeacherDashboard({
                           display: 'flex', 
                           flexDirection: 'column', 
                           gap: '16px',
-                          border: isSessionActive ? '2px solid #22c55e' : '1px solid #e2e8f0',
+                          border: isSessionActive ? '2px solid #34a853' : '1px solid #e2e8f0',
                           cursor: 'pointer'
                         }}
                         onClick={() => setSelectedStudentProfile(student)}
@@ -12940,8 +12940,8 @@ export function TeacherDashboard({
 
             {/* Status bar */}
             <div style={{
-              background: sickNotifModal.notifs.length > 0 ? '#fff5f5' : '#f0fdf4',
-              border: `1.5px solid ${sickNotifModal.notifs.length > 0 ? '#fecaca' : '#bbf7d0'}`,
+              background: sickNotifModal.notifs.length > 0 ? '#fff5f5' : '#e6f4ea',
+              border: `1.5px solid ${sickNotifModal.notifs.length > 0 ? '#fecaca' : '#e6f4ea'}`,
               borderRadius: '16px', padding: '14px 16px',
               display: 'flex', alignItems: 'center', gap: '12px',
             }}>

@@ -23,7 +23,7 @@ interface CampusSetupScreenProps {
 export function CampusSetupScreen({ 
   school, 
   admin, 
-  brandColor = '#22c55e', // Green by default for Campus
+  brandColor = '#34a853', // Green by default for Campus
   onUpdate 
 }: CampusSetupScreenProps) {
   const effectiveSchool = Array.isArray(school) ? school[0] : school;

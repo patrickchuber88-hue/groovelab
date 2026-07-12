@@ -859,7 +859,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           {onboardingStep === 3 && onboardCreatedUser && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', marginBottom: '8px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', marginBottom: '8px' }}>
                 <Check size={36} />
               </div>
               <div>
@@ -2428,7 +2428,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       logoText: "GrooveLab",
       foregroundColor: "rgb(255, 255, 255)",
       backgroundColor: "rgb(10, 54, 28)",
-      labelColor: "rgb(167, 243, 208)",
+      labelColor: "rgb(230, 244, 234)",
       studentName: `${verifiedStudentDetails?.first_name} ${verifiedStudentDetails?.last_name}`,
       instrument: verifiedStudentDetails?.instrument || "ohne Zuweisung",
       qrToken: verifiedStudentDetails?.qr_token || verifiedStudentId
@@ -3280,7 +3280,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </h2>
             <p style={{
               fontSize: '1.25rem',
-              color: '#a7f3d0',
+              color: '#e6f4ea',
               marginTop: '6px',
               marginBottom: '0',
               fontWeight: 600,
@@ -3436,7 +3436,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
         </h1>
         <p style={{ 
-          color: isGroovelabKiosk ? '#78350f' : '#a7f3d0', 
+          color: isGroovelabKiosk ? '#78350f' : '#e6f4ea', 
           textAlign: 'center', 
           fontSize: '14px', 
           marginBottom: '32px', 
@@ -3472,7 +3472,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease'
       }}>
         <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
-          <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#a7f3d0' }} />
+          <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#e6f4ea' }} />
           {isGroovelabKiosk ? 'GrooveLab QR-Code scannen' : 'Standard Login über Campus QR-Ausweis'}
         </div>
 
@@ -3533,10 +3533,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                    zIndex: 10
                  }}>
                    {/* 4 Corner brackets for scanner target */}
-                   <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderTopLeftRadius: '8px' }} />
-                   <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderTopRightRadius: '8px' }} />
-                   <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderLeft: '3px solid #a7f3d0', borderBottomLeftRadius: '8px' }} />
-                   <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #a7f3d0', borderRight: '3px solid #a7f3d0', borderBottomRightRadius: '8px' }} />
+                   <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #e6f4ea', borderLeft: '3px solid #e6f4ea', borderTopLeftRadius: '8px' }} />
+                   <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #e6f4ea', borderRight: '3px solid #e6f4ea', borderTopRightRadius: '8px' }} />
+                   <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #e6f4ea', borderLeft: '3px solid #e6f4ea', borderBottomLeftRadius: '8px' }} />
+                   <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #e6f4ea', borderRight: '3px solid #e6f4ea', borderBottomRightRadius: '8px' }} />
                    
                    {/* Animated Laser line */}
                    <div style={{
@@ -3544,7 +3544,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                      left: 0,
                      width: '100%',
                      height: '80px',
-                     background: 'linear-gradient(180deg, rgba(167, 243, 208, 0) 0%, rgba(167, 243, 208, 0.08) 50%, rgba(167, 243, 208, 0) 100%)',
+                     background: 'linear-gradient(180deg, rgba(52, 168, 83, 0) 0%, rgba(52, 168, 83, 0.08) 50%, rgba(52, 168, 83, 0) 100%)',
                      filter: 'blur(6px)',
                      animation: 'scanLaser 4s ease-in-out infinite',
                      pointerEvents: 'none'
@@ -3603,7 +3603,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                  padding: '24px',
                  textAlign: 'center'
                }}>
-                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7f3d0' }}>
+                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e6f4ea' }}>
                    {cameraHasError ? <span style={{ fontSize: '20px' }}>📷🚫</span> : <Tablet size={24} />}
                  </div>
                  {cameraHasError ? (
@@ -3621,12 +3621,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                        padding: '10px 20px',
                        borderRadius: '12px',
                        border: 'none',
-                       background: '#a7f3d0',
+                       background: '#e6f4ea',
                        color: '#062413',
                        fontWeight: 800,
                        fontSize: '13px',
                        cursor: 'pointer',
-                       boxShadow: '0 4px 12px rgba(167, 243, 208, 0.2)'
+                       boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
                      }}
                    >
                      Kamera aktivieren
@@ -3635,7 +3635,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
                    {cameraHasError 
                      ? "Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung." 
-                     : <>Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#a7f3d0', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span></>
+                     : <>Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#e6f4ea', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span></>
                    }
                  </div>
                </div>
@@ -3652,7 +3652,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 zIndex: 10,
                 backdropFilter: 'blur(10px)'
               }}>
-                <div style={{ width: '36px', height: '36px', border: '3px solid #a7f3d0', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <div style={{ width: '36px', height: '36px', border: '3px solid #e6f4ea', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               </div>
             )}
           </div>
@@ -3766,7 +3766,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </>
               ) : (
                 <>
-                  <Tablet size={16} color="#a7f3d0" />
+                  <Tablet size={16} color="#e6f4ea" />
                   Im GrooveLab anmelden
                 </>
               )}
@@ -3803,7 +3803,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <School size={16} color="#a7f3d0" />
+              <School size={16} color="#e6f4ea" />
               Neue Schule registrieren (Software-Lizenz 100% kostenlos)
             </button>
           </div>
@@ -4006,7 +4006,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
             >
-              <Fingerprint size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
+              <Fingerprint size={14} color={isGroovelabKiosk ? '#062413' : '#e6f4ea'} />
               Fingerabdruck Login
             </button>
           )}
@@ -4034,7 +4034,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
             onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
           >
-            <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#a7f3d0'} />
+            <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#e6f4ea'} />
             Passwort Anmeldung
           </button>
         </div>
@@ -4057,7 +4057,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         WebkitBackdropFilter: 'blur(30px)'
       }}>
         <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <User size={14} style={{ color: '#a7f3d0' }} /> Manueller Zugang über PIN / QR-Token
+          <User size={14} style={{ color: '#e6f4ea' }} /> Manueller Zugang über PIN / QR-Token
         </div>
         <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -4086,7 +4086,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 padding: '14px 24px',
                 borderRadius: '16px',
                 border: 'none',
-                background: schoolData?.primary_color || '#a7f3d0',
+                background: schoolData?.primary_color || '#e6f4ea',
                 color: schoolData?.primary_color ? '#ffffff' : '#062413',
                 fontWeight: 800,
                 fontSize: '14px',
@@ -4107,7 +4107,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
             />
             <label htmlFor="login-consent-checkbox" style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)', textAlign: 'left', cursor: 'pointer', lineHeight: '1.4' }}>
-              Ich bin mit der <span style={{ textDecoration: 'underline', color: '#a7f3d0' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); alert("Unsere Datenschutzerklärung finden Sie unter der Datenschutz-Schaltfläche im Hauptmenü."); }}>Datenschutzerklärung</span> einverstanden.
+              Ich bin mit der <span style={{ textDecoration: 'underline', color: '#e6f4ea' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); alert("Unsere Datenschutzerklärung finden Sie unter der Datenschutz-Schaltfläche im Hauptmenü."); }}>Datenschutzerklärung</span> einverstanden.
             </label>
           </div>
         </form>
@@ -4137,7 +4137,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         {/* Progress Bar & Steps */}
         <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', width: '100%', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
               <Calendar size={20} />
             </div>
             <div style={{ textAlign: 'left' }}>
@@ -4560,8 +4560,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                         padding: '8px 14px',
                         borderRadius: '12px',
                         border: activeParentChildIndex === index ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
-                        background: activeParentChildIndex === index ? '#ecfdf5' : '#ffffff',
-                        color: activeParentChildIndex === index ? '#047857' : '#475569',
+                        background: activeParentChildIndex === index ? '#e6f4ea' : '#ffffff',
+                        color: activeParentChildIndex === index ? '#137333' : '#475569',
                         fontWeight: 800,
                         fontSize: '11.5px',
                         cursor: 'pointer',
@@ -4925,14 +4925,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
 
                 {/* Live Progress Info */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#065f46', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#137333', textAlign: 'left' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={16} />
                     <span>
                       Ausgewählte Wunschzeit: <strong>{((Object.values(parentChildren[activeParentChildIndex].selectedSlots).filter(v => v === 'wunsch').length * 30) / 60).toFixed(1)} Std.</strong>
                     </span>
                   </div>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#047857' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#137333' }}>
                     (mind. 2,0 Std. benötigt)
                   </span>
                 </div>
@@ -4969,7 +4969,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         {parentOnboardingStep === 'success' && verifiedStudentDetails && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', boxShadow: '0 8px 16px rgba(52, 168, 83, 0.15)' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', boxShadow: '0 8px 16px rgba(52, 168, 83, 0.15)' }}>
               <Check size={36} strokeWidth={3} />
             </div>
 
@@ -5252,7 +5252,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 background: 'rgba(52, 168, 83, 0.08)',
                 border: '2px solid rgba(52, 168, 83, 0.25)',
                 borderRadius: '24px',
-                color: '#a7f3d0',
+                color: '#e6f4ea',
                 fontWeight: 800,
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -5314,7 +5314,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 background: 'rgba(52, 168, 83, 0.08)',
                 border: '2px solid rgba(52, 168, 83, 0.25)',
                 borderRadius: '24px',
-                color: '#d1fae5',
+                color: '#e6f4ea',
                 fontWeight: 800,
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -5469,15 +5469,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         gap: '16px', 
         fontSize: '11px', 
         fontWeight: 800, 
-        color: '#047857',
+        color: '#137333',
         textTransform: 'uppercase',
         letterSpacing: '0.05em'
       }}>
         <span 
           onClick={() => setShowPrivacy(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#064e3b'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#047857'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#137333'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#137333'; }}
         >
           Datenschutz
         </span>
@@ -5485,8 +5485,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowAgb(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#064e3b'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#047857'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#137333'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#137333'; }}
         >
           AGB
         </span>
@@ -5494,8 +5494,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowImpressum(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#064e3b'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#047857'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#137333'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#137333'; }}
         >
           Impressum
         </span>
@@ -5555,7 +5555,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -5720,7 +5720,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -6067,7 +6067,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(167, 243, 208, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a7f3d0' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e6f4ea' }}>
                 <HelpCircle size={20} />
               </div>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, letterSpacing: '-0.02em', color: '#ffffff' }}>
@@ -6082,7 +6082,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Safari / iOS */}
               <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#a7f3d0' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#e6f4ea' }}>
                    Safari (iPhone, iPad, Mac)
                 </h4>
                 <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#d4d4d8', lineHeight: '1.6' }}>
@@ -6107,7 +6107,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <button
               onClick={() => setShowPermissionHelp(false)}
               style={{
-                background: '#a7f3d0',
+                background: '#e6f4ea',
                 color: '#062413',
                 border: 'none',
                 padding: '14px',
@@ -6173,7 +6173,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               ✕
             </button>
 
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#a7f3d0', letterSpacing: '-0.02em' }}>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#e6f4ea', letterSpacing: '-0.02em' }}>
               🔑 Magic Link anfordern
             </h3>
 
@@ -6183,7 +6183,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 border: magicLinkSuccess ? '1px solid #34a853' : '1px solid #ef4444',
                 padding: '12px 16px',
                 borderRadius: '16px',
-                color: magicLinkSuccess ? '#a7f3d0' : '#fca5a5',
+                color: magicLinkSuccess ? '#e6f4ea' : '#fca5a5',
                 fontSize: '13px',
                 fontWeight: 650
               }}>
@@ -6212,7 +6212,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   disabled={parentOnboardingLoading}
                   style={{
                     width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                    background: schoolData?.primary_color || '#a7f3d0',
+                    background: schoolData?.primary_color || '#e6f4ea',
                     color: schoolData?.primary_color ? '#ffffff' : '#062413',
                     fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s'
                   }}
@@ -6445,7 +6445,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #d1fae5 0%, #bbf7d0 100%)',
+                background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -6497,7 +6497,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   fontSize: '1rem',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 8px 20px rgba(22, 163, 74, 0.25)',
+                  boxShadow: '0 8px 20px rgba(52, 168, 83, 0.25)',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',

@@ -1822,8 +1822,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     return (
       <div style={{
-        background: '#f0fdf4',
-        border: '1.5px solid #bbf7d0',
+        background: '#e6f4ea',
+        border: '1.5px solid #e6f4ea',
         borderRadius: '24px',
         padding: '28px 16px',
         display: 'flex',
@@ -1831,7 +1831,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         alignItems: 'center',
         gap: '20px',
         textAlign: 'center',
-        boxShadow: '0 10px 25px rgba(22, 163, 74, 0.06)',
+        boxShadow: '0 10px 25px rgba(52, 168, 83, 0.06)',
         width: '100%',
         boxSizing: 'border-box'
       }}>
@@ -1918,11 +1918,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         {/* Text descriptions */}
         <div>
-          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#14532d' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#137333' }}>
             {isGoalMet ? 'Tagesziel erreicht!' : 'Übung eingetragen!'}
           </h3>
-          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
-            Heute geübt: <strong style={{ color: '#14532d', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#14532d', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#137333', fontWeight: 650, lineHeight: 1.4 }}>
+            Heute geübt: <strong style={{ color: '#137333', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#137333', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
           </p>
           <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#4f5e53', fontWeight: 650, lineHeight: 1.4 }}>
             {isGoalMet 
@@ -2436,12 +2436,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               // ACTIVE STUDENT WIDGETS
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                 {/* Fokus-Timer Card */}
-                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #d1fae5', background: '#f0fdf4', textAlign: 'center'}}>
+                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #e6f4ea', background: '#e6f4ea', textAlign: 'center'}}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                     <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
                       <Timer size={20} color="#34a853" /> Fokus-Timer
                     </h3>
-                    <p style={{margin: 0, fontSize: '0.82rem', color: '#15803d', lineHeight: 1.5, fontWeight: 550}}>
+                    <p style={{margin: 0, fontSize: '0.82rem', color: '#137333', lineHeight: 1.5, fontWeight: 550}}>
                       Starte deine tägliche Übe-Session direkt hier, um deine Streaks fortzusetzen und Abzeichen zu sammeln!
                     </p>
                   </div>
@@ -2474,10 +2474,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             ) : (
               // INACTIVE STUDENT WIDGETS
               activationAllowed ? (
-                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #a7f3d0', background: '#f0fdf4', textAlign: 'center'}}>
+                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #e6f4ea', background: '#e6f4ea', textAlign: 'center'}}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#065f46'}}>Jetzt Campus testen</h3>
-                    <p style={{margin: 0, fontSize: '0.85rem', color: '#047857', lineHeight: 1.5, fontWeight: 550}}>
+                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#137333'}}>Jetzt Campus testen</h3>
+                    <p style={{margin: 0, fontSize: '0.85rem', color: '#137333', lineHeight: 1.5, fontWeight: 550}}>
                       Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 7 Tage kostenlos frei!
                     </p>
                   </div>
@@ -2604,12 +2604,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             </div>
 
-            <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#f0fdf4', padding: '16px', borderRadius: '16px', border: '1px solid #a7f3d0'}}>
+            <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#e6f4ea', padding: '16px', borderRadius: '16px', border: '1px solid #e6f4ea'}}>
               Die Aktivierung deines Schülerkontos erfordert die Begleichung der GrooveLab-Jahresgebühr für dieses Schuljahr.
-              <div style={{ marginTop: '10px', fontWeight: 900, color: '#065f46', fontSize: '0.95rem' }}>
+              <div style={{ marginTop: '10px', fontWeight: 900, color: '#137333', fontSize: '0.95rem' }}>
                 Betrag: {price.toFixed(2).replace('.', ',')} € (einmalig für dieses Schuljahr)
               </div>
-              <span style={{ fontSize: '0.7rem', color: '#047857', display: 'block', marginTop: '6px', fontWeight: 550 }}>
+              <span style={{ fontSize: '0.7rem', color: '#137333', display: 'block', marginTop: '6px', fontWeight: 550 }}>
                 * Bisher wird diese Gebühr über die Schule abgerechnet. Direktzahlung der Eltern über Lastschrift/Kreditkarte wird zu einem späteren Zeitpunkt eingeführt.
               </span>
             </div>
@@ -2627,7 +2627,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       padding: '12px 14px',
                       borderRadius: '14px',
                       border: paymentMethod === 'debit' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                      background: paymentMethod === 'debit' ? '#f0fdf4' : 'white',
+                      background: paymentMethod === 'debit' ? '#e6f4ea' : 'white',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -2664,7 +2664,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       padding: '12px 14px',
                       borderRadius: '14px',
                       border: paymentMethod === 'cash' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                      background: paymentMethod === 'cash' ? '#f0fdf4' : 'white',
+                      background: paymentMethod === 'cash' ? '#e6f4ea' : 'white',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -2768,7 +2768,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         {activationStep === 'success' && (
           <div style={{...styles.card, maxWidth: '380px', textAlign: 'center', gap: '24px', padding: '36px 24px'}}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
               <CheckCircle size={36} color="#34a853" />
             </div>
             <div>
@@ -3572,7 +3572,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     style={{
                       flex: 1,
                       padding: '12px',
-                      background: (!acceptedTerms || !acceptedPrivacy) ? '#cbd5e1' : '#16a34a',
+                      background: (!acceptedTerms || !acceptedPrivacy) ? '#cbd5e1' : '#34a853',
                       color: 'white',
                       border: 'none',
                       borderRadius: '14px',
@@ -3688,8 +3688,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                 {profile.app_usage_mode === 'parent_hybrid' && parentUnlocked && (
                   <div style={{
-                    background: '#f0fdf4',
-                    border: '1.5px solid #bbf7d0',
+                    background: '#e6f4ea',
+                    border: '1.5px solid #e6f4ea',
                     borderRadius: '24px',
                     padding: '20px',
                     display: 'flex',
@@ -3699,10 +3699,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     width: '100%',
                     boxSizing: 'border-box'
                   }}>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#16a34a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Key size={16} style={{ color: '#16a34a' }} /> Berechtigungen verwalten
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Key size={16} style={{ color: '#34a853' }} /> Berechtigungen verwalten
                     </h4>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#166534', fontWeight: 650, lineHeight: 1.4 }}>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#137333', fontWeight: 650, lineHeight: 1.4 }}>
                       Du kannst die Kommunikationsrechte auf dein Kind übertragen oder einzelne Funktionen gezielt freigeben.
                     </p>
                     
@@ -3710,7 +3710,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       type="button"
                       onClick={() => setShowConsentModal(true)}
                       style={{
-                        background: '#16a34a',
+                        background: '#34a853',
                         color: 'white',
                         border: 'none',
                         borderRadius: '12px',
@@ -3725,13 +3725,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       Modus wechseln zu "Selbstnutzer"
                     </button>
 
-                    <div style={{ borderTop: '1px solid #bbf7d0', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#15803d', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Settings size={14} style={{ color: '#15803d' }} /> Einzelne Funktionen freigeben:
+                    <div style={{ borderTop: '1px solid #e6f4ea', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#137333', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Settings size={14} style={{ color: '#137333' }} /> Einzelne Funktionen freigeben:
                       </h5>
                       
                       {/* Toggle 1: Chat */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_chat ?? true}
@@ -3740,14 +3740,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             const { error } = await supabase.from('users').update({ parent_allow_chat: checked }).eq('id', profile.id);
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_chat: checked } : null);
                           }}
-                          style={{ accentColor: '#16a34a' }}
+                          style={{ accentColor: '#34a853' }}
                         />
-                        <MessageSquare size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <MessageSquare size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                         <span>Chat &amp; Lehrer-Kommunikation erlauben</span>
                       </label>
 
                       {/* Toggle 2: Timer */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_timer ?? true}
@@ -3756,14 +3756,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             const { error } = await supabase.from('users').update({ parent_allow_timer: checked }).eq('id', profile.id);
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_timer: checked } : null);
                           }}
-                          style={{ accentColor: '#16a34a' }}
+                          style={{ accentColor: '#34a853' }}
                         />
-                        <Timer size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <Timer size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                         <span>Selbständiger Übe-Timer &amp; Streaks</span>
                       </label>
 
                       {/* Toggle 3: Leaderboard */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_leaderboard ?? true}
@@ -3772,14 +3772,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             const { error } = await supabase.from('users').update({ parent_allow_leaderboard: checked }).eq('id', profile.id);
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_leaderboard: checked } : null);
                           }}
-                          style={{ accentColor: '#16a34a' }}
+                          style={{ accentColor: '#34a853' }}
                         />
-                        <Trophy size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <Trophy size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                         <span>Sichtbarkeit in Bestenlisten</span>
                       </label>
 
                       {/* Toggle 4: Groups */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_groups ?? true}
@@ -3788,14 +3788,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             const { error } = await supabase.from('users').update({ parent_allow_groups: checked }).eq('id', profile.id);
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_groups: checked } : null);
                           }}
-                          style={{ accentColor: '#16a34a' }}
+                          style={{ accentColor: '#34a853' }}
                         />
-                        <Users size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <Users size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                         <span>Beitritt zu Band- &amp; Gruppen-Chats</span>
                       </label>
 
                       {/* Toggle 5: Proposals */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#166534', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_proposals ?? true}
@@ -3804,9 +3804,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             const { error } = await supabase.from('users').update({ parent_allow_proposals: checked }).eq('id', profile.id);
                             if (!error) setProfile(prev => prev ? { ...prev, parent_allow_proposals: checked } : null);
                           }}
-                          style={{ accentColor: '#16a34a' }}
+                          style={{ accentColor: '#34a853' }}
                         />
-                        <Music size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <Music size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                         <span>Repertoire- &amp; Songvorschläge senden</span>
                       </label>
                     </div>
@@ -3964,7 +3964,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               position: 'relative', 
                               width: '210px', 
                               height: '210px', 
-                              filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(52, 168, 83, 0.25))' : (timerRunning ? (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(52, 199, 89, 0.15))' : 'drop-shadow(0 0 12px rgba(255, 59, 48, 0.2))') : 'none'),
+                              filter: isExtraTime ? 'drop-shadow(0 0 12px rgba(52, 168, 83, 0.25))' : (timerRunning ? (isPhoneFlat ? 'drop-shadow(0 0 12px rgba(52, 168, 83, 0.15))' : 'drop-shadow(0 0 12px rgba(255, 59, 48, 0.2))') : 'none'),
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center'
@@ -4105,7 +4105,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: '8px',
-                                  boxShadow: '0 4px 15px rgba(52, 199, 89, 0.15)'
+                                  boxShadow: '0 4px 15px rgba(52, 168, 83, 0.15)'
                                 }}
                               >
                                 Beenden

@@ -358,7 +358,7 @@ export function DeviceSetupScreen() {
               }
 
               const lowerName = name.toLowerCase();
-              if (lowerName.includes('lehrer')) return '#22c55e'; // Green
+              if (lowerName.includes('lehrer')) return '#34a853'; // Green
               const matches = name.match(/\d+/g);
               if (!matches) return '#64748b';
               const num = parseInt(matches[matches.length - 1]);
@@ -534,7 +534,7 @@ export function DeviceSetupScreen() {
                             borderRadius: '16px',
                             border: '2px solid',
                             borderColor: isActive ? '#ef4444' : (sColor + '40'),
-                            background: isActive ? '#fef2f2' : (isTeacherStation ? '#f0fdf4' : 'white'),
+                            background: isActive ? '#fef2f2' : (isTeacherStation ? '#e6f4ea' : 'white'),
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
@@ -553,7 +553,7 @@ export function DeviceSetupScreen() {
                               BESETZT
                             </div>
                           )}
-                          {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#22c55e', fontWeight: 800 }}>LEHRER</div>}
+                          {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#34a853', fontWeight: 800 }}>LEHRER</div>}
                         </button>
                       );
                     })}
@@ -589,7 +589,7 @@ export function DeviceSetupScreen() {
                     borderRadius: '16px',
                     border: '2px solid',
                     borderColor: isActive ? '#ef4444' : (sColor + '40'),
-                    background: isActive ? '#fef2f2' : (isTeacherStation ? '#f0fdf4' : 'white'),
+                    background: isActive ? '#fef2f2' : (isTeacherStation ? '#e6f4ea' : 'white'),
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -607,7 +607,7 @@ export function DeviceSetupScreen() {
                       BESETZT
                     </div>
                   )}
-                  {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#22c55e', fontWeight: 800 }}>LEHRER</div>}
+                  {isTeacherStation && !isActive && <div style={{ fontSize: '0.5rem', color: '#34a853', fontWeight: 800 }}>LEHRER</div>}
                 </button>
               );
             };

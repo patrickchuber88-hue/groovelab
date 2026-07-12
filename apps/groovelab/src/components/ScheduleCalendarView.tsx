@@ -2843,13 +2843,13 @@ export function ScheduleCalendarView({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#34a853', text: '#065f46' };
+      case 'scheduled': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#137333' };
       case 'cancelled':
       case 'teacher_sick':
       case 'canceled_by_teacher_sick':
         return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(220, 252, 231, 0.45)', border: '#34a853', text: '#065f46' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#137333' };
       default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
     }
   };
@@ -2996,7 +2996,7 @@ export function ScheduleCalendarView({
         {/* Row 1: Title & Main Navigation */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', width: '100%', gap: '10px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(22, 163, 74, 0.12)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <CalendarIcon size={16} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -3150,9 +3150,9 @@ export function ScheduleCalendarView({
             {Object.keys(pendingChanges).length > 0 && (
               <button 
                 onClick={savePendingChanges}
-                style={{ background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)', minHeight: '36px', display: 'flex', alignItems: 'center' }}
-                onMouseOver={e => e.currentTarget.style.background = '#15803d'}
-                onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
+                style={{ background: '#34a853', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(52, 168, 83, 0.25)', minHeight: '36px', display: 'flex', alignItems: 'center' }}
+                onMouseOver={e => e.currentTarget.style.background = '#137333'}
+                onMouseOut={e => e.currentTarget.style.background = '#34a853'}
               >
                 Änderungen speichern ({Object.keys(pendingChanges).length})
               </button>
@@ -3577,7 +3577,7 @@ export function ScheduleCalendarView({
                   <div style={{
                     fontSize: '0.62rem',
                     fontWeight: 900,
-                    color: '#047857',
+                    color: '#137333',
                     background: 'rgba(52, 168, 83, 0.08)',
                     padding: '2px 6px',
                     borderRadius: '4px',
@@ -3919,7 +3919,7 @@ export function ScheduleCalendarView({
                     : isSick 
                       ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
                       : isVacant
-                        ? { bg: 'rgba(52, 168, 83, 0.02)', border: '#34a853', text: '#047857' }
+                        ? { bg: 'rgba(52, 168, 83, 0.02)', border: '#34a853', text: '#137333' }
                         : getStatusColor(occ.status);
                   const finalColors = { ...colors };
                   let cardBackground = '';
@@ -3956,7 +3956,7 @@ export function ScheduleCalendarView({
                           finalColors.border = '#34a853';
                           finalColors.text = '#34a853';
                         } else {
-                          cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
+                          cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                           finalColors.border = '#34a853';
                           finalColors.text = '#34a853';
                         }
@@ -3988,7 +3988,7 @@ export function ScheduleCalendarView({
                         finalColors.border = '#34a853';
                         finalColors.text = '#34a853';
                       } else {
-                        cardBackground = 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)';
+                        cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                         finalColors.border = '#34a853';
                         finalColors.text = '#34a853';
                       }
@@ -4695,7 +4695,7 @@ export function ScheduleCalendarView({
                 </p>
                 {rescheduledOcc ? (
                   <div style={{ 
-                    background: '#f0fdf4', 
+                    background: '#e6f4ea', 
                     border: '1px solid #34a853', 
                     borderRadius: '16px', 
                     padding: '14px 18px', 
@@ -4703,8 +4703,8 @@ export function ScheduleCalendarView({
                     boxSizing: 'border-box',
                     textAlign: 'center'
                   }}>
-                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Neuer Termin</span>
-                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#065f46', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>{newAppointmentText}</span>
+                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Neuer Termin</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#137333', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>{newAppointmentText}</span>
                   </div>
                 ) : (
                   <div style={{ 
@@ -4829,7 +4829,7 @@ export function ScheduleCalendarView({
               <div style={{ 
                 background: isEnsembleOcc 
                   ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
-                  : 'linear-gradient(135deg, #118a44 0%, #15803d 100%)', 
+                  : 'linear-gradient(135deg, #137333 0%, #137333 100%)', 
                 padding: '20px 28px', 
                 display: 'flex', 
                 justifyContent: 'space-between', 
@@ -4975,7 +4975,7 @@ export function ScheduleCalendarView({
                         width: '100%',
                         padding: '11px 14px',
                         borderRadius: '12px',
-                        border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#118a44'}` : '1px solid rgba(0, 0, 0, 0.15)',
+                        border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#137333'}` : '1px solid rgba(0, 0, 0, 0.15)',
                         background: '#ffffff',
                         fontSize: '0.92rem',
                         fontFamily: 'inherit',
@@ -4983,7 +4983,7 @@ export function ScheduleCalendarView({
                         color: '#1d1d1f',
                         outline: 'none',
                         boxSizing: 'border-box',
-                        boxShadow: roomDropdownOpen ? `0 0 0 3px ${isEnsembleOcc ? 'rgba(0, 122, 255, 0.15)' : 'rgba(17, 138, 68, 0.12)'}` : '0 2px 4px rgba(0,0,0,0.02)',
+                        boxShadow: roomDropdownOpen ? `0 0 0 3px ${isEnsembleOcc ? 'rgba(0, 122, 255, 0.15)' : 'rgba(19, 115, 51, 0.12)'}` : '0 2px 4px rgba(0,0,0,0.02)',
                         transition: 'all 0.2s ease',
                         cursor: 'pointer',
                         display: 'flex',
@@ -5070,8 +5070,8 @@ export function ScheduleCalendarView({
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
                                 cursor: 'pointer',
-                                background: isSelected ? (isEnsembleOcc ? 'rgba(0, 122, 255, 0.08)' : 'rgba(17, 138, 68, 0.08)') : 'transparent',
-                                color: isSelected ? (isEnsembleOcc ? '#007aff' : '#118a44') : '#1d1d1f',
+                                background: isSelected ? (isEnsembleOcc ? 'rgba(0, 122, 255, 0.08)' : 'rgba(19, 115, 51, 0.08)') : 'transparent',
+                                color: isSelected ? (isEnsembleOcc ? '#007aff' : '#137333') : '#1d1d1f',
                                 fontWeight: isSelected ? 700 : 500,
                                 fontSize: '0.9rem',
                                 marginTop: '2px',
@@ -5079,7 +5079,7 @@ export function ScheduleCalendarView({
                               }}
                               onMouseEnter={e => {
                                 if (!isSelected) {
-                                  e.currentTarget.style.background = isEnsembleOcc ? 'rgba(0, 122, 255, 0.04)' : 'rgba(17, 138, 68, 0.04)';
+                                  e.currentTarget.style.background = isEnsembleOcc ? 'rgba(0, 122, 255, 0.04)' : 'rgba(19, 115, 51, 0.04)';
                                 }
                               }}
                               onMouseLeave={e => {
@@ -5093,7 +5093,7 @@ export function ScheduleCalendarView({
                                 <span>{r.name}</span>
                               </div>
                               {isSelected && (
-                                <span style={{ color: isEnsembleOcc ? '#007aff' : '#118a44', fontWeight: 'bold' }}>✓</span>
+                                <span style={{ color: isEnsembleOcc ? '#007aff' : '#137333', fontWeight: 'bold' }}>✓</span>
                               )}
                             </div>
                           );
@@ -5253,9 +5253,9 @@ export function ScheduleCalendarView({
                       </button>
                       <button 
                         onClick={handleSaveEdit} 
-                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#118a44', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                        onMouseOver={e => e.currentTarget.style.background = isEnsembleOcc ? '#0055d4' : '#15803d'}
-                        onMouseOut={e => e.currentTarget.style.background = isEnsembleOcc ? '#007aff' : '#118a44'}
+                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#137333', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                        onMouseOver={e => e.currentTarget.style.background = isEnsembleOcc ? '#0055d4' : '#137333'}
+                        onMouseOut={e => e.currentTarget.style.background = isEnsembleOcc ? '#007aff' : '#137333'}
                       >
                         Speichern
                       </button>
@@ -5504,7 +5504,7 @@ export function ScheduleCalendarView({
                                     </span>
                                   )}
                                   <div style={{ 
-                                    background: isMe ? (isEnsembleOcc ? '#007aff' : '#118a44') : '#f5f5f7', 
+                                    background: isMe ? (isEnsembleOcc ? '#007aff' : '#137333') : '#f5f5f7', 
                                     color: isMe ? 'white' : '#1d1d1f', 
                                     padding: '8px 12px', 
                                     borderRadius: '12px', 
@@ -5536,7 +5536,7 @@ export function ScheduleCalendarView({
                             onChange={e => setChatTypedMessage(e.target.value)}
                             style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
                           />
-                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isEnsembleOcc ? '#007aff' : '#118a44'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
+                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isEnsembleOcc ? '#007aff' : '#137333'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
                             <Send size={14} />
                           </button>
                         </form>
@@ -5827,7 +5827,7 @@ export function ScheduleCalendarView({
               <button
                 onClick={savePendingChanges}
                 style={{
-                  background: '#16a34a',
+                  background: '#34a853',
                   border: 'none',
                   color: 'white',
                   padding: '8px 20px',
@@ -5835,19 +5835,19 @@ export function ScheduleCalendarView({
                   fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
                 onMouseOver={e => {
-                  e.currentTarget.style.background = '#15803d';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(22, 163, 74, 0.45)';
+                  e.currentTarget.style.background = '#137333';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 168, 83, 0.45)';
                 }}
                 onMouseOut={e => {
-                  e.currentTarget.style.background = '#16a34a';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
+                  e.currentTarget.style.background = '#34a853';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 168, 83, 0.3)';
                 }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

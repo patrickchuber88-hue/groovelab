@@ -1,6 +1,9 @@
 -- Migration: 126_update_campus_events_rls_students
 -- Description: Allow students who are assigned to a private event to read (select) it.
 
+-- Ensure assigned_student_ids column exists
+ALTER TABLE public.campus_events ADD COLUMN IF NOT EXISTS assigned_student_ids UUID[] DEFAULT '{}';
+
 DROP POLICY IF EXISTS campus_events_select ON public.campus_events;
 
 CREATE POLICY campus_events_select ON public.campus_events FOR SELECT USING (

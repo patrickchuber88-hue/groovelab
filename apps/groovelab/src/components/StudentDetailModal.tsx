@@ -1147,7 +1147,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.2s',
-              background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)' : '#1e293b',
+              background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)' : '#1e293b',
               color: '#ffffff',
               boxShadow: localTab === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
             }}
@@ -1309,14 +1309,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 {/* Card 2: Campus Songs (Green) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #34a853, #047857)',
+                  background: 'linear-gradient(135deg, #34a853, #137333)',
                   color: 'white',
                   borderRadius: '16px',
                   padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  boxShadow: '0 6px 15px rgba(4, 120, 87, 0.1)',
+                  boxShadow: '0 6px 15px rgba(19, 115, 51, 0.1)',
                   height: '100%',
                   boxSizing: 'border-box'
                 }}>
@@ -1855,21 +1855,21 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                         {/* Mastered repertoire songs */}
                         {repertoire.map((s: any) => (
                           <div key={s.id + s.level} style={{ 
-                            background: '#f0fdf4', 
+                            background: '#e6f4ea', 
                             padding: '8px 12px', 
                             borderRadius: '12px', 
-                            border: '1px solid #bbf7d0',
+                            border: '1px solid #e6f4ea',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             fontSize: '0.82rem'
                           }}>
-                            <span style={{ fontWeight: 800, color: '#166534' }}>
-                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#15803d', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                            <span style={{ fontWeight: 800, color: '#137333' }}>
+                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#137333', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
                             </span>
                             <span style={{ 
-                              background: '#dcfce7', 
-                              color: '#15803d', 
+                              background: '#e6f4ea', 
+                              color: '#137333', 
                               padding: '2px 8px', 
                               borderRadius: '6px', 
                               fontWeight: 900,
@@ -1983,7 +1983,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       justifyContent: 'center',
                       gap: '8px',
                       background: copiedOnboardingLink ? '#e6f4ea' : '#ffffff',
-                      border: copiedOnboardingLink ? '1.5px solid #a7f3d0' : '1.5px solid #cbd5e1',
+                      border: copiedOnboardingLink ? '1.5px solid #e6f4ea' : '1.5px solid #cbd5e1',
                       color: copiedOnboardingLink ? '#34a853' : '#0f172a',
                       borderRadius: '16px',
                       cursor: 'pointer',
@@ -2063,7 +2063,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             fontWeight: isCampusActive ? 800 : 600,
                             cursor: 'pointer',
                             transition: 'all 0.2s',
-                            boxShadow: isCampusActive ? '0 1px 4px rgba(52, 199, 89, 0.3)' : 'none'
+                            boxShadow: isCampusActive ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
                           }}
                         >
                           Aktiv
@@ -2699,7 +2699,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             {localTab === 'campus' ? (
               /* ============ CAMPUS PASS OVERLAY ============ */
               <div style={{ 
-                background: 'linear-gradient(135deg, #34a853 0%, #064e3b 100%)', 
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
                 borderRadius: '32px', 
                 padding: '32px', 
                 color: 'white',

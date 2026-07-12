@@ -151,7 +151,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 }
               }}
               style={{
-                background: '#16a34a',
+                background: '#34a853',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
@@ -159,7 +159,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 fontSize: '0.72rem',
                 fontWeight: 750,
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(22, 163, 74, 0.15)'
+                boxShadow: '0 2px 4px rgba(52, 168, 83, 0.15)'
               }}
             >
               Drucken / PDF
@@ -187,7 +187,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
           {/* Invoice Meta */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: dynamicMargin }}>
             <div>
-              <h2 style={{ margin: 0, color: '#16a34a', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900 }}>Campus-Groovelab</h2>
+              <h2 style={{ margin: 0, color: '#34a853', fontFamily: 'Urbanist', fontSize: '1.3rem', fontWeight: 900 }}>Campus-Groovelab</h2>
               <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab Billing System</span>
             </div>
             <div style={{ textAlign: 'right', fontSize: '0.78rem' }}>
@@ -210,7 +210,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
             </div>
             <div>
               <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.62rem', fontWeight: 800, display: 'block', marginBottom: '6px' }}>Dienstleister</span>
-              <strong style={{ color: '#16a34a', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
+              <strong style={{ color: '#34a853', display: 'block', fontSize: '0.85rem' }}>Campus-Groovelab</strong>
               <strong style={{ color: '#0f172a', display: 'block', fontWeight: 600 }}>{operator.company}</strong>
               <span>{operator.contact}</span><br />
               <span>{operator.street}</span><br />
@@ -257,13 +257,13 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: dynamicTdPadding }}>
                       <strong style={{ display: 'block', color: '#0f172a' }}>Campus-Groovelab Musikschul-Software</strong>
-                      <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
+                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>Software-Infrastruktur 100% kostenlos</span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
                       1 Monat
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>0,00 €</td>
-                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>0,00 €</td>
+                    <td style={{ padding: dynamicTdPadding, textAlign: 'right', color: '#34a853', fontWeight: 700 }}>0,00 €</td>
                   </tr>
 
                   {/* Position 2: Campus platform access */}
@@ -340,10 +340,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
 
                   {/* Kombinations-Rabatt row */}
                   {hasKombi && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#16a34a' }}>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#34a853' }}>
                       <td style={{ padding: dynamicTdPadding }}>
                         <strong style={{ display: 'block' }}>Kombinations-Rabatt (Campus &amp; GrooveLab)</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a' }}>Sonderkondition für Doppel-Modulnutzung</span>
+                        <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Sonderkondition für Doppel-Modulnutzung</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
                         1 Monat
@@ -357,10 +357,10 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
 
                   {/* Direktabrechnungs-Vorteil row */}
                   {activeStudentDiscount > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#16a34a' }}>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9', color: '#34a853' }}>
                       <td style={{ padding: dynamicTdPadding }}>
                         <strong style={{ display: 'block' }}>Direktabrechnungs-Vorteil</strong>
-                        <span style={{ fontSize: '0.68rem', color: '#16a34a' }}>Deduction für {school.premiumStudents || 0} aktive Selbstzahler-Schüler (0,09 € / Mo. pro User)</span>
+                        <span style={{ fontSize: '0.68rem', color: '#34a853' }}>Deduction für {school.premiumStudents || 0} aktive Selbstzahler-Schüler (0,09 € / Mo. pro User)</span>
                       </td>
                       <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right' }}>
                         1 Monat
@@ -382,8 +382,8 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                       <strong style={{ display: 'block', color: '#0f172a' }}>Schüler-Account Aktivierungsgebühr (Sammelabrechnung)</strong>
                       <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                         Jahrespauschale für aktivierte Schüler-Accounts (Umlagesatz = 0,40 € / Mo. für {invoice.restmonate || 12} Restmonate)
-                        {school.studentBillingOption === 'option3_2' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
-                        {school.studentBillingOption === 'option3_3' && <strong style={{ color: '#16a34a', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
+                        {school.studentBillingOption === 'option3_2' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 10% Rabatt für Jahrespauschale)</strong>}
+                        {school.studentBillingOption === 'option3_3' && <strong style={{ color: '#34a853', marginLeft: '6px' }}>(inkl. 20% Rabatt für Komplett-Jahrespauschale)</strong>}
                       </span>
                     </td>
                     <td style={{ padding: dynamicTdPaddingRight, textAlign: 'right', color: '#64748b' }}>
@@ -426,17 +426,17 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 {isAkt && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
                     <span>{school.billingPayer === 'student' ? '• Durchlaufender Posten (Umlage an Schüler):' : '• Direktabrechnung Schüler-Aktivierungen (Träger):'}</span>
-                    <span style={{ fontWeight: 650, color: school.billingPayer === 'student' ? '#16a34a' : '#ea580c', whiteSpace: 'nowrap' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ fontWeight: 650, color: school.billingPayer === 'student' ? '#34a853' : '#ea580c', whiteSpace: 'nowrap' }}>{studentShareTotal.toFixed(2).replace('.', ',')} €</span>
                   </div>
                 )}
                 <div style={{ borderTop: '1px dashed #e2e8f0', margin: '8px 0' }}></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', color: '#0f172a' }}>
                   <span style={{ fontWeight: 800 }}>Gesamtbetrag dieser Rechnung:</span>
-                  <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#16a34a', whiteSpace: 'nowrap' }}>{invoice.amount.toFixed(2).replace('.', ',')} €</strong>
+                  <strong style={{ fontWeight: 900, color: isInf ? '#0369a1' : '#34a853', whiteSpace: 'nowrap' }}>{invoice.amount.toFixed(2).replace('.', ',')} €</strong>
                 </div>
               </div>
               {isAkt && school.billingPayer === 'student' && (
-                <div style={{ fontSize: '0.64rem', color: '#16a34a', background: '#d1fae5', border: '1px solid #bbf7d0', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.64rem', color: '#34a853', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
                   💡 <strong>Durchlaufender Posten:</strong> Abdeckung der Gebühren direkt durch die aktivierenden Schüler/Eltern. Keine effektiven Kosten für die Musikschule.
                 </div>
               )}
@@ -498,11 +498,11 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                 <div style={{ 
                   marginTop: '12px', 
                   padding: '14px 16px', 
-                  background: '#f0fdf4', 
+                  background: '#e6f4ea', 
                   borderRadius: '16px', 
-                  border: '1px solid #bbf7d0', 
+                  border: '1px solid #e6f4ea', 
                   fontSize: '0.74rem', 
-                  color: '#15803d', 
+                  color: '#137333', 
                   fontWeight: 700,
                   width: '100%', 
                   textAlign: 'center'

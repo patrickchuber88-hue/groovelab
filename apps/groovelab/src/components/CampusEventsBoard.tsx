@@ -620,8 +620,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
     if (saveStatus === 'saved') {
       return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#16a34a', fontWeight: 650, background: '#f0fdf4', padding: '2px 8px', borderRadius: '20px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#34a853', fontWeight: 650, background: '#e6f4ea', padding: '2px 8px', borderRadius: '20px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
           Gespeichert
         </span>
       );
@@ -2029,7 +2029,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       '#f59e0b': { color: '#f59e0b', bg: '#fef3c7' }, // Gelb
       '#3b82f6': { color: '#3b82f6', bg: '#eff6ff' }, // Blau
       '#ef4444': { color: '#ef4444', bg: '#fee2e2' }, // Rot
-      '#34a853': { color: '#34a853', bg: '#ecfdf5' }, // Grün
+      '#34a853': { color: '#34a853', bg: '#e6f4ea' }, // Grün
     };
 
     if (ev.color && COLOR_MAP[ev.color]) {
@@ -2040,13 +2040,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const cLower = (ev.category || '').toLowerCase();
 
     if (cLower.includes('ferien') || cLower.includes('feiertag') || tLower.includes('ferien') || tLower.includes('feiertag') || tLower.includes('schulfrei') || tLower.includes('holiday') || tLower.includes('break')) {
-      return { color: '#34a853', bg: '#ecfdf5' };
+      return { color: '#34a853', bg: '#e6f4ea' };
     }
     if (cLower.includes('vorspiel') || cLower.includes('klassenvorspiel') || tLower.includes('vorspiel') || tLower.includes('klassenvorspiel') || tLower.includes('schülervorspiel') || tLower.includes('recital')) {
       return { color: '#3b82f6', bg: '#eff6ff' };
     }
     if (cLower.includes('fest') || tLower.includes('fest') || tLower.includes('weihnachtsfeier') || tLower.includes('party') || tLower.includes('feier')) {
-      return { color: '#34a853', bg: '#ecfdf5' }; // Grün (was Orange)
+      return { color: '#34a853', bg: '#e6f4ea' }; // Grün (was Orange)
     }
     if (cLower.includes('konzert') || cLower.includes('auftritt') || tLower.includes('konzert') || tLower.includes('auftritt') || tLower.includes('show') || tLower.includes('gig')) {
       return { color: '#a855f7', bg: '#f3e8ff' };
@@ -3872,7 +3872,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             display: inline-block;
           }
           .delta-pill.pos {
-            background: rgba(52, 199, 89, 0.08);
+            background: rgba(52, 168, 83, 0.08);
             color: #34c759;
           }
           .delta-pill.neg {
@@ -4344,8 +4344,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             title="1:1 Shoutbox öffnen"
                                             style={{
                                               border: 'none',
-                                              background: activeChatOcc?.id === occ.id ? '#dcfce7' : '#f1f5f9',
-                                              color: activeChatOcc?.id === occ.id ? '#16a34a' : '#475569',
+                                              background: activeChatOcc?.id === occ.id ? '#e6f4ea' : '#f1f5f9',
+                                              color: activeChatOcc?.id === occ.id ? '#34a853' : '#475569',
                                               padding: '5px',
                                               borderRadius: '6px',
                                               cursor: 'pointer',
@@ -6295,7 +6295,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       fontWeight: 600,
                       background: isHighlighted 
                         ? `${brandColor}0a` 
-                        : (isAlreadySelected ? '#f0fdf4' : '#ffffff'),
+                        : (isAlreadySelected ? '#e6f4ea' : '#ffffff'),
                       borderLeft: `3px solid ${isHighlighted ? brandColor : 'transparent'}`,
                       transition: 'all 0.1s'
                     }}
@@ -6310,7 +6310,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       height: '18px',
                       borderRadius: '50%',
                       border: isAlreadySelected ? 'none' : '1.5px solid #cbd5e1',
-                      background: isAlreadySelected ? '#22c55e' : 'transparent',
+                      background: isAlreadySelected ? '#34a853' : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -6485,8 +6485,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   <span style={{
                     fontSize: '0.68rem',
                     fontWeight: 800,
-                    background: hasUnanswered ? '#fef3c7' : '#dcfce7',
-                    color: hasUnanswered ? '#d97706' : '#15803d',
+                    background: hasUnanswered ? '#fef3c7' : '#e6f4ea',
+                    color: hasUnanswered ? '#d97706' : '#137333',
                     padding: '4px 10px',
                     borderRadius: '100px',
                     textTransform: 'uppercase'
@@ -6755,8 +6755,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       fontWeight: 700,
                       padding: '3px 8px',
                       borderRadius: '6px',
-                      background: isScheduled ? '#dcfce7' : '#fef3c7',
-                      color: isScheduled ? '#15803d' : '#b45309'
+                      background: isScheduled ? '#e6f4ea' : '#fef3c7',
+                      color: isScheduled ? '#137333' : '#b45309'
                     }}>
                       {isScheduled ? 'Eingeteilt' : 'Wartet auf Einteilung'}
                     </span>
@@ -7039,7 +7039,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     let statusColor = '#475569';
                     let statusLabel = 'Eingereicht';
                     if (pp.status === 'approved') {
-                      statusBg = '#ecfdf5';
+                      statusBg = '#e6f4ea';
                       statusColor = '#137333';
                       statusLabel = 'Freigegeben';
                     } else if (pp.status === 'rejected') {
@@ -9364,7 +9364,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     overflowY: 'auto'
                   }}>
                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: '#1f1f1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <AlertCircle size={16} style={{ color: dbConflicts.length > 0 ? '#ff3b30' : '#22c55e' }} />
+                      <AlertCircle size={16} style={{ color: dbConflicts.length > 0 ? '#ff3b30' : '#34a853' }} />
                       Konflikte ({dbConflicts.length})
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
@@ -9997,7 +9997,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               liveColor: isNight ? '#ff453a' : '#ff3b30',
               nextColor: isNight ? '#30b0c7' : '#007aff',
               okColor: isNight ? '#30d158' : '#34c759',
-              okBg: isNight ? 'rgba(48, 209, 88, 0.15)' : 'rgba(52, 199, 89, 0.08)',
+              okBg: isNight ? 'rgba(52, 168, 83, 0.15)' : 'rgba(52, 168, 83, 0.08)',
               p48vColor: isNight ? '#ff9f0a' : '#ff9500',
               p48vBg: isNight ? 'rgba(255, 159, 10, 0.15)' : 'rgba(255, 149, 0, 0.08)',
               rowHoverBg: isNight ? '#22222a' : '#f5f5f7',
@@ -11005,14 +11005,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                      background: '#ecfdf5', border: '1.5px solid #a7f3d0', color: '#137333',
+                      background: '#e6f4ea', border: '1.5px solid #e6f4ea', color: '#137333',
                       padding: '10px', borderRadius: '12px', cursor: 'pointer',
                       fontWeight: 800, fontSize: '0.82rem',
                       transition: 'all 0.15s',
                       marginTop: '6px'
                     }}
-                    onMouseOver={e => { e.currentTarget.style.background = '#d1fae5'; }}
-                    onMouseOut={e => { e.currentTarget.style.background = '#ecfdf5'; }}
+                    onMouseOver={e => { e.currentTarget.style.background = '#e6f4ea'; }}
+                    onMouseOut={e => { e.currentTarget.style.background = '#e6f4ea'; }}
                   >
                     <CalendarPlus size={14} />
                     Für Event-Planung aktivieren
@@ -11397,7 +11397,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             >
               {/* Header */}
               <div style={{
-                background: `linear-gradient(135deg, ${brandColor || '#16a34a'} 0%, #15803d 100%)`,
+                background: `linear-gradient(135deg, ${brandColor || '#34a853'} 0%, #137333 100%)`,
                 padding: '24px',
                 color: '#ffffff',
                 display: 'flex',
@@ -11469,7 +11469,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         gap: '2px'
                       }}>
                         <div style={{
-                          background: isMe ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#ffffff',
+                          background: isMe ? 'linear-gradient(135deg, #34a853, #137333)' : '#ffffff',
                           color: isMe ? '#ffffff' : '#1e293b',
                           padding: '10px 14px',
                           borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
@@ -11579,7 +11579,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                        type="submit"
                        disabled={isDisabled || !chatTypedMessage.trim()}
                        style={{
-                         background: isDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #16a34a, #15803d)',
+                         background: isDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #137333)',
                          color: '#ffffff',
                          border: 'none',
                          borderRadius: '12px',
@@ -11609,7 +11609,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           bottom: '24px',
           right: '24px',
           zIndex: 99999,
-          background: toast.type === 'success' ? '#16a34a' : toast.type === 'error' ? '#dc2626' : '#2563eb',
+          background: toast.type === 'success' ? '#34a853' : toast.type === 'error' ? '#dc2626' : '#2563eb',
           color: '#ffffff',
           padding: '12px 20px',
           borderRadius: '12px',

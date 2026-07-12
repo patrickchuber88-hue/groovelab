@@ -9,6 +9,7 @@ CREATE OR REPLACE FUNCTION public.get_current_user_id()
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 STABLE
 AS $$
 DECLARE

@@ -80,7 +80,7 @@ const APP_INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
   "Bass": "#eab308", "E-Bass": "#eab308", 
   "Drums": "#3b82f6", "E-Drums": "#3b82f6", 
-  "Vocals": "#22c55e", 
+  "Vocals": "#34a853", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
 };
 const brandColor = "#f59e0b"; // Orange (matched with legend)
@@ -125,7 +125,7 @@ const getRoleColor = (role: string, stationName?: string) => {
   const r = role?.toLowerCase();
   if (r === 'teacher' || r === 'admin') {
     if (!stationName) return '#64748b'; // Gray for teachers in Home/no station mode
-    return '#22c55e'; // Green when checked in at a station
+    return '#34a853'; // Green when checked in at a station
   }
   if (!stationName) return '#64748b'; // Default gray
   
@@ -810,7 +810,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                   }}>
                     {APP_INSTRUMENT_ICONS[activeSkill.instrument]}
                   </div>
-                  <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', color: '#16a34a', padding: '24px', borderRadius: '24px', flex: 1, display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid #bbf7d0' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #e6f4ea, #e6f4ea)', color: '#34a853', padding: '24px', borderRadius: '24px', flex: 1, display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid #e6f4ea' }}>
                     <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                       <Award size={28} />
                     </div>
@@ -5791,8 +5791,8 @@ function App() {
         }}>
           {/* Brand header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-            <div style={{ width: '32px', height: '32px', background: '#e8f5e9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#2e7d32', fontWeight: 900, fontSize: '1.2rem' }}>C</span>
+            <div style={{ width: '32px', height: '32px', background: '#e6f4ea', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#137333', fontWeight: 900, fontSize: '1.2rem' }}>C</span>
             </div>
             <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>CAMPUS PASS</div>
           </div>
@@ -6239,7 +6239,7 @@ function App() {
       { solidBg: '#3b82f6', solidBorder: '#2563eb', lightBg: 'rgba(59, 130, 246, 0.12)', lightBorder: 'rgba(59, 130, 246, 0.5)', lightText: '#2563eb' }, // Blue
       { solidBg: '#8b5cf6', solidBorder: '#7c3aed', lightBg: 'rgba(139, 92, 246, 0.12)', lightBorder: 'rgba(139, 92, 246, 0.5)', lightText: '#7c3aed' }, // Violet
       { solidBg: '#ec4899', solidBorder: '#db2777', lightBg: 'rgba(236, 72, 153, 0.12)', lightBorder: 'rgba(236, 72, 153, 0.5)', lightText: '#db2777' }, // Pink
-      { solidBg: '#14b8a6', solidBorder: '#0d9488', lightBg: 'rgba(20, 184, 166, 0.12)', lightBorder: 'rgba(20, 184, 166, 0.5)', lightText: '#0d9488' }, // Teal
+      { solidBg: '#34a853', solidBorder: '#137333', lightBg: 'rgba(52, 168, 83, 0.12)', lightBorder: 'rgba(52, 168, 83, 0.5)', lightText: '#137333' }, // Teal
       { solidBg: '#f43f5e', solidBorder: '#e11d48', lightBg: 'rgba(244, 63, 94, 0.12)', lightBorder: 'rgba(244, 63, 94, 0.5)', lightText: '#e11d48' }, // Rose
     ];
     
@@ -6438,7 +6438,7 @@ function App() {
           }}
           onClick={() => setToastMessage(null)}
         >
-          {toastMessage.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} color="#22c55e" />}
+          {toastMessage.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} color="#34a853" />}
           <span>{toastMessage.text}</span>
         </div>
       )}
@@ -6614,13 +6614,13 @@ function App() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '11px',
-                background: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
                 fontSize: '1.5rem',
-                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
               }}>
                 🎓
               </div>
@@ -6644,8 +6644,8 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(22, 163, 74, 0.08)',
-                      color: '#16a34a',
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      color: '#34a853',
                       fontSize: '0.85rem',
                       fontWeight: 800,
                       display: 'flex',
@@ -6685,8 +6685,8 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(22, 163, 74, 0.08)',
-                      color: '#16a34a',
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      color: '#34a853',
                       fontSize: '0.85rem',
                       fontWeight: 800,
                       display: 'flex',
@@ -6726,8 +6726,8 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(22, 163, 74, 0.08)',
-                      color: '#16a34a',
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      color: '#34a853',
                       fontSize: '0.85rem',
                       fontWeight: 800,
                       display: 'flex',
@@ -6750,8 +6750,8 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(22, 163, 74, 0.08)',
-                      color: '#16a34a',
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      color: '#34a853',
                       fontSize: '0.85rem',
                       fontWeight: 800,
                       display: 'flex',
@@ -6791,8 +6791,8 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(22, 163, 74, 0.08)',
-                      color: '#16a34a',
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      color: '#34a853',
                       fontSize: '0.85rem',
                       fontWeight: 800,
                       display: 'flex',
@@ -6812,8 +6812,8 @@ function App() {
                       width: '28px',
                       height: '28px',
                       borderRadius: '50%',
-                      background: 'rgba(22, 163, 74, 0.08)',
-                      color: '#16a34a',
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      color: '#34a853',
                       fontSize: '0.85rem',
                       fontWeight: 800,
                       display: 'flex',
@@ -6860,7 +6860,7 @@ function App() {
             <button 
               onClick={() => setShowInstallGuide(false)}
               style={{
-                background: '#16a34a',
+                background: '#34a853',
                 color: 'white',
                 border: 'none',
                 borderRadius: '14px',
@@ -6868,7 +6868,7 @@ function App() {
                 fontSize: '0.9rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.2)',
+                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
                 textAlign: 'center',
                 transition: 'all 0.2s ease'
               }}
@@ -7222,7 +7222,7 @@ function App() {
                   right: -2, 
                   width: '12px', 
                   height: '12px', 
-                  background: activePlatform === 'campus' ? '#22c55e' : '#eab308', 
+                  background: activePlatform === 'campus' ? '#34a853' : '#eab308', 
                   borderRadius: '50%', 
                   border: '2px solid white' 
                 }} />
@@ -7660,8 +7660,8 @@ function App() {
                   {/* Lab Count Pill */}
                   <div style={{ 
                     display: 'flex', alignItems: 'center', gap: '8px', 
-                    background: '#22c55e', padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+                    background: '#34a853', padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
                   }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
                     <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{activeStudentsCount} im Lab</span>
@@ -9403,8 +9403,8 @@ function App() {
                                 fontWeight: 900,
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.05em',
-                                background: msg.type === 'school' ? '#fee2e2' : '#dcfce7',
-                                color: msg.type === 'school' ? '#ef4444' : '#22c55e',
+                                background: msg.type === 'school' ? '#fee2e2' : '#e6f4ea',
+                                color: msg.type === 'school' ? '#ef4444' : '#34a853',
                                 padding: '3px 8px',
                                 borderRadius: '6px'
                               }}>
@@ -9490,8 +9490,8 @@ function App() {
                               fontWeight: 900,
                               textTransform: 'uppercase',
                               letterSpacing: '0.05em',
-                              background: selectedStudentMessage.type === 'school' ? '#fee2e2' : '#dcfce7',
-                              color: selectedStudentMessage.type === 'school' ? '#ef4444' : '#22c55e',
+                              background: selectedStudentMessage.type === 'school' ? '#fee2e2' : '#e6f4ea',
+                              color: selectedStudentMessage.type === 'school' ? '#ef4444' : '#34a853',
                               padding: '2px 6px',
                               borderRadius: '5px'
                             }}>
@@ -9552,7 +9552,7 @@ function App() {
                         </button>
 
                         {selectedStudentMessage.read_by?.includes(user?.id) ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontSize: '0.85rem', fontWeight: 700, padding: '10px 16px', background: '#dcfce7', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34a853', fontSize: '0.85rem', fontWeight: 700, padding: '10px 16px', background: '#e6f4ea', borderRadius: '12px', border: '1px solid #e6f4ea' }}>
                             <Check size={16} strokeWidth={3} /> Nachricht gelesen & verstanden
                           </div>
                         ) : (
@@ -9560,7 +9560,7 @@ function App() {
                             onClick={() => handleAcknowledgeStudentMessage(selectedStudentMessage)}
                             className="hover-scale"
                             style={{
-                              background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                              background: 'linear-gradient(135deg, #34a853, #34a853)',
                               color: 'white',
                               border: 'none',
                               padding: '12px 24px',
@@ -9571,7 +9571,7 @@ function App() {
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px',
-                              boxShadow: '0 4px 15px rgba(22, 163, 74, 0.2)'
+                              boxShadow: '0 4px 15px rgba(52, 168, 83, 0.2)'
                             }}
                           >
                             <CheckCircle size={18} /> Als gelesen markieren
@@ -9982,8 +9982,8 @@ function App() {
                               fontWeight: 900, 
                               padding: '4px 10px', 
                               borderRadius: '8px', 
-                              background: parsed.target_type === 'all' ? '#e0f2fe' : parsed.target_type === 'students' ? '#dbeafe' : parsed.target_type === 'teachers' ? '#dcfce7' : '#f3e8ff',
-                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#15803d' : '#7e22ce'
+                              background: parsed.target_type === 'all' ? '#e0f2fe' : parsed.target_type === 'students' ? '#dbeafe' : parsed.target_type === 'teachers' ? '#e6f4ea' : '#f3e8ff',
+                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#137333' : '#7e22ce'
                             }}>
                               {parsed.target_type === 'all' ? 'ALLE' : parsed.target_type === 'students' ? 'SCHÜLER' : parsed.target_type === 'teachers' ? 'LEHRER' : 'EINZELNE'}
                             </span>
@@ -10288,7 +10288,7 @@ function App() {
                           <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', lineHeight: 1 }}>{group.artist}</div>
                           <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2 }}>{group.title}</div>
                         </div>
-                        <div style={{ background: '#f0fdf4', color: '#34a853', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                        <div style={{ background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
                           <Award size={12} /> 100%
                         </div>
                       </div>
@@ -10484,8 +10484,8 @@ function App() {
                                 <>
                                   {activeBandForSong && (
                                     <div style={{
-                                      background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                                      border: '1px solid #a7f3d0',
+                                      background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
+                                      border: '1px solid #e6f4ea',
                                       padding: '20px 24px',
                                       borderRadius: '24px',
                                       display: 'flex',
@@ -10501,10 +10501,10 @@ function App() {
                                           <CheckCircle size={24} />
                                         </div>
                                         <div>
-                                           <div style={{ fontSize: '1rem', fontWeight: 900, color: '#065f46', marginBottom: '2px' }}>
+                                           <div style={{ fontSize: '1rem', fontWeight: 900, color: '#137333', marginBottom: '2px' }}>
                                              Du spielst bereits {myInstrument} in der Band "{activeBandForSong.name}" für diesen Song! 🚀
                                            </div>
-                                           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#047857', opacity: 0.85 }}>
+                                           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#137333', opacity: 0.85 }}>
                                              Dein Repertoire-Beitrag ist aktiv und verifiziert.
                                            </div>
                                          </div>
@@ -10670,7 +10670,7 @@ function App() {
                                                   alt="" 
                                                 />
                                                 {member.isMastered && (
-                                                  <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                  <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
                                                     <CheckCircle size={12} strokeWidth={4} />
                                                   </div>
                                                 )}
@@ -11045,7 +11045,7 @@ function App() {
                               </div>
 
                               {isMeIn ? (
-                                <div style={{ textAlign: 'center', padding: '10px', background: '#f0fdf4', borderRadius: '12px', color: '#34a853', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <div style={{ textAlign: 'center', padding: '10px', background: '#e6f4ea', borderRadius: '12px', color: '#34a853', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                                   <CheckCircle size={16} /> Du bist dabei!
                                 </div>
                               ) : (
@@ -11371,14 +11371,14 @@ function App() {
                         <div style={{ flexShrink: 0 }}>
                           {userSongs.some(us => us.song_id === song.id) ? (
                             <div style={{ 
-                              background: '#f0fdf4', 
-                              border: '1px solid #bbf7d0', 
+                              background: '#e6f4ea', 
+                              border: '1px solid #e6f4ea', 
                               padding: '12px 24px', 
                               borderRadius: '16px', 
                               display: 'flex', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              color: '#166534', 
+                              color: '#137333', 
                               fontWeight: 900, 
                               fontSize: '0.85rem' 
                             }}>
@@ -11564,7 +11564,7 @@ function App() {
             textAlign: 'center',
             boxShadow: '0 40px 120px rgba(0,0,0,0.6)'
           }}>
-            <div style={{ width: '100px', height: '100px', borderRadius: '35px', background: '#dcfce7', color: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 10px 30px rgba(34, 197, 94, 0.2)' }}>
+            <div style={{ width: '100px', height: '100px', borderRadius: '35px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 10px 30px rgba(52, 168, 83, 0.2)' }}>
               <Users size={50} />
             </div>
             
@@ -12205,7 +12205,7 @@ function App() {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -14349,9 +14349,9 @@ const SecurePdfViewerModal: React.FC<SecurePdfViewerModalProps> = ({ song, folde
                       }
                     }}
                     style={{
-                      background: isAutoScrollEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.05)',
-                      border: isAutoScrollEnabled ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255,255,255,0.1)',
-                      color: isAutoScrollEnabled ? '#4ade80' : '#94a3b8',
+                      background: isAutoScrollEnabled ? 'rgba(52, 168, 83, 0.15)' : 'rgba(255,255,255,0.05)',
+                      border: isAutoScrollEnabled ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(255,255,255,0.1)',
+                      color: isAutoScrollEnabled ? '#34a853' : '#94a3b8',
                       padding: '5px 10px',
                       borderRadius: '10px',
                       fontSize: '0.75rem',

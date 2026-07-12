@@ -1118,7 +1118,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   borderRadius: '16px',
                   background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.15) 0%, rgba(52, 168, 83, 0.25) 100%)',
                   border: '1px solid rgba(52, 168, 83, 0.3)',
-                  color: '#d1fae5',
+                  color: '#e6f4ea',
                   cursor: 'pointer',
                   fontWeight: 750,
                   fontSize: '13.5px',
@@ -1185,7 +1185,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <div style={{
                   fontFamily: 'Courier New, monospace',
                   fontSize: '13px',
-                  color: '#22c55e',
+                  color: '#34a853',
                   lineHeight: 1.5
                 }}>
                   <div style={{ color: '#71717a' }}>-- PostgreSQL Row-Level Security (RLS)</div>

@@ -1371,9 +1371,9 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                 <span style={{ 
                                   fontSize: '0.65rem', 
                                   fontWeight: 900, 
-                                  color: '#34d399', 
-                                  background: 'rgba(52, 211, 153, 0.15)',
-                                  border: '1px solid rgba(52, 211, 153, 0.3)',
+                                  color: '#34a853', 
+                                  background: 'rgba(52, 168, 83, 0.15)',
+                                  border: '1px solid rgba(52, 168, 83, 0.3)',
                                   padding: '4px 10px', 
                                   borderRadius: '10px'
                                 }}>
@@ -1536,7 +1536,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                                 alt="" 
                                               />
                                               {isMastered && !isPendingOffer && (
-                                                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#22c55e', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
                                                   <Check size={12} strokeWidth={4} />
                                                 </div>
                                               )}
@@ -1573,7 +1573,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                                 if (error) alert('Fehler: ' + error.message);
                                                 else fetchSongProposals();
                                               }}
-                                              style={{ background: '#22c55e', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
+                                              style={{ background: '#34a853', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 6px', fontSize: '0.5rem', fontWeight: 900, cursor: 'pointer' }}
                                             >
                                               JA 🎤
                                             </button>
@@ -1723,7 +1723,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   let bg = "rgba(255,255,255,0.03)";
                                   let color = "rgba(255,255,255,0.2)";
                                   if (!isOpen) { bg = "transparent"; color = "transparent"; }
-                                  else if (isFixed) { bg = "#22c55e"; color = "black"; }
+                                  else if (isFixed) { bg = "#34a853"; color = "black"; }
                                   else if (isTopMatch) { bg = brandColor; color = "black"; }
                                   else if (count > 0) { bg = "rgba(255,255,255,0.1)"; color = "white"; }
                                   return (

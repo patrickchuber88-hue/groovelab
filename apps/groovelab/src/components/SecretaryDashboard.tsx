@@ -245,7 +245,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   }
 
   const lowerName = name.toLowerCase();
-  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#22c55e'; // Green
+  if (lowerName.includes('lehrer') || lowerName.includes('teacher')) return '#34a853'; // Green
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
@@ -488,8 +488,8 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
 const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], onProfileSelect: (u: any) => void }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 12px #22c55e' }}></span>
+      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', boxShadow: '0 0 12px #34a853' }}></span>
         Coaches vor Ort
       </div>
       <div style={{ 
@@ -2361,7 +2361,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           return (
             <div key={key} style={{ fontSize: '0.74rem', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Inter' }}>
               <span style={{ fontWeight: 700, color: '#64748b', minWidth: '120px' }}>{label}</span>
-              <span style={{ color: '#16a34a', backgroundColor: '#f0fdf4', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
+              <span style={{ color: '#34a853', backgroundColor: '#e6f4ea', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
                 {valStr}
               </span>
             </div>
@@ -2402,7 +2402,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 {oldValStr}
               </span>
               <span style={{ color: '#94a3b8' }}>➔</span>
-              <span style={{ color: '#16a34a', backgroundColor: '#f0fdf4', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
+              <span style={{ color: '#34a853', backgroundColor: '#e6f4ea', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
                 {newValStr}
               </span>
             </div>
@@ -5532,8 +5532,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                 return (
                   <div style={{
-                    background: 'rgba(34, 197, 94, 0.03)',
-                    border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                    background: 'rgba(52, 168, 83, 0.03)',
+                    border: '1.5px solid rgba(52, 168, 83, 0.12)',
                     borderRadius: '16px',
                     padding: '12px 16px',
                     display: 'flex',
@@ -5545,7 +5545,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
-                      <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                      <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
                         ⚡ Smart Auto-Zuweisung:
                       </span>
                       
@@ -5584,7 +5584,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       </div>
                     </div>
                     
-                    <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                    <span style={{ fontSize: '0.65rem', color: '#137333', fontWeight: 900, background: '#e6f4ea', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
                       Lehrer wird automatisch zugewiesen!
                     </span>
                   </div>
@@ -5627,9 +5627,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               <span style={{ fontSize: '0.62rem', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Kooperationen Gesamt</span>
               <strong style={{ fontSize: '1.4rem', color: '#1e3a8a', fontWeight: 900, fontFamily: 'Urbanist' }}>{totalCoops}</strong>
             </div>
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '0.62rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Aktiv</span>
-              <strong style={{ fontSize: '1.4rem', color: '#14532d', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeCoopsCount}</strong>
+            <div style={{ background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.62rem', color: '#137333', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Aktiv</span>
+              <strong style={{ fontSize: '1.4rem', color: '#137333', fontWeight: 900, fontFamily: 'Urbanist' }}>{activeCoopsCount}</strong>
             </div>
             <div style={{ background: '#feefe3', border: '1px solid #fed7aa', padding: '10px 14px', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{ fontSize: '0.62rem', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'Urbanist' }}>Ausstehend</span>
@@ -5888,7 +5888,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           fontSize: '0.72rem', 
                           fontWeight: 800, 
                           color: c.status === 'active' ? '#34a853' : c.status === 'pending' ? '#b45309' : '#86868b',
-                          background: c.status === 'active' ? '#e2f6ea' : c.status === 'pending' ? '#fffbeb' : '#f5f5f7',
+                          background: c.status === 'active' ? '#e6f4ea' : c.status === 'pending' ? '#fffbeb' : '#f5f5f7',
                           border: 'none',
                           outline: 'none',
                           cursor: 'pointer',
@@ -6791,7 +6791,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
                             {hasCompleted ? (
                               <>
-                                <span style={{ background: '#ecfdf5', color: '#047857', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>✓ Erledigt</span>
+                                <span style={{ background: '#e6f4ea', color: '#137333', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>✓ Erledigt</span>
                                 <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '4px' }}>
                                   {new Date(response.created_at).toLocaleDateString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                                 </div>
@@ -6889,8 +6889,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     padding: '8px 16px', 
                     fontSize: '0.8rem', 
                     fontWeight: 800,
-                    background: copiedStudentId === 'general-onboarding' ? '#ecfdf5' : '#ffffff',
-                    border: copiedStudentId === 'general-onboarding' ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
+                    background: copiedStudentId === 'general-onboarding' ? '#e6f4ea' : '#ffffff',
+                    border: copiedStudentId === 'general-onboarding' ? '1px solid #e6f4ea' : '1px solid #cbd5e1',
                     color: copiedStudentId === 'general-onboarding' ? '#137333' : '#0f172a',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
@@ -6980,8 +6980,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                   return (
                     <div style={{
-                      background: 'rgba(34, 197, 94, 0.03)',
-                      border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                      background: 'rgba(52, 168, 83, 0.03)',
+                      border: '1.5px solid rgba(52, 168, 83, 0.12)',
                       borderRadius: '16px',
                       padding: '12px 16px',
                       display: 'flex',
@@ -6993,7 +6993,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
-                        <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
                           ⚡ Smart Auto-Zuweisung:
                         </span>
                         
@@ -7032,7 +7032,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         </div>
 
                         {/* Arrow */}
-                        <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 900 }}>&rarr;</span>
+                        <span style={{ fontSize: '0.8rem', color: '#137333', fontWeight: 900 }}>&rarr;</span>
 
                         {/* Instrument Pill */}
                         <div style={{
@@ -7069,7 +7069,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         </div>
                       </div>
 
-                      <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                      <span style={{ fontSize: '0.65rem', color: '#137333', fontWeight: 900, background: '#e6f4ea', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
                         Nur Name nötig!
                       </span>
                     </div>
@@ -7504,7 +7504,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             fontSize: '0.75rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            background: student.is_campus_active ? '#e2f6ea' : '#f5f5f7',
+                            background: student.is_campus_active ? '#e6f4ea' : '#f5f5f7',
                             color: student.is_campus_active ? '#34a853' : '#86868b',
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
@@ -7603,7 +7603,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   display: 'inline-block',
                                   padding: '4px 10px',
                                   borderRadius: '20px',
-                                  background: '#e2f6ea',
+                                  background: '#e6f4ea',
                                   color: '#34a853',
                                   fontSize: '0.7rem',
                                   fontWeight: 800,
@@ -10365,9 +10365,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>{b.title || 'Eigennutzung'}</span>
                                 <span style={{
-                                  background: b.status === 'pending' ? '#fff7ed' : '#f0fdf4',
-                                  color: b.status === 'pending' ? '#c2410c' : '#15803d',
-                                  border: b.status === 'pending' ? '1px solid #fed7aa' : '1px solid #bbf7d0',
+                                  background: b.status === 'pending' ? '#fff7ed' : '#e6f4ea',
+                                  color: b.status === 'pending' ? '#c2410c' : '#137333',
+                                  border: b.status === 'pending' ? '1px solid #fed7aa' : '1px solid #e6f4ea',
                                   padding: '2px 8px',
                                   borderRadius: '9999px',
                                   fontSize: '0.64rem',
@@ -10558,8 +10558,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       } else if (oldT === true && newT === false && newC !== false) {
                         detailMsg = 'Probezeit beendet und Account dauerhaft freigeschaltet.';
                         actionIcon = '✅';
-                        actionColor = '#ecfdf5';
-                        actionBorder = '#a7f3d0';
+                        actionColor = '#e6f4ea';
+                        actionBorder = '#e6f4ea';
                       } else if (newC === false && oldC === true) {
                         detailMsg = 'Campus-Zugang wurde deaktiviert.';
                         actionIcon = '🚫';
@@ -10568,8 +10568,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       } else if (newC === true && oldC !== true) {
                         detailMsg = 'Campus-Zugang wurde aktiviert.';
                         actionIcon = '⚡';
-                        actionColor = '#ecfdf5';
-                        actionBorder = '#a7f3d0';
+                        actionColor = '#e6f4ea';
+                        actionBorder = '#e6f4ea';
                       } else {
                         detailMsg = 'Profil-Informationen wurden aktualisiert.';
                       }
@@ -10792,7 +10792,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
         </div>
 
         {/* Profile Info at bottom of sidebar */}
-        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #d1fae5' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '20px' }}>
+        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #e6f4ea' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '20px' }}>
           <div 
             onClick={() => setShowOwnQrModal(true)}
             style={{ 
@@ -10803,7 +10803,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               borderRadius: '16px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#ecfdf5' : (activeTab === 'secretary' ? '#fff1f2' : '#fffbeb')) : 'transparent',
+              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#e6f4ea' : (activeTab === 'secretary' ? '#fff1f2' : '#fffbeb')) : 'transparent',
               marginBottom: '8px'
             }}
           >
@@ -10997,13 +10997,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              background: '#f0fdf4',
+              background: '#e6f4ea',
               padding: '6px 12px',
               borderRadius: '12px',
-              border: '1px solid #bbf7d0',
+              border: '1px solid #e6f4ea',
               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
             }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#137333', textTransform: 'uppercase', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 Datumssimulator (heute):
               </span>
               <input
@@ -11014,7 +11014,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: isSimulatedDateLocked ? '#15803d' : '#166534',
+                  color: isSimulatedDateLocked ? '#137333' : '#137333',
                   fontWeight: 900,
                   fontSize: '0.74rem',
                   outline: 'none',
@@ -11032,14 +11032,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   }}
                   style={{
                     padding: '4px 10px',
-                    background: '#16a34a',
+                    background: '#34a853',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '6px',
                     fontSize: '0.68rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(22,163,74,0.2)'
+                    boxShadow: '0 2px 4px rgba(52,168,83,0.2)'
                   }}
                 >
                   Bestätigen
@@ -11222,15 +11222,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           <div style={{
             background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
               ? '#fef2f2'
-              : (trialDaysRemaining <= 7 ? '#fff7ed' : '#f0fdf4'),
+              : (trialDaysRemaining <= 7 ? '#fff7ed' : '#e6f4ea'),
             borderBottom: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
               ? '1px solid #fee2e2'
-              : (trialDaysRemaining <= 7 ? '1px solid #ffedd5' : '1px solid #dcfce7'),
+              : (trialDaysRemaining <= 7 ? '1px solid #ffedd5' : '1px solid #e6f4ea'),
             padding: '10px 40px',
             fontSize: '0.82rem',
             color: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
               ? '#b91c1c'
-              : (trialDaysRemaining <= 7 ? '#c2410c' : '#15803d'),
+              : (trialDaysRemaining <= 7 ? '#c2410c' : '#137333'),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -11257,7 +11257,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                 style={{
                   background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
                     ? '#dc2626'
-                    : (trialDaysRemaining <= 7 ? '#ea580c' : '#16a34a'),
+                    : (trialDaysRemaining <= 7 ? '#ea580c' : '#34a853'),
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '100px',
@@ -11774,7 +11774,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       <div style={{
                         background: 'rgba(52, 168, 83, 0.04)',
                         border: '1px solid rgba(52, 168, 83, 0.1)',
-                        color: '#065f46',
+                        color: '#137333',
                         borderRadius: '16px',
                         padding: '16px 20px',
                         display: 'flex',
@@ -11944,7 +11944,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <div style={{
                           background: 'rgba(52, 168, 83, 0.04)',
                           border: '1px solid rgba(52, 168, 83, 0.1)',
-                          color: '#065f46',
+                          color: '#137333',
                           borderRadius: '16px',
                           padding: '16px',
                           textAlign: 'center'
@@ -12070,7 +12070,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       <div style={{
                         background: 'rgba(52, 168, 83, 0.04)',
                         border: '1px solid rgba(52, 168, 83, 0.1)',
-                        color: '#065f46',
+                        color: '#137333',
                         borderRadius: '16px',
                         padding: '16px',
                         textAlign: 'center'
@@ -12309,7 +12309,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             {isUploadingAttachment && <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Lädt hoch...</span>}
                           </div>
                           {newEventAttachmentUrl && (
-                            <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.7rem', color: '#34a853', fontWeight: 600 }}>
                               ✓ Datei verknüpft: {newEventAttachmentUrl.substring(newEventAttachmentUrl.lastIndexOf('/') + 1)}
                             </span>
                           )}
@@ -12630,7 +12630,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             const urgencyMeta = {
               RED:    { leftBar: '#ef4444', bg: 'linear-gradient(135deg, rgba(254, 242, 242, 0.75) 0%, rgba(254, 226, 226, 0.45) 100%)', border: 'rgba(239, 68, 68, 0.25)', badge: '#ef4444', badgeText: 'white', badgeLabel: '🚨 Akuter Ausfall', dot: '#ef4444' },
               YELLOW: { leftBar: '#f59e0b', bg: 'linear-gradient(135deg, rgba(255, 251, 235, 0.75) 0%, rgba(254, 243, 199, 0.45) 100%)', border: 'rgba(245, 158, 11, 0.25)', badge: '#f59e0b', badgeText: 'white', badgeLabel: '⏳ Ausstehend', dot: '#f59e0b' },
-              GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(240, 253, 244, 0.75) 0%, rgba(220, 252, 231, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#34a853' },
+              GREEN:  { leftBar: '#34a853', bg: 'linear-gradient(135deg, rgba(230, 244, 234, 0.75) 0%, rgba(230, 244, 234, 0.45) 100%)', border: 'rgba(52, 168, 83, 0.25)', badge: '#34a853', badgeText: 'white', badgeLabel: '✓ Informiert', dot: '#34a853' },
             };
             const m = urgencyMeta[urgency] || urgencyMeta['GREEN'];
 
@@ -13074,7 +13074,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     {pendingCount > 0 ? `${pendingCount} Ausstehend` : 'Alle informiert'}
                                   </span>
                                   {doneCount > 0 && (
-                                    <span style={{ fontSize: '0.78rem', background: '#dcfce7', color: '#15803d', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
+                                    <span style={{ fontSize: '0.78rem', background: '#e6f4ea', color: '#137333', padding: '4px 12px', borderRadius: '100px', fontWeight: 800 }}>
                                       {doneCount} Erledigt
                                     </span>
                                   )}
@@ -13191,8 +13191,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </span>
                                   {(() => {
                                     const successRate = total > 0 ? Math.round((successCount / total) * 100) : 100;
-                                    const rateBg = successRate >= 80 ? '#d1fae5' : successRate >= 50 ? '#fef3c7' : '#fee2e2';
-                                    const rateColor = successRate >= 80 ? '#065f46' : successRate >= 50 ? '#92400e' : '#991b1b';
+                                    const rateBg = successRate >= 80 ? '#e6f4ea' : successRate >= 50 ? '#fef3c7' : '#fee2e2';
+                                    const rateColor = successRate >= 80 ? '#137333' : successRate >= 50 ? '#92400e' : '#991b1b';
                                     return (
                                       <span style={{ fontSize: '0.78rem', background: rateBg, color: rateColor, padding: '4px 10px', borderRadius: '100px', fontWeight: 900 }}>
                                         {successRate}% Erfolgsquote
@@ -13240,8 +13240,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'space-between',
-                                          background: isSuccess ? '#f0fdf4' : '#fef2f2',
-                                          border: `1px solid ${isSuccess ? '#bbf7d0' : '#fca5a5'}`,
+                                          background: isSuccess ? '#e6f4ea' : '#fef2f2',
+                                          border: `1px solid ${isSuccess ? '#e6f4ea' : '#fca5a5'}`,
                                           borderRadius: '12px',
                                           padding: '10px 14px'
                                         }}
@@ -13257,8 +13257,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         <span style={{
                                           fontSize: '0.72rem',
                                           fontWeight: 800,
-                                          color: isSuccess ? '#16a34a' : '#dc2626',
-                                          background: isSuccess ? '#dcfce7' : '#fee2e2',
+                                          color: isSuccess ? '#34a853' : '#dc2626',
+                                          background: isSuccess ? '#e6f4ea' : '#fee2e2',
                                           padding: '4px 10px',
                                           borderRadius: '100px'
                                         }}>
@@ -13302,11 +13302,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       <div style={{
                         background: sickTeachers.length === 0 ? '#e6f4ea' : '#fee2e2',
                         borderRadius: '12px', padding: '8px',
-                        border: sickTeachers.length === 0 ? '1px solid #bbf7d0' : '1px solid #fca5a5',
+                        border: sickTeachers.length === 0 ? '1px solid #e6f4ea' : '1px solid #fca5a5',
                         display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}>
                         {sickTeachers.length === 0 ? (
-                          <UserCheck size={16} color="#16a34a" />
+                          <UserCheck size={16} color="#34a853" />
                         ) : (
                           <UserX size={16} color="#ef4444" />
                         )}
@@ -13324,7 +13324,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                     {sickTeachers.length === 0 ? (
                       <div style={{ textAlign: 'center', padding: '24px 0' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                          <CheckCircle size={32} color="#16a34a" />
+                          <CheckCircle size={32} color="#34a853" />
                         </div>
                         <p style={{ margin: 0, fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 700 }}>Alle Lehrkräfte aktiv im Dienst</p>
                       </div>
@@ -13436,7 +13436,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       {[
                         { icon: <AlertCircle size={14} color="#ef4444" />, title: 'Rot (Akut)', text: 'Ausfall in unter 2 Std. — Telefonischer Sofort-Kontakt dringend empfohlen!', bg: '#fee2e2' },
                         { icon: <Clock size={14} color="#f59e0b" />, title: 'Gelb (Offen)', text: 'Schüler wurde digital benachrichtigt. Rückmeldung steht noch aus.', bg: '#fef3c7' },
-                        { icon: <CheckCircle size={14} color="#34a853" />, title: 'Grün (Erledigt)', text: 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).', bg: '#dcfce7' },
+                        { icon: <CheckCircle size={14} color="#34a853" />, title: 'Grün (Erledigt)', text: 'Schüler wurde erfolgreich informiert (Kenntnisnahme bestätigt oder manuell gemeldet).', bg: '#e6f4ea' },
                       ].map((item) => (
                         <div key={item.title} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                           <div style={{ background: item.bg, borderRadius: '8px', padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
@@ -13935,7 +13935,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               <span style={{
                                 padding: '5px 12px',
                                 borderRadius: '10px',
-                                background: isActive ? '#e2f6ea' : '#f5f5f7',
+                                background: isActive ? '#e6f4ea' : '#f5f5f7',
                                 color: isActive ? '#34a853' : '#86868b',
                                 fontSize: '0.74rem',
                                 fontWeight: 700,
@@ -14703,8 +14703,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         value: `${activeTeachersCount} Aktiv`,
                         details: `${pendingTeachersCount} im Onboarding/Bypass`,
                         icon: GraduationCap,
-                        iconBg: '#f0fdf4',
-                        iconColor: '#15803d',
+                        iconBg: '#e6f4ea',
+                        iconColor: '#137333',
                       },
                       {
                         id: 'students',
@@ -14731,7 +14731,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         details: 'Konfigurierte Unterrichtsräume',
                         icon: DoorOpen,
                         iconBg: '#f0fdfa',
-                        iconColor: '#0d9488',
+                        iconColor: '#137333',
                       },
                       enabledCampusEvents && {
                         id: 'events',
@@ -14748,8 +14748,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         value: `${pendingSchedules.length} Review`,
                         details: pendingSchedules.length > 0 ? 'Dringende Freigaben ausstehend' : 'Alle Stundenpläne freigegeben',
                         icon: Calendar,
-                        iconBg: pendingSchedules.length > 0 ? '#fef2f2' : '#f0fdf4',
-                        iconColor: pendingSchedules.length > 0 ? '#991b1b' : '#15803d',
+                        iconBg: pendingSchedules.length > 0 ? '#fef2f2' : '#e6f4ea',
+                        iconColor: pendingSchedules.length > 0 ? '#991b1b' : '#137333',
                         badge: pendingSchedules.length > 0 ? pendingSchedules.length : undefined,
                       },
                       {
@@ -14956,12 +14956,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             padding: '8px 16px', 
                             fontSize: '0.8rem', 
                             fontWeight: 800,
-                            background: '#22c55e',
+                            background: '#34a853',
                             color: '#ffffff',
                             border: 'none',
                             cursor: 'pointer',
                             fontFamily: 'Urbanist',
-                            boxShadow: '0 4px 10px rgba(34,197,94,0.15)',
+                            boxShadow: '0 4px 10px rgba(52,168,83,0.15)',
                             transition: 'all 0.2s'
                           }}
                         >
@@ -14988,8 +14988,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                           return (
                             <div style={{
-                              background: 'rgba(34, 197, 94, 0.03)',
-                              border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                              background: 'rgba(52, 168, 83, 0.03)',
+                              border: '1.5px solid rgba(52, 168, 83, 0.12)',
                               borderRadius: '16px',
                               padding: '12px 16px',
                               display: 'flex',
@@ -15001,8 +15001,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
-                                <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
-                                  <Zap size={14} style={{ marginRight: '6px', verticalAlign: 'middle', fill: '#166534' }} /> Smart Auto-Zuweisung:
+                                <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                                  <Zap size={14} style={{ marginRight: '6px', verticalAlign: 'middle', fill: '#137333' }} /> Smart Auto-Zuweisung:
                                 </span>
 
                                 {/* Instrument Pill */}
@@ -15040,7 +15040,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 </div>
                               </div>
                               
-                              <span style={{ fontSize: '0.65rem', color: '#15803d', fontWeight: 900, background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
+                              <span style={{ fontSize: '0.65rem', color: '#137333', fontWeight: 900, background: '#e6f4ea', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
                                 Hauptinstrument wird automatisch verknüpft!
                               </span>
                             </div>
@@ -15161,9 +15161,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           transform: scale(1.05);
                         }
                         .status-toggle-btn.campus-active {
-                          background: #e2f6ea;
+                          background: #e6f4ea;
                           color: #34a853;
-                          box-shadow: 0 2px 8px rgba(34,197,94,0.12);
+                          box-shadow: 0 2px 8px rgba(52,168,83,0.12);
                         }
                         .status-toggle-btn.campus-active:hover {
                           background: #d1f2dd !important;
@@ -15838,9 +15838,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         );
 
                                         // Beautiful pastel coloring replaced with uniform green
-                                        const themeBg = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
+                                        const themeBg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                                         const themeBorder = '#34a853';
-                                        const themeText = '#065f46';
+                                        const themeText = '#137333';
 
                                         return (
                                           <div
@@ -16131,7 +16131,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
                                             
                                             // Dynamic instrument-based pastel coloring replaced with uniform green
-                                            const themeBg = 'rgba(220, 252, 231, 0.45)'; // default green
+                                            const themeBg = 'rgba(230, 244, 234, 0.45)'; // default green
                                             let themeBorder = '1px solid #e2e8f0';
                                             const themeBorderLeft = '4px solid #34a853';
                                             const themeText = '#0f172a';
@@ -16523,7 +16523,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                   {/* Header Title & Subtitle */}
                   <div style={{ padding: '0 8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(52, 199, 89, 0.12)', color: '#249d3d', padding: '4px 10px', borderRadius: '100px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', padding: '4px 10px', borderRadius: '100px' }}>
                         Campus Customizer
                       </span>
                     </div>
@@ -16842,19 +16842,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isHovered 
-                                ? '2px dashed #22c55e' 
+                                ? '2px dashed #34a853' 
                                 : isActive 
-                                  ? '1.5px solid #22c55e' 
+                                  ? '1.5px solid #34a853' 
                                   : '1.5px solid #cbd5e1',
                               background: isHovered 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : isActive 
-                                  ? '#f0fdf4' 
+                                  ? '#e6f4ea' 
                                   : '#ffffff',
                               cursor: 'pointer',
                               transform: isHovered ? 'scale(1.02)' : 'scale(1)',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                              boxShadow: isActive ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -16886,8 +16886,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isActive ? '#d1fae5' : '#f1f5f9',
-                              color: isActive ? '#065f46' : '#64748b',
+                              background: isActive ? '#e6f4ea' : '#f1f5f9',
+                              color: isActive ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist',
@@ -16930,14 +16930,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isHovered 
-                                ? '2px dashed #22c55e' 
+                                ? '2px dashed #34a853' 
                                 : isActive 
-                                  ? '1.5px solid #22c55e' 
+                                  ? '1.5px solid #34a853' 
                                   : '1.5px solid #f1f5f9',
                               background: isHovered 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : isActive 
-                                  ? '#f0fdf4' 
+                                  ? '#e6f4ea' 
                                   : '#ffffff',
                               cursor: 'pointer',
                               transform: isHovered ? 'scale(1.02)' : 'scale(1)',
@@ -16971,8 +16971,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isActive ? '#d1fae5' : '#f1f5f9',
-                              color: isActive ? '#065f46' : '#64748b',
+                              background: isActive ? '#e6f4ea' : '#f1f5f9',
+                              color: isActive ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist',
@@ -17041,14 +17041,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isActive 
-                                ? '1.5px solid #22c55e' 
+                                ? '1.5px solid #34a853' 
                                 : '1.5px solid #f1f5f9',
                               background: isActive 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : '#ffffff',
                               cursor: 'pointer',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                              boxShadow: isActive ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -17056,7 +17056,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 width: '36px',
                                 height: '36px',
                                 borderRadius: '50%',
-                                background: '#e2f6ea',
+                                background: '#e6f4ea',
                                 color: '#34a853',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -17078,8 +17078,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isActive ? '#d1fae5' : '#f1f5f9',
-                              color: isActive ? '#065f46' : '#64748b',
+                              background: isActive ? '#e6f4ea' : '#f1f5f9',
+                              color: isActive ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist',
@@ -17216,14 +17216,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isHovered 
-                                ? '2px dashed #22c55e' 
+                                ? '2px dashed #34a853' 
                                 : isSelected 
-                                  ? '1.5px solid #22c55e' 
+                                  ? '1.5px solid #34a853' 
                                   : '1.5px solid #f1f5f9',
                               background: isHovered 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : isSelected 
-                                  ? '#f0fdf4' 
+                                  ? '#e6f4ea' 
                                   : '#ffffff',
                               cursor: 'pointer',
                               transform: isHovered ? 'scale(1.02)' : 'scale(1)',
@@ -17260,8 +17260,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isSelected ? '#d1fae5' : '#f1f5f9',
-                              color: isSelected ? '#065f46' : '#64748b',
+                              background: isSelected ? '#e6f4ea' : '#f1f5f9',
+                              color: isSelected ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist',
@@ -17327,7 +17327,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               alignItems: 'center',
                               gap: '4px'
                             }}>
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }}></span>
                               {item.value}
                             </span>
                           </div>
@@ -17398,14 +17398,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isActive 
-                                ? '1.5px solid #22c55e' 
+                                ? '1.5px solid #34a853' 
                                 : '1.5px solid #f1f5f9',
                               background: isActive 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : '#ffffff',
                               cursor: 'pointer',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                              boxShadow: isActive ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
                             }}
                             className="hover-scale-mini"
                           >
@@ -17437,8 +17437,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isActive ? '#d1fae5' : '#f1f5f9',
-                              color: isActive ? '#065f46' : '#64748b',
+                              background: isActive ? '#e6f4ea' : '#f1f5f9',
+                              color: isActive ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist'
@@ -17466,14 +17466,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isActive 
-                                ? '1.5px solid #22c55e' 
+                                ? '1.5px solid #34a853' 
                                 : '1.5px solid #f1f5f9',
                               background: isActive 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : '#ffffff',
                               cursor: 'pointer',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                              boxShadow: isActive ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
                             }}
                             className="hover-scale-mini"
                           >
@@ -17505,8 +17505,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isActive ? '#d1fae5' : '#f1f5f9',
-                              color: isActive ? '#065f46' : '#64748b',
+                              background: isActive ? '#e6f4ea' : '#f1f5f9',
+                              color: isActive ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist'
@@ -17540,14 +17540,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isSelected 
-                                ? '1.5px solid #22c55e' 
+                                ? '1.5px solid #34a853' 
                                 : '1.5px solid #f1f5f9',
                               background: isSelected 
-                                ? '#f0fdf4' 
+                                ? '#e6f4ea' 
                                 : '#ffffff',
                               cursor: 'pointer',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isSelected ? '0 4px 12px rgba(34,197,150,0.06)' : 'none'
+                              boxShadow: isSelected ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
                             }}
                             className="hover-scale-mini"
                           >
@@ -17588,8 +17588,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '10px',
-                              background: isSelected ? '#d1fae5' : '#f1f5f9',
-                              color: isSelected ? '#065f46' : '#64748b',
+                              background: isSelected ? '#e6f4ea' : '#f1f5f9',
+                              color: isSelected ? '#137333' : '#64748b',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               fontFamily: 'Urbanist',
@@ -18110,7 +18110,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   width: '24px',
                                   height: '24px',
                                   borderRadius: '50%',
-                                  background: hasUnassigned ? 'rgba(255, 149, 0, 0.1)' : 'rgba(52, 199, 89, 0.1)',
+                                  background: hasUnassigned ? 'rgba(255, 149, 0, 0.1)' : 'rgba(52, 168, 83, 0.1)',
                                   color: hasUnassigned ? '#ff9500' : '#34c759'
                                 }}>
                                   <Calendar size={13} />
@@ -18145,7 +18145,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               width: '24px',
                               height: '24px',
                               borderRadius: '50%',
-                              background: 'rgba(52, 199, 89, 0.1)',
+                              background: 'rgba(52, 168, 83, 0.1)',
                               color: '#34c759'
                             }}>
                               <CheckCircle size={13} />
@@ -19949,7 +19949,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
               </h3>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span>Verwalte deine aktiven Module und buche zusätzliche Schülerzugänge.</span>
-                <span style={{ fontSize: '0.74rem', color: '#15803d', background: '#d1fae5', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '0.74rem', color: '#137333', background: '#e6f4ea', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   🔒 100% DSGVO-konform auf deutschen Servern
                 </span>
               </p>
@@ -20063,7 +20063,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           {checkoutStep === 1 && (
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 1 von 4</span>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 1 von 4</span>
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Welche Module möchtest du buchen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Wähle die gewünschten Bereiche für deine Musikschule aus. Server- &amp; Service-Bereitstellungskosten fallen nur für Team-Profile und gebuchte Schüler an.
@@ -20141,7 +20141,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
                                     <span style={{ fontWeight: 900, color: '#1e293b' }}>7,99 € <span style={{ fontWeight: 400, color: '#64748b' }}>/ Mo.</span></span>
-                                    <span style={{ color: hasCampusSub ? '#047857' : '#94a3b8', fontWeight: 800 }}>{hasCampusSub ? 'Aktiviert' : 'Bereit'}</span>
+                                    <span style={{ color: hasCampusSub ? '#137333' : '#94a3b8', fontWeight: 800 }}>{hasCampusSub ? 'Aktiviert' : 'Bereit'}</span>
                                   </div>
                                 </div>
 
@@ -20237,7 +20237,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           {checkoutStep === 2 && (
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 2 von 4</span>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 2 von 4</span>
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Wer trägt die Kosten für die Schüleraktivierungen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Die Abrechnung läuft grundsätzlich über die Musikschule. Entscheide hier, wer die Kosten für die Schüleraktivierungen übernimmt.
@@ -20356,7 +20356,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                               {billingPayer === 'school' && (
                                 <div style={{
-                                  background: '#f0fdf4',
+                                  background: '#e6f4ea',
                                   border: '1.5px solid #34a853',
                                   borderRadius: '20px',
                                   padding: '20px',
@@ -20365,7 +20365,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   flexDirection: 'column',
                                   gap: '12px'
                                 }}>
-                                  <strong style={{ fontSize: '0.82rem', color: '#065f46', fontFamily: 'Urbanist' }}>
+                                  <strong style={{ fontSize: '0.82rem', color: '#137333', fontFamily: 'Urbanist' }}>
                                     Abrechnungsmodell für Schüler-Aktivierungen wählen:
                                   </strong>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -20424,7 +20424,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          2. Jahresbeitrag bei Aktivierung <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>10% Rabatt</span>
+                                          2. Jahresbeitrag bei Aktivierung <span style={{ background: '#e6f4ea', color: '#137333', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>10% Rabatt</span>
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
                                           Der Grundpreis bleibt gleich. Aktivierungen werden als Jahresbeitrag in einer separaten monatlichen Rechnung voll abgerechnet (inkl. 10% Rabatt).
@@ -20455,7 +20455,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          3. Einmalige Komplett-Aktivierung zum Schuljahresstart <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>20% Rabatt</span>
+                                          3. Einmalige Komplett-Aktivierung zum Schuljahresstart <span style={{ background: '#e6f4ea', color: '#137333', fontSize: '0.6rem', padding: '1px 6px', borderRadius: '100px', fontWeight: 800 }}>20% Rabatt</span>
                                         </span>
                                         <span style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.3' }}>
                                           Der Grundpreis bleibt monatlich gleich. Zum Schuljahresstart aktiviert die Schule alle Schüler. Einmalig für das komplette Schuljahr für alle Schüler eine separate Aktivierungsrechnung (inkl. 20% Rabatt).
@@ -20610,7 +20610,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                           {checkoutStep === 3 && (
                             <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                               <div>
-                                <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 3 von 4</span>
+                                <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 3 von 4</span>
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Rechnungsadresse für Schüler-Aktivierungen</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Gib an, wohin die Rechnungen für die Schüler-Aktivierungen gesendet werden sollen.
@@ -20828,7 +20828,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             return (
                               <div className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                                 <div>
-                                  <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 4</span>
+                                  <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '4px 10px', borderRadius: '100px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schritt 4 von 4</span>
                                   <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Bestätige deine Buchung</h4>
                                   <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                     Die Abrechnung wird aus Transparenzgründen in zwei separate Ströme aufgeteilt. Bitte überprüfe die beiden Rechnungsvorschauen.
@@ -20840,15 +20840,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                   <div style={{
                                     border: '1.5px solid #34a853',
                                     borderRadius: '16px',
-                                    background: '#f0fdf4',
+                                    background: '#e6f4ea',
                                     padding: '16px',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '10px'
                                   }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #d1fae5', paddingBottom: '6px' }}>
-                                      <strong style={{ fontSize: '0.78rem', color: '#065f46' }}>RECHNUNG A: System &amp; Infrastruktur (Fixkosten)</strong>
-                                      <span style={{ fontSize: '0.62rem', color: '#047857', background: '#d1fae5', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>14 Tage Zahlungsziel</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e6f4ea', paddingBottom: '6px' }}>
+                                      <strong style={{ fontSize: '0.78rem', color: '#137333' }}>RECHNUNG A: System &amp; Infrastruktur (Fixkosten)</strong>
+                                      <span style={{ fontSize: '0.62rem', color: '#137333', background: '#e6f4ea', padding: '2px 8px', borderRadius: '100px', fontWeight: 700 }}>14 Tage Zahlungsziel</span>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.7rem', color: '#374151' }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -20868,12 +20868,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         <strong>{(passiveStudentCost).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                       </div>
                                     </div>
-                                    <div style={{ borderTop: '1px dotted #34a853', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#065f46' }}>
+                                    <div style={{ borderTop: '1px dotted #34a853', paddingTop: '8px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#137333' }}>
                                       <span>Monatlicher Betrag (Rechnung A):</span>
                                       <strong>{finalInvoiceA_monthly.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                     </div>
                                     {hasCustomBillingAddress && billingPayer !== 'student' && (
-                                      <div style={{ fontSize: '0.62rem', color: '#047857', borderTop: '1px solid #d1fae5', paddingTop: '6px', marginTop: '4px' }}>
+                                      <div style={{ fontSize: '0.62rem', color: '#137333', borderTop: '1px solid #e6f4ea', paddingTop: '6px', marginTop: '4px' }}>
                                         📍 Rechnungsadresse: {customBillingName}, {customBillingStreet}, {customBillingZip} {customBillingCity}
                                       </div>
                                     )}
@@ -21148,12 +21148,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               <span style={{ fontSize: '0.62rem', color: '#6b21a8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BESTELL-ZUSAMMENFASSUNG</span>
                             {activeStudentsCount_global > 0 && billingPayer === 'student' && studentBillingOption === 'student_full' && (
                               <div style={{
-                                background: '#f0fdf4',
+                                background: '#e6f4ea',
                                 border: '1px solid #34a853',
                                 borderRadius: '12px',
                                 padding: '10px 12px',
                                 fontSize: '0.7rem',
-                                color: '#15803d',
+                                color: '#137333',
                                 fontWeight: 700,
                                 margin: '8px 0',
                                 display: 'flex',
@@ -21234,7 +21234,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 </strong>
                               </div>
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#137333', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                 <span style={{ fontWeight: 900 }}>Monatliche Rate:</span>
                                 <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>
                                   {isStarterFlat ? '69,00 € / Mo.' : (checkoutStep >= 2 ? `${mixedTotal.toFixed(2).replace('.', ',')} € / Mo.` : `${baseB2B.toFixed(2).replace('.', ',')} € / Mo.`)}
@@ -21310,7 +21310,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             width: '72px',
                             height: '72px',
                             borderRadius: '50%',
-                            background: '#d1fae5',
+                            background: '#e6f4ea',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -21358,19 +21358,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                         <div style={{
                           background: isCancelled 
                             ? 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)' 
-                            : 'linear-gradient(90deg, #f0fdf4 0%, #dcfce7 100%)',
-                          border: isCancelled ? '1px solid #fde68a' : '1px solid #bbf7d0',
+                            : 'linear-gradient(90deg, #e6f4ea 0%, #e6f4ea 100%)',
+                          border: isCancelled ? '1px solid #fde68a' : '1px solid #e6f4ea',
                           borderRadius: '20px',
                           padding: '20px 24px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '16px',
-                          boxShadow: '0 4px 16px rgba(22, 163, 74, 0.04)'
+                          boxShadow: '0 4px 16px rgba(52, 168, 83, 0.04)'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
                             <div style={{ 
-                              background: isCancelled ? '#d97706' : '#16a34a', 
+                              background: isCancelled ? '#d97706' : '#34a853', 
                               color: '#ffffff', 
                               width: '38px', 
                               height: '38px', 
@@ -21382,12 +21382,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                               fontWeight: 900 
                             }}>{isCancelled ? '!' : '✓'}</div>
                             <div>
-                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: isCancelled ? '#78350f' : '#14532d', fontFamily: 'Urbanist' }}>
+                              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: isCancelled ? '#78350f' : '#137333', fontFamily: 'Urbanist' }}>
                                 {isCancelled 
                                   ? 'Abonnement gekündigt zum 31.08.2026' 
                                   : 'Abrechnungssystem für das Schuljahr 2026/2027 aktiv'}
                               </h4>
-                              <span style={{ fontSize: '0.74rem', color: isCancelled ? '#b45309' : '#15803d', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.74rem', color: isCancelled ? '#b45309' : '#137333', fontWeight: 600 }}>
                                 {isCancelled 
                                   ? 'Dein Zugang bleibt bis zum Ende des Schuljahres am 31. August 2026 aktiv. Es erfolgen danach keine weiteren Abbuchungen.'
                                   : 'Alle Module und gewählten Abrechnungsarten sind verbindlich eingerichtet und aktiv gebucht.'}
@@ -21432,7 +21432,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                 }}
                                 className="hover-scale"
                                 style={{
-                                  background: '#16a34a',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '10px',
@@ -21555,7 +21555,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Aktive Module &amp; Status</h4>
                                       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
                                         {hasCampusSub && (
-                                          <span style={{ fontSize: '0.74rem', background: '#d1fae5', color: '#065f46', padding: '6px 12px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                          <span style={{ fontSize: '0.74rem', background: '#e6f4ea', color: '#137333', padding: '6px 12px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                             Campus Aktiv
                                           </span>
@@ -21610,7 +21610,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       {/* Savings Display */}
                                       {(billingPayer === 'student' || studentBillingOption === 'cash') && (
                                         <div style={{
-                                          background: 'linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%)',
+                                          background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
                                           border: '1px solid #34a853',
                                           borderRadius: '16px',
                                           padding: '14px 16px',
@@ -21621,8 +21621,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                           gap: '6px'
                                         }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <TrendingDown size={18} style={{ color: '#065f46', verticalAlign: 'middle', marginRight: '6px' }} />
-                                            <strong style={{ fontSize: '0.8rem', color: '#065f46' }}>Kostenersparnis durch aktive Profile</strong>
+                                            <TrendingDown size={18} style={{ color: '#137333', verticalAlign: 'middle', marginRight: '6px' }} />
+                                            <strong style={{ fontSize: '0.8rem', color: '#137333' }}>Kostenersparnis durch aktive Profile</strong>
                                           </div>
                                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '4px' }}>
                                             <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', border: '1px solid rgba(52,168,83,0.15)' }}>
@@ -21638,7 +21638,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               </strong>
                                             </div>
                                           </div>
-                                          <span style={{ fontSize: '0.62rem', color: '#047857', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
+                                          <span style={{ fontSize: '0.62rem', color: '#137333', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
                                             {(billingPayer === 'student' || studentBillingOption === 'cash') 
                                               ? '* Basierend darauf, dass aktive Schüler-Gebühren (0,49 €/Monat) direkt von den Eltern getragen werden.' 
                                               : '* Durch Verrechnung der passiven Infrastrukturgebühr (0,09 €) bei aktiven Schülerprofilen.'
@@ -21652,7 +21652,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                         display: 'flex',
                                         gap: '12px',
                                         alignItems: 'flex-start',
-                                        background: '#f0fdf4',
+                                        background: '#e6f4ea',
                                         border: '1.5px dashed #34a853',
                                         borderRadius: '16px',
                                         padding: '16px'
@@ -21715,7 +21715,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                   <span>Server &amp; Service Gebühren Groovelab:</span>
                                                   <strong>4,99 € / Mo.</strong>
                                                 </div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: 'bold' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#34a853', fontWeight: 'bold' }}>
                                                   <span>Kombi-Rabatt (Campus + Groovelab):</span>
                                                   <strong>-2,99 € / Mo.</strong>
                                                 </div>
@@ -21766,7 +21766,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               </div>
                                             )}
 
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#15803d', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#137333', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                               <span style={{ fontWeight: 900 }}>Gesamtrate:</span>
                                               <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>{totalMonthlySim.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
@@ -21983,15 +21983,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                               alignItems: 'center', 
                                               fontSize: '0.74rem', 
                                               padding: '8px 10px', 
-                                              background: isPaid ? '#f0fdf4' : '#ffffff', 
+                                              background: isPaid ? '#e6f4ea' : '#ffffff', 
                                               borderRadius: '10px', 
-                                              border: isPaid ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                              border: isPaid ? '1px solid #e6f4ea' : '1px solid #e2e8f0',
                                               boxShadow: '0 2px 6px rgba(0,0,0,0.01)',
                                               transition: 'all 0.2s'
                                             }}
                                           >
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                              <strong style={{ color: isPaid ? '#166534' : '#0f172a', textDecoration: isPaid ? 'line-through' : 'none' }}>
+                                              <strong style={{ color: isPaid ? '#137333' : '#0f172a', textDecoration: isPaid ? 'line-through' : 'none' }}>
                                                 {s.first_name} {s.last_name}
                                               </strong>
                                               <span style={{ color: '#64748b', fontSize: '0.68rem' }}>{s.instrument || 'Allgemein'}</span>
@@ -22018,9 +22018,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                                     alert("Fehler beim Speichern des Status: " + err.message);
                                                   }
                                                 }}
-                                                style={{ width: '14px', height: '14px', accentColor: '#16a34a', cursor: 'pointer' }}
+                                                style={{ width: '14px', height: '14px', accentColor: '#34a853', cursor: 'pointer' }}
                                               />
-                                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isPaid ? '#166534' : '#475569' }}>
+                                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isPaid ? '#137333' : '#475569' }}>
                                                 {isPaid ? 'Bezahlt' : 'Ausstehend'}
                                               </span>
                                             </label>
@@ -22304,15 +22304,15 @@ status: status,
                                                  </span>
                                               </div>
                                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', fontSize: '0.74rem' }}>
-                                                <div style={{ color: inv.type === 'INF' ? '#0369a1' : '#16a34a', fontWeight: 800 }}>
+                                                <div style={{ color: inv.type === 'INF' ? '#0369a1' : '#34a853', fontWeight: 800 }}>
                                                   Betrag: {inv.amount.toFixed(2).replace('.', ',')} €
                                                 </div>
                                                 {inv.type === 'AKT' && (
                                                    <div style={{ 
                                                      fontSize: '0.58rem', 
-                                                     color: billingPayer === 'student' ? '#16a34a' : '#ea580c', 
-                                                     background: billingPayer === 'student' ? '#d1fae5' : '#ffedd5', 
-                                                     border: billingPayer === 'student' ? '1px solid #bbf7d0' : '1px solid #fed7aa',
+                                                     color: billingPayer === 'student' ? '#34a853' : '#ea580c', 
+                                                     background: billingPayer === 'student' ? '#e6f4ea' : '#ffedd5', 
+                                                     border: billingPayer === 'student' ? '1px solid #e6f4ea' : '1px solid #fed7aa',
                                                      padding: '4px 8px', 
                                                      borderRadius: '6px', 
                                                      fontWeight: 800 
@@ -22323,8 +22323,8 @@ status: status,
                                               </div>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <span style={{ 
-                                                  background: inv.status === 'Versendet' ? '#d1fae5' : inv.status === 'Bezahlt' ? '#e0f2fe' : '#fef3c7', 
-                                                  color: inv.status === 'Versendet' ? '#065f46' : inv.status === 'Bezahlt' ? '#0369a1' : '#d97706', 
+                                                  background: inv.status === 'Versendet' ? '#e6f4ea' : inv.status === 'Bezahlt' ? '#e0f2fe' : '#fef3c7', 
+                                                  color: inv.status === 'Versendet' ? '#137333' : inv.status === 'Bezahlt' ? '#0369a1' : '#d97706', 
                                                   fontSize: '0.62rem', 
                                                   padding: '6px 14px', 
                                                   borderRadius: '100px', 
@@ -22579,8 +22579,8 @@ status: status,
                       {/* smarte-auto-zuweisung indicator */}
                       {((roomFilterFloor && roomFilterFloor !== 'All') || (selectedBuildingId && selectedBuildingId !== 'All')) && (
                         <div style={{
-                          background: 'rgba(34, 197, 94, 0.03)',
-                          border: '1.5px solid rgba(34, 197, 94, 0.12)',
+                          background: 'rgba(52, 168, 83, 0.03)',
+                          border: '1.5px solid rgba(52, 168, 83, 0.12)',
                           borderRadius: '16px',
                           padding: '12px 16px',
                           display: 'flex',
@@ -22590,7 +22590,7 @@ status: status,
                           marginBottom: '2px',
                           flexWrap: 'wrap'
                         }}>
-                          <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
+                          <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
                             ⚡ smarte-auto-zuweisung:
                           </span>
                           
@@ -22974,7 +22974,7 @@ status: status,
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                               🏢
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -23572,7 +23572,7 @@ status: status,
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e2f6ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                                   🏢
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -24992,8 +24992,8 @@ status: status,
                         padding: '12px 14px', 
                         borderRadius: '12px', 
                         cursor: 'pointer', 
-                        background: isSelected ? '#fce8e6' : isDragOver ? '#f0fdf4' : '#f8fafc',
-                        border: isSelected ? '1.5px solid #ea4335' : isDragOver ? '2px dashed #22c55e' : '1px solid #f1f5f9',
+                        background: isSelected ? '#fce8e6' : isDragOver ? '#e6f4ea' : '#f8fafc',
+                        border: isSelected ? '1.5px solid #ea4335' : isDragOver ? '2px dashed #34a853' : '1px solid #f1f5f9',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '4px',
@@ -26035,14 +26035,14 @@ status: status,
               <div>
                 {/* Students KPI Card */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%)',
-                  border: '1px solid #bbf7d0',
+                  background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
+                  border: '1px solid #e6f4ea',
                   padding: '16px',
                   borderRadius: '16px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
                 }}>
-                  <span style={{ fontSize: '0.68rem', color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
-                  <strong style={{ display: 'block', fontSize: '1.45rem', color: '#14532d', marginTop: '4px', fontWeight: 900 }}>{manageTeacher.studentCount || 0}</strong>
+                  <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
+                  <strong style={{ display: 'block', fontSize: '1.45rem', color: '#137333', marginTop: '4px', fontWeight: 900 }}>{manageTeacher.studentCount || 0}</strong>
                 </div>
               </div>
 
@@ -26455,7 +26455,7 @@ status: status,
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{opt.title}</strong>
-                        {isCurrentActive && <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>Aktuell aktiv</span>}
+                        {isCurrentActive && <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '2px 6px', borderRadius: '4px', fontWeight: 800 }}>Aktuell aktiv</span>}
                       </div>
                       <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginTop: '2px' }}>{opt.desc}</span>
                     </div>
@@ -26590,7 +26590,7 @@ status: status,
                         <span style={{ fontSize: '0.68rem', color: '#64748b' }}>{email}</span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.62rem', background: '#d1fae5', color: '#065f46', padding: '4px 8px', borderRadius: '100px', fontWeight: 800, display: 'inline-block' }}>
+                        <span style={{ fontSize: '0.62rem', background: '#e6f4ea', color: '#137333', padding: '4px 8px', borderRadius: '100px', fontWeight: 800, display: 'inline-block' }}>
                           Aktiv seit: {dateStr}
                         </span>
                       </div>
@@ -26812,7 +26812,7 @@ status: status,
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
                 <FileText size={28} />
               </div>
               <div>

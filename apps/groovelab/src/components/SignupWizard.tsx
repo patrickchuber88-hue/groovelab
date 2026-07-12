@@ -70,7 +70,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const [subdomain, setSubdomain] = useState('');
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
   const [checkingSubdomain, setCheckingSubdomain] = useState(false);
-  const primaryColor = '#16a34a';
+  const primaryColor = '#34a853';
   const [street, setStreet] = useState('');
   const [houseNumber, setHouseNumber] = useState('');
   const [zipCode, setZipCode] = useState('');
@@ -344,7 +344,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
       logoText: "Campus-Groovelab",
       foregroundColor: "rgb(255, 255, 255)",
       backgroundColor: "rgb(10, 54, 28)",
-      labelColor: "rgb(167, 243, 208)",
+      labelColor: "rgb(230, 244, 234)",
       studentName: `${createdUser.first_name} ${createdUser.last_name}`,
       instrument: "Administrator / Schulleitung",
       qrToken: createdUser.qr_token
@@ -414,7 +414,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
-      background: 'radial-gradient(circle at 50% 50%, #064e3b 0%, #022c22 100%)',
+      background: 'radial-gradient(circle at 50% 50%, #137333 0%, #022c22 100%)',
       color: '#ffffff',
       zIndex: 9999,
       overflowY: 'auto',
@@ -797,11 +797,11 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         {/* STEP 3: REGISTRATION SUCCESS & QR BADGE PREVIEW */}
         {step === 3 && createdUser && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', marginBottom: '2px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', marginBottom: '2px' }}>
               <CheckCircle size={24} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#16a34a', fontFamily: '"Outfit", sans-serif' }}>Registrierung erfolgreich!</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#34a853', fontFamily: '"Outfit", sans-serif' }}>Registrierung erfolgreich!</h3>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
                 Die Schule <strong>{createdUser.schoolName}</strong> wurde erfolgreich angelegt.
               </p>
@@ -901,9 +901,9 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: '12px',
-                    border: biometricsStatus === 'success' ? '1.5px solid #16a34a' : '1.5px solid #d1d5db',
-                    background: biometricsStatus === 'success' ? '#f0fdf4' : biometricsStatus === 'error' ? '#fef2f2' : '#f8fafc',
-                    color: biometricsStatus === 'success' ? '#16a34a' : biometricsStatus === 'error' ? '#dc2626' : '#1e293b',
+                    border: biometricsStatus === 'success' ? '1.5px solid #34a853' : '1.5px solid #d1d5db',
+                    background: biometricsStatus === 'success' ? '#e6f4ea' : biometricsStatus === 'error' ? '#fef2f2' : '#f8fafc',
+                    color: biometricsStatus === 'success' ? '#34a853' : biometricsStatus === 'error' ? '#dc2626' : '#1e293b',
                     fontWeight: 800,
                     fontSize: '0.8rem',
                     cursor: (biometricsStatus === 'registering' || biometricsStatus === 'success') ? 'not-allowed' : 'pointer',

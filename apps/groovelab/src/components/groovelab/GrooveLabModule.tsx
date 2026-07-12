@@ -138,7 +138,7 @@ export const GrooveLabModule: React.FC<GrooveLabModuleProps> = (props) => {
                       <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#fffbeb', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>
                         {student.first_name?.[0]}
                       </div>
-                      <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? '#22c55e' : '#cbd5e1', border: '2px solid white' }} />
+                      <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? '#34a853' : '#cbd5e1', border: '2px solid white' }} />
                     </div>
                     <div>
                       <strong style={{ fontSize: '0.92rem', display: 'block' }}>{student.first_name} {student.last_name}</strong>
