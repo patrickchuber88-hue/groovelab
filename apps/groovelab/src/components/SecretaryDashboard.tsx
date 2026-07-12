@@ -1798,7 +1798,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   };
   
   // Apple-style settings panel states
-  const [settingsTab, setSettingsTab] = useState<'general' | 'branding' | 'security' | 'notifications' | 'gdpr'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy'>('general');
+  const [initialSettings, setInitialSettings] = useState<any>(null);
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
   const [kioskAutoLogout, setKioskAutoLogout] = useState<number>(5);
   const [bypassPin, setBypassPin] = useState<string>('1234');
@@ -1849,7 +1850,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
-  const mixedTotal_global = currentTotalB2B_global + studentLevyMonthly_global + extraLevyMonthly_global;
+  const isSettingsDirty = useMemo(() => {
+    if (!initialSettings) return false;
+    return (
+      schoolName !== initialSettings.schoolName ||
+      schoolSubdomain !== initialSettings.schoolSubdomain ||
+      schoolZipCode !== initialSettings.schoolZipCode ||
+      schoolCity !== initialSettings.schoolCity ||
+      schoolStreet !== initialSettings.schoolStreet ||
+      schoolHouseNumber !== initialSettings.schoolHouseNumber ||
+      schoolPhoneNumber !== initialSettings.schoolPhoneNumber ||
+      schoolEmail !== initialSettings.schoolEmail ||
+      logoUrl !== initialSettings.logoUrl ||
+      JSON.stringify(calendarUrls) !== JSON.stringify(initialSettings.calendarUrls) ||
+      kioskPinLength !== initialSettings.kioskPinLength ||
+      bypassPin !== initialSettings.bypassPin ||
+      logRetention !== initialSettings.logRetention ||
+      syncInterval !== initialSettings.syncInterval
+    );
+  }, [
+    initialSettings,
+    schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail,
+    logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval
+  ]);
+
   const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
   
   // Room Planner Matrix states
@@ -2729,6 +2753,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           if (rawUrl) parsedUrls = [rawUrl];
         }
         setCalendarUrls(parsedUrls);
+        const op = schoolData.opening_hours || {};
+        const loadedKioskPinLength = op.kiosk_pin_length || 4;
+        const loadedBypassPin = op.bypass_pin || '1234';
+        const loadedLogRetention = op.log_retention || '90';
+        const loadedSyncInterval = op.sync_interval || 'daily';
+        
+        setKioskPinLength(loadedKioskPinLength);
+        setBypassPin(loadedBypassPin);
+        setLogRetention(loadedLogRetention);
+        setSyncInterval(loadedSyncInterval);
+
+        setInitialSettings({
+          schoolName: schoolData.name || '',
+          schoolSubdomain: schoolData.subdomain || '',
+          schoolZipCode: schoolData.zip_code || '',
+          schoolCity: schoolData.city || '',
+          schoolStreet: schoolData.street || '',
+          schoolHouseNumber: schoolData.house_number || '',
+          schoolPhoneNumber: schoolData.phone_number || '',
+          schoolEmail: schoolData.email || '',
+          logoUrl: schoolData.logo_url || '',
+          calendarUrls: parsedUrls,
+          kioskPinLength: loadedKioskPinLength,
+          bypassPin: loadedBypassPin,
+          logRetention: loadedLogRetention,
+          syncInterval: loadedSyncInterval
+        });
         setKioskToken(schoolData.groovelab_kiosk_token || '');
         setCampusToken(schoolData.campus_login_token || '');
         setAllowMessagesGlobal(schoolData.allow_messages_global ?? true);
@@ -4072,30 +4123,25 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
     setCalendarUrls(calendarUrls.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handleSaveCalendarUrls = async () => {
-    try {
-      const serialized = JSON.stringify(calendarUrls);
-      const { error } = await supabase
-        .from('schools')
-        .update({
-          calendar_url: serialized || null
-        })
-        .eq('id', schoolId);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-      if (error) throw error;
-      alert('Kalender-Feeds erfolgreich gespeichert! 📅🔗');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Speichern der Kalender-Feeds: ' + err.message);
-    }
-  };
-
-  const handleSaveSchoolGeneralData = async () => {
+  const handleSaveAllSettings = async () => {
     if (!schoolName.trim()) {
       alert('Bitte einen Musikschulnamen eingeben.');
       return;
     }
+    setIsSavingSettings(true);
     try {
+      const updatedOp = {
+        ...(openingHours || {}),
+        kiosk_pin_length: kioskPinLength,
+        bypass_pin: bypassPin,
+        log_retention: logRetention,
+        sync_interval: syncInterval
+      };
+
+      const serializedUrls = JSON.stringify(calendarUrls);
+
       const { error } = await supabase
         .from('schools')
         .update({
@@ -4106,45 +4152,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
           zip_code: schoolZipCode || null,
           city: schoolCity || null,
           phone_number: schoolPhoneNumber || null,
-          email: schoolEmail || null
-        })
-        .eq('id', schoolId);
-
-      if (error) throw error;
-      alert('Stammdaten der Musikschule erfolgreich gespeichert! 🏢');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Speichern der Stammdaten: ' + err.message);
-    }
-  };
-
-  const handleSaveBrandingAndCalendar = async () => {
-    if (!editColor || !/^#([A-Fa-f0-9]{6})$/.test(editColor)) {
-      alert('Bitte gebe einen gültigen Hex-Farbcode ein (z. B. #ea4335).');
-      return;
-    }
-    try {
-      const { error } = await supabase
-        .from('schools')
-        .update({
-          name: schoolName,
-          primary_color: editColor,
+          email: schoolEmail || null,
           logo_url: logoUrl || null,
-          calendar_url: calendarUrl || null,
-          street: schoolStreet || null,
-          house_number: schoolHouseNumber || null,
-          zip_code: schoolZipCode || null,
-          city: schoolCity || null,
-          phone_number: schoolPhoneNumber || null,
-          email: schoolEmail || null
+          calendar_url: serializedUrls || null,
+          opening_hours: updatedOp
         })
         .eq('id', schoolId);
 
       if (error) throw error;
-      alert('Schul- und Kalendereinstellungen erfolgreich gespeichert! 🎨🔗');
+
+      setOpeningHours(updatedOp);
+      alert('Alle Einstellungen erfolgreich gespeichert! 🏢');
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Speichern: ' + err.message);
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
