@@ -6,6 +6,7 @@ import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -263,7 +264,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     const targetUser = user;
     
     const r = (targetUser?.role || '').toLowerCase();
-    if (r === 'admin' || r === 'secretary') {
+    if ((r === 'admin' || r === 'secretary') && activePlat === 'campus') {
       return '/campus_login_hero.png';
     }
     
@@ -316,6 +317,13 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
         src.includes('bariton_avatar') || 
         src.includes('oboe_avatar')
       );
+      const isTeacherAvatar = src && (
+        src.includes('teacher_') ||
+        src.includes('avatar_teacher')
+      );
+      if (r === 'teacher' || r === 'admin' || r === 'secretary') {
+        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
+      }
       if (!src || isInstrument || src === '/avatar_ghost.jpg') {
         return '/avatar_ghost.jpg';
       }
@@ -337,6 +345,15 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
   };
 
   const hasAction = !!(onClick || user || userId);
+  const isPortraitAvatar = displaySrc && (
+    displaySrc.includes('teacher_') ||
+    displaySrc.includes('avatar_teacher') ||
+    displaySrc.includes('student_') ||
+    displaySrc.includes('bandstyle_') ||
+    displaySrc.includes('teen_') ||
+    displaySrc.includes('avatar_boy') ||
+    displaySrc.includes('avatar_girl')
+  );
 
   return (
     <div 
@@ -360,6 +377,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
           width: '100%', 
           height: '100%', 
           objectFit: 'cover', 
+          objectPosition: isPortraitAvatar ? 'center 15%' : 'center',
           opacity: isLoaded ? 1 : 0,
           transition: 'opacity 0.3s ease-in-out',
           willChange: 'opacity',
@@ -401,7 +419,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
-  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 1 || num === 2) return '#eab308'; // Yellow
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
   if (num === 7 || num === 8) return '#eab308'; // Yellow
@@ -707,7 +725,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
-                <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name?.[0]}.</div>
+                <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {activePlatform === 'groovelab' ? (c.users?.last_name || '') : `${c.users?.last_name?.[0] || ''}.`}</div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer iPad'}</div>
                 {isSelf && onSelfCheckout ? (
                   <button
@@ -4855,7 +4873,7 @@ export function TeacherDashboard({
     const studentId = crypto.randomUUID();
     const qrToken = crypto.randomUUID();
     const lName = newStudent.lastName;
-    const formattedLastName = lName.length > 1 ? lName.charAt(0) + '.' : lName;
+    const formattedLastName = lName;
     
     const { data, error } = await supabase.from('users').insert({
       id: studentId,
@@ -4905,7 +4923,7 @@ export function TeacherDashboard({
     e.preventDefault();
     if (!editingStudent) return;
     const lName = editingStudent.last_name || '';
-    const formattedLast = lName.length > 1 ? lName.charAt(0) + '.' : lName;
+    const formattedLast = lName;
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
       last_name: formattedLast,
@@ -4988,7 +5006,7 @@ export function TeacherDashboard({
       const studentId = crypto.randomUUID();
       const qrToken = crypto.randomUUID();
       const lName = inviteLastName.trim();
-      const formattedLast = lName.length > 1 ? lName.charAt(0) + '.' : lName;
+      const formattedLast = lName;
       const { data, error } = await supabase.from('users').insert({
         id: studentId,
         school_id: teacher.school_id,
