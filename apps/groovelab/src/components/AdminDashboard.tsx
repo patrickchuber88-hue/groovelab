@@ -16000,7 +16000,7 @@ export function AdminDashboard({
   );
 }
 
-function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: string, onShowQR: (user: any) => void }) {
+function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any[], brandColor: string, onShowQR: (user: any) => void, activePlatform?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'teacher' | 'student' | 'vocalist'>('all');
   
@@ -16147,19 +16147,19 @@ function IDGallery({ users, brandColor, onShowQR }: { users: any[], brandColor: 
                   borderRadius: '100px', 
                   border: `4px solid ${u.role === 'student' ? '#eab308' : (u.role === 'admin' || u.role === 'secretary') ? '#ea4335' : '#34a853'}`,
                   padding: '6px',
-                  background: 'white'
+                  background: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden'
                 }}>
                   <div style={{ 
                     width: '100%', 
                     height: '100%', 
                     borderRadius: '50%', 
-                    overflow: 'hidden',
-                    backgroundImage: `url(${u.photo_url || '/avatar_ghost.jpg'})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundColor: '#f1f5f9'
+                    overflow: 'hidden'
                   }}>
+                    <StudioAvatar src={u.photo_url} user={u} activePlatform={activePlatform} />
                   </div>
                 </div>
 
