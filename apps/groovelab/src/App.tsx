@@ -133,7 +133,7 @@ const getRoleColor = (role: string, stationName?: string) => {
   if (!match) return '#64748b';
   
   const num = parseInt(match[0]);
-  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 1 || num === 2) return '#eab308'; // Yellow
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
   if (num === 7 || num === 8) return '#eab308'; // Yellow
@@ -1568,8 +1568,8 @@ function App() {
       }
     }
 
-    // Auto-subscribe or sync web push notifications in the background
-    if ('Notification' in window && (Notification.permission === 'granted' || Notification.permission === 'default')) {
+    // Auto-subscribe or sync web push notifications in the background if permission is already granted
+    if ('Notification' in window && Notification.permission === 'granted') {
       setTimeout(() => {
         subscribeUserToPush(loggedInUserId)
           .then((success) => console.log('PWA Push auto-subscribe sync outcome:', success))
@@ -2865,7 +2865,7 @@ function App() {
         const r = (userData.role || '').toLowerCase();
         const rolesArr = userData.roles || [];
         const isAdminOrSec = r === 'admin' || r === 'secretary' || rolesArr.includes('admin') || rolesArr.includes('secretary');
-        if (isAdminOrSec) {
+        if (isAdminOrSec && activePlatform === 'campus') {
           userData.photo_url = '/campus_login_hero.png';
           userData.avatar_url = '/campus_login_hero.png';
         }
@@ -2898,8 +2898,16 @@ function App() {
       }
 
       // Determine what platform the user is allowed to access and what is default:
+      const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
+      const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
+      const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+
       let allowedPlatform: 'campus' | 'groovelab' = 'campus';
-      if (userData.is_campus_active && !userData.is_groovelab_active) {
+      if (!schoolHasCampus && schoolHasGroove) {
+        allowedPlatform = 'groovelab';
+      } else if (schoolHasCampus && !schoolHasGroove) {
+        allowedPlatform = 'campus';
+      } else if (userData.is_campus_active && !userData.is_groovelab_active) {
         allowedPlatform = 'campus';
       } else if (!userData.is_campus_active && userData.is_groovelab_active) {
         allowedPlatform = 'groovelab';
@@ -2913,21 +2921,22 @@ function App() {
         const isSecretary = userData.role?.toLowerCase() === 'secretary';
 
         if (isStudent) {
-          allowedPlatform = 'campus';
-          setActivePlatform('campus');
-          localStorage.setItem('groovelab_active_platform', 'campus');
-          setActiveStudentTab('briefing');
-          localStorage.setItem('campus_active_tab', 'briefing');
+          const startPlat = allowedPlatform;
+          setActivePlatform(startPlat);
+          localStorage.setItem('groovelab_active_platform', startPlat);
+          const startTab = startPlat === 'campus' ? 'briefing' : 'live';
+          setActiveStudentTab(startTab);
+          localStorage.setItem(startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
         } else if (isTeacher) {
-          allowedPlatform = 'campus';
-          setActivePlatform('campus');
-          localStorage.setItem('groovelab_active_platform', 'campus');
+          const startPlat = allowedPlatform;
+          setActivePlatform(startPlat);
+          localStorage.setItem('groovelab_active_platform', startPlat);
           setActiveStudentTab('live');
-          localStorage.setItem('campus_active_tab', 'live');
+          localStorage.setItem(startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', 'live');
         } else if (isSecretary) {
-          allowedPlatform = 'campus';
-          setActivePlatform('campus');
-          localStorage.setItem('groovelab_active_platform', 'campus');
+          const startPlat = allowedPlatform;
+          setActivePlatform(startPlat);
+          localStorage.setItem('groovelab_active_platform', startPlat);
           localStorage.setItem('groovelab_active_workspace', 'secretary');
           localStorage.setItem('groovelab_secretary_subtab', 'briefing');
           setActiveStudentTab('briefing');
@@ -2956,8 +2965,8 @@ function App() {
         (window as any).debugUserId = userId;
         (window as any).debugUserData = JSON.stringify(userData);
       }
-      if (!schoolId) {
-        console.warn('[Dashboard] No school_id found. Board will be empty.');
+      if (!schoolId || schoolId.length !== 36) {
+        console.warn('[Dashboard] No valid school_id found. Board will be empty.');
         setUser(userData);
         setLoading(false);
         return;
@@ -5332,6 +5341,13 @@ function App() {
       localStorage.setItem('groovelab_kiosk_room_id', roomId);
 
       // Clear local credentials/states
+      localStorage.removeItem('isBillingBooked');
+      localStorage.removeItem('isCancelled');
+      localStorage.removeItem('contractStartDate');
+      localStorage.removeItem('bookedExtraUsers');
+      localStorage.removeItem('nextBillingOption');
+      localStorage.removeItem('nextBillingOptionEffectiveAt');
+      localStorage.removeItem('unbooked_52_temp');
       setLoggedInUserId(null);
       setUser(null);
       setSession(null);
@@ -5350,6 +5366,13 @@ function App() {
     localStorage.removeItem('groovelab_station_id');
     localStorage.removeItem('groovelab_kiosk_room_id');
     localStorage.removeItem('groovelab_active_platform');
+    localStorage.removeItem('isBillingBooked');
+    localStorage.removeItem('isCancelled');
+    localStorage.removeItem('contractStartDate');
+    localStorage.removeItem('bookedExtraUsers');
+    localStorage.removeItem('nextBillingOption');
+    localStorage.removeItem('nextBillingOptionEffectiveAt');
+    localStorage.removeItem('unbooked_52_temp');
     setLoggedInUserId(null);
     setUser(null);
     setSession(null);
@@ -5916,6 +5939,9 @@ function App() {
             sub = parts[0];
           }
         }
+        if (!sub) {
+          sub = urlParams.get('school') || urlParams.get('subdomain');
+        }
         return !!sub;
       })();
 
@@ -5999,10 +6025,19 @@ function App() {
       if (error) throw error;
 
       if (newRole === 'teacher') {
-        localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'live');
-        setActivePlatform('campus');
+        const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
+        const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
+        const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+
+        let targetPlatform: 'campus' | 'groovelab' = 'campus';
+        if (!schoolHasCampus && schoolHasGroove) {
+          targetPlatform = 'groovelab';
+        }
+
+        localStorage.setItem('groovelab_active_platform', targetPlatform);
+        setActivePlatform(targetPlatform);
         setActiveStudentTab('live');
+        localStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', 'live');
       } else if (newRole === 'admin' || newRole === 'secretary') {
         localStorage.setItem('groovelab_active_workspace', 'secretary');
         localStorage.setItem('groovelab_active_platform', 'campus');
@@ -7138,18 +7173,22 @@ function App() {
                   <Monitor size={20} /> Live Lab
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', marginLeft: 'auto', flexShrink: 0 }} className="animate-pulse"></div>
                 </button>
-                <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`}>
-                  <Mail size={20} /> Nachrichten
-                </button>
+                {school?.has_campus_subscription && (
+                  <button onClick={() => setActiveStudentTab('messages')} className={`sidebar-item ${activeStudentTab === 'messages' ? `active ${activePlatform}` : ''}`}>
+                    <Mail size={20} /> Nachrichten
+                  </button>
+                )}
                 <button onClick={() => setActiveStudentTab('students')} className={`sidebar-item ${activeStudentTab === 'students' ? `active ${activePlatform}` : ''}`}>
                   <Users size={20} /> Schüler
                 </button>
                 <button onClick={() => setActiveStudentTab('team')} className={`sidebar-item ${activeStudentTab === 'team' ? `active ${activePlatform}` : ''}`}>
                   <Shield size={20} /> Team
                 </button>
-                <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
-                  <Box size={20} /> Räume
-                </button>
+                {(school?.has_campus_subscription || school?.has_groovelab_subscription) && (
+                  <button onClick={() => setActiveStudentTab('rooms')} className={`sidebar-item ${activeStudentTab === 'rooms' ? `active ${activePlatform}` : ''}`}>
+                    <Box size={20} /> Räume
+                  </button>
+                )}
                 <button onClick={() => setActiveStudentTab('songs')} className={`sidebar-item ${activeStudentTab === 'songs' ? `active ${activePlatform}` : ''}`}>
                   <Library size={20} /> Songs
                 </button>
@@ -7369,8 +7408,11 @@ function App() {
                 }}
               >
                 <GraduationCap size={15} color={activePlatform === 'campus' ? '#ffffff' : '#34a853'} />
-                <span>
-                  {locationMode === 'lab' && user?.role === 'student' && activePlatform !== 'campus' ? '🔒 ' : ''}Campus
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {locationMode === 'lab' && user?.role === 'student' && activePlatform !== 'campus' && (
+                    <Lock size={12} style={{ color: 'inherit' }} />
+                  )}
+                  Campus
                 </span>
               </div>
             )}
@@ -7457,7 +7499,7 @@ function App() {
               {activePlatform === 'campus' ? (
                 <>
                   {/* Trial Pill */}
-                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && trialDaysLeft !== null && (
+                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
                     <div style={{ 
                       display: 'flex', alignItems: 'center', gap: '8px', 
                       background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
@@ -7625,7 +7667,7 @@ function App() {
               ) : (
                 <>
                   {/* Trial Pill */}
-                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && trialDaysLeft !== null && (
+                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
                     <div style={{ 
                       display: 'flex', alignItems: 'center', gap: '8px', 
                       background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
@@ -7660,8 +7702,8 @@ function App() {
                   {/* Lab Count Pill */}
                   <div style={{ 
                     display: 'flex', alignItems: 'center', gap: '8px', 
-                    background: '#34a853', padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
+                    background: (activePlatform as string) === 'campus' ? '#34a853' : '#eab308', padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                    boxShadow: (activePlatform as string) === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(234, 179, 8, 0.2)'
                   }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
                     <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{activeStudentsCount} im Lab</span>
@@ -7705,6 +7747,36 @@ function App() {
                 <div style={{ width: windowWidth <= 768 ? '40px' : '52px', height: windowWidth <= 768 ? '40px' : '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', flexShrink: 0 }}>
                   <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} />
                 </div>
+              )}
+              {/* Elegant Switch to Admin/Verwaltung Button */}
+              {user?.role === 'teacher' && user.roles && (user.roles.includes('admin') || user.roles.includes('secretary')) && (
+                <button 
+                  onClick={() => {
+                    const targetRole = user.roles.includes('admin') ? 'admin' : 'secretary';
+                    handleSwitchActiveRole(targetRole);
+                  }}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    background: '#fce8e6', 
+                    border: '1px solid #fad2cf', 
+                    padding: windowWidth <= 768 ? '8px' : '8px 14px', 
+                    borderRadius: '12px', 
+                    color: '#ea4335', 
+                    fontWeight: 800, 
+                    fontSize: '0.8rem', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 4px 12px rgba(234, 67, 53, 0.08)',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                  title="Zur Verwaltung wechseln"
+                >
+                  <School size={14} color="#ea4335" />
+                  {windowWidth > 768 && <span>Verwaltung</span>}
+                </button>
               )}
               {/* Elegant Logout Button next to avatar */}
               <button 
@@ -7877,7 +7949,7 @@ function App() {
                     borderRight: '1px solid rgba(52, 168, 83, 0.15)',
                   }}>
                     <img
-                      src={getInstrumentAvatarUrl(user.instrument)}
+                      src={user.photo_url || '/avatar_ghost.jpg'}
                       alt=""
                       style={{
                         width: '100%',
@@ -8170,8 +8242,7 @@ function App() {
                     <button 
                       onClick={() => {
                         const r = (user?.role || '').toLowerCase();
-                        const rolesArr = user?.roles || [];
-                        const isAdminOrSec = r === 'admin' || r === 'secretary' || rolesArr.includes('admin') || rolesArr.includes('secretary');
+                        const isAdminOrSec = r === 'admin' || r === 'secretary';
                         if (isAdminOrSec) {
                           alert('Mitarbeiter der Verwaltung und des Sekretariats nutzen das Standard-Profilbild (/campus_login_hero.png).');
                           return;
@@ -13456,7 +13527,7 @@ function App() {
                  </button>
               </div>
 
-              {avatarPickerType !== 'band' && (
+              {avatarPickerType !== 'band' && !(user?.role === 'teacher' || user?.role === 'admin') && (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', minHeight: '62px' }}>
                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
                         {(['Alle', 'E-Gitarre', 'E-Piano', 'E-Drum', 'E-Bass', 'Gesang'] as const).map(inst => {
@@ -13515,7 +13586,7 @@ function App() {
                   } else if (role === 'teacher' || role === 'admin') {
                     list = TEACHER_AVATARS;
                   }
-                  if (avatarInstrumentFilter !== 'Alle') {
+                  if (avatarInstrumentFilter !== 'Alle' && !(role === 'teacher' || role === 'admin')) {
                     list = list.filter((av: any) => av.category === avatarInstrumentFilter);
                   }
 

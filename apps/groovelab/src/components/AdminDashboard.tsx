@@ -13,6 +13,7 @@ import { ScheduleBoard } from './ScheduleBoard';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
+import { StudioAvatar } from './StudioAvatar';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -196,7 +197,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
-  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 1 || num === 2) return '#eab308'; // Yellow
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
   if (num === 7 || num === 8) return '#eab308'; // Yellow
@@ -1461,6 +1462,8 @@ export function AdminDashboard({
   const [customizingRoom, setCustomizingRoom] = useState<any | null>(null);
   const [roomWidth, setRoomWidth] = useState<number>(10.0);
   const [roomHeight, setRoomHeight] = useState<number>(8.0);
+  const [roomWidthInput, setRoomWidthInput] = useState<string>('10');
+  const [roomHeightInput, setRoomHeightInput] = useState<string>('8');
   const [activeEditStationId, setActiveEditStationId] = useState<string | null>(null);
   const [editingStationName, setEditingStationName] = useState<string>('');
   const [editingStationInstrument, setEditingStationInstrument] = useState<string>('');
@@ -1472,8 +1475,12 @@ export function AdminDashboard({
 
   useEffect(() => {
     if (customizingRoom) {
-      setRoomWidth(customizingRoom.room_width || 10.0);
-      setRoomHeight(customizingRoom.room_height || 8.0);
+      const w = customizingRoom.room_width || 10.0;
+      const h = customizingRoom.room_height || 8.0;
+      setRoomWidth(w);
+      setRoomHeight(h);
+      setRoomWidthInput(String(w));
+      setRoomHeightInput(String(h));
       setActiveEditStationId(null);
     }
   }, [customizingRoom?.id]);
@@ -1683,7 +1690,7 @@ export function AdminDashboard({
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
 
-  const brandColor = '#ea4335';
+  const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
 
   const getStatusColor = (studentId: string, lastSeen: string | null, createdAt?: string | null) => {
     const hasLiveSession = activeSessions.some(se => se.user_id === studentId);
@@ -4121,7 +4128,7 @@ export function AdminDashboard({
     { id: 'team', label: 'Team', icon: Shield },
     { id: 'rooms', label: 'Räume', icon: Box },
     { id: 'songs', label: activePlatform === 'campus' ? 'Mediathek' : 'Songs', icon: activePlatform === 'campus' ? Library : Music },
-    { id: 'stats', label: 'Statistik', icon: LucideBarChart },
+    ...(activePlatform === 'campus' ? [{ id: 'stats', label: 'Statistik', icon: LucideBarChart }] : []),
     { id: 'gallery', label: 'ID Galerie', icon: QrCode },
     { id: 'setup', label: 'Einstellungen', icon: Settings },
   ];
@@ -4147,7 +4154,7 @@ export function AdminDashboard({
   );
 
   const renderBandsTab = () => {
-    const brandColor = '#ea4335';
+    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     
     const filteredBands = allBands.filter(band => {
@@ -4675,7 +4682,7 @@ export function AdminDashboard({
   };
 
   const renderStudentsTab = () => {
-    const brandColor = '#ea4335';
+    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -4693,7 +4700,7 @@ export function AdminDashboard({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-              <div style={{ background: 'rgba(52, 168, 83, 0.15)', color: '#34a853', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#eab308', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
               Schülerverwaltung ({students.length})
@@ -4715,14 +4722,14 @@ export function AdminDashboard({
                   style={{
                     flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
                     background: listType === 'active' ? 'white' : 'transparent',
-                    color: listType === 'active' ? '#34a853' : '#64748b',
+                    color: listType === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
                     fontWeight: listType === 'active' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'active' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
                     cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px',
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? '#34a853' : 'transparent' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent' }} />
                   Aktive Schüler
                 </button>
                 <button
@@ -4730,14 +4737,14 @@ export function AdminDashboard({
                   style={{
                     flex: 1, padding: '8px 16px', borderRadius: '12px', border: 'none',
                     background: listType === 'archive' ? 'white' : 'transparent',
-                    color: listType === 'archive' ? '#34a853' : '#64748b',
+                    color: listType === 'archive' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
                     fontWeight: listType === 'archive' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'archive' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
                     cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px',
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? '#34a853' : 'transparent' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: listType === 'archive' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent' }} />
                   Archiv
                 </button>
               </div>
@@ -5018,7 +5025,7 @@ export function AdminDashboard({
                       style={{
                         flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
                         background: (editingStudent.status || 'active') === 'active' ? '#ffffff' : 'transparent',
-                        color: (editingStudent.status || 'active') === 'active' ? '#34a853' : '#64748b',
+                        color: (editingStudent.status || 'active') === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
                         fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
                         boxShadow: (editingStudent.status || 'active') === 'active' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                       }}
@@ -5187,7 +5194,7 @@ export function AdminDashboard({
                             ⏳ PROBE
                           </div>
                         ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
-                          <div style={{ padding: '1px 5px', background: '#e6f4ea', color: '#34a853', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          <div style={{ padding: '1px 5px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#eab308', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
                             Aktiv
                           </div>
                         ) : (
@@ -5248,7 +5255,7 @@ export function AdminDashboard({
   };
 
   const renderTeachersTab = () => {
-    const brandColor = '#ea4335';
+    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     return (
       <div style={{ marginTop: '0px' }}>
       <div 
@@ -5315,7 +5322,7 @@ export function AdminDashboard({
                   style={{
                     flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
                     background: editingTeacher.role === 'admin' ? '#ffffff' : 'transparent',
-                    color: editingTeacher.role === 'admin' ? '#ef4444' : '#64748b',
+                    color: editingTeacher.role === 'admin' ? brandColor : '#64748b',
                     fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
                     boxShadow: editingTeacher.role === 'admin' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                   }}
@@ -5411,7 +5418,7 @@ export function AdminDashboard({
                 
                 {/* Avatar */}
                 <div style={{ width: '80px', height: '80px', borderRadius: '20px', overflow: 'hidden', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', opacity: isObserver ? 0.65 : 1, transition: 'opacity 0.3s' }}>
-                  <img src={t.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                  <StudioAvatar src={t.photo_url} user={t} activePlatform={activePlatform} />
                 </div>
                 
                 {/* Info */}
@@ -5485,7 +5492,7 @@ export function AdminDashboard({
                 {/* Action buttons */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setSelectedQRUser(t)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><QrCode size={18} /></button>
-                  <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: '#fff1f2', border: '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                  <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
                 </div>
               </div>
             );
@@ -5497,7 +5504,7 @@ export function AdminDashboard({
   };
 
   const renderCampusRoomsTab = () => {
-    const brandColor = '#34a853';
+    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     
     const handleQuickDuration = (mins: number) => {
@@ -9291,7 +9298,7 @@ export function AdminDashboard({
   };
 
   const renderSongsTab = () => {
-    const brandColor = '#34a853';
+    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -11455,7 +11462,7 @@ export function AdminDashboard({
   };
 
   const renderMissionsTab = () => {
-    const brandColor = '#ea4335';
+    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     
     const filteredSubmissions = submissions.filter(sub => {
       const studentName = `${sub.users?.first_name || ''} ${sub.users?.last_name || ''}`.toLowerCase();
@@ -12513,6 +12520,16 @@ export function AdminDashboard({
   };
 
 
+  const handleAutoSaveRoomSize = async (w: number, h: number) => {
+    if (!customizingRoom) return;
+    setRooms(rooms.map(r => r.id === customizingRoom.id ? { ...r, room_width: w, room_height: h } : r));
+    setCustomizingRoom((prev: any) => prev ? { ...prev, room_width: w, room_height: h } : null);
+    await supabase
+      .from('rooms')
+      .update({ room_width: w, room_height: h })
+      .eq('id', customizingRoom.id);
+  };
+
   const handleSaveRoomSize = async () => {
     if (!customizingRoom) return;
     const { error } = await supabase
@@ -12731,7 +12748,7 @@ export function AdminDashboard({
                         zIndex: isSelected ? 100 : 10,
                         touchAction: 'none',
                         userSelect: 'none',
-                        width: '18%',
+                        width: 'clamp(76px, 16%, 115px)',
                         aspectRatio: '180 / 210'
                       }}
                     >
@@ -12784,38 +12801,46 @@ export function AdminDashboard({
               {/* Section 1: Room Dimensions */}
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>Raumgröße (Seitenverhältnis)</h3>
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Breite (Meter)</label>
                     <input 
-                      type="number" 
-                      step="0.5" 
-                      min="3" 
-                      max="30"
-                      value={roomWidth} 
-                      onChange={e => setRoomWidth(Number(e.target.value))} 
+                      type="text" 
+                      value={roomWidthInput} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setRoomWidthInput(val);
+                        const parsed = parseFloat(val.replace(',', '.'));
+                        if (!isNaN(parsed) && parsed >= 3 && parsed <= 30) {
+                          setRoomWidth(parsed);
+                          handleAutoSaveRoomSize(parsed, roomHeight);
+                        }
+                      }} 
                       style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700 }}
                     />
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>Höhe (Meter)</label>
                     <input 
-                      type="number" 
-                      step="0.5" 
-                      min="2" 
-                      max="30"
-                      value={roomHeight} 
-                      onChange={e => setRoomHeight(Number(e.target.value))} 
+                      type="text" 
+                      value={roomHeightInput} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        setRoomHeightInput(val);
+                        const parsed = parseFloat(val.replace(',', '.'));
+                        if (!isNaN(parsed) && parsed >= 2 && parsed <= 30) {
+                          setRoomHeight(parsed);
+                          handleAutoSaveRoomSize(roomWidth, parsed);
+                        }
+                      }} 
                       style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '4px', fontSize: '0.875rem', fontWeight: 700 }}
                     />
                   </div>
                 </div>
-                <button 
-                  onClick={handleSaveRoomSize}
-                  style={{ width: '100%', background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                >
-                  Größe aktualisieren
-                </button>
+                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '0.75rem', fontWeight: 700 }}>
+                  <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
+                  Änderungen werden live gespeichert
+                </div>
               </div>
 
               {/* Section 1.5: Grid & Alignment Tools */}
