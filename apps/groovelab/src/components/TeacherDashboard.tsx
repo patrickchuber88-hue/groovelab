@@ -3598,6 +3598,13 @@ export function TeacherDashboard({
       })
       .subscribe();
 
+    const channelUsers = supabase
+      .channel('realtime_teacher_users')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users_raw' }, () => {
+        debouncedFetchData();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channelSessions);
       supabase.removeChannel(channelHelp);
@@ -3605,6 +3612,7 @@ export function TeacherDashboard({
       supabase.removeChannel(channelBands);
       supabase.removeChannel(channelCrisis);
       supabase.removeChannel(channelOccurrences);
+      supabase.removeChannel(channelUsers);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [userId, activePlatform, selectedRoomId, locationMode]);
