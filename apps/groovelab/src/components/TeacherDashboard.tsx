@@ -588,9 +588,10 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               <>
                 <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>
                 <span style={{ 
-                  color: isMe ? color : '#64748b', 
+                  color: isMe ? color : '#1e293b', 
                   fontWeight: isMe ? 900 : 800, 
                   textTransform: 'none', 
+                  fontSize: '0.8rem',
                   whiteSpace: 'nowrap', 
                   overflow: 'hidden', 
                   textOverflow: 'ellipsis' 
