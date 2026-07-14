@@ -7417,7 +7417,7 @@ function App() {
               }}>
                 {activePlatform === 'campus'
                   ? (user.role === 'admin' ? 'Campus Admin' : user.role === 'teacher' ? 'Campus Lehrkraft' : user.role === 'secretary' ? 'Campus Verwaltung' : 'Campus Schüler')
-                  : (user.role === 'admin' ? 'Campus-Groovelab Admin' : user.role === 'teacher' ? 'Campus-Groovelab Lehrer' : user.role === 'secretary' ? 'Campus-Groovelab Verwaltung' : (user.role === 'student' ? 'groovelab' : 'Campus-Groovelab Schüler'))}
+                  : (user.role === 'admin' ? 'Groovelab Admin' : user.role === 'teacher' ? 'Groovelab Lehrer' : user.role === 'secretary' ? 'Groovelab Verwaltung' : (user.role === 'student' ? 'groovelab' : 'Groovelab Schüler'))}
               </div>
             </div>
           </button>
@@ -7868,7 +7868,7 @@ function App() {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>Hallo {user.first_name}</div>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                    {user.role === 'admin' ? 'Campus-Groovelab Admin' : user.role === 'teacher' ? 'Campus-Groovelab Lehrer' : user.role === 'secretary' ? 'Campus-Groovelab Verwaltung' : 'Groovelab Schüler'}
+                    {user.role === 'admin' ? 'Groovelab Admin' : user.role === 'teacher' ? 'Groovelab Lehrer' : user.role === 'secretary' ? 'Groovelab Verwaltung' : 'Groovelab Schüler'}
                   </div>
                 </div>
               )}
