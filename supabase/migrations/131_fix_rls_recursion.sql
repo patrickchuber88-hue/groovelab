@@ -20,6 +20,12 @@ BEGIN
     FROM public.kiosks
     WHERE secret_token = v_token;
     
+    IF v_school_id IS NULL THEN
+        SELECT id INTO v_school_id
+        FROM public.schools
+        WHERE groovelab_kiosk_token = v_token::text OR campus_login_token = v_token::text;
+    END IF;
+    
     RETURN v_school_id;
 EXCEPTION WHEN OTHERS THEN
     RETURN NULL;

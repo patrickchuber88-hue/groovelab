@@ -59,7 +59,7 @@ CREATE POLICY "users_update" ON public.users_raw
 FOR UPDATE
 USING (
     public.is_master_admin()
-    OR (public.check_school_access(school_id) AND (public.is_teacher_or_admin() OR id = (current_setting('request.headers', true)::json->>'x-user-id')::uuid))
+    OR (public.check_school_access(school_id) AND (public.is_teacher_or_admin() OR id = public.get_current_user_id()))
 )
 WITH CHECK (
     public.is_master_admin()
@@ -68,7 +68,7 @@ WITH CHECK (
         AND (
             public.is_teacher_or_admin()
             OR (
-                id = (current_setting('request.headers', true)::json->>'x-user-id')::uuid
+                id = public.get_current_user_id()
             )
         )
     )
