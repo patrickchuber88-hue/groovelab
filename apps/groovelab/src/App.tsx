@@ -5284,6 +5284,22 @@ function App() {
     const currentUser = user;
     const currentSession = session;
 
+    // Resolve school token before clearing any states
+    const schoolId = currentUser?.school_id || (currentUser?.schools ? (Array.isArray(currentUser.schools) ? currentUser.schools[0]?.id : currentUser.schools?.id) : null);
+    let schoolToken = localStorage.getItem('groovelab_kiosk_token');
+    if (!schoolToken && schoolId) {
+      try {
+        const { data: schoolData } = await supabase
+          .from('schools')
+          .select('groovelab_kiosk_token, campus_login_token')
+          .eq('id', schoolId)
+          .single();
+        schoolToken = schoolData?.groovelab_kiosk_token || schoolData?.campus_login_token || null;
+      } catch (err) {
+        console.error('[Logout] Error fetching school token:', err);
+      }
+    }
+
     try {
       if (loggedInUserId) {
         // Mark user as offline
@@ -5335,7 +5351,6 @@ function App() {
       }
 
       // Fallback 2: Lookup first room for user's school ID
-      const schoolId = currentUser?.school_id || (currentUser?.schools ? (Array.isArray(currentUser.schools) ? currentUser.schools[0]?.id : currentUser.schools?.id) : null);
       if (!roomId && schoolId) {
         try {
           let roomsQuery = supabase
@@ -5385,7 +5400,7 @@ function App() {
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
-      const redirectPath = storedKioskToken ? `/qr/${storedKioskToken}` : window.location.pathname;
+      const redirectPath = schoolToken ? `/qr/${schoolToken}` : window.location.pathname;
       window.location.replace(`${window.location.origin}${redirectPath}`);
       return;
     }
@@ -5414,7 +5429,7 @@ function App() {
       localStorage.removeItem('groovelab_active_tab');
 
       // Redirect
-      const redirectPath = storedKioskToken ? `/qr/${storedKioskToken}` : window.location.pathname;
+      const redirectPath = schoolToken ? `/qr/${schoolToken}` : window.location.pathname;
       window.location.replace(`${window.location.origin}${redirectPath}?kiosk_room_id=${roomId}`);
       return;
     }
@@ -5439,6 +5454,12 @@ function App() {
     localStorage.removeItem('groovelab_user_id');
     localStorage.removeItem('groovelab_location_mode');
     localStorage.removeItem('groovelab_active_tab');
+
+    if (schoolToken) {
+      window.location.replace(`${window.location.origin}/qr/${schoolToken}`);
+    } else {
+      window.location.replace(`${window.location.origin}/`);
+    }
   };
 
   const hasInviteSchoolId = searchParams.has('invite_school_id');
