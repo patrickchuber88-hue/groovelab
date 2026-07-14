@@ -5385,7 +5385,8 @@ function App() {
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
-      window.location.replace(`${window.location.origin}${window.location.pathname}`);
+      const redirectPath = storedKioskToken ? `/qr/${storedKioskToken}` : window.location.pathname;
+      window.location.replace(`${window.location.origin}${redirectPath}`);
       return;
     }
 
@@ -5413,7 +5414,8 @@ function App() {
       localStorage.removeItem('groovelab_active_tab');
 
       // Redirect
-      window.location.replace(`${window.location.origin}${window.location.pathname}?kiosk_room_id=${roomId}`);
+      const redirectPath = storedKioskToken ? `/qr/${storedKioskToken}` : window.location.pathname;
+      window.location.replace(`${window.location.origin}${redirectPath}?kiosk_room_id=${roomId}`);
       return;
     }
 
