@@ -1,233 +1,280 @@
-# Handoff Report - teamwork_preview_explorer_m1
-
-This report compiles the findings of the database configuration exploration, analysis of load simulation scripts, and database schema, school list, user count, and RPC/view status verification.
+# Handoff Report - Load Simulation Exploration
 
 ## 1. Observation
 
-### 1.1 Load Simulation Scripts
-We searched and analyzed the load simulation scripts in the workspace. Here are the files and how they work:
+### Codebase Paths & Schema Definitions
+The database schema and UI components for Campus-Groovelab interact with the following database tables, columns, and write operations:
 
-#### A. `scratch/simulate_load_15m.mjs`
-*   **Mechanism**: Spawns virtual users (up to 6,375 in production or 20 in dry-run mode) to run concurrent loops simulating user traffic. Staggers the startup using a ramp-up delay (3m in production, 5s in dry-run).
-*   **User routine**: Each virtual user enters a loop executing randomized HTTP requests with a think-time delay (30-60s in production, 2-5s in dry-run):
-    *   **70% Read operations**: Fetches profiles (`/rest/v1/users`), lessons (`/rest/v1/lessons`), events (`/rest/v1/campus_events`), or program points (`/rest/v1/campus_event_program_points`).
-    *   **20% Practice/Check-in sessions**: Inserts fokus logs (`/rest/v1/fokus_logs`) or sessions (`/rest/v1/sessions`).
-    *   **10% Writes**: Creates program points (designed to fail under RLS for students), updates room preferences, or updates bio.
-*   **Database connection**: Makes direct HTTP REST requests to the Supabase endpoint using the native global `fetch` API. It authenticates as a user by setting the `x-user-id` header along with the `anonKey` and `Authorization: Bearer <anonKey>`.
-*   **Dependencies**: Uses Node.js built-in modules (`fs` and `path`) and standard Web APIs (`fetch`). No external NPM packages.
-*   **Seed Fetching**: Fetches list of songs and stations during startup using a service key.
+#### Sickness Report (Krankheitsmeldung)
+- **Tables affected**: `public.users`, `public.schedules`, `public.schedule_occurrences`, `public.crisis_notifications`, `public.system_alerts`
+- **Table references**:
+  - `public.users` fields: `sick_start` (DATE, added in migration `117_add_sick_start.sql:1`) and `sick_until` (TIMESTAMPTZ, added in migration `70_add_teacher_sick_until.sql:2`).
+  - `public.schedules` status values: `'canceled_by_teacher_sick'` and `'approved'` (migration `65_add_pending_reschedule_status.sql:3`).
+  - `public.schedule_occurrences` status values: `'cancelled'` and `'rescheduled_confirmed'` (migration `100_schedule_occurrences.sql:5`).
+  - `public.crisis_notifications` inserts `{ teacher_id, student_id, slot_start_datetime, status }` for cancelled appointments (from `TeacherDashboard.tsx:1754`).
+  - `public.system_alerts` inserts alerts of type `'Teacher Illness Alert'` with structure `{ school_id, teacher_id, type, message, resolved }` (from `TeacherDashboard.tsx:1780`).
+- **Direct write quotes**:
+  - Setting sick status:
+    ```typescript
+    // apps/groovelab/src/components/TeacherDashboard.tsx:1593
+    const { error: userErr } = await supabase
+      .from('users')
+      .update({ 
+        sick_until: sickUntilDate,
+        sick_start: sickStartVal
+      })
+      .eq('id', userId);
+    ```
+  - Reverting sick status:
+    ```typescript
+    // apps/groovelab/src/components/TeacherDashboard.tsx:1853
+    .update({ 
+      sick_until: null,
+      sick_start: null
+    })
+    ```
 
-#### B. `apps/groovelab/scratch/simulate_student_load.py`
-*   **Mechanism**: Sequentially executes standard database queries triggered when loading a single student dashboard (`student_id = "02b976e8-0893-443b-a41a-5e7010fd05f3"`).
-*   **Queries executed**: Fetches users+schools, avatars, student stats, schedule occurrences (today & school-year-wide), schedules, learning materials (`lehrwerke`), and progress matrix.
-*   **Database connection**: Directly calls the Supabase REST API via `urllib.request`. Hardcodes `SUPABASE_URL = "https://supabase.campus-groovelab.de"` and `SUPABASE_KEY` (anon key).
-*   **Dependencies**: Standard Python library modules: `urllib.request` and `json`.
+#### Reschedule (Terminverschiebung) & Room Booking (Räume buchen)
+- **Tables affected**: `public.schedule_occurrences`, `public.reschedule_requests`, `public.room_bookings`, `public.schedules`
+- **Table references**:
+  - `public.schedule_occurrences` columns (migration `100_schedule_occurrences.sql:9`): `id`, `student_id`, `teacher_id`, `date`, `start_time`, `duration`, `status`, `original_date`.
+  - `public.reschedule_requests` columns (migration `100_schedule_occurrences.sql:24`): `id`, `occurrence_id`, `proposed_date`, `proposed_start_time`, `status`, `created_at`, `updated_at`.
+  - `public.room_bookings` columns (migration `125_room_bookings.sql:9`): `id`, `school_id`, `room_id`, `booked_by`, `campus_event_id`, `date`, `start_time`, `end_time`, `title`.
+  - `public.schedules` columns (migration `56_schedule_engine_matrix.sql:7`): `id`, `school_id`, `teacher_id`, `student_id`, `day_of_week`, `time_slot`, `status`, `room_id`.
+- **Direct write quotes**:
+  - Updating occurrence date/time for reschedule:
+    ```typescript
+    // apps/groovelab/src/components/ScheduleCalendarView.tsx:1021
+    const { error } = await supabase.from('schedule_occurrences')
+      .update({
+        date: change.date,
+        start_time: change.start_time,
+        status: finalStatus,
+        original_date: origDateStr,
+        student_acknowledged: false,
+        student_id: change.student_id ? change.student_id : null,
+        duration: change.duration
+      })
+      .eq('id', change.id);
+    ```
+  - Syncing room booking delete/insert:
+    ```typescript
+    // apps/groovelab/src/components/ScheduleCalendarView.tsx:1044 & 1095
+    await supabase.from('room_bookings').delete().eq('booked_by', userId).eq('date', oldDate).eq('start_time', oldStartTime);
+    ...
+    await supabase.from('room_bookings').insert({
+      school_id: schoolId,
+      room_id: currentRoomId,
+      booked_by: userId,
+      date: change.date,
+      start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
+      end_time: endTimeStr,
+      title: `Unterricht: ${studentName}`
+    });
+    ```
+  - Custom Room Bookings on Schedule Board:
+    ```typescript
+    // apps/groovelab/src/components/CampusTeacherDashboard.tsx:1702
+    const { data, error } = await supabase
+      .from('schedules')
+      .insert(payload)
+    ```
 
-#### C. `apps/groovelab/src/tests/simulate_load.ts`
-*   **Mechanism**: A highly detailed TypeScript load simulation. Spawns 250 parallel user routines (admin, secretary, teacher, student). Creates a temporary school (`tempSchoolId`) and inserts generated users, songs, events, and lessons. Then, virtual users perform role-specific database actions:
-    *   **Students**: Fetch profile, fetch lessons, fetch events, insert song skills.
-    *   **Teachers**: Submit or update program points, create bands, add band members.
-    *   **Admins/Secretaries**: List program points, change program point status, configure event settings, schedule program points (incorporating local checks for teacher/lesson conflicts), request feedback.
-    *   **Cleanup**: On shutdown, deletes all generated data (cascaded delete from the temporary school) to keep the DB clean.
-*   **Database connection**: Employs `@supabase/supabase-js` `createClient`. Overrides global `fetch` to inject `x-user-id` and `x-invite-school-id` headers for RLS routing.
-*   **Dependencies**: Uses npm packages `dotenv`, `@supabase/supabase-js`, and Node.js built-ins `fs`, `path`, `crypto`.
+#### Homework Book (Digitales Hausaufgabenheft)
+- **Tables affected**: `public.progress_matrix`, `public.lessons`
+- **Table references**:
+  - `public.progress_matrix` columns (migration `54_meisterwerk_protocol.sql:10`): `id`, `student_id`, `teacher_id`, `topic_name`, `status`, `is_current_homework`, `teacher_notes`, `homework_notes` (added in migration `102_add_homework_notes_to_progress_matrix.sql`).
+  - `public.lessons` columns (from `TeacherDashboard.tsx:703`): `coach_notes`, `homework`.
+- **Direct write quotes**:
+  - Inserting/updating topics and homework in matrix:
+    ```typescript
+    // apps/groovelab/src/components/CampusTeacherDashboard.tsx:892
+    .from('progress_matrix')
+    .update({
+      status: newDocStatus,
+      is_current_homework: newDocHomework,
+      teacher_notes: newDocNotes,
+      updated_at: new Date().toISOString()
+    })
+    ```
+
+#### Audio Recording & Loopstation Activities
+- **Tables & Storage affected**: Supabase Storage bucket `'campus-assets'`, `public.progress_matrix` (`homework_notes` column)
+- **Functional Description**: The core audio loopstation logic runs strictly in-memory (utilizing HTML5 `AudioContext` and local browser blobs in `GrooveLoopstation.tsx`). However, when export/mixing or recording feedback is sent to the homework book, files are uploaded to storage, and metadata is saved as string entries inside `progress_matrix.homework_notes`.
+- **Direct write quotes**:
+  - Storage upload:
+    ```typescript
+    // apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx:553
+    const { error: uploadErr } = await supabase.storage
+      .from('campus-assets')
+      .upload(filePath, blob);
+    ```
+  - Appending audio metadata with `AUDIO:` prefix:
+    ```typescript
+    // apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx:535
+    const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${audioLabel.trim() || 'Aufnahme'}|${creatorRole}`;
+    setHomeworkNotesList(prev => [...prev, audioMetaStr]);
+    ```
+
+#### XP Gathering, Sticker Rewards & Focus Timer
+- **Tables affected**: `public.student_stats`, `public.avatars`, `public.users`, `public.fokus_logs`, `public.focus_sessions`, `public.progress_matrix` (`homework_notes`)
+- **Table references**:
+  - `public.student_stats` columns (migration `61_student_stats.sql`): `student_id`, `total_focus_minutes`, `monthly_focus_minutes`, `streak_flame`, `last_practice_date`, `current_xp`.
+  - `public.avatars` columns (migration `60_detox_wrapped_matrix.sql:1`): `xp`, `streak_flame`, `last_focus_date`, `evolution_level`, `asset_path` (migration `52_campus_erp_integration.sql:909`).
+  - `public.fokus_logs` columns (migration `60_detox_wrapped_matrix.sql:21` & `115_practice_logbook_columns.sql`): `id`, `user_id`, `song_id`, `duration_minutes`, `is_extra`, `duration_seconds`, `flame_level`, `created_at`.
+  - `public.focus_sessions` columns (migration `103_display_down_focus_sessions.sql`): `id`, `school_id`, `student_id`, `goal_level`, `flame_tier`, `target_duration_seconds`, `streak_time_mastered`, `additional_practice_minutes`, `completed_streak`, `started_at`, `ended_at`.
+- **Direct write quotes**:
+  - Awarding XP (+50 XP) automatically for mastered songs:
+    Trigger functions in `196_award_xp_for_mastered_songs.sql` listen to `user_song_skills` changes:
+    ```sql
+    UPDATE public.avatars SET xp = COALESCE(xp, 0) + 50 WHERE user_id = NEW.user_id;
+    UPDATE public.student_stats SET current_xp = COALESCE(current_xp, 0) + 50 WHERE student_id = NEW.user_id;
+    ```
+  - Appending stickers inside the homework notes:
+    Stickers are stored as text elements in `homework_notes` prefixed by `STICKER:`:
+    ```typescript
+    // apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx:609
+    const stickerMetaStr = `STICKER:${stickerId}|${targetTopic}|${dateStr}`;
+    ```
+  - Upserting stats & logging focus sessions:
+    ```typescript
+    // packages/shared/src/controllers/studentPracticeController.ts:97 & 113
+    await supabase.from('student_stats').upsert({
+      student_id: studentId,
+      total_focus_minutes: totalFocus,
+      monthly_focus_minutes: monthlyFocus,
+      streak_flame: streakFlame,
+      last_practice_date: todayStr,
+      current_xp: currentXp,
+      updated_at: new Date().toISOString()
+    });
+    await supabase.from('fokus_logs').insert({
+      user_id: studentId,
+      duration_minutes: durationMinutes,
+      created_at: new Date().toISOString()
+    });
+    ```
 
 ---
 
-### 1.2 Supabase Credentials & Environment Variables
-We located two `.env.local` files in the workspace (one in the root and one in `apps/groovelab/`):
-```ini
-VITE_SUPABASE_URL=https://supabase.campus-groovelab.de
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwNDE3ODE1LCJleHAiOjQ5MzQwMTc4MTV9.zOsuxweIlQBi7doeBoUqg9aTR6-qzOr0sjsa0Oee5cc
-```
-
-Additionally, the **Service Key** used across several scratch scripts (e.g. `run_exec_sql.ts`, `scratch/simulate_load_15m.mjs`) is:
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys
-```
-
-For direct postgres/psql database connection, the scripts (such as `apps/groovelab/scratch/inspect_server_key.cjs`) connect via SSH:
-*   **Host**: `178.105.10.2`
-*   **Port**: `22`
-*   **User**: `root`
-*   **Authentication**: Private key located at `/Users/patrickhuber/.ssh/id_ed25519`
-*   **Database client command**: `docker exec -i supabase-db psql -U postgres -d postgres`
+### Realistic Load Simulation Setup (simulate_load_realistic_15m.mjs)
+- **Role Mocking Logic**:
+  - Dynamically assigns simulation roles (`simRole`) to partitioned lists per school ID:
+    - 1% of fetched student profiles are designated as `admin`.
+    - 5% of fetched student profiles are designated as `teacher`.
+    - The remaining profiles preserve their status as `student`.
+    - Existing DB teachers/admins keep their roles.
+- **Log Management**:
+  - Staggered log events are accumulated in-memory by `BufferedLogger` (up to 200 items in a memory buffer) and written as batch chunks to file every 2 seconds via `setInterval`.
+- **Database Seeding Logic**:
+  - Seed records are fetched/upserted at startup (`initializeSeedData`):
+    - Fetches existing `songs` and `stations`.
+    - Fetches `campus_events`.
+    - For each simulated school, verifies if a mock band exists (checks `/rest/v1/bands` and `/rest/v1/band_songs`), inserting default values if not.
+    - If no concert event is active for a school, creates a mock `campus_events` record.
+    - Inserts up to 5 mock lessons in `public.lessons` matching simulated student-teacher pairings.
 
 ---
 
-### 1.3 Database Query Findings
-We connected to the Postgres container via SSH and ran inspection queries.
-
-#### A. Schools List (10 newly created dummy schools confirmed)
-The query returned the following schools list (sorted by `created_at` descending):
-```
-                  id                  |              name              |          created_at           
---------------------------------------+--------------------------------+-------------------------------
- 5e0b8364-12dd-43b1-aeb5-17417d53e957 | Beat Lab Essen                 | 2026-06-21 08:54:06.995588+00
- 46bace52-2d7a-4a87-aae2-5778ded238cb | Harmonie Institut Dortmund     | 2026-06-21 08:54:06.652273+00
- ca3c620a-7cde-4281-8522-ae278e137995 | Symphonie Schule Leipzig       | 2026-06-21 08:54:06.226695+00
- d5838bdd-d779-424b-94d3-878d12c60140 | Tonart Akademie Düsseldorf     | 2026-06-21 08:54:05.813074+00
- 532b4d91-67c8-4194-9cde-f231ecb12bdd | Melodie Schule Stuttgart       | 2026-06-21 08:54:05.347468+00
- 109e83b3-a1ff-42f0-95b9-db6562f8e77d | Konservatorium Frankfurt       | 2026-06-21 08:54:04.867648+00
- 01329036-22f0-4424-b9e5-9064df450841 | Rhythmus & Groove Köln         | 2026-06-21 08:54:04.424601+00
- 3bf920b9-49b5-4aca-be79-42359fef3f1f | Musikschule Klangwiese Hamburg | 2026-06-21 08:54:03.893865+00
- 6abb3e70-cd0f-420d-b963-64f977f66a64 | Sound Center München           | 2026-06-21 08:54:03.550091+00
- 41c07ebd-1b59-4f75-8359-408d957dd080 | Akkord Akademie Berlin         | 2026-06-21 08:54:02.93963+00
- dcee77f2-9bc9-4f2a-805e-aaf027869de5 | Load Test Academy dcee77f2     | 2026-06-21 07:54:21.450004+00
- 11111111-1111-1111-1111-111111111111 | Groove Academy                 | 2026-06-16 18:08:52.535491+00
- 74713df2-6176-4a41-a8cd-9fbebe34e9b8 | Musäk Bad Säckingen            | 2026-06-01 04:58:56.762523+00
-(13 rows)
-```
-The 10 newly created dummy schools (created 2026-06-21 at ~08:54 UTC) are successfully confirmed.
-
-#### B. Total and Active Users (confirming ~6,500 active users)
-*   **Total Users Count**: `6,845`
-*   **Active Users Count** (`is_active = true`): `6,726` (confirmed ~6,500 active users).
-
-#### C. Schemas of Inspected Tables
-Columns and data types in the `public` schema for the specified tables are:
-1.  **`users`**:
-    *   `id` (uuid, nullable: NO)
-    *   `school_id` (uuid, nullable: YES)
-    *   `role` (USER-DEFINED/user_role, nullable: YES)
-    *   `first_name` (character varying, nullable: YES)
-    *   `last_name` (character varying, nullable: YES)
-    *   `avatar_url` (text, nullable: YES)
-    *   `qr_token` (uuid, nullable: YES)
-    *   `instrument` (text, nullable: YES)
-    *   `created_at` (timestamp with time zone, nullable: YES)
-    *   `bio` (text, nullable: YES)
-    *   `is_active` (boolean, nullable: YES)
-    *   `nickname` (text, nullable: YES)
-    *   `password_hash` (text, nullable: YES)
-    *   `roles` (ARRAY, nullable: YES)
-    *   `email` (text, nullable: YES)
-    *   *(Note: 87 total columns are present in `users` representing configuration preferences, permissions, and profile details)*.
-2.  **`user_progress`**:
-    *   `id` (uuid, nullable: NO)
-    *   `user_id` (uuid, nullable: YES)
-    *   `exercise_id` (uuid, nullable: YES)
-    *   `current_level` (integer, nullable: YES)
-    *   `progress_percent` (integer, nullable: YES)
-    *   `stage_ready_badge` (boolean, nullable: YES)
-    *   `last_updated` (timestamp with time zone, nullable: YES)
-3.  **`help_requests`**:
-    *   `id` (uuid, nullable: NO)
-    *   `user_id` (uuid, nullable: YES)
-    *   `station_id` (uuid, nullable: YES)
-    *   `status` (USER-DEFINED/request_status, nullable: YES)
-    *   `created_at` (timestamp with time zone, nullable: YES)
-    *   `resolved_at` (timestamp with time zone, nullable: YES)
-    *   `school_id` (uuid, nullable: YES)
-4.  **`band_members`**:
-    *   `id` (uuid, nullable: NO)
-    *   `band_id` (uuid, nullable: YES)
-    *   `user_id` (uuid, nullable: YES)
-    *   `instrument` (text, nullable: NO)
-    *   `confetti_seen` (boolean, nullable: YES)
-    *   `created_at` (timestamp with time zone, nullable: YES)
-    *   `role` (text, nullable: YES)
-    *   `external_name` (text, nullable: YES)
-5.  **`band_song_proposals`**:
-    *   `id` (uuid, nullable: NO)
-    *   `band_id` (uuid, nullable: YES)
-    *   `proposed_by` (uuid, nullable: YES)
-    *   `title` (text, nullable: NO)
-    *   `artist` (text, nullable: NO)
-    *   `youtube_url` (text, nullable: YES)
-    *   `status` (text, nullable: YES)
-    *   `created_at` (timestamp with time zone, nullable: YES)
-6.  **`band_proposal_votes`**:
-    *   `id` (uuid, nullable: NO)
-    *   `proposal_id` (uuid, nullable: YES)
-    *   `user_id` (uuid, nullable: YES)
-    *   `vote` (text, nullable: YES)
-    *   `created_at` (timestamp with time zone, nullable: YES)
-7.  **`band_song_slots`**:
-    *   `id` (uuid, nullable: NO)
-    *   `band_song_id` (uuid, nullable: YES)
-    *   `user_id` (uuid, nullable: YES)
-    *   `instrument` (text, nullable: NO)
-    *   `part_number` (integer, nullable: YES)
-    *   `joined_at` (timestamp with time zone, nullable: YES)
-    *   `status` (text, nullable: YES)
-    *   `is_founder` (boolean, nullable: YES)
-    *   `is_exclusive` (boolean, nullable: YES)
-    *   `external_name` (text, nullable: YES)
-8.  **`lab_planning`**:
-    *   `id` (uuid, nullable: NO)
-    *   `user_id` (uuid, nullable: YES)
-    *   `school_id` (uuid, nullable: YES)
-    *   `day` (text, nullable: NO)
-    *   `time` (text, nullable: NO)
-    *   `created_at` (timestamp with time zone, nullable: YES)
-
-#### D. Database RPC & View Signatures
-*   **RPC Function `get_schedule_conflicts`**:
-    *   **Arguments**: `p_event_id uuid, p_transition_time integer DEFAULT 10`
-    *   **Result Type**: `TABLE(program_point_id uuid, conflict_type text, conflict_message text)`
-    *   **Logic**: Loops through program points of an event per stage in sort order, computes temporal timelines (start and end times) including transition overhead, and returns overlaps as double-booked lessons (`l.start_time` / duration check) or stage conflicts (same teacher scheduled elsewhere).
-*   **Database View `school_user_statistics`**:
-    *   **Details**: The query confirmed that `school_user_statistics` is **NOT** a database RPC function but is in fact a **Database View**.
-    *   **Definition File**: Found in `supabase/migrations/177_school_user_statistics_view.sql`.
-    *   **SQL Definition**:
-        ```sql
-        CREATE OR REPLACE VIEW public.school_user_statistics WITH (security_invoker = true) AS
-        SELECT 
-            school_id,
-            COUNT(CASE WHEN role IN ('teacher', 'admin') THEN 1 END)::int AS teachers,
-            COUNT(CASE WHEN role = 'student' THEN 1 END)::int AS students,
-            COUNT(CASE WHEN role IN ('teacher', 'admin') AND is_campus_active THEN 1 END)::int AS teachers_campus,
-            COUNT(CASE WHEN role IN ('teacher', 'admin') AND is_groovelab_active THEN 1 END)::int AS teachers_groovelab,
-            COUNT(CASE WHEN role = 'student' AND is_campus_active THEN 1 END)::int AS students_campus,
-            COUNT(CASE WHEN role = 'student' AND is_groovelab_active THEN 1 END)::int AS students_groovelab
-        FROM public.users_raw
-        GROUP BY school_id;
-        ```
-    *   **Columns**:
-        *   `school_id` (uuid, YES)
-        *   `teachers` (integer, YES)
-        *   `students` (integer, YES)
-        *   `teachers_campus` (integer, YES)
-        *   `teachers_groovelab` (integer, YES)
-        *   `students_campus` (integer, YES)
-        *   `students_groovelab` (integer, YES)
+### VPS Connection Credentials
+SSH connections inside the script tooling execute SQL queries directly on the DB container via the following parameters (verified from `run_ssh_query.js` and `inspect_server.cjs`):
+- **Host**: `178.105.10.2`
+- **Port**: `22`
+- **Username**: `root`
+- **Password**: `LlYoQzfwy$v=`
+- **SQL Execution Method**: `docker exec -i supabase-db psql -U postgres -d postgres`
 
 ---
 
 ## 2. Logic Chain
 
-1.  **Simulations Analysis**: By locating and inspecting `scratch/simulate_load_15m.mjs`, `apps/groovelab/scratch/simulate_student_load.py`, and `apps/groovelab/src/tests/simulate_load.ts`, we resolved their operational flows, client request routines, and authorization strategies (using custom headers `x-user-id` and `x-invite-school-id` for RLS testing).
-2.  **Credential Identification**: Examining `.env.local` files in the root and in `apps/groovelab/` revealed identical Supabase URL (`https://supabase.campus-groovelab.de`) and anon keys. We also identified the master SSH connection credentials (`host: '178.105.10.2'`, `user: 'root'`) and private key (`/Users/patrickhuber/.ssh/id_ed25519`) from `apps/groovelab/scratch/inspect_server_key.cjs`.
-3.  **Database Connection and Inspection**: Using the SSH parameters, we established a connection and successfully inspected the DB tables.
-    *   Listing schools and sorting by `created_at` confirmed the 10 dummy schools created on 2026-06-21.
-    *   Counting rows in `users` table verified that `active_users` equals `6,726` and `total_users` equals `6,845`, confirming the count requirements.
-    *   We queried `information_schema.columns` to extract schemas for the 8 target tables.
-    *   We queried `pg_proc` for `get_schedule_conflicts` and `school_user_statistics`. Finding no function for the latter, we widened our search using `grep_search` and identified `supabase/migrations/177_school_user_statistics_view.sql` establishing that it is defined as a view, which we subsequently verified by querying view columns.
+1. **Sickness report triggers workflow propagation**: A write to `users.sick_until` automatically cascades cancellations on `schedules` and `schedule_occurrences` for that timeframe in the application layer (`TeacherDashboard.tsx`). Simultaneously, new warning entries are appended to `crisis_notifications` (for the impacted student views) and `system_alerts` (for administrative secretary review boards).
+2. **Rescheduling maps directly to room occupancy**: Moving an occurrence update triggers a deletion of the old `room_bookings` row and inserts a corresponding entry to `room_bookings` for the new slot, unless the lesson falls within the teacher's regular template hours.
+3. **Loopstation storage bypasses DB bloat limits**: High-bandwidth audio blobs are kept strictly in-memory during editing, but upon completion, they are uploaded directly to the `'campus-assets'` storage bucket. The database table `progress_matrix` only stores a small reference string (`AUDIO:http...`) in the `homework_notes` column, complying with user rules banning base64 storage.
+4. **Stickers and XP inherit a unified structure**: XP changes cascade down to `avatars` and `student_stats` via PostgreSQL trigger hooks, whereas Sticker rewards are encoded directly as `'STICKER:sticker_id|topic|date'` string entries in the student's `homework_notes` array column, keeping database schemas lightweight.
 
 ---
 
 ## 3. Caveats
 
-*   **SSH Credentials**: The SSH configuration is hardcoded in the scratch files. If server details or credentials change, the query script will fail.
-*   **Active Users definition**: Active users are defined as `is_active = true`. If this flag semantics changes, the active count will differ.
+- **Missing UI bindings for focus_sessions**: Although table `focus_sessions` is fully declared in migration `103_display_down_focus_sessions.sql`, it is currently only referenced inside the shared backend practice controller (`studentPracticeController.ts`). The main React frontend `StudentAvatarDashboard.tsx` uses `fokus_logs` instead. Both must be cleared during cleanup.
+- **Production database write permission limits**: The RLS policies on production tables are historically disabled for MVP local dev, but the production VPS might enforce strict auth policies. Ensure `serviceKey` auth headers are used in load testing.
 
 ---
 
 ## 4. Conclusion
 
-1.  **10 Dummy Schools**: Confirmed active in database (created on 2026-06-21 at 08:54 UTC).
-2.  **User Counts**: Confirmed `6,726` active users out of `6,845` total users.
-3.  **Schemas**: Table existence and structure verified for `users`, `user_progress`, `help_requests`, `band_members`, `band_song_proposals`, `band_proposal_votes`, `band_song_slots`, and `lab_planning`.
-4.  **RPCs & Views**: `get_schedule_conflicts` exists as a PL/pgSQL database function. `school_user_statistics` is **not** an RPC function, but is instead implemented as a database VIEW aggregating counts of students/teachers (for campus and groovelab modes) from `public.users_raw` grouped by `school_id`.
+### Target Simulation Schemas & Fields
+To safely run load simulations without contaminating production user metrics, the following mock structures and required fields must be utilized:
+
+| Action | Target Table / Path | Key Fields |
+|---|---|---|
+| **Krankmeldung** | `users` | `id` (UUID), `sick_start` (DATE), `sick_until` (TIMESTAMPTZ) |
+| | `crisis_notifications` | `teacher_id` (UUID), `student_id` (UUID), `slot_start_datetime` (TIMESTAMPTZ), `status` ('UNREAD') |
+| | `system_alerts` | `school_id`, `teacher_id`, `type` ('Teacher Illness Alert'), `message` (TEXT), `resolved` (false) |
+| **Reschedule** | `schedule_occurrences` | `student_id` (UUID), `teacher_id` (UUID), `date` (DATE), `start_time` (TIME), `duration` (INT), `status` ('pending_reschedule'), `original_date` (DATE) |
+| **Raumbuchung** | `room_bookings` | `school_id` (UUID), `room_id` (UUID), `booked_by` (UUID), `date` (DATE), `start_time` (TIME), `end_time` (TIME), `title` (TEXT) |
+| **Hausaufgaben** | `progress_matrix` | `student_id` (UUID), `teacher_id` (UUID), `topic_name` (VARCHAR), `status` ('IN_PROGRESS'), `is_current_homework` (true), `teacher_notes` (TEXT), `homework_notes` (TEXT[]) |
+| **Audio Feed** | Storage `campus-assets` | File Path: `avatars/audio_feedback_${studentId}_feedback_${timestamp}.mp3` |
+| **Sticker Award** | `progress_matrix` | `homework_notes` appends: `'STICKER:stickerId\|topicName\|dateStr'` |
+| **Focus Session** | `fokus_logs` | `user_id` (UUID), `duration_minutes` (INT), `is_extra` (bool), `duration_seconds` (INT) |
+| | `focus_sessions` | `school_id`, `student_id`, `goal_level` (INT), `flame_tier` (VARCHAR), `target_duration_seconds` (INT), `started_at` (TIMESTAMPTZ), `ended_at` (TIMESTAMPTZ) |
+
+### Non-Disruptive Cleanup Routines
+After running load simulations, the following queries must be executed to remove mock entries and restore initial user profiles:
+
+```sql
+-- 1. Revert user sickness fields
+UPDATE users SET sick_start = NULL, sick_until = NULL WHERE id IN (SELECT id FROM users WHERE is_simulation_user = true);
+
+-- 2. Restore schedules and occurrences status
+UPDATE schedules SET status = 'approved' WHERE status = 'canceled_by_teacher_sick' AND school_id = :sim_school_id;
+UPDATE schedule_occurrences SET status = 'scheduled' WHERE status = 'cancelled' AND teacher_id IN (SELECT id FROM users WHERE is_simulation_user = true);
+
+-- 3. Delete temporary warnings, bookings, and alerts
+DELETE FROM crisis_notifications WHERE teacher_id IN (SELECT id FROM users WHERE is_simulation_user = true);
+DELETE FROM system_alerts WHERE type = 'Teacher Illness Alert' AND school_id = :sim_school_id;
+DELETE FROM room_bookings WHERE booked_by IN (SELECT id FROM users WHERE is_simulation_user = true);
+DELETE FROM schedules WHERE status = 'approved' AND created_at >= :simulation_start;
+DELETE FROM schedule_occurrences WHERE created_at >= :simulation_start;
+
+-- 4. Clean up mock homework notes
+DELETE FROM progress_matrix WHERE topic_name LIKE 'SimTopic_%';
+
+-- 5. Delete focus logs and focus sessions
+DELETE FROM fokus_logs WHERE created_at >= :simulation_start;
+DELETE FROM focus_sessions WHERE created_at >= :simulation_start;
+
+-- 6. Deduct XP and restore avatar stages
+UPDATE student_stats SET current_xp = GREATEST(0, current_xp - :sim_xp_gained), total_focus_minutes = total_focus_minutes - :sim_focus_mins WHERE student_id IN (SELECT id FROM users WHERE is_simulation_user = true);
+UPDATE avatars SET xp = GREATEST(0, xp - :sim_xp_gained), evolution_level = 1, asset_path = '/avatars/silhouette_default.png' WHERE user_id IN (SELECT id FROM users WHERE is_simulation_user = true);
+UPDATE users SET avatar_url = '/avatars/silhouette_default.png' WHERE id IN (SELECT id FROM users WHERE is_simulation_user = true);
+```
+
+For Supabase Storage cleanup:
+```typescript
+// Remove all files matching the simulation pattern
+const { data, error } = await supabase.storage.from('campus-assets').list('avatars');
+const simFiles = data.filter(f => f.name.includes('_loopmix_') || f.name.includes('_feedback_')).map(f => `avatars/${f.name}`);
+if (simFiles.length > 0) {
+  await supabase.storage.from('campus-assets').remove(simFiles);
+}
+```
 
 ---
 
 ## 5. Verification Method
 
-To verify these database findings independently:
-1.  Run the inspection script via SSH using:
-    ```bash
-    node scratch/inspect_db.js
-    ```
-2.  Inspect the output to confirm schools list, user counts, schemas, and RPC/view details match this report.
+- **SSH Database Auditing**:
+  To verify if the schemas exist and tables align with the documented types, connect to the database container using the SSH credentials:
+  ```bash
+  ssh -p 22 root@178.105.10.2
+  # Inside host:
+  docker exec -it supabase-db psql -U postgres -d postgres -c "\d"
+  ```
+- **Local Application Test Scripts**:
+  Validate code consistency by running local tests:
+  ```bash
+  node tests/validate_groovelab.mjs
+  node tests/security_rls_isolation.mjs
+  ```

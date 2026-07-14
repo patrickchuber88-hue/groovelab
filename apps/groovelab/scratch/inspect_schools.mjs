@@ -5,10 +5,11 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsIm
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
-  const { data, error } = await supabase
+  const { data: schools, error } = await supabase
     .from('schools')
-    .select('opening_hours');
+    .select('id, name, created_at, is_trial, trial_ends_at, is_billing_booked')
+    .order('created_at', { ascending: false });
   console.log("Error:", error);
-  console.log("Opening Hours detail:", JSON.stringify(data?.[0]?.opening_hours, null, 2));
+  console.log("Schools in DB:", schools);
 }
 run();

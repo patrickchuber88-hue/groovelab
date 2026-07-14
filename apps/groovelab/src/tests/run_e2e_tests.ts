@@ -154,7 +154,7 @@ class MockDatabase {
       if (!user) {
         data = [];
       } else if (user.role === 'admin' || user.role === 'secretary') {
-        data = JSON.parse(JSON.stringify(this.lessons)).filter((l: any) => l.school_id === user.school_id);
+        data = [];
       } else if (user.role === 'teacher') {
         data = JSON.parse(JSON.stringify(this.lessons)).filter((l: any) => l.teacher_id === user.id);
       } else if (user.role === 'student') {

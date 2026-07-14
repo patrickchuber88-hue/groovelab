@@ -142,5 +142,48 @@ Ensure that authentication sessions (managed via Supabase) are properly validate
 ### Routing & Authentication
 - [ ] Accessing `/` when unauthenticated renders `LandingPage`.
 - [ ] Accessing `/login` when unauthenticated renders `LoginScreen`.
-- [ ] Clicking "Anmelden" on the landing page routes to `/login`.
 - [ ] If already authenticated, accessing `/` or `/login` redirects automatically to the respective dashboard.
+
+
+## 2026-07-12T19:31:50Z
+
+Simulation und Belastungstest für die Campus-Groovelab Applikation mit steigender Benutzeranzahl.
+
+Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+Integrity mode: development
+
+## Requirements
+
+### R1. Belastungssimulation starten
+- Simulation der aktiven Nutzung beginnend mit 8 Schulen, 50 Lehrern und 500 Schülern pro Schule.
+- Simuliert werden sollen Aktionen wie:
+  - Krankheitsmeldung
+  - Terminverschiebung
+  - Räume buchen
+  - Digitales Hausaufgabenheft
+  - Audio-Aufnahmen & Loopstation-Aktivitäten
+  - XP-Sammeln & Sticker-Belohnungen
+  - Fokus-Timer
+- Die API-Calls sollen über die Supabase-Clientverbindung durchgeführt werden.
+
+### R2. Ressourcen-Analyse & Server-Monitoring
+- Live-Abfrage der Server-Statistiken auf dem VPS `178.105.10.2` via SSH (uptime, free -m, df -h, CPU-Last etc.).
+- Analyse von CPU-Auslastung, RAM-Verbrauch, Festplattenspeicher (Datenbank/Storage) und API-Latenzen (p95, Average).
+- Identifikation der rechenintensivsten und speicherintensivsten Funktionen.
+
+### R3. Iterative Skalierung
+- Wenn das System unter den Grenzwerten bleibt (CPU-Last < 8.0, p95-Latenz < 800ms, Fehlerrate < 8%), werden die Werte (Anzahl Schulen und User) für die nächste Stufe verdoppelt (z.B. 16 Schulen, 100 Lehrer, 1000 Schüler pro Schule, und so weiter).
+- Der Prozess wiederholt sich, bis ein Limit detektiert wird.
+
+### R4. Sicherheit & Datenschutz
+- Es dürfen keine echten Benutzerdaten gelöscht oder beeinträchtigt werden. Alle temporär erstellten Schulen und Benutzer müssen nach jedem Testlauf bzw. nach Ende des gesamten Tests physisch und rückstandslos gelöscht werden (Clean-Up).
+- Die Namens-Anonymisierung und Datenschutz-Standards (gemäß Projekt-Regeln) müssen bei der Generierung der Testdaten beachtet werden (z. B. keine SEPA- oder Vertragsdaten, Namens-Anonymisierung auf Vorname + Anfangsbuchstabe Nachname).
+
+## Acceptance Criteria
+
+### Simulationsdurchführung
+- [ ] Vollständige Durchführung der Belastungssimulation auf dem Testserver, bis ein Limit erreicht ist.
+- [ ] Ausführlicher Report in einer neuen oder aktualisierten Markdown-Datei (`simulation_stress_report.md`), die alle Teststufen (Schulen, User, Durchsatz req/s, Latenzen, CPU/RAM/Swap-Werte und Fehlerquote) übersichtlich alistet.
+- [ ] Detaillierte Angabe, welche spezifische Funktion (z.B. Loopstation-Spuren, Fokus-Timer, Raum-Engine) die meiste CPU-Last bzw. den meiste Speicher benötigt.
+- [ ] Vollständiger Clean-Up aller während des Tests angelegten Schulen, Benutzer und zugehöriger DB-Einträge.
+

@@ -5286,19 +5286,19 @@ function App() {
 
     try {
       if (loggedInUserId) {
-        // Mark user as offline in background
+        // Mark user as offline
         const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
-        supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId)
-          .then(({ error }) => { if (error) console.error('Error updating last_seen on logout:', error); });
+        const { error } = await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
+        if (error) console.error('Error updating last_seen on logout:', error);
       }
 
       if (updateDb && currentSession?.id) {
-        // Session beenden in background
-        supabase
+        // Session beenden
+        const { error } = await supabase
           .from('sessions')
           .update({ check_out_time: new Date().toISOString() })
-          .eq('id', currentSession.id)
-          .then(({ error }) => { if (error) console.error('Error ending session on logout:', error); });
+          .eq('id', currentSession.id);
+        if (error) console.error('Error ending session on logout:', error);
       }
     } catch (err) {
       console.error('Logout error:', err);

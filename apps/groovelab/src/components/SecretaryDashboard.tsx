@@ -171,18 +171,38 @@ interface PendingSchedule {
 }
 
 // Replicated Helpers and Components from TeacherDashboard for 1:1 Live Lab Layout
-const AvatarImage = React.memo(({ src, style, className, user, userId, onClick }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void }) => {
+const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, activePlatform }: { src: string | null, style?: React.CSSProperties, className?: string, user?: any, userId?: string, onClick?: () => void, activePlatform?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   const displaySrc = React.useMemo(() => {
     const r = (user?.role || '').toLowerCase();
-    if (r === 'admin' || r === 'secretary') {
+    const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
+    if ((r === 'admin' || r === 'secretary') && activePlat === 'campus') {
       return '/campus_login_hero.png';
+    }
+    if (activePlat === 'groovelab') {
+      const isTeacherAvatar = src && (
+        src.includes('teacher_') ||
+        src.includes('avatar_teacher')
+      );
+      if (r === 'teacher' || r === 'admin' || r === 'secretary') {
+        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
+      }
+      const isStudent = src && (
+        src.includes('student_') ||
+        src.includes('bandstyle_') ||
+        src.includes('teen_') ||
+        src.includes('avatar_boy') ||
+        src.includes('avatar_girl')
+      );
+      if (r === 'student') {
+        return isStudent ? src : '/avatar_ghost.jpg';
+      }
     }
     if (hasError || !src) return '/avatar_ghost.jpg';
     return src;
-  }, [src, hasError, user]);
+  }, [src, hasError, user, activePlatform]);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -350,8 +370,8 @@ const getCompressedRoomCoordinates = (rStations: any[], aspect: number): Compres
   return { stations: compressedStations, minX, maxX, minY, maxY, F };
 };
 
-const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName }: { 
-  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string
+const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProfileSelect, onLogout, hasHelpRequest, customName, activePlatform }: { 
+  num: number, color: string, inst: string, sess: any, isMe: boolean, viewMode: string, onProfileSelect: (u: any) => void, onLogout: (id: string) => void, hasHelpRequest?: boolean, customName?: string, activePlatform?: string
 }) => {
   const stationName = customName || sess?.stations?.name || `iPad ${num}`;
   const isActive = !!sess;
@@ -453,7 +473,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               marginBottom: '4px',
               transition: 'all 0.3s ease'
             }}>
-              <AvatarImage src={sess.users?.photo_url} user={sess.users} />
+              <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
             </div>
             <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
               <div style={{ 
@@ -485,7 +505,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   );
 });
 
-const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], onProfileSelect: (u: any) => void }) => {
+const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -526,10 +546,10 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect }: { coaches: any[], 
               }}
             >
               <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0 }}>
-                <AvatarImage src={c.users?.photo_url || c.photo_url} user={c.users || c} />
+                <AvatarImage src={c.users?.photo_url || c.photo_url} user={c.users || c} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
-                <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name || c.first_name} {c.users?.last_name?.[0] || c.last_name?.[0]}.</div>
+                <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name || c.first_name} {activePlatform === 'groovelab' ? (c.users?.last_name || c.last_name || '') : `${c.users?.last_name?.[0] || c.last_name?.[0] || ''}.`}</div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer'}</div>
               </div>
             </div>
@@ -743,6 +763,7 @@ interface SecretaryDashboardProps {
   userId?: string;
   onLogout?: () => void;
   onRoleSwitched?: (newRole: string) => void;
+  activePlatform?: string;
 }
 
 const getAlphabeticalColor = (name: string) => {
@@ -1069,7 +1090,7 @@ const parseRoomName = (name: string) => {
   };
 };
 
-export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched }: SecretaryDashboardProps) {
+export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched, activePlatform }: SecretaryDashboardProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const getSchoolNumericId = (id: string): number => {
     if (id === '74713df2-6176-4a41-a8cd-9fbebe34e9b8') return 1;
@@ -1201,7 +1222,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
   const [adHocStudentName, setAdHocStudentName] = useState<string>('');
   const [adHocStartTime, setAdHocStartTime] = useState<string>('14:00');
   const [adHocDuration, setAdHocDuration] = useState<number>(45);
-  const [groovelabSubTab, setGroovelabSubTab] = useState<'live' | 'students' | 'coaches' | 'kiosk'>('live');
+  const [groovelabSubTab, setGroovelabSubTab] = useState<'live' | 'students' | 'coaches' | 'kiosk' | 'settings'>('live');
+  const [teachersManageStudents, setTeachersManageStudents] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_students');
+    return saved !== 'false';
+  });
+  const [teachersManageTeachers, setTeachersManageTeachers] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_teachers');
+    return saved !== 'false';
+  });
   const [pendingBookings, setPendingBookings] = useState<any[]>([]);
   const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
@@ -10906,11 +10935,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
             );
           })}
 
-          {/* If activeTab is GrooveLab */}
           {activeTab === 'groovelab' && [
             { id: 'live', label: 'Live Lab', icon: Monitor },
             { id: 'coaches', label: 'Lehrer', icon: GraduationCap },
-            { id: 'students', label: 'Schüler', icon: Users }
+            { id: 'students', label: 'Schüler', icon: Users },
+            { id: 'settings', label: 'Einstellungen', icon: Settings }
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = groovelabSubTab === item.id;
@@ -18701,7 +18730,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                       zIndex: 100
                                     }}
                                   >
-                                    <CoachesNode coaches={activeCoachesForLayout} onProfileSelect={setSelectedCoachProfile} />
+                                    <CoachesNode coaches={activeCoachesForLayout} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
                                   </div>
                                 );
                               }
@@ -18732,6 +18761,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                                     onProfileSelect={setSelectedStudentForDetail}
                                     onLogout={handleLogoutStudent}
                                     hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                                    activePlatform={activePlatform}
                                   />
                                 </div>
                               );
@@ -18755,7 +18785,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '24px', background: '#ffffff', padding: '24px', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
                     <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                      <CoachesNode coaches={activeCoachesForLayout} onProfileSelect={setSelectedCoachProfile} />
+                      <CoachesNode coaches={activeCoachesForLayout} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} />
                     </div>
                     {roomStations.filter(s => {
                       const sName = s.name || '';
@@ -18779,6 +18809,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                             onProfileSelect={setSelectedStudentForDetail}
                             onLogout={handleLogoutStudent}
                             hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                            activePlatform={activePlatform}
                           />
                         </div>
                       );
@@ -20070,6 +20101,120 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched 
                       onChange={(e) => handleToggleHolidayXp(e.target.checked)}
                       style={{ width: '18px', height: '18px', accentColor: '#fbbc05' }}
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {groovelabSubTab === 'settings' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div className="google-card" style={{ padding: '32px', background: '#ffffff', border: '1.5px solid #e2e8f0', color: '#1e293b', borderRadius: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.4rem', fontWeight: 950, color: '#09090b', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: 'Urbanist' }}>
+                      <Settings size={22} color="#eab308" />
+                      GrooveLab-Rechte &amp; Moduleinstellungen
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                      Definiere hier die Berechtigungen für Lehrkräfte im GrooveLab-Modul deines Campus.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Schüler-Verwaltung Toggle */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: '#fafafa',
+                      border: '1px solid #f1f5f9',
+                      padding: '20px 24px',
+                      borderRadius: '24px',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '80%' }}>
+                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>Schüler hinzufügen &amp; verwalten</span>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          Erlaubt es Lehrkräften, im GrooveLab-Modul neue Schüler-Profile anzulegen, zu bearbeiten oder zu löschen.
+                        </span>
+                      </div>
+                      <div 
+                        onClick={() => {
+                          const val = !teachersManageStudents;
+                          localStorage.setItem('gl_setting_groovelab_teachers_manage_students', String(val));
+                          setTeachersManageStudents(val);
+                        }}
+                        style={{
+                          width: '56px',
+                          height: '32px',
+                          borderRadius: '100px',
+                          background: teachersManageStudents ? '#eab308' : '#cbd5e1',
+                          padding: '3px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: teachersManageStudents ? 'flex-end' : 'flex-start',
+                          transition: 'all 0.3s ease-in-out',
+                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)'
+                        }}
+                      >
+                        <div style={{
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '50%',
+                          background: 'white',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          transition: 'all 0.2s'
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Lehrer-Verwaltung Toggle */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: '#fafafa',
+                      border: '1px solid #f1f5f9',
+                      padding: '20px 24px',
+                      borderRadius: '24px',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '80%' }}>
+                        <span style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>Lehrkräfte hinzufügen &amp; verwalten</span>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          Erlaubt es Lehrkräften, im GrooveLab-Modul Profile anderer Lehrer (Coaches) anzulegen, zu bearbeiten oder zu deaktivieren.
+                        </span>
+                      </div>
+                      <div 
+                        onClick={() => {
+                          const val = !teachersManageTeachers;
+                          localStorage.setItem('gl_setting_groovelab_teachers_manage_teachers', String(val));
+                          setTeachersManageTeachers(val);
+                        }}
+                        style={{
+                          width: '56px',
+                          height: '32px',
+                          borderRadius: '100px',
+                          background: teachersManageTeachers ? '#eab308' : '#cbd5e1',
+                          padding: '3px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: teachersManageTeachers ? 'flex-end' : 'flex-start',
+                          transition: 'all 0.3s ease-in-out',
+                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)'
+                        }}
+                      >
+                        <div style={{
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '50%',
+                          background: 'white',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          transition: 'all 0.2s'
+                        }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

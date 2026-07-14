@@ -22,7 +22,9 @@ import {
   Star,
   Palmtree,
   Eye,
-  EyeOff
+  EyeOff,
+  TrendingUp,
+  Bell
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
@@ -1995,7 +1997,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Heutige Stunden</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📅</div>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Calendar size={14} color="white" />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                   <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.length}</span>
@@ -2015,7 +2019,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Auslastung</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>📈</div>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <TrendingUp size={14} color="white" />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                   <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{rooms.length ? Math.min(100, Math.round((sortedTodaySchedules.length / 9) * 100)) : 75}</span>
@@ -2035,7 +2041,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Offene Alerts</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>🔔</div>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Bell size={14} color="white" />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                   <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{notifications.filter(n => !n.resolved).length}</span>
@@ -2069,7 +2077,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             {notifications.length > 0 && (
               <div style={{ background: 'rgba(30, 41, 59, 0.4)', borderRadius: '24px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.05)', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.1rem' }}>🔔</span>
+                  <Bell size={16} color="#eab308" />
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: 'white', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>[ Terminänderungen & Alerts ]</h3>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

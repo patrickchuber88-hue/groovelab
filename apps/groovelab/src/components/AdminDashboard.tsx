@@ -1445,6 +1445,18 @@ export function AdminDashboard({
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [newTeacher, setNewTeacher] = useState({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' });
 
+  const [teachersManageStudents] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_students');
+    return saved !== 'false';
+  });
+  const [teachersManageTeachers] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_teachers');
+    return saved !== 'false';
+  });
+
+  const canManageStudents = admin?.role === 'admin' || admin?.role === 'secretary' || (admin?.role === 'teacher' && teachersManageStudents);
+  const canManageTeachers = admin?.role === 'admin' || admin?.role === 'secretary' || (admin?.role === 'teacher' && teachersManageTeachers);
+
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomLocation, setNewRoomLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -4748,6 +4760,60 @@ export function AdminDashboard({
                   Archiv
                 </button>
               </div>
+
+              {canManageStudents && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {!showAddStudent && (
+                    <button
+                      onClick={() => {
+                        setShowAddStudent(true);
+                        setShowBulkAddStudents(false);
+                      }}
+                      style={{
+                        background: brandColor,
+                        color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
+                        border: 'none',
+                        padding: '10px 18px',
+                        borderRadius: '16px',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: `0 4px 12px ${brandColor}20`
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={16} /> Schüler hinzufügen
+                    </button>
+                  )}
+                  {!showBulkAddStudents && (
+                    <button
+                      onClick={() => {
+                        setShowBulkAddStudents(true);
+                        setShowAddStudent(false);
+                      }}
+                      style={{
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        border: '1px solid #e2e8f0',
+                        padding: '10px 18px',
+                        borderRadius: '16px',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Users size={16} /> Mehrere anlegen
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -4870,65 +4936,10 @@ export function AdminDashboard({
                 </button>
               </div>
 
-              {/* Clickable Instrument Avatars */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Klasse wählen (Instrument)</label>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '4px 0' }}>
-                  {[
-                    { name: 'Gitarre', label: 'Gitarre' },
-                    { name: 'Bass', label: 'Bass' },
-                    { name: 'Drums', label: 'Drums' },
-                    { name: 'Piano / Keys', label: 'Piano' },
-                    { name: 'Gesang', label: 'Gesang' },
-                    { name: 'Trompete', label: 'Trompete' },
-                    { name: 'Posaune', label: 'Posaune' },
-                    { name: 'Horn', label: 'Horn' },
-                    { name: 'Cello', label: 'Cello' },
-                    { name: 'Geige', label: 'Geige' },
-                    { name: 'Klarinette', label: 'Klarinette' },
-                    { name: 'Querflöte', label: 'Querflöte' },
-                    { name: 'Saxofon', label: 'Saxofon' }
-                  ].map(inst => {
-                    const isActive = defaultInstrumentForBulk === inst.name;
-                    return (
-                      <button
-                        key={inst.name}
-                        type="button"
-                        onClick={() => {
-                          setDefaultInstrumentForBulk(inst.name);
-                          parseBulkInput(bulkInput, inst.name);
-                        }}
-                        style={{
-                          padding: '8px 16px',
-                          borderRadius: '14px',
-                          border: isActive ? `2px solid ${brandColor}` : '2px solid #e2e8f0',
-                          background: isActive ? `${brandColor}0d` : 'white',
-                          color: isActive ? brandColor : '#475569',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.05)' : 'none'
-                        }}
-                      >
-                        <img 
-                          src={getInstrumentAvatarUrl(inst.name)} 
-                          style={{ width: '24px', height: '24px', borderRadius: '6px', objectFit: 'cover' }} 
-                        />
-                        {inst.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Schülerliste (Namen)</label>
                 <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  Füge einen Schülernamen pro Zeile ein. Alle Schüler werden der oben ausgewählten Klasse zugewiesen.
+                  Füge einen Schülernamen pro Zeile ein.
                 </div>
                 <textarea 
                   placeholder="Beispiel:&#10;Lukas Müller&#10;Marie Schmidt&#10;Felix Becker"
@@ -5206,25 +5217,27 @@ export function AdminDashboard({
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', marginLeft: '8px' }}>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
-                      style={{ 
-                        background: "#ffffff", 
-                        border: "1px solid #cbd5e1", 
-                        padding: "8px", 
-                        borderRadius: "10px", 
-                        cursor: "pointer", 
-                        color: "#475569", 
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }} 
-                      className="hover-scale-mini"
-                      title="Bearbeiten"
-                    >
-                      <Pencil size={16} />
-                    </button>
+                    {canManageStudents && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
+                        style={{ 
+                          background: "#ffffff", 
+                          border: "1px solid #cbd5e1", 
+                          padding: "8px", 
+                          borderRadius: "10px", 
+                          cursor: "pointer", 
+                          color: "#475569", 
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }} 
+                        className="hover-scale-mini"
+                        title="Bearbeiten"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    )}
                     <button 
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
                       style={{ 
@@ -5278,7 +5291,121 @@ export function AdminDashboard({
             </div>
             Team
           </h2>
+          {canManageTeachers && !showAddTeacher && (
+            <button
+              onClick={() => {
+                setShowAddTeacher(true);
+                setEditingTeacher(null);
+              }}
+              style={{
+                background: brandColor,
+                color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
+                border: 'none',
+                padding: '10px 18px',
+                borderRadius: '14px',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: `0 4px 12px ${brandColor}20`
+              }}
+              className="hover-scale"
+            >
+              <Plus size={16} /> Lehrkraft hinzufügen
+            </button>
+          )}
         </div>
+
+        {showAddTeacher && (
+          <form onSubmit={handleAddTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}20`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neue Lehrkraft hinzufügen</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
+                <input required placeholder="Vorname" value={newTeacher.firstName} onChange={e => setNewTeacher({...newTeacher, firstName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                <input required placeholder="Nachname" value={newTeacher.lastName} onChange={e => setNewTeacher({...newTeacher, lastName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rolle</label>
+              <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: '12px', padding: '3px' }}>
+                <button
+                  type="button"
+                  onClick={() => setNewTeacher({...newTeacher, isAdmin: false, photoUrl: '/avatar_ghost.jpg'})}
+                  style={{
+                    flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
+                    background: !newTeacher.isAdmin ? '#ffffff' : 'transparent',
+                    color: !newTeacher.isAdmin ? brandColor : '#64748b',
+                    fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: !newTeacher.isAdmin ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Lehrkraft / Coach
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewTeacher({...newTeacher, isAdmin: true, photoUrl: '/campus_login_hero.png'})}
+                  style={{
+                    flex: 1, padding: '8px', border: 'none', borderRadius: '10px',
+                    background: newTeacher.isAdmin ? '#ffffff' : 'transparent',
+                    color: newTeacher.isAdmin ? brandColor : '#64748b',
+                    fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                    boxShadow: newTeacher.isAdmin ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  }}
+                >
+                  Lehrer (Admin)
+                </button>
+              </div>
+            </div>
+
+            {!newTeacher.isAdmin && (
+              <div>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+                  {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
+                    const currentInstruments = (newTeacher.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                    const isSelected = currentInstruments.includes(inst);
+                    return (
+                      <button
+                        key={inst}
+                        type="button"
+                        onClick={() => {
+                          const next = isSelected ? currentInstruments.filter((s: string) => s !== inst) : [...currentInstruments, inst];
+                          setNewTeacher({...newTeacher, instrument: next.join(', ')});
+                        }}
+                        style={{
+                          flex: 1,
+                          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px 8px', borderRadius: '12px', 
+                          border: `1.5px solid ${isSelected ? brandColor : '#e2e8f0'}`,
+                          background: isSelected ? `${brandColor}10` : 'white',
+                          color: isSelected ? '#1e293b' : '#64748b',
+                          fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                          boxShadow: isSelected ? `0 2px 8px ${brandColor}15` : 'none',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
+                        }}
+                      >
+                        <span style={{ fontSize: '1rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst === "Piano / Keys" ? "Piano" : inst}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#1e293b' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Hinzufügen</button>
+              <button type="button" onClick={() => { setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' }); }} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Abbrechen</button>
+            </div>
+          </form>
+        )}
 
         {editingTeacher && (
           <form onSubmit={handleUpdateTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}20`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
@@ -5411,7 +5538,12 @@ export function AdminDashboard({
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
-                onClick={() => setEditingTeacher(t)}
+                onClick={() => {
+                  if (t.id === userId || canManageTeachers) {
+                    setEditingTeacher(t);
+                    setShowAddTeacher(false);
+                  }
+                }}
               >
                 {/* Left accent bar */}
                 <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '6px', background: accentColor, transition: 'background 0.3s' }}></div>
@@ -5432,49 +5564,66 @@ export function AdminDashboard({
                   </div>
 
                   {/* Lehrer / Hospitant Toggle */}
-                  <div
-                    onClick={(e) => handleToggleObserver(t, e)}
-                    title={isObserver ? 'Auf Lehrer-Modus umschalten' : 'Auf Hospitant-Modus umschalten'}
-                    style={{
+                  {(t.id === userId || canManageTeachers) ? (
+                    <div
+                      onClick={(e) => handleToggleObserver(t, e)}
+                      title={isObserver ? 'Auf Lehrer-Modus umschalten' : 'Auf Hospitant-Modus umschalten'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '8px',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        padding: '4px 8px 4px 4px',
+                        borderRadius: '16px',
+                        background: isObserver ? '#f1f5f9' : `${brandColor}10`,
+                        border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`,
+                        transition: 'all 0.25s'
+                      }}
+                    >
+                      {/* Toggle pill */}
+                      <div style={{
+                        width: '36px', height: '20px',
+                        borderRadius: '10px',
+                        background: isObserver ? '#cbd5e1' : brandColor,
+                        position: 'relative',
+                        transition: 'background 0.25s',
+                        flexShrink: 0,
+                        boxShadow: isObserver ? 'none' : `0 2px 6px ${brandColor}30`
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: '2px',
+                          left: isObserver ? '2px' : '18px',
+                          width: '16px', height: '16px',
+                          background: 'white',
+                          borderRadius: '50%',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                          transition: 'left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
+                        }}></div>
+                      </div>
+                      {/* Label */}
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#94a3b8' : brandColor, letterSpacing: '0.02em', transition: 'color 0.25s' }}>
+                        {isObserver ? 'Hospitant' : 'Lehrer aktiv'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '8px',
                       marginBottom: '8px',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      padding: '4px 8px 4px 4px',
+                      padding: '4px 8px',
                       borderRadius: '16px',
                       background: isObserver ? '#f1f5f9' : `${brandColor}10`,
-                      border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`,
-                      transition: 'all 0.25s'
-                    }}
-                  >
-                    {/* Toggle pill */}
-                    <div style={{
-                      width: '36px', height: '20px',
-                      borderRadius: '10px',
-                      background: isObserver ? '#cbd5e1' : brandColor,
-                      position: 'relative',
-                      transition: 'background 0.25s',
-                      flexShrink: 0,
-                      boxShadow: isObserver ? 'none' : `0 2px 6px ${brandColor}30`
+                      border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`
                     }}>
-                      <div style={{
-                        position: 'absolute',
-                        top: '2px',
-                        left: isObserver ? '2px' : '18px',
-                        width: '16px', height: '16px',
-                        background: 'white',
-                        borderRadius: '50%',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                        transition: 'left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
-                      }}></div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#94a3b8' : brandColor, letterSpacing: '0.02em' }}>
+                        {isObserver ? '👁 Hospitant' : 'Lehrer aktiv'}
+                      </span>
                     </div>
-                    {/* Label */}
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#94a3b8' : brandColor, letterSpacing: '0.02em', transition: 'color 0.25s' }}>
-                      {isObserver ? 'Hospitant' : 'Lehrer aktiv'}
-                    </span>
-                  </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                     {t.groovelab_instrument?.split(',')
@@ -5492,7 +5641,9 @@ export function AdminDashboard({
                 {/* Action buttons */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => setSelectedQRUser(t)} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><QrCode size={18} /></button>
-                  <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                  {t.id !== userId && canManageTeachers && (
+                    <button onClick={() => handleDeleteTeacher(t.id)} style={{ background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                  )}
                 </div>
               </div>
             );
@@ -12235,14 +12386,16 @@ export function AdminDashboard({
         const isQRAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
         const dataUrl = await toJpeg(qrCardRef.current, { 
           quality: 0.95, 
-          backgroundColor: (selectedQRUser.role === 'student' || isQRAdminOrSecretary) 
+          backgroundColor: (activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) 
             ? (isQRAdminOrSecretary ? '#7f1d1d' : '#137333') 
             : '#ffffff',
           cacheBust: true,
           pixelRatio: 2,
         });
         const link = document.createElement('a');
-        link.download = (selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? `Campus-Groovelab_Pass_${selectedQRUser.first_name}.jpg` : `Campus-Groovelab_ID_${selectedQRUser.first_name}.jpg`;
+        link.download = (activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) 
+          ? `Campus_Pass_${selectedQRUser.first_name}.jpg` 
+          : `Groovelab_Pass_${selectedQRUser.first_name}.jpg`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
@@ -12250,9 +12403,78 @@ export function AdminDashboard({
       }
     };
 
+    const downloadWalletPass = () => {
+      const passContent = JSON.stringify({
+        passTypeIdentifier: selectedQRUser.role === 'admin' ? 'pass.de.groovelab.admin' : (selectedQRUser.role === 'teacher' ? 'pass.de.groovelab.teacher' : 'pass.de.groovelab.student'),
+        serialNumber: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.id,
+        teamIdentifier: "GROOVELAB",
+        organizationName: "Campus-Groovelab",
+        description: `Campus-Groovelab ${selectedQRUser.role} Pass`,
+        logoText: "Campus-Groovelab",
+        foregroundColor: "rgb(255, 255, 255)",
+        backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
+        labelColor: "rgb(230, 244, 234)",
+        studentName: `${selectedQRUser.first_name} ${selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : ''}`,
+        instrument: selectedQRUser.instrument || (selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
+        qrToken: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token
+      }, null, 2);
+
+      const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `campus-pass-${selectedQRUser.first_name || 'user'}.pkpass`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    };
+
+    const downloadGoogleWalletPass = () => {
+      const passContent = JSON.stringify({
+        classId: `groovelab.${selectedQRUser.role || 'student'}`,
+        id: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.id,
+        state: "ACTIVE",
+        barcode: {
+          type: "QR_CODE",
+          value: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token
+        },
+        cardTitle: {
+          defaultValue: {
+            language: "de-DE",
+            value: "Campus-Groovelab"
+          }
+        },
+        subheader: {
+          defaultValue: {
+            language: "de-DE",
+            value: selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : (selectedQRUser.role === 'teacher' ? 'Lehrkraft' : 'Schüler'))
+          }
+        },
+        header: {
+          defaultValue: {
+            language: "de-DE",
+            value: `${selectedQRUser.first_name} ${selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : ''}`
+          }
+        }
+      }, null, 2);
+
+      const blob = new Blob([passContent], { type: 'application/json' });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `google-wallet-pass-${selectedQRUser.first_name || 'user'}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    };
+
+    const brandColor = activePlatform === 'groovelab' ? '#f59e0b' : '#34a853';
+
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedQRUser(null)}>
-        <div style={{ width: '100%', maxWidth: '400px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: '100%', maxWidth: activePlatform === 'groovelab' ? '290px' : '400px', position: 'relative' }} onClick={e => e.stopPropagation()}>
           {/* Close Button */}
           <button 
             onClick={() => setSelectedQRUser(null)} 
@@ -12264,13 +12486,19 @@ export function AdminDashboard({
           {/* ID Card Design */}
           <div 
             ref={qrCardRef}
-            style={(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? {
-              background: isQRAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
+            style={(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? {
+              background: isQRAdminOrSecretary 
+                ? 'radial-gradient(circle at 80% 10%, rgba(239, 68, 68, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(239, 68, 68, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)' 
+                : 'radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)',
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
-              boxShadow: isQRAdminOrSecretary ? '0 25px 50px -12px rgba(127, 29, 29, 0.5), 0 0 30px rgba(220, 38, 38, 0.2)' : '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
-              border: isQRAdminOrSecretary ? '1.5px solid rgba(220, 38, 38, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)',
+              boxShadow: isQRAdminOrSecretary 
+                ? '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(239, 68, 68, 0.15)' 
+                : '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(16, 185, 129, 0.15)',
+              border: isQRAdminOrSecretary 
+                ? '1.5px solid rgba(239, 68, 68, 0.25)' 
+                : '1.5px solid rgba(16, 185, 129, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -12289,16 +12517,19 @@ export function AdminDashboard({
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
-              width: '100%'
+              width: '100%',
+              aspectRatio: '0.62',
+              boxSizing: 'border-box',
+              border: '1px solid rgba(255,255,255,0.1)'
             }}
           >
-            {(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (
+            {(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? (
               <>
                 {/* Sheen effect */}
                 <div style={{
                   position: 'absolute',
                   top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(255, 255, 255, 0.02) 100%)',
                   pointerEvents: 'none'
                 }} />
 
@@ -12306,7 +12537,7 @@ export function AdminDashboard({
                  <span style={{ 
                    fontSize: '0.68rem', 
                    fontWeight: 900, 
-                   color: '#fbbf24', 
+                   color: isQRAdminOrSecretary ? '#f87171' : '#34d399', 
                    textTransform: 'uppercase', 
                    letterSpacing: '0.2em',
                    zIndex: 1,
@@ -12328,7 +12559,7 @@ export function AdminDashboard({
                        height: '92px', 
                        borderRadius: '22px', 
                        objectFit: 'cover',
-                       border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(52, 168, 83, 0.75)',
+                       border: isQRAdminOrSecretary ? '1.5px solid rgba(239, 68, 68, 0.4)' : '1.5px solid rgba(16, 185, 129, 0.4)',
                        boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
                        flexShrink: 0,
                        marginTop: '2px'
@@ -12354,7 +12585,7 @@ export function AdminDashboard({
                  </div>
 
                 {/* Dashed divider line */}
-                <div style={{ background: isQRAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+                <div style={{ background: isQRAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.25) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
                 {/* QR Code Scan area */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
@@ -12366,7 +12597,7 @@ export function AdminDashboard({
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: isQRAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)'
+                    border: isQRAdminOrSecretary ? '1.5px solid rgba(239, 68, 68, 0.2)' : '1.5px solid rgba(16, 185, 129, 0.2)'
                   }}>
                     <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
                   </div>
@@ -12375,82 +12606,74 @@ export function AdminDashboard({
             ) : (
               <>
                 {/* Lanyard Hole Mockup */}
-                <div style={{ height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-                  <div style={{ width: '36px', height: '8px', borderRadius: '4px', background: '#0f172a' }}></div>
+                <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
+                  <div style={{ width: '30px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
                 </div>
 
                 {/* Status Header */}
-                <div style={{ 
-                  background: selectedQRUser.role === 'student' ? '#eab308' : '#34a853', 
-                  padding: '10px', 
-                  textAlign: 'center',
-                  textTransform: 'uppercase'
-                }}>
-                  <div style={{ color: 'white', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.2em' }}>
-                    {selectedQRUser.role === 'student' ? 'Member Access' : 'Staff / Coach'}
-                  </div>
-                </div>
+                {(() => {
+                  const isQRAdminOrSec = selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary';
+                  const cardHeaderColor = isQRAdminOrSec ? '#ea4335' : (selectedQRUser.role === 'student' ? '#eab308' : '#34a853');
+                  const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (selectedQRUser.role === 'student' ? 'Member Access' : 'Staff / Coach');
+                  return (
+                    <div style={{ 
+                      background: cardHeaderColor, 
+                      padding: '6px', 
+                      textAlign: 'center',
+                      textTransform: 'uppercase'
+                    }}>
+                      <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
+                        {cardBadgeLabel}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Content Area */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 36px 24px', gap: '20px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
                   {/* Portrait */}
                   <div style={{ 
-                    width: '120px', 
-                    height: '120px', 
-                    borderRadius: '50%', 
-                    border: `4px solid ${selectedQRUser.role === 'student' ? '#eab308' : '#34a853'}`,
-                    padding: '4px',
+                    width: '130px', 
+                    height: '130px', 
+                    borderRadius: '100px', 
+                    border: `4px solid ${selectedQRUser.role === 'student' ? '#eab308' : (selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary') ? '#ea4335' : '#34a853'}`,
+                    padding: '6px',
                     background: 'white',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden'
                   }}>
-                    <img 
-                      src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
-                      onLoad={handleQRImageLoad}
-                      crossOrigin={qrAvatarDataUrl?.startsWith('data:') || qrAvatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
-                      alt="Profile"
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        borderRadius: '50%'
-                      }} 
-                    />
+                    <div style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      borderRadius: '50%', 
+                      overflow: 'hidden'
+                    }}>
+                      <StudioAvatar src={selectedQRUser.photo_url} user={selectedQRUser} activePlatform={activePlatform} />
+                    </div>
                   </div>
 
                   {/* Identity */}
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{selectedQRUser.first_name}</div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : 'Member'}</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>{selectedQRUser.first_name}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name || 'Member'}</div>
                   </div>
 
                   {/* QR Code Container */}
                   <div style={{ 
-                    background: 'white', 
-                    padding: '16px', 
-                    borderRadius: '20px',
+                    marginTop: 'auto', 
+                    background: '#f8fafc', 
+                    padding: '12px', 
+                    borderRadius: '16px',
                     border: '1px solid #f1f5f9',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={150} />
+                    <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={110} />
                   </div>
-                  
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', margin: 0, fontWeight: 600, lineHeight: 1.4, maxWidth: '220px' }}>
-                    Halte diesen Code vor die Kamera des iPads,<br />um dich automatisch am Platz anzumelden.
-                  </p>
                 </div>
-
-                {/* Bottom Brand Stripe */}
-                <div style={{ 
-                  height: '12px', 
-                  background: `linear-gradient(90deg, ${selectedQRUser.role === 'student' ? '#34a853' : '#34a853'}, #1e293b, ${selectedQRUser.role === 'student' ? '#34a853' : '#34a853'})` 
-                }}></div>
               </>
             )}
           </div>
@@ -12459,10 +12682,10 @@ export function AdminDashboard({
             onClick={saveAsImage} 
             style={{ 
               width: '100%', 
-              background: (selectedQRUser.role === 'student' || isQRAdminOrSecretary) 
+              background: (activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) 
                 ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') 
-                : '#34a853', 
-              color: 'white', 
+                : brandColor, 
+              color: activePlatform === 'groovelab' ? '#1e293b' : 'white', 
               border: 'none', 
               padding: '20px', 
               borderRadius: '24px', 
@@ -12474,12 +12697,77 @@ export function AdminDashboard({
               justifyContent: 'center', 
               gap: '10px', 
               marginTop: '24px', 
-              boxShadow: `0 15px 35px ${(selectedQRUser.role === 'student' || isQRAdminOrSecretary) ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') : '#34a853'}50`, 
+              boxShadow: `0 15px 35px ${(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') : brandColor}50`, 
               transition: 'all 0.2s' 
             }} 
           >
             <Download size={24} /> Ausweis als JPEG speichern
           </button>
+
+          {/* Wallet integration options */}
+          <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+            <button 
+              onClick={downloadWalletPass}
+              style={{
+                flex: 1,
+                padding: '16px',
+                borderRadius: '20px',
+                border: '1.5px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f8fafc';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#ffffff';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              <span>Apple Wallet</span>
+            </button>
+
+            <button 
+              onClick={downloadGoogleWalletPass}
+              style={{
+                flex: 1,
+                padding: '16px',
+                borderRadius: '20px',
+                border: '1.5px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f8fafc';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#ffffff';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              <span>Google Wallet</span>
+            </button>
+          </div>
 
           {/* Action button for managers to regenerate QR Code */}
           <button
@@ -17037,11 +17325,20 @@ function DeviceSetupScreen({
       {activeSubTab === 'maintenance' && (
         <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '10px', 
+              background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', 
+              color: brandColor, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
               <AlertCircle size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ef4444', margin: 0 }}>Systemwartung & Bereinigung</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: brandColor, margin: 0 }}>Systemwartung & Bereinigung</h2>
               <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '2px 0 0 0' }}>Hier kannst du Datenleichen entfernen und die Datenbank konsistent halten.</p>
             </div>
           </div>
@@ -17055,8 +17352,8 @@ function DeviceSetupScreen({
                 style={{ 
                   width: 'fit-content',
                   background: 'white', 
-                  border: '1px solid #fee2e2', 
-                  color: '#ef4444', 
+                  border: `1px solid ${activePlatform === 'campus' ? '#d1fae5' : '#fef08a'}`, 
+                  color: brandColor, 
                   padding: '10px 18px', 
                   borderRadius: '10px', 
                   fontWeight: 700, 
@@ -17079,8 +17376,8 @@ function DeviceSetupScreen({
                 style={{ 
                   width: 'fit-content',
                   background: 'white', 
-                  border: '1px solid #fee2e2', 
-                  color: '#ef4444', 
+                  border: `1px solid ${activePlatform === 'campus' ? '#d1fae5' : '#fef08a'}`, 
+                  color: brandColor, 
                   padding: '10px 18px', 
                   borderRadius: '10px', 
                   fontWeight: 700, 
@@ -17122,8 +17419,8 @@ function DeviceSetupScreen({
                 style={{ 
                   width: 'fit-content',
                   background: 'white', 
-                  border: '1px solid #fee2e2', 
-                  color: '#ef4444', 
+                  border: `1px solid ${activePlatform === 'campus' ? '#d1fae5' : '#fef08a'}`, 
+                  color: brandColor, 
                   padding: '10px 18px', 
                   borderRadius: '10px', 
                   fontWeight: 700, 

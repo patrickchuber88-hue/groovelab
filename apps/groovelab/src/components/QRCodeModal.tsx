@@ -2,6 +2,7 @@ import QRCode from 'react-qr-code';
 import { X, Download, RefreshCw } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { StudioAvatar } from './StudioAvatar';
 
 interface QRCodeModalProps {
   user: {
@@ -215,7 +216,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     const isAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
 
     let originalUrl = user.photo_url || '/avatar_ghost.jpg';
-    if (isAdminOrSecretary) {
+    if (isAdminOrSecretary && activePlatform === 'campus') {
       originalUrl = '/campus_login_hero.png';
     } else if (activePlatform === 'campus') {
       originalUrl = getInstrumentAvatarUrl(user.instrument);
@@ -261,7 +262,13 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         user.photo_url.includes('bariton_avatar') || 
         user.photo_url.includes('oboe_avatar')
       );
-      if (!user.photo_url || isInstrumentAvatar || user.photo_url === '/avatar_ghost.jpg') {
+      const isTeacherAvatar = user.photo_url && (
+        user.photo_url.includes('teacher_') ||
+        user.photo_url.includes('avatar_teacher')
+      );
+      if (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') {
+        originalUrl = (isTeacherAvatar && user.photo_url) ? user.photo_url : '/avatar_ghost.jpg';
+      } else if (!user.photo_url || isInstrumentAvatar || user.photo_url === '/avatar_ghost.jpg') {
         originalUrl = getDefaultMusicianAvatarUrl(user.instrument, user.role);
       }
     }
@@ -428,7 +435,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     >
       <div 
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '400px', width: '100%', position: 'relative' }}
+        style={{ maxWidth: activePlatform === 'groovelab' ? '290px' : '400px', width: '100%', position: 'relative' }}
       >
         {/* Close Button */}
         <button 
@@ -457,12 +464,18 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           <div 
             ref={cardRef} 
             style={{
-              background: isAdminOrSecretary ? 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)' : 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
+              background: isAdminOrSecretary 
+                ? 'radial-gradient(circle at 80% 10%, rgba(239, 68, 68, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(239, 68, 68, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)' 
+                : 'radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)',
               borderRadius: '32px', 
               padding: '28px', 
               color: 'white',
-              boxShadow: isAdminOrSecretary ? '0 25px 50px -12px rgba(127, 29, 29, 0.5), 0 0 30px rgba(220, 38, 38, 0.2)' : '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 30px rgba(52, 168, 83, 0.2)',
-              border: isAdminOrSecretary ? '1.5px solid rgba(220, 38, 38, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)',
+              boxShadow: isAdminOrSecretary 
+                ? '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(239, 68, 68, 0.15)' 
+                : '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(16, 185, 129, 0.15)',
+              border: isAdminOrSecretary 
+                ? '1.5px solid rgba(239, 68, 68, 0.25)' 
+                : '1.5px solid rgba(16, 185, 129, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
@@ -479,7 +492,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
             <div style={{
               position: 'absolute',
               top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(255, 255, 255, 0.02) 100%)',
               pointerEvents: 'none'
             }} />
 
@@ -487,7 +500,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
              <span style={{ 
                fontSize: '0.68rem', 
                fontWeight: 900, 
-               color: '#fbbf24', 
+               color: isAdminOrSecretary ? '#f87171' : '#34d399', 
                textTransform: 'uppercase', 
                letterSpacing: '0.2em',
                zIndex: 1,
@@ -508,7 +521,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                    height: '92px', 
                    borderRadius: '22px', 
                    objectFit: 'cover',
-                   border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.75)' : '1.5px solid rgba(52, 168, 83, 0.75)',
+                   border: isAdminOrSecretary ? '1.5px solid rgba(239, 68, 68, 0.4)' : '1.5px solid rgba(16, 185, 129, 0.4)',
                    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
                    flexShrink: 0,
                    marginTop: '2px'
@@ -534,7 +547,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
              </div>
 
             {/* Dashed divider line */}
-            <div style={{ background: isAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(251, 191, 36, 0.3) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(52, 168, 83, 0.3) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
+            <div style={{ background: isAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.25) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
 
             {/* QR Code Scan area */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
@@ -546,7 +559,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                border: isAdminOrSecretary ? '1.5px solid rgba(251, 191, 36, 0.3)' : '1.5px solid rgba(52, 168, 83, 0.3)'
+                border: isAdminOrSecretary ? '1.5px solid rgba(239, 68, 68, 0.2)' : '1.5px solid rgba(16, 185, 129, 0.2)'
               }}>
                 <QRCode value={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={135} />
               </div>
@@ -562,93 +575,81 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               flexDirection: 'column',
               boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
               overflow: 'hidden',
-              width: '100%'
+              width: '100%',
+              aspectRatio: '0.62',
+              boxSizing: 'border-box',
+              border: '1px solid rgba(255,255,255,0.1)'
             }}
           >
             {/* Lanyard Hole Mockup */}
-            <div style={{ height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-              <div style={{ width: '36px', height: '8px', borderRadius: '4px', background: '#0f172a' }}></div>
+            <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
+              <div style={{ width: '30px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
             </div>
 
             {/* Status Header */}
-            <div style={{ 
-              background: user.role === 'student' ? brandColor : '#f59e0b', 
-              padding: '10px', 
-              textAlign: 'center',
-              textTransform: 'uppercase'
-            }}>
-              <div style={{ color: 'white', fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.2em' }}>
-                {user.role === 'student' ? 'Member Access' : 'Staff / Coach'}
-              </div>
-            </div>
+            {(() => {
+              const isQRAdminOrSec = user.role === 'admin' || user.role === 'secretary';
+              const cardHeaderColor = isQRAdminOrSec ? '#ea4335' : (user.role === 'student' ? '#eab308' : '#34a853');
+              const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (user.role === 'student' ? 'Member Access' : 'Staff / Coach');
+              return (
+                <div style={{ 
+                  background: cardHeaderColor, 
+                  padding: '6px', 
+                  textAlign: 'center',
+                  textTransform: 'uppercase'
+                }}>
+                  <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
+                    {cardBadgeLabel}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Content Area */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px 36px 24px', gap: '20px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
               {/* Portrait */}
               <div style={{ 
-                width: '120px', 
-                height: '120px', 
-                borderRadius: '50%', 
-                border: `4px solid ${user.role === 'student' ? brandColor : '#f59e0b'}`,
-                padding: '4px',
+                width: '130px', 
+                height: '130px', 
+                borderRadius: '100px', 
+                border: `4px solid ${user.role === 'student' ? '#eab308' : (user.role === 'admin' || user.role === 'secretary') ? '#ea4335' : '#34a853'}`,
+                padding: '6px',
                 background: 'white',
-                boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden'
               }}>
-                <img 
-                  src={avatarDataUrl || '/avatar_ghost.jpg'} 
-                  alt="Profile"
-                  crossOrigin={avatarDataUrl?.startsWith('data:') || avatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'cover',
-                    borderRadius: '50%'
-                  }} 
-                />
+                <div style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  borderRadius: '50%', 
+                  overflow: 'hidden'
+                }}>
+                  <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} />
+                </div>
               </div>
 
               {/* Identity */}
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{user.first_name}</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{user.last_name ? user.last_name.charAt(0) + '.' : 'Member'}</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>{user.first_name}</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{user.last_name || 'Member'}</div>
               </div>
 
               {/* QR Code Container */}
               <div style={{ 
-                background: 'white', 
-                padding: '16px', 
-                borderRadius: '20px',
+                marginTop: 'auto', 
+                background: '#f8fafc', 
+                padding: '12px', 
+                borderRadius: '16px',
                 border: '1px solid #f1f5f9',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <QRCode value={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={150} />
+                <QRCode value={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || ''}`} size={110} />
               </div>
-
-              <p style={{ 
-                fontSize: '0.75rem', 
-                color: '#94a3b8', 
-                textAlign: 'center', 
-                margin: '0', 
-                fontWeight: 600, 
-                lineHeight: 1.4,
-                maxWidth: '220px'
-              }}>
-                Halte diesen Code vor die Kamera des iPads,<br/>um dich automatisch am Platz anzumelden.
-              </p>
             </div>
-
-            {/* Bottom Brand Stripe */}
-            <div style={{ 
-              height: '12px', 
-              background: `linear-gradient(90deg, ${user.role === 'student' ? brandColor : '#f59e0b'}, #1e293b, ${user.role === 'student' ? brandColor : '#f59e0b'})` 
-            }}></div>
           </div>
         )}
 

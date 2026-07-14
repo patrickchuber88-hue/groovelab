@@ -71,15 +71,54 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   if (role === 'admin' || role === 'secretary') {
     displaySrc = '/campus_login_hero.png';
   } else if (activePlat === 'campus') {
-    if (targetUser) {
-      if (role === 'student' || role === 'teacher') {
-        displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser.instrument);
-      }
-    } else {
+    // In Campus module, musician/instrument avatars are strictly prohibited.
+    // We only show custom non-avatar photos, otherwise default to /avatar_ghost.jpg
+    const isMusicianOrInstrumentAvatar = src && (
+      src.includes('student_') ||
+      src.includes('bandstyle_') ||
+      src.includes('teen_') ||
+      src.includes('avatar_boy') ||
+      src.includes('avatar_girl') ||
+      src.includes('avatar.png') || 
+      src.includes('avatar_new') ||
+      src.includes('_avatar') ||
+      src.includes('guitar_avatar') || 
+      src.includes('gitarre_avatar') || 
+      src.includes('ebass_avatar') || 
+      src.includes('egitarre_avatar') || 
+      src.includes('kontrabass_avatar') || 
+      src.includes('bass_avatar') || 
+      src.includes('drums_avatar') || 
+      src.includes('schlagzeug_avatar') || 
+      src.includes('piano_avatar') || 
+      src.includes('klavier_avatar') || 
+      src.includes('vocals_avatar') || 
+      src.includes('gesang_avatar') || 
+      src.includes('trumpet_avatar') || 
+      src.includes('trompete_avatar') || 
+      src.includes('trombone_avatar') || 
+      src.includes('posaune_avatar') || 
+      src.includes('horn_avatar') || 
+      src.includes('cello_avatar') || 
+      src.includes('violin_avatar') || 
+      src.includes('violine_avatar') || 
+      src.includes('clarinet_avatar') || 
+      src.includes('klarinette_avatar') || 
+      src.includes('flute_avatar') || 
+      src.includes('querfloete_avatar') || 
+      src.includes('saxophone_avatar') || 
+      src.includes('saxophon_avatar') || 
+      src.includes('blockfloete_avatar') || 
+      src.includes('bariton_avatar') || 
+      src.includes('oboe_avatar') ||
+      src.includes('teacher_') ||
+      src.includes('avatar_teacher')
+    );
+    if (!src || isMusicianOrInstrumentAvatar) {
       displaySrc = '/avatar_ghost.jpg';
     }
   } else {
-    // GrooveLab platform: strictly block instrument avatars and fall back to student/musician avatars
+    // GrooveLab platform: musician/instrument avatars are allowed for students/teachers
     const isStudentAvatar = src && (
       src.includes('student_') ||
       src.includes('bandstyle_') ||
@@ -121,7 +160,17 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       src.includes('bariton_avatar') || 
       src.includes('oboe_avatar')
     );
-    if (!src || isInstrumentAvatar || src === '/avatar_ghost.jpg') {
+    const isTeacherAvatar = src && (
+      src.includes('teacher_') ||
+      src.includes('avatar_teacher')
+    );
+    if (role === 'teacher') {
+      displaySrc = isTeacherAvatar ? src : '/avatar_ghost.jpg';
+    } else if (role === 'student') {
+      if (!src || src === '/avatar_ghost.jpg') {
+        displaySrc = '/avatar_ghost.jpg';
+      }
+    } else {
       displaySrc = '/avatar_ghost.jpg';
     }
   }
@@ -139,6 +188,15 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   };
 
   const hasAction = !!(onClick || user || userId);
+  const isPortraitAvatar = displaySrc && (
+    displaySrc.includes('teacher_') ||
+    displaySrc.includes('avatar_teacher') ||
+    displaySrc.includes('student_') ||
+    displaySrc.includes('bandstyle_') ||
+    displaySrc.includes('teen_') ||
+    displaySrc.includes('avatar_boy') ||
+    displaySrc.includes('avatar_girl')
+  );
 
   return (
     <div 
@@ -161,6 +219,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
           width: '100%', 
           height: '100%', 
           objectFit: 'cover', 
+          objectPosition: isPortraitAvatar ? 'center 15%' : 'center',
           opacity: isLoaded ? 1 : 0,
           transition: 'opacity 0.3s ease-in-out',
           willChange: 'opacity',

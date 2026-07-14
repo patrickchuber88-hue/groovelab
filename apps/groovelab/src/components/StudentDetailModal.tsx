@@ -69,11 +69,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
-  const [localTab, setLocalTab] = useState<'campus' | 'groovelab'>(activePlatform === 'groovelab' && (student.is_groovelab_active ?? student.isGroovelabActive ?? false) ? 'groovelab' : 'campus');
+  const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
+  const [localTab, setLocalTab] = useState<'campus' | 'groovelab'>(() => {
+    const isCampusAct = student.is_campus_active ?? student.isCampusActive ?? false;
+    const isGrooveAct = student.is_groovelab_active ?? student.isGroovelabActive ?? false;
+    if (!isCampusAct && isGrooveAct) return 'groovelab';
+    if (activePlatform === 'groovelab' && isGrooveAct) return 'groovelab';
+    return 'campus';
+  });
   const isPlatformCampus = localTab === 'campus' || !isGroovelabActive;
 
   let displayAvatarSrc = student.photo_url || '/avatar_ghost.jpg';
-  if (student.role === 'admin' || student.role === 'secretary') {
+  if ((student.role === 'admin' || student.role === 'secretary') && isPlatformCampus) {
     displayAvatarSrc = '/campus_login_hero.png';
   } else if (isPlatformCampus) {
     displayAvatarSrc = getInstrumentAvatarUrl(student.instrument);
@@ -119,16 +126,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       student.photo_url.includes('bariton_avatar') || 
       student.photo_url.includes('oboe_avatar')
     );
-    if (!student.photo_url || isInstrumentAvatar || student.photo_url === '/avatar_ghost.jpg') {
+    const isTeacherAvatar = student.photo_url && (
+      student.photo_url.includes('teacher_') ||
+      student.photo_url.includes('avatar_teacher')
+    );
+    if (student.role === 'teacher' || student.role === 'admin' || student.role === 'secretary') {
+      displayAvatarSrc = isTeacherAvatar ? student.photo_url : '/avatar_ghost.jpg';
+    } else if (!student.photo_url || isInstrumentAvatar || student.photo_url === '/avatar_ghost.jpg') {
       displayAvatarSrc = '/avatar_ghost.jpg';
     }
   }
 
   useEffect(() => {
     if (activePlatform) {
-      setLocalTab(activePlatform === 'groovelab' ? 'groovelab' : 'campus');
+      if (activePlatform === 'groovelab' && isGroovelabActive) {
+        setLocalTab('groovelab');
+      } else if (!isCampusActive && isGroovelabActive) {
+        setLocalTab('groovelab');
+      } else {
+        setLocalTab('campus');
+      }
     }
-  }, [activePlatform]);
+  }, [activePlatform, isCampusActive, isGroovelabActive]);
 
   const handleTabChange = (tab: 'campus' | 'groovelab') => {
     setLocalTab(tab);
@@ -147,7 +166,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [schedulesList, setSchedulesList] = useState<any[]>([]);
   const [avatar, setAvatar] = useState<any>(null);
   const [studentStats, setStudentStats] = useState<any>(null);
-  const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
   const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
@@ -555,6 +573,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       if (error) throw error;
       setIsCampusActive(newVal);
       student.is_campus_active = newVal;
+      if (!newVal && isGroovelabActive) {
+        setLocalTab('groovelab');
+      }
       if (newVal) {
         localStorage.removeItem(`req_campus_${student.id}`);
         setCampusRequestSent(false);
@@ -1091,27 +1112,29 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             display: 'inline-flex', 
             gap: '2px' 
           }}>
-            <button
-              onClick={() => handleTabChange('campus')}
-              style={{
-                border: 'none',
-                borderRadius: '99px',
-                padding: '8px 20px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                background: localTab === 'campus' ? '#ffffff' : 'transparent',
-                color: localTab === 'campus' ? '#000000' : '#636366',
-                boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-              }}
-            >
-              <GraduationCap size={16} />
-              <span>Campus</span>
-            </button>
+            {isCampusActive && (
+              <button
+                onClick={() => handleTabChange('campus')}
+                style={{
+                  border: 'none',
+                  borderRadius: '99px',
+                  padding: '8px 20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  background: localTab === 'campus' ? '#ffffff' : 'transparent',
+                  color: localTab === 'campus' ? '#000000' : '#636366',
+                  boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
+                }}
+              >
+                <GraduationCap size={16} />
+                <span>Campus</span>
+              </button>
+            )}
             {isGroovelabActive && (
               <button
                 onClick={() => handleTabChange('groovelab')}
@@ -2705,12 +2728,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             {localTab === 'campus' ? (
               /* ============ CAMPUS PASS OVERLAY ============ */
               <div style={{ 
-                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
+                background: 'radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)', 
                 borderRadius: '32px', 
                 padding: '32px', 
                 color: 'white',
-                boxShadow: '0 25px 50px -12px rgba(2, 44, 34, 0.5), 0 0 40px rgba(52, 168, 83, 0.25)',
-                border: '1.5px solid rgba(52, 168, 83, 0.35)',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(16, 185, 129, 0.15)',
+                border: '1.5px solid rgba(16, 185, 129, 0.25)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -2723,7 +2746,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 <div style={{
                   position: 'absolute',
                   top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(52, 168, 83, 0.03) 100%)',
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(255, 255, 255, 0.02) 100%)',
                   pointerEvents: 'none'
                 }} />
 
@@ -2732,7 +2755,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   <span style={{ 
                     fontSize: '0.7rem', 
                     fontWeight: 900, 
-                    color: '#fbbf24', 
+                    color: '#34d399', 
                     textTransform: 'uppercase', 
                     letterSpacing: '0.22em',
                   }}>
@@ -2753,8 +2776,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       height: '76px', 
                       borderRadius: '24px', 
                       objectFit: 'cover', 
-                      border: '3px solid rgba(255, 255, 255, 0.2)',
-                      boxShadow: '0 8px 24px rgba(2, 44, 34, 0.2)'
+                      border: '3px solid rgba(16, 185, 129, 0.4)',
+                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
                     }} 
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

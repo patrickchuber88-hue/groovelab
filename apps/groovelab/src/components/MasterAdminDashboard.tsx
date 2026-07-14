@@ -64,7 +64,7 @@ function getSubdomainOrigin(schoolName: string): string {
 
   if (host.includes('localhost') || host.includes('127.0.0.1')) {
     const port = host.split(':')[1] || '5173';
-    return `${protocol}//${subdomain}.localhost:${port}`;
+    return `${protocol}//localhost:${port}?subdomain=${subdomain}`;
   } else {
     let cleanHost = host;
     if (cleanHost.startsWith('www.')) {
@@ -678,7 +678,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           primary_color: newSchoolColor,
           logo_url: newSchoolLogo || null,
           zip_code: newSchoolZip.trim() || null,
-          city: newSchoolCity.trim() || null
+          city: newSchoolCity.trim() || null,
+          is_trial: true,
+          trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .select()
         .single();
@@ -833,6 +835,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   };
 
   const filteredSchools = schools.filter(school => {
+    if (school.id === '11111111-1111-1111-1111-111111111111') return false;
     const q = schoolSearchQuery.trim().toLowerCase();
     if (!q) return true;
     const nameMatch = school.name?.toLowerCase().includes(q);
@@ -3363,12 +3366,12 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                                   {school.has_campus_subscription && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: 'rgba(56, 189, 248, 0.12)', padding: '2px 8px', borderRadius: '100px' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#137333', background: '#e6f4ea', padding: '2px 8px', borderRadius: '100px' }}>
                                       🎓 Campus
                                     </span>
                                   )}
                                   {school.has_groovelab_subscription && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ea580c', background: 'rgba(251, 146, 60, 0.12)', padding: '2px 8px', borderRadius: '100px' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ca8a04', background: '#fef9c3', padding: '2px 8px', borderRadius: '100px' }}>
                                       🎸 GrooveLab
                                     </span>
                                   )}

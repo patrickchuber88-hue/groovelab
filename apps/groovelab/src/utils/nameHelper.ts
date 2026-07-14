@@ -12,7 +12,7 @@ export function maskLastName(lastName: string | undefined | null, forceShow: boo
   const firstLetter = trimmed.charAt(0);
   if (!firstLetter) return '';
   // Fixed masking format as requested
-  return `${firstLetter}xxxxx`;
+  return `${firstLetter}.`;
 }
 
 // React Hook to use and toggle the visibility reactively

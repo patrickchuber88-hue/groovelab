@@ -814,7 +814,7 @@ interface TeacherDashboardProps {
   hideHeader?: boolean;
   hideSidebar?: boolean;
   viewMode?: 'admin' | 'student';
-  initialTab?: 'briefing' | 'live' | 'bands' | 'students' | 'proposals';
+  initialTab?: 'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'coaches';
   onTabChange?: (tab: string) => void;
   onOpenBandProfile?: (band: any) => void;
   onFoundBand?: (form: any, mySlot: any) => void;
@@ -873,7 +873,7 @@ export function TeacherDashboard({
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
   const [docStudent, setDocStudent] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings'>(initialTab || (hideHeader ? 'live' : 'briefing'));
+  const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches'>(initialTab || (hideHeader ? 'live' : 'briefing'));
   const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile'>('fokus');
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -898,6 +898,14 @@ export function TeacherDashboard({
     app_usage_mode: 'student_only'
   });
   const [showInviteStudent, setShowInviteStudent] = useState(false);
+  const [teachersManageStudents] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_students');
+    return saved !== 'false';
+  });
+  const [teachersManageTeachers] = useState<boolean>(() => {
+    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_teachers');
+    return saved !== 'false';
+  });
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFirstName, setInviteFirstName] = useState('');
   const [inviteLastName, setInviteLastName] = useState('');
@@ -5328,15 +5336,20 @@ export function TeacherDashboard({
               Teacher Portal
             </span>
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-            {[
-              { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
-              { id: 'live', label: 'Live Lab', icon: Music },
-              { id: 'bands', label: 'Bands', icon: Users },
-              { id: 'students', label: 'Schüler', icon: GraduationCap },
-              { id: 'settings', label: 'Einstellungen', icon: Settings }
-            ].map((tab) => {
+            {(() => {
+              const tabs = [
+                { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
+                { id: 'live', label: 'Live Lab', icon: Music },
+                { id: 'bands', label: 'Bands', icon: Users },
+                { id: 'students', label: 'Schüler', icon: teachersManageTeachers ? Users : GraduationCap }
+              ];
+              if (teachersManageTeachers) {
+                tabs.push({ id: 'coaches', label: 'Lehrer', icon: GraduationCap });
+              }
+              tabs.push({ id: 'settings', label: 'Einstellungen', icon: Settings });
+              return tabs;
+            })().map((tab) => {
               const Icon = tab.icon;
               const isSelected = activeTab === tab.id;
               return (
@@ -11727,6 +11740,27 @@ export function TeacherDashboard({
                   style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} 
                 />
               </div>
+              {teachersManageStudents && (
+                <button
+                  onClick={() => setShowInviteStudent(true)}
+                  style={{
+                    padding: '14px 28px',
+                    borderRadius: '24px',
+                    border: 'none',
+                    background: '#8b5cf6',
+                    color: 'white',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(139,92,246,0.15)'
+                  }}
+                  className="hover-scale"
+                >
+                  <UserPlus size={16} /> Schüler einladen
+                </button>
+              )}
             </div>
 
             {/* A-Z Schnellsuche */}
@@ -11836,55 +11870,57 @@ export function TeacherDashboard({
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
-                          <button
-                            onClick={() => setEditingStudent({
-                              id: student.id,
-                              first_name: student.first_name,
-                              last_name: student.last_name,
-                              birth_date: student.birth_date || '',
-                              status: student.status || 'active',
-                              is_trial: student.is_trial || false,
-                              trial_ends_at: student.trial_ends_at || '',
-                              contract_ends_at: student.contract_ends_at || '',
-                              is_external_vocalist: student.is_external_vocalist || false
-                            })}
-                            style={{
-                              flex: 1,
-                              background: '#f1f5f9',
-                              border: 'none',
-                              padding: '8px 12px',
-                              borderRadius: '12px',
-                              fontSize: '0.78rem',
-                              fontWeight: 800,
-                              color: '#475569',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Edit3 size={14} /> Bearbeiten
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStudent(student.id)}
-                            style={{
-                              background: '#fee2e2',
-                              border: 'none',
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#ef4444',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                        {teachersManageStudents && (
+                          <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => setEditingStudent({
+                                id: student.id,
+                                first_name: student.first_name,
+                                last_name: student.last_name,
+                                birth_date: student.birth_date || '',
+                                status: student.status || 'active',
+                                is_trial: student.is_trial || false,
+                                trial_ends_at: student.trial_ends_at || '',
+                                contract_ends_at: student.contract_ends_at || '',
+                                is_external_vocalist: student.is_external_vocalist || false
+                              })}
+                              style={{
+                                flex: 1,
+                                background: '#f1f5f9',
+                                border: 'none',
+                                padding: '8px 12px',
+                                borderRadius: '12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                color: '#475569',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <Edit3 size={14} /> Bearbeiten
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStudent(student.id)}
+                              style={{
+                                background: '#fee2e2',
+                                border: 'none',
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ef4444',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -12137,6 +12173,62 @@ export function TeacherDashboard({
               </ul>
             </div>
           </aside>
+        </div>
+      ) : activeTab === 'coaches' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
+          <div>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+              🎓 Lehrerverwaltung
+            </h2>
+            <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+              Übersicht über alle aktiven Lehrkräfte und Coaches an deiner Musikschule.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            {coaches.map(coach => (
+              <div 
+                key={coach.id} 
+                className="google-card"
+                style={{ 
+                  padding: '24px', 
+                  borderRadius: '24px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '16px',
+                  border: '1px solid #e2e8f0',
+                  background: 'white'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '16px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', flexShrink: 0 }}>
+                    <AvatarImage src={coach.photo_url} user={coach} activePlatform={activePlatform} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {coach.first_name} {coach.last_name || ''}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+                      {coach.role === 'admin' ? 'Administrator' : coach.role === 'secretary' ? 'Sekretariat' : 'Lehrer'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9', fontSize: '0.75rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Instrument:</span>
+                    <span style={{ fontWeight: 800 }}>{coach.instrument || 'Allgemein'}</span>
+                  </div>
+                  {coach.email && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>E-Mail:</span>
+                      <span style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>{coach.email}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : activeTab === 'settings' ? (
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>

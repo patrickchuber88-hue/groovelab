@@ -27,7 +27,7 @@ async function loadJSQR() {
 }
 
 interface LoginScreenProps {
-  onLogin: (userId: string, isHome?: boolean) => void;
+  onLogin: (userId: string, isHome?: boolean, stationId?: string | null) => void;
   kioskStationId?: string | null;
 }
 
@@ -204,17 +204,17 @@ const adjustPositions = (stations: any[], containerWidth: number = 364) => {
 
   const containerHeight = containerWidth / 1.4;
   
-  // Safe margin is button radius (72px * 1.08 / 2 = 38.88px) + box shadow glow (4px) + margin rule (2px) = 44.88px.
-  // We round this up to 45px to guarantee at least 2px of empty space to the container borders.
-  const safeMarginPx = 45;
+  // Safe margin is button radius (62px * 1.08 / 2 = 33.48px) + box shadow glow (4px) + margin rule (2px) = 39.48px.
+  // We round this to 40px to guarantee empty space.
+  const safeMarginPx = 40;
   const safeMinX = Math.min(45, (safeMarginPx / containerWidth) * 100);
   const safeMaxX = Math.max(55, 100 - safeMinX);
   const safeMinY = Math.min(45, (safeMarginPx / containerHeight) * 100);
   const safeMaxY = Math.max(55, 100 - safeMinY);
   
-  // Minimum gap of 4px: Button width/height is 72px, so minimum center-to-center is 72px + 4px = 76px.
-  const minXDistPx = 76;
-  const minYDistPx = 76;
+  // Minimum gap of 4px: Button width/height is 62px, so minimum center-to-center is 62px + 4px = 66px.
+  const minXDistPx = 66;
+  const minYDistPx = 66;
 
   const iterations = 50;
   const minXDist = (minXDistPx / containerWidth) * 100; // minimum X distance in percentage
@@ -318,7 +318,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
-  if (num === 1 || num === 2) return '#ef4444'; // Red
+  if (num === 1 || num === 2) return '#eab308'; // Yellow
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
   if (num === 7 || num === 8) return '#eab308'; // Yellow
@@ -1329,6 +1329,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
     try {
       setLoading(true);
+      const effectiveSchool = schoolData || (Array.isArray(user.schools) ? user.schools[0] : user.schools);
+      if (isGroovelabKiosk && effectiveSchool?.groovelab_kiosk_token) {
+        localStorage.setItem('groovelab_kiosk_token', effectiveSchool.groovelab_kiosk_token);
+      }
       const rolesArray = Array.isArray(user.roles) ? user.roles : [];
       const hasAdminRole = rolesArray.includes('admin');
       const hasSecretaryRole = rolesArray.includes('secretary');
@@ -1430,12 +1434,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const effectiveSchool = schoolData || userSchool;
           if (!effectiveSchool?.id) {
             alert("Login verweigert. Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.");
+            localStorage.removeItem('groovelab_station_id');
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
           if (user.school_id !== effectiveSchool.id) {
-            alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.");
+            alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.");
+            localStorage.removeItem('groovelab_station_id');
             await supabase.auth.signOut();
             setLoading(false);
             return;
@@ -1612,7 +1618,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       sessionStorage.setItem('groovelab_location_mode', isHome ? 'home' : 'lab');
       setLoading(false);
       
-      onLogin(user.id, isHome);
+       onLogin(user.id, isHome, finalStationId);
     } catch (err: any) {
       console.error('[Login] Finalize error:', err.message);
       sessionStorage.removeItem('groovelab_user_id');
@@ -1658,7 +1664,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   // Fetch rooms and stations for the Kiosk activator when schoolData is resolved (or query all active if not set yet)
   useEffect(() => {
-    if (!isGroovelabKiosk) return;
+    if (!isGroovelabKiosk || !schoolData?.id) return;
     async function fetchKioskData() {
       try {
         setLoadingKioskData(true);
@@ -1689,7 +1695,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
     }
     fetchKioskData();
-  }, [schoolData]);
+  }, [schoolData, isGroovelabKiosk]);
 
 
   const handleKeypadPress = (val: string, type: 'setup' | 'verify') => {
@@ -2623,7 +2629,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // Intercept login for PIN setup or verification if it's an Ausweis ID login
       const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
       if (!isQrLogin) {
-        const studentBirthDay = user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
+        const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
         const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
 
         if (!isPinActivated) {
@@ -2808,13 +2814,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setSchoolName(userSchool.name);
       }
 
-      if (user.role === 'student') {
+       if (user.role === 'student') {
         const effectiveSchool = schoolData || userSchool;
         if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
         }
         if (user.school_id !== effectiveSchool.id) {
-          throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
+          localStorage.removeItem('groovelab_station_id');
+          throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.');
         }
       }
 
@@ -2824,80 +2831,101 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isGroovelabScreen = isGroovelabKiosk;
       const isBypass = !isGroovelabScreen;
 
+      const isLocalhost = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.endsWith('.local') ||
+        /^192\.168\./.test(window.location.hostname) ||
+        /^10\./.test(window.location.hostname) ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
+      );
+
       // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
       if (isGroovelabKiosk) {
-        isWithinAnyRoom = false;
-        console.log('[Login] Geofence check active. Fetching current location...');
-        
-        let currentPos = userPos;
-        if (!currentPos && navigator.geolocation) {
-          try {
-            currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => reject(err),
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
-              );
-            });
-            setUserPos(currentPos);
-          } catch (e) {
-            console.warn('[Login] Geolocation fetch during scan failed:', e);
+        if (isLocalhost) {
+          isWithinAnyRoom = true;
+          console.log('[Login] Localhost detected: geofence check bypassed.');
+          setGeoDebug({
+            isWithinAnyRoom: true,
+            userPos: null,
+            schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
+            distToSchool: 0,
+            withinHours: true
+          });
+        } else {
+          isWithinAnyRoom = false;
+          console.log('[Login] Geofence check active. Fetching current location...');
+          
+          let currentPos = userPos;
+          if (!currentPos && navigator.geolocation) {
+            try {
+              currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                  (err) => reject(err),
+                  { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+                );
+              });
+              setUserPos(currentPos);
+            } catch (e) {
+              console.warn('[Login] Geolocation fetch during scan failed:', e);
+            }
           }
-        }
 
-        if (currentPos) {
-          // 1. Check Rooms (Multi-Point)
-          const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-          let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
-          if (activePlatform === 'campus') {
-            roomsQuery = roomsQuery.eq('is_campus_active', true);
-          } else {
-            roomsQuery = roomsQuery.eq('is_groovelab_active', true);
-          }
-          const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
-          if (rooms) {
-            for (const room of rooms) {
-              const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-              const allCoords = [...points];
-              if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
-              
-              for (const pt of allCoords) {
-                if (pt && pt.lat && pt.lng) {
-                  const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                  if (dist < 100) { 
-                    isWithinAnyRoom = true;
-                    break;
+          if (currentPos) {
+            // 1. Check Rooms (Multi-Point)
+            const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+            let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
+            if (activePlatform === 'campus') {
+              roomsQuery = roomsQuery.eq('is_campus_active', true);
+            } else {
+              roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+            }
+            const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
+            if (rooms) {
+              for (const room of rooms) {
+                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+                const allCoords = [...points];
+                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+                
+                for (const pt of allCoords) {
+                  if (pt && pt.lat && pt.lng) {
+                    const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
+                    if (dist < 100) { 
+                      isWithinAnyRoom = true;
+                      break;
+                    }
                   }
                 }
+                if (isWithinAnyRoom) break;
               }
-              if (isWithinAnyRoom) break;
             }
+
+            // 2. School Fallback (Single Point + Radius)
+            if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+              const distToSchool = getDistanceFromLatLonInM(
+                currentPos.lat, currentPos.lng, 
+                Number(schoolData.latitude), Number(schoolData.longitude)
+              );
+              const radius = schoolData.geofence_radius_meters || 150;
+              if (distToSchool < radius) {
+                isWithinAnyRoom = true;
+              }
+            }
+          } else {
+            console.warn('[Login] Geofence check failed because user position could not be acquired.');
           }
 
-          // 2. School Fallback (Single Point + Radius)
-          if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
-            const distToSchool = getDistanceFromLatLonInM(
-              currentPos.lat, currentPos.lng, 
-              Number(schoolData.latitude), Number(schoolData.longitude)
-            );
-            const radius = schoolData.geofence_radius_meters || 150;
-            if (distToSchool < radius) {
-              isWithinAnyRoom = true;
-            }
-          }
-        } else {
-          console.warn('[Login] Geofence check failed because user position could not be acquired.');
+          setGeoDebug({
+            isWithinAnyRoom,
+            userPos: currentPos,
+            schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
+            distToSchool: (currentPos && schoolData?.latitude && schoolData?.longitude)
+              ? Math.round(getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude)))
+              : null,
+            withinHours: true
+          });
         }
-
-        setGeoDebug({
-          isWithinAnyRoom,
-          userPos: currentPos,
-          schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
-          distToSchool: (currentPos && schoolData?.latitude && schoolData?.longitude)
-            ? Math.round(getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude)))
-            : null,
-          withinHours: true
-        });
       } else {
         console.log('[Login] Geofence check bypassed.');
         setGeoDebug(null);
@@ -2905,7 +2933,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
-      const studentBirthDay = user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
+      if (isGroovelabKiosk && user.role === 'student') {
+        await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+        return;
+      }
+
+      const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
       const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
 
       if (!isPinActivated) {
@@ -2982,12 +3015,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           }}>
             <div style={{
               width: '64px', height: '64px', borderRadius: '50%', 
-              background: isSecretary ? '#fce8e6' : '#34a85320',
+              background: isSecretary ? '#e6f4ea' : '#34a85320',
               display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'
             }}>
-              <Check size={36} color={isSecretary ? '#ea4335' : '#34a853'} strokeWidth={3} />
+              <Check size={36} color={isSecretary ? '#137333' : '#34a853'} strokeWidth={3} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#ea4335' : '#34a853', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#137333' : '#34a853', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
               Registrierung erfolgreich!
             </h1>
             <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0', fontWeight: 600 }}>
@@ -3017,7 +3050,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/qr/${registeredUser.qr_token}`)}`} 
+                   src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/qr/${registeredUser.qr_token}`)}`} 
                   alt="QR Code" 
                   style={{ width: '180px', height: '180px', display: 'block' }}
                 />
@@ -3030,7 +3063,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
                 
                 <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Schule</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#ea4335' : '#eab308' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#137333' : '#eab308' }}>
                   {schoolName || 'GrooveLab Academy'}
                 </div>
               </div>
@@ -3040,9 +3073,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={() => onLogin(registeredUser.id, true)}
               style={{
                 width: '100%', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#ea4335' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(234, 67, 53, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
                 transition: 'all 0.2s', outline: 'none'
               }}
             >
@@ -3073,18 +3106,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{
-              background: isSecretary ? '#fce8e6' : '#eab308', 
+              background: isSecretary ? '#e6f4ea' : '#eab308', 
               padding: '10px', borderRadius: '12px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isSecretary ? '0 4px 12px rgba(234, 67, 53, 0.08)' : 'none'
+              boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
             }}>
               {isSecretary ? (
-                <School size={24} color="#ea4335" strokeWidth={2.5} />
+                <School size={24} color="#137333" strokeWidth={2.5} />
               ) : (
                 <Music size={24} color="#0f172a" />
               )}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#ea4335' : '#ffffff' }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#137333' : '#ffffff' }}>
               {isSecretary ? 'Campus-Groovelab Admin Einladung' : 'Campus-Groovelab Coach Einladung'}
             </div>
           </div>
@@ -3096,7 +3129,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {isSecretary 
               ? `Du wurdest eingeladen, als Administrator/Verwaltung für die Schule `
               : `Du wurdest eingeladen, als Coach für die Schule `}
-            <strong style={{ color: isSecretary ? '#ea4335' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
+            <strong style={{ color: isSecretary ? '#137333' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
           </p>
 
           <form onSubmit={async (e) => {
@@ -3180,9 +3213,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${firstNameFocused ? '#ea4335' : '#dadce0'}` 
+                    ? `1px solid ${firstNameFocused ? '#137333' : '#dadce0'}` 
                     : `1px solid ${firstNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(234, 67, 53, 0.12)' : 'none',
+                  boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
                   transition: 'all 0.15s ease'
@@ -3204,9 +3237,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${lastNameFocused ? '#ea4335' : '#dadce0'}` 
+                    ? `1px solid ${lastNameFocused ? '#137333' : '#dadce0'}` 
                     : `1px solid ${lastNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
-                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(234, 67, 53, 0.12)' : 'none',
+                  boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
                   transition: 'all 0.15s ease'
@@ -3219,9 +3252,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={signingUp}
               style={{
                 marginTop: '8px', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#ea4335' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
-                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(234, 67, 53, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
+                cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}
             >
@@ -3925,16 +3958,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                             const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
                             if (!confirm) return;
                           }
-                          setSelectedKioskStationId(isSelected ? null : station.id);
+                          const newSelection = isSelected ? null : station.id;
+                          setSelectedKioskStationId(newSelection);
+                          if (newSelection) {
+                            if (schoolData?.groovelab_kiosk_token) {
+                              localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                            }
+                            localStorage.setItem('groovelab_station_id', newSelection);
+                          } else {
+                            localStorage.removeItem('groovelab_kiosk_token');
+                            localStorage.removeItem('groovelab_station_id');
+                          }
                         }}
                         style={{
                           position: 'absolute',
                           left: `${posX}%`,
                           top: `${posY}%`,
                           transform: isSelected ? 'translate(-50%, -50%) scale(1.08)' : 'translate(-50%, -50%)',
-                          width: '72px',
-                          height: '72px',
-                          borderRadius: '16px',
+                          width: '62px',
+                          height: '62px',
+                          borderRadius: '14px',
                           border: isSelected
                             ? '1px solid #ffffff'
                             : `2px solid ${stationColor}`,
@@ -6789,14 +6832,17 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 if (pinSetupInput.length !== 4) return;
                 setLoading(true);
                 try {
-                  if (pinSetupUser?.ausweis_nummer) {
-                    sessionStorage.setItem('groovelab_qr_token', pinSetupUser.ausweis_nummer);
+                  const authQrToken = pinSetupUser?.qr_token || pinSetupUser?.ausweis_nummer || pinSetupUser?.id;
+                  if (authQrToken) {
+                    sessionStorage.setItem('groovelab_qr_token', authQrToken);
                   }
-                  const { error } = await supabase
+                   const { error } = await supabase
                     .from('users')
                     .update({
                       personal_pin: pinSetupInput,
-                      is_pin_activated: true
+                      is_pin_activated: true,
+                      is_groovelab_active: isGroovelabKiosk ? true : pinSetupUser.is_groovelab_active,
+                      is_campus_active: !isGroovelabKiosk ? true : pinSetupUser.is_campus_active
                     })
                     .eq('id', pinSetupUser.id);
 
@@ -6804,7 +6850,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
                   if (error) throw error;
                   
-                  const user = pinSetupUser;
+                  const user = {
+                    ...pinSetupUser,
+                    personal_pin: pinSetupInput,
+                    is_pin_activated: true,
+                    is_groovelab_active: isGroovelabKiosk ? true : pinSetupUser.is_groovelab_active,
+                    is_campus_active: !isGroovelabKiosk ? true : pinSetupUser.is_campus_active
+                  };
                   setPinSetupUser(null);
                   
                   const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
