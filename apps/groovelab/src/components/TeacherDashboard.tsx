@@ -10792,114 +10792,130 @@ export function TeacherDashboard({
                 
                 {submissions.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {submissions.slice(0, 5).map(sub => (
-                      <div key={sub.id} style={{ 
-                        background: '#f8fafc', 
-                        padding: '16px', 
-                        borderRadius: '24px', 
-                        border: '1px solid #f1f5f9',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '14px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-                            <AvatarImage src={sub.users?.photo_url} user={sub.users} activePlatform={activePlatform} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                    {submissions.slice(0, 5).map(sub => {
+                      const studentSession = activeSessions.find(s => s.user_id === sub.user_id);
+                      return (
+                        <div key={sub.id} style={{ 
+                          background: '#f8fafc', 
+                          padding: '16px', 
+                          borderRadius: '24px', 
+                          border: '1px solid #f1f5f9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ width: '44px', height: '44px', borderRadius: '14px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                              <AvatarImage src={sub.users?.photo_url} user={sub.users} activePlatform={activePlatform} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', minWidth: 0 }}>
-                                <div style={{ 
-                                  fontWeight: 950, 
-                                  fontSize: '0.9rem', 
-                                  color: '#1e293b', 
-                                  lineHeight: 1.1,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
-                                }}>
-                                  {sub.users?.first_name}
-                                </div>
-                                {(() => {
-                                  const norm = normalizeInstrument(sub.instrument);
-                                  return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', minWidth: 0, flexWrap: 'wrap' }}>
+                                  <div style={{ 
+                                    fontWeight: 950, 
+                                    fontSize: '0.9rem', 
+                                    color: '#1e293b', 
+                                    lineHeight: 1.1,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    {sub.users?.first_name}
+                                  </div>
+                                  {(() => {
+                                    const norm = normalizeInstrument(sub.instrument);
+                                    return (
+                                      <div style={{ 
+                                        width: '20px', height: '20px', borderRadius: '6px', 
+                                        background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                        fontSize: '0.7rem', flexShrink: 0,
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                      }}>
+                                        {TEACHER_INSTRUMENT_ICONS[norm] || '🎸'}
+                                      </div>
+                                    );
+                                  })()}
+                                  <div style={{ background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: 950, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                    {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
+                                  </div>
+                                  {studentSession && (
                                     <div style={{ 
-                                      width: '20px', height: '20px', borderRadius: '6px', 
-                                      background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                      fontSize: '0.7rem', flexShrink: 0,
-                                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                      background: `${studentSession.stations?.color || '#3b82f6'}15`, 
+                                      border: `1.5px solid ${studentSession.stations?.color || '#3b82f6'}`,
+                                      padding: '2px 8px', 
+                                      borderRadius: '6px', 
+                                      fontSize: '0.6rem', 
+                                      fontWeight: 950, 
+                                      color: studentSession.stations?.color || '#3b82f6', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      gap: '4px',
+                                      flexShrink: 0
                                     }}>
-                                      {TEACHER_INSTRUMENT_ICONS[norm] || '🎸'}
+                                      {studentSession.stations?.name}
                                     </div>
-                                  );
-                                })()}
-                                <div style={{ background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: 950, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
+                                  )}
                                 </div>
-                              </div>
 
-                              <div style={{ 
-                                fontSize: '0.65rem', 
-                                fontWeight: 800, 
-                                color: '#64748b', 
-                                textTransform: 'uppercase', 
-                                overflow: 'hidden', 
-                                textOverflow: 'ellipsis', 
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {sub.songs?.artist}: {sub.songs?.title}
+                                <div style={{ 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 800, 
+                                  color: '#64748b', 
+                                  textTransform: 'uppercase', 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {sub.songs?.artist}: {sub.songs?.title}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button 
-                            onClick={() => handleRejectSubmission(sub.id)}
-                            style={{ 
-                              flex: 1,
-                              background: '#f1f5f9', 
-                              color: '#64748b', 
-                              border: 'none', 
-                              padding: '12px', 
-                              borderRadius: '14px', 
-                              fontSize: '0.7rem', 
-                              fontWeight: 950, 
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                            
-                            
-                          >
-                            Üben
-                          </button>
-                          <button 
-                            onClick={() => handleApproveSubmission(sub.id)}
-                            style={{ 
-                              flex: 1,
-                              background: '#34a853', 
-                              color: 'white', 
-                              border: 'none', 
-                              padding: '12px', 
-                              borderRadius: '14px', 
-                              fontSize: '0.7rem', 
-                              fontWeight: 950, 
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              cursor: 'pointer',
-                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
-                              transition: 'all 0.2s'
-                            }}
-                            
-                            
-                          >
-                            GO!
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              onClick={() => handleRejectSubmission(sub.id)}
+                              style={{ 
+                                flex: 1,
+                                background: '#f1f5f9', 
+                                color: '#64748b', 
+                                border: 'none', 
+                                padding: '12px', 
+                                borderRadius: '14px', 
+                                fontSize: '0.7rem', 
+                                fontWeight: 950, 
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              Üben
+                            </button>
+                            <button 
+                              onClick={() => handleApproveSubmission(sub.id)}
+                              style={{ 
+                                flex: 1,
+                                background: '#34a853', 
+                                color: 'white', 
+                                border: 'none', 
+                                padding: '12px', 
+                                borderRadius: '14px', 
+                                fontSize: '0.7rem', 
+                                fontWeight: 950, 
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              GO!
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
