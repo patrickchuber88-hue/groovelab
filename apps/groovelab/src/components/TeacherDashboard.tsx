@@ -584,7 +584,19 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stationName}</span>
-            {sess && <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>}
+            {sess && (
+              <>
+                <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>
+                <span style={{ 
+                  color: isMe ? color : '#64748b', 
+                  fontWeight: isMe ? 900 : 800, 
+                  textTransform: 'none', 
+                  whiteSpace: 'nowrap', 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis' 
+                }}>• {sess.users?.first_name}</span>
+              </>
+            )}
           </div>
           {hasHelpRequest && (
             <div style={{ 
@@ -638,30 +650,16 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         {sess ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px' }}>
             <div style={{ 
-              width: '104px', 
-              height: '104px', 
+              width: '120px', 
+              height: '120px', 
               borderRadius: '24px', 
               overflow: 'hidden', 
               border: `2px solid ${color}`, 
               boxShadow: `0 10px 28px ${color}25`, 
               flexShrink: 0, 
-              marginBottom: '4px',
               transition: 'all 0.3s ease'
             }}>
               <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
-            </div>
-            <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
-              <div style={{ 
-                fontWeight: isMe ? 800 : 600, 
-                fontSize: '0.85rem', 
-                color: isMe ? color : '#1e293b', 
-                lineHeight: 1.1, 
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {sess.users?.first_name}
-              </div>
             </div>
           </div>
         ) : (
@@ -674,6 +672,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   return (
     prev.sess?.id === next.sess?.id &&
     prev.sess?.users?.photo_url === next.sess?.users?.photo_url &&
+    prev.sess?.users?.first_name === next.sess?.users?.first_name &&
     prev.sess?.songs?.title === next.sess?.songs?.title &&
     !!prev.sess === !!next.sess &&
     prev.isMe === next.isMe
