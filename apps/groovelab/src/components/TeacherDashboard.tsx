@@ -10804,54 +10804,60 @@ export function TeacherDashboard({
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', minWidth: 0, flexWrap: 'wrap' }}>
-                                  <div style={{ 
-                                    fontWeight: 950, 
-                                    fontSize: '0.9rem', 
-                                    color: '#1e293b', 
-                                    lineHeight: 1.1,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                  }}>
-                                    {sub.users?.first_name}
-                                  </div>
-                                  {(() => {
-                                    const norm = normalizeInstrument(sub.instrument);
-                                    return (
-                                      <div style={{ 
-                                        width: '20px', height: '20px', borderRadius: '6px', 
-                                        background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                        fontSize: '0.7rem', flexShrink: 0,
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                      }}>
-                                        {TEACHER_INSTRUMENT_ICONS[norm] || '🎸'}
-                                      </div>
-                                    );
-                                  })()}
-                                  <div style={{ background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', fontSize: '0.6rem', fontWeight: 950, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                    {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
-                                  </div>
-                                  {studentSession && (
-                                    <div style={{ 
-                                      background: `${studentSession.stations?.color || '#3b82f6'}15`, 
-                                      border: `1.5px solid ${studentSession.stations?.color || '#3b82f6'}`,
-                                      padding: '2px 8px', 
-                                      borderRadius: '6px', 
-                                      fontSize: '0.6rem', 
-                                      fontWeight: 950, 
-                                      color: studentSession.stations?.color || '#3b82f6', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: '4px',
-                                      flexShrink: 0
-                                    }}>
-                                      {studentSession.stations?.name}
-                                    </div>
-                                  )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', minWidth: 0 }}>
+                                <div style={{ 
+                                  fontWeight: 950, 
+                                  fontSize: '0.9rem', 
+                                  color: '#1e293b', 
+                                  lineHeight: 1.1,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {sub.users?.first_name}
                                 </div>
+                                {(() => {
+                                  const norm = normalizeInstrument(sub.instrument);
+                                  return (
+                                    <div style={{ 
+                                      width: '18px', height: '18px', borderRadius: '5px', 
+                                      background: INSTRUMENT_COLORS[norm] || '#cbd5e1', 
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                      fontSize: '0.65rem', flexShrink: 0,
+                                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                    }}>
+                                      {TEACHER_INSTRUMENT_ICONS[norm] || '🎸'}
+                                    </div>
+                                  );
+                                })()}
+                                {studentSession && (
+                                  <span style={{ 
+                                    color: studentSession.stations?.color || '#3b82f6', 
+                                    fontWeight: 900, 
+                                    fontSize: '0.75rem',
+                                    marginLeft: '2px',
+                                    flexShrink: 0
+                                  }}>
+                                    • {studentSession.stations?.name}
+                                  </span>
+                                )}
+                              </div>
 
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                <div style={{ 
+                                  background: '#e2e8f0', 
+                                  padding: '1px 5px', 
+                                  borderRadius: '4px', 
+                                  fontSize: '0.55rem', 
+                                  fontWeight: 950, 
+                                  color: '#475569', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '2px', 
+                                  flexShrink: 0 
+                                }}>
+                                  {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
+                                </div>
                                 <div style={{ 
                                   fontSize: '0.65rem', 
                                   fontWeight: 800, 
@@ -10859,12 +10865,15 @@ export function TeacherDashboard({
                                   textTransform: 'uppercase', 
                                   overflow: 'hidden', 
                                   textOverflow: 'ellipsis', 
-                                  whiteSpace: 'nowrap'
+                                  whiteSpace: 'nowrap',
+                                  flex: 1,
+                                  minWidth: 0
                                 }}>
                                   {sub.songs?.artist}: {sub.songs?.title}
                                 </div>
                               </div>
                             </div>
+                          </div>
 
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button 
