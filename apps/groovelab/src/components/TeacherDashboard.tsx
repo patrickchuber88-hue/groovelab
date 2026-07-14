@@ -371,25 +371,18 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     >
       <img 
         src={displaySrc}
-        onLoad={() => setIsLoaded(true)}
         onError={() => setHasError(true)}
         style={{ 
           width: '100%', 
           height: '100%', 
           objectFit: 'cover', 
           objectPosition: isPortraitAvatar ? 'center 15%' : 'center',
-          opacity: isLoaded ? 1 : 0,
-          transition: 'opacity 0.3s ease-in-out',
-          willChange: 'opacity',
-          backfaceVisibility: 'hidden'
+          backfaceVisibility: 'hidden',
+          transform: isPortraitAvatar ? 'scale(1.25)' : 'none',
+          transformOrigin: 'center 20%'
         }} 
         alt=""
       />
-      {!isLoaded && !hasError && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-           <div className="pulse" style={{ width: '20px', height: '20px', background: '#e2e8f0', borderRadius: '50%' }}></div>
-        </div>
-      )}
     </div>
   );
 }, (prev, next) => {
@@ -584,20 +577,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', width: '100%', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 900, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{stationName}</span>
-            {sess && (
-              <>
-                <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>
-                <span style={{ 
-                  color: isMe ? color : '#1e293b', 
-                  fontWeight: isMe ? 900 : 800, 
-                  textTransform: 'none', 
-                  fontSize: '0.8rem',
-                  whiteSpace: 'nowrap', 
-                  overflow: 'hidden', 
-                  textOverflow: 'ellipsis' 
-                }}>• {sess.users?.first_name}</span>
-              </>
-            )}
+            {sess && <span style={{ color: color, fontWeight: 900, textTransform: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>• {activeMins}m</span>}
           </div>
           {hasHelpRequest && (
             <div style={{ 
@@ -651,16 +631,30 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         {sess ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px' }}>
             <div style={{ 
-              width: '120px', 
-              height: '120px', 
+              width: '104px', 
+              height: '104px', 
               borderRadius: '24px', 
               overflow: 'hidden', 
               border: `2px solid ${color}`, 
               boxShadow: `0 10px 28px ${color}25`, 
               flexShrink: 0, 
+              marginBottom: '4px',
               transition: 'all 0.3s ease'
             }}>
               <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
+            </div>
+            <div style={{ textAlign: 'center', minWidth: 0, width: '100%' }}>
+              <div style={{ 
+                fontWeight: isMe ? 800 : 600, 
+                fontSize: '0.85rem', 
+                color: isMe ? color : '#1e293b', 
+                lineHeight: 1.1, 
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {sess.users?.first_name}
+              </div>
             </div>
           </div>
         ) : (
@@ -725,7 +719,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
                 <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
-                <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {activePlatform === 'groovelab' ? (c.users?.last_name || '') : `${c.users?.last_name?.[0] || ''}.`}</div>
+                <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name || ''}</div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer iPad'}</div>
                 {isSelf && onSelfCheckout ? (
                   <button

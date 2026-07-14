@@ -7382,7 +7382,7 @@ function App() {
                 textOverflow: 'ellipsis',
                 marginBottom: '2px'
               }}>
-                {user.role === 'student' ? 'Mein Profil' : user.first_name}
+                {user.role === 'student' ? 'Mein Profil' : `${user.first_name} ${user.last_name || ''}`.trim()}
               </div>
               <div style={{ 
                 fontSize: '0.68rem', 
