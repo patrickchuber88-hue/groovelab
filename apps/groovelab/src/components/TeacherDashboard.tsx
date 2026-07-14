@@ -3722,12 +3722,12 @@ export function TeacherDashboard({
             ? Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // submissions (user_song_skills pending approval)
-          (activeTab === 'briefing' || activeTab === 'proposals')
+          (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'proposals')
             ? Promise.resolve(supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)').eq('is_pending_approval', true)).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // bands
           (activeTab === 'briefing' || activeTab === 'bands')
-            ? Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e }))
+            ? Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // student list (also needed on live tab for checking in student roster modal)
           (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'students' || activeTab === 'bands' || activeTab === 'proposals')
