@@ -5359,6 +5359,36 @@ function App() {
       }
     }
 
+    const storedStationIdForCheck = localStorage.getItem('groovelab_station_id');
+    const isGeneralKiosk = !storedStationIdForCheck || storedStationIdForCheck === 'skip';
+
+    if (isDeviceKiosk && isGeneralKiosk) {
+      console.log('[Logout] Redirecting general kiosk to clean login page.');
+      localStorage.setItem('groovelab_station_id', 'skip');
+      localStorage.removeItem('groovelab_kiosk_room_id');
+
+      // Clear local credentials/states
+      localStorage.removeItem('isBillingBooked');
+      localStorage.removeItem('isCancelled');
+      localStorage.removeItem('contractStartDate');
+      localStorage.removeItem('bookedExtraUsers');
+      localStorage.removeItem('nextBillingOption');
+      localStorage.removeItem('nextBillingOptionEffectiveAt');
+      localStorage.removeItem('unbooked_52_temp');
+      setLoggedInUserId(null);
+      setUser(null);
+      setSession(null);
+      setIsCampusUnlocked(false);
+      sessionStorage.removeItem('groovelab_user_id');
+      sessionStorage.removeItem('groovelab_location_mode');
+      localStorage.removeItem('groovelab_user_id');
+      localStorage.removeItem('groovelab_location_mode');
+      localStorage.removeItem('groovelab_active_tab');
+
+      window.location.replace(`${window.location.origin}${window.location.pathname}`);
+      return;
+    }
+
     if (isDeviceKiosk && roomId) {
       console.log('[Logout] Redirecting Kiosk device to school room:', roomId);
       // Keep groovelab_station_id so the kiosk device remains configured for that station!
@@ -5372,7 +5402,7 @@ function App() {
       localStorage.removeItem('nextBillingOption');
       localStorage.removeItem('nextBillingOptionEffectiveAt');
       localStorage.removeItem('unbooked_52_temp');
-       setLoggedInUserId(null);
+      setLoggedInUserId(null);
       setUser(null);
       setSession(null);
       setIsCampusUnlocked(false);
