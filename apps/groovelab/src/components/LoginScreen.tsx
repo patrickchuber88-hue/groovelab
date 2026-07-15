@@ -1290,14 +1290,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 .replace(/^-+|-+$/g, '');
             };
 
-            const matchedSchool = allSchools.find(s => {
+            // 1. Try exact match first
+            let matchedSchool = allSchools.find(s => {
               const slug = slugify(s.name);
               const cleanSub = subdomain.toLowerCase().trim();
-              return slug === cleanSub || 
-                     slug.replace(/-/g, '') === cleanSub.replace(/-/g, '') ||
-                     slug.startsWith(cleanSub + '-') || 
-                     cleanSub.startsWith(slug + '-');
+              return slug === cleanSub || slug.replace(/-/g, '') === cleanSub.replace(/-/g, '');
             });
+
+            // 2. Fall back to prefix matching if no exact match was found
+            if (!matchedSchool) {
+              matchedSchool = allSchools.find(s => {
+                const slug = slugify(s.name);
+                const cleanSub = subdomain.toLowerCase().trim();
+                return slug.startsWith(cleanSub + '-') || cleanSub.startsWith(slug + '-');
+              });
+            }
             if (matchedSchool) {
               setSchoolName(matchedSchool.name);
               setSchoolData(matchedSchool);
