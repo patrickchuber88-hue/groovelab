@@ -49,6 +49,10 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
     loadJSQR(); // Start loading/getting jsQR in background when scanner mounts
 
     async function startCamera() {
+      // Delay camera request by 150ms to prevent race conditions during component mounting/state updates
+      await new Promise(resolve => setTimeout(resolve, 150));
+      if (!active) return;
+
       try {
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
@@ -63,7 +67,15 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
           audio: false
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+          console.warn('[Scanner] getUserMedia with constraints failed, retrying with simple constraints:', err);
+          if (!active) return;
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+
         if (!active) {
           stream.getTracks().forEach(track => track.stop());
           return;
