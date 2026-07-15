@@ -2029,7 +2029,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         await supabase.from('activation_days').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
         await supabase.from('students').delete().eq('school_id', schoolId);
         await supabase.from('rooms').delete().eq('school_id', schoolId);
-        await supabase.from('users').delete().eq('school_id', schoolId);
+        await supabase.from('users').delete().eq('school_id', schoolId).neq('id', userId);
 
         if (backupData.school) {
           const { id, created_at, ...schoolSettings } = backupData.school;
@@ -2037,8 +2037,17 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         }
 
         if (backupData.users.length > 0) {
-          const { error } = await supabase.from('users').insert(backupData.users);
-          if (error) throw error;
+          const usersToInsert = backupData.users.filter((u: any) => u.id !== userId);
+          if (usersToInsert.length > 0) {
+            const { error } = await supabase.from('users').insert(usersToInsert);
+            if (error) throw error;
+          }
+          // Update the current logged-in user with their backup data (excluding primary key/email conflicts)
+          const currentUserBackup = backupData.users.find((u: any) => u.id === userId);
+          if (currentUserBackup) {
+            const { id, created_at, email, ...updatableFields } = currentUserBackup;
+            await supabase.from('users').update(updatableFields).eq('id', userId);
+          }
         }
         if (backupData.rooms.length > 0) {
           const { error } = await supabase.from('rooms').insert(backupData.rooms);
