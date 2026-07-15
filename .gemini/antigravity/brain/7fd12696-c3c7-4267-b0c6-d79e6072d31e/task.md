@@ -1,0 +1,5 @@
+- [x] Add copy onboarding link button in `StudentDetailModal.tsx`
+- [x] Implement `StudentOnboardingPage.tsx`
+- [x] Implement `ProfileSelector.tsx`
+- [x] Update routing and authentication checks in `App.tsx`
+- [x] Run typescript and bundler build check to verify correctness

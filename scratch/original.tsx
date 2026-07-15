@@ -1298,7 +1298,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
           .maybeSingle();
 
         setOperatorDetails({
-          companyName: billingSettings?.company_name || 'Simplified Work GbR',
+          companyName: billingSettings?.company_name || 'Patrick Huber (Einzelunternehmer)',
           iban: billingSettings?.iban || 'DE89 3704 0044 0532 9482 11',
           bic: billingSettings?.bic || 'WELADED1XYZ'
         });

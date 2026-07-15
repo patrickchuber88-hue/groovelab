@@ -1,0 +1,15 @@
+{
+  "schools": 8,
+  "teachersPerSchool": 50,
+  "studentsPerSchool": 500,
+  "totalRequests": 9224,
+  "successRate": 98.42,
+  "errorRate": 1.58,
+  "p95Latency": 393,
+  "cpuLoad": 8.71,
+  "errors": {
+    "RLS": 146,
+    "Database": 0,
+    "Logic": 0
+  }
+}

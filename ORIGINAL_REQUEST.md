@@ -187,3 +187,30 @@ Integrity mode: development
 - [ ] Detaillierte Angabe, welche spezifische Funktion (z.B. Loopstation-Spuren, Fokus-Timer, Raum-Engine) die meiste CPU-Last bzw. den meiste Speicher benötigt.
 - [ ] Vollständiger Clean-Up aller während des Tests angelegten Schulen, Benutzer und zugehöriger DB-Einträge.
 
+## 2026-07-15T18:22:03Z
+
+Das Ziel dieses Projekts ist es, ein Experten-Team (Rechtsanwalt, Cybersecurity-Spezialist, Datenschutzbeauftragter und Programmierer) mit der Durchführung und Implementierung eines vollständigen, rechtssicheren Audits und Updates der Rechtsdokumente (AGB, Datenschutz, Impressum) sowie der technischen Absicherungen auf der Plattform Campus-Groovelab zu beauftragen.
+
+Working directory: /Users/patrickhuber/Documents/Antigravity Projects/Groovelab app
+Integrity mode: demo
+
+## Requirements
+
+### R1. Rechtssichere Rechtsdokumente (B2B)
+Die Allgemeinen Geschäftsbedingungen (AGB), die Datenschutzerklärung und das Impressum auf der Landingpage der Plattform Campus-Groovelab müssen zu 100% mit der technischen Realität der App übereinstimmen. Alle Haftungsklauseln müssen für den reinen B2B-Verkehr rechtssicher formuliert sein.
+
+### R2. Technische Datenschutz- & Timer-Ausrichtung
+Die Beschreibungen der Lagesensoren, des Übe-Timers (Toleranzzeit von 10 Sekunden, die erst nach den Fokus-Minuten greift), des iCal-Exports (Pseudonymisierung zu "Vorname A.") und des Serverstandorts (100% in Deutschland, Hetzner Falkenstein) müssen sich exakt und ohne Widersprüche im Quellcode und in den Rechtstexten wiederfinden.
+
+### R3. Generisches Rate-Limiting & Sicherheit
+Die Klauseln zu automatisierten IP-Sperren in den AGB müssen an das tatsächliche Verhalten des Systems angepasst und rechtssicher verallgemeinert werden, ohne Falschangaben über feste Sperrzeiten zu machen.
+
+## Acceptance Criteria
+
+### Rechtliche Validierung
+- [ ] Alle Rechtstexte (AGB, Datenschutz, Impressum) im Modal der Landingpage sind aktualisiert und frei von nicht existierenden GbR-Bezeichnungen (Simplified Work GbR entfernt, Vertragspartner ist Patrick Huber als Einzelunternehmer).
+- [ ] Die AGB definieren die Timer-Gewährleistung mit einer 10-sekündigen Grace Period, welche erst nach Ablauf der Fokus-Minuten aktiv wird.
+- [ ] Der Server-Standort wird einheitlich und wahrheitsgemäß als 100% Deutschland (Hetzner Falkenstein) deklariert.
+- [ ] Die Kalender-Pseudonymisierung ist mit dem tatsächlichen Format (z. B. "Jonas M.") synchronisiert.
+- [ ] Das Rate-Limiting ist in den AGB allgemein gehalten und verweist nicht auf starre, nicht im Code existierende Sperren.
+- [ ] Die Anwendung lässt sich nach allen Änderungen fehlerfrei kompilieren (`npm run build` läuft erfolgreich durch).
