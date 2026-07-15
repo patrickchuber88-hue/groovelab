@@ -26,14 +26,12 @@ const capitalizeName = (str: string | null | undefined): string => {
 };
 
 const DEFAULT_IMPRESSUM = `Angaben gemäß § 5 TMG
-Manuel Wagner
-Friedrichstr. 33
-79713 Bad Säckingen
+Patrick Huber
+Karl-Fürstenberg Str. 59
+79618 Rheinfelden
 
 Kontakt
-Mo-Fr: 08-15 Uhr
-Telefon: 07761 – 2416
-E-Mail: info@musaek.de
+E-Mail: patrick.c.huber88@gmail.com
 
 EU-Streitschlichtung
 Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.
