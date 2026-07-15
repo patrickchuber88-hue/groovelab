@@ -1267,6 +1267,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
+  const [copiedKioskLink, setCopiedKioskLink] = useState<boolean>(false);
   const [showOwnQrModal, setShowOwnQrModal] = useState<boolean>(false);
 
   // Visual Live Lab states & refs
@@ -25984,6 +25985,55 @@ status: status,
                         </button>
                       </div>
                     </div>
+
+                    {/* QR Code Scanner Login Link (Kiosk Mode) */}
+                    {kioskToken && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', marginTop: '16px' }}>
+                        <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '6px' }}>QR-Code Scanner Login (Kiosk-Modus)</strong>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: '1.4' }}>
+                          Verwende diesen Link, um Tablets/Endgeräte in deiner Schule permanent als Scan-Stationen (Kiosk-Modus) einzurichten.
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input 
+                            readOnly 
+                            value={schoolSubdomain 
+                              ? (window.location.hostname.includes('localhost') 
+                                ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                              : `${window.location.origin}/device-onboarding/${kioskToken}`
+                            } 
+                            style={{ flex: 1, padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.82rem', fontFamily: 'monospace', background: '#ffffff', color: '#1e293b' }} 
+                          />
+                          <button 
+                            onClick={() => { 
+                              const link = schoolSubdomain 
+                                ? (window.location.hostname.includes('localhost') 
+                                  ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                  : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                                : `${window.location.origin}/device-onboarding/${kioskToken}`;
+                              navigator.clipboard.writeText(link); 
+                              setCopiedKioskLink(true);
+                              setTimeout(() => setCopiedKioskLink(false), 2000);
+                            }} 
+                            style={{ 
+                              padding: '10px 20px', 
+                              fontSize: '0.8rem', 
+                              fontWeight: 800,
+                              borderRadius: '10px',
+                              border: copiedKioskLink ? '1.5px solid #ea4335' : 'none',
+                              background: copiedKioskLink ? '#fce8e6' : '#ea4335',
+                              color: copiedKioskLink ? '#ea4335' : '#ffffff',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {copiedKioskLink ? '✓ Kopiert!' : 'Link kopieren'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Zahlungsart Card */}
                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
