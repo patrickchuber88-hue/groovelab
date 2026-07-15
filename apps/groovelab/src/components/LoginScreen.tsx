@@ -4005,7 +4005,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     <button
                       key={room.id}
                       type="button"
-                      onClick={() => setKioskSelectedRoomId(room.id)}
+                      onClick={() => {
+                        setKioskSelectedRoomId(room.id);
+                        // Trigger GPS request pre-emptively on user click gesture!
+                        if (navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                              const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                              setUserPos(coords);
+                              console.log('[GPS Room Click] Cached coords:', coords);
+                            },
+                            (err) => console.warn('[GPS Room Click] Failed:', err),
+                            { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+                          );
+                        }
+                      }}
                       style={{
                         padding: '8px 14px',
                         borderRadius: '12px',
@@ -4067,6 +4081,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                               localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                             }
                             localStorage.setItem('groovelab_station_id', newSelection);
+                            
+                            // Trigger GPS request pre-emptively on user click gesture!
+                            if (navigator.geolocation) {
+                              navigator.geolocation.getCurrentPosition(
+                                (pos) => {
+                                  const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                                  setUserPos(coords);
+                                  console.log('[GPS Station Click] Cached coords:', coords);
+                                },
+                                (err) => console.warn('[GPS Station Click] Failed:', err),
+                                { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+                              );
+                            }
                           } else {
                             localStorage.removeItem('groovelab_kiosk_token');
                             localStorage.removeItem('groovelab_station_id');
