@@ -2594,7 +2594,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let isWithinAnyRoom = true;
       const isGroovelabScreen = isGroovelabKiosk;
       const effectiveSchool = schoolData || userSchool;
-      const isBypass = !isGroovelabScreen || !!(effectiveSchool?.opening_hours?.geofence_bypass);
+      const isBypass = !isGroovelabScreen || 
+                       !!(schoolData?.opening_hours?.geofence_bypass) || 
+                       !!(userSchool?.opening_hours?.geofence_bypass) ||
+                       isMusaekSchool(schoolData?.id) || 
+                       isMusaekSchool(userSchool?.id);
 
       // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
       if (isGroovelabKiosk) {
@@ -2607,9 +2611,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
         );
 
-        if (isLocalhost) {
+        if (isLocalhost || isBypass) {
           isWithinAnyRoom = true;
-          console.log('[Login] Localhost detected: geofence check bypassed in PIN login.');
+          console.log('[Login] Geofence check bypassed (localhost or database bypass active) in PIN login.');
           setGeoDebug({
             isWithinAnyRoom: true,
             userPos: null,
@@ -2923,7 +2927,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let isWithinAnyRoom = true;
       const isGroovelabScreen = isGroovelabKiosk;
       const effectiveSchool = schoolData || userSchool;
-      const isBypass = !isGroovelabScreen || !!(effectiveSchool?.opening_hours?.geofence_bypass);
+      const isBypass = !isGroovelabScreen || 
+                       !!(schoolData?.opening_hours?.geofence_bypass) || 
+                       !!(userSchool?.opening_hours?.geofence_bypass) ||
+                       isMusaekSchool(schoolData?.id) || 
+                       isMusaekSchool(userSchool?.id);
 
       const isLocalhost = typeof window !== 'undefined' && (
         window.location.hostname === 'localhost' || 
@@ -2936,9 +2944,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
       if (isGroovelabKiosk) {
-        if (isLocalhost) {
+        if (isLocalhost || isBypass) {
           isWithinAnyRoom = true;
-          console.log('[Login] Localhost detected: geofence check bypassed.');
+          console.log('[Login] Geofence check bypassed (localhost or database bypass active).');
           setGeoDebug({
             isWithinAnyRoom: true,
             userPos: null,
