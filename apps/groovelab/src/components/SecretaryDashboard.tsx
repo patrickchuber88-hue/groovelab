@@ -1912,7 +1912,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
       const [
         bandMembersRes,
-        studentNamesRes,
+        studentFirstNamesRes,
+        studentLastNamesRes,
         emailPrefixesRes,
         emailSuffixesRes,
         activationDaysRes
@@ -1921,7 +1922,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           ? supabase.from('band_members').select('*').in('band_id', bandIds)
           : Promise.resolve({ data: [], error: null }),
         studentIds.length > 0
-          ? supabase.from('student_names').select('*').in('student_id', studentIds)
+          ? supabase.from('student_first_names').select('*').in('student_id', studentIds)
+          : Promise.resolve({ data: [], error: null }),
+        studentIds.length > 0
+          ? supabase.from('student_last_names').select('*').in('student_id', studentIds)
           : Promise.resolve({ data: [], error: null }),
         studentIds.length > 0
           ? supabase.from('email_prefixes').select('*').in('student_id', studentIds)
@@ -1935,7 +1939,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       ]);
 
       if (bandMembersRes.error) throw bandMembersRes.error;
-      if (studentNamesRes.error) throw studentNamesRes.error;
+      if (studentFirstNamesRes.error) throw studentFirstNamesRes.error;
+      if (studentLastNamesRes.error) throw studentLastNamesRes.error;
       if (emailPrefixesRes.error) throw emailPrefixesRes.error;
       if (emailSuffixesRes.error) throw emailSuffixesRes.error;
       if (activationDaysRes.error) throw activationDaysRes.error;
@@ -1952,19 +1957,22 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         bands: bandsRes.data || [],
         bandMembers: bandMembersRes.data || [],
         students: studentsRes.data || [],
-        studentNames: studentNamesRes.data || [],
+        studentFirstNames: studentFirstNamesRes.data || [],
+        studentLastNames: studentLastNamesRes.data || [],
         emailPrefixes: emailPrefixesRes.data || [],
         emailSuffixes: emailSuffixesRes.data || [],
         activationDays: activationDaysRes.data || []
       };
 
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const jsonBlob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(jsonBlob);
       const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("href", downloadUrl);
       downloadAnchor.setAttribute("download", `Backup_Campus_Groovelab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
+      URL.revokeObjectURL(downloadUrl);
 
       const nowStr = new Date().toISOString();
       localStorage.setItem(`groovelab_last_backup_${schoolId}`, nowStr);
@@ -2031,10 +2039,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         await supabase.from('band_members').delete().in('band_id', (await supabase.from('bands').select('id').eq('school_id', schoolId)).data?.map((b: any) => b.id) || []);
         await supabase.from('bands').delete().eq('school_id', schoolId);
         await supabase.from('schedules').delete().eq('school_id', schoolId);
-        await supabase.from('student_names').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
-        await supabase.from('email_prefixes').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
-        await supabase.from('email_suffixes').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
-        await supabase.from('activation_days').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
+        const restoreStudentIds = (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || [];
+        await supabase.from('student_first_names').delete().in('student_id', restoreStudentIds);
+        await supabase.from('student_last_names').delete().in('student_id', restoreStudentIds);
+        await supabase.from('email_prefixes').delete().in('student_id', restoreStudentIds);
+        await supabase.from('email_suffixes').delete().in('student_id', restoreStudentIds);
+        await supabase.from('activation_days').delete().in('student_id', restoreStudentIds);
         await supabase.from('students').delete().eq('school_id', schoolId);
         await supabase.from('rooms').delete().eq('school_id', schoolId);
         await supabase.from('users').delete().eq('school_id', schoolId).neq('id', userId);
@@ -2069,9 +2079,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           const { error } = await supabase.from('students').insert(backupData.students);
           if (error) throw error;
         }
-        if (backupData.studentNames && backupData.studentNames.length > 0) {
-          const { error } = await supabase.from('student_names').insert(backupData.studentNames);
+        if (backupData.studentFirstNames && backupData.studentFirstNames.length > 0) {
+          const { error } = await supabase.from('student_first_names').insert(backupData.studentFirstNames);
           if (error) throw error;
+        }
+        if (backupData.studentLastNames && backupData.studentLastNames.length > 0) {
+          const { error } = await supabase.from('student_last_names').insert(backupData.studentLastNames);
+          if (error) throw error;
+        }
+        if (backupData.studentNames && backupData.studentNames.length > 0) {
+          const firstNamesToInsert = backupData.studentNames.map((sn: any) => ({
+            student_id: sn.student_id,
+            first_name: sn.first_name
+          }));
+          const lastNamesToInsert = backupData.studentNames.map((sn: any) => ({
+            student_id: sn.student_id,
+            last_name: sn.last_name
+          }));
+          const { error: fErr } = await supabase.from('student_first_names').insert(firstNamesToInsert);
+          if (fErr) throw fErr;
+          const { error: lErr } = await supabase.from('student_last_names').insert(lastNamesToInsert);
+          if (lErr) throw lErr;
         }
         if (backupData.emailPrefixes && backupData.emailPrefixes.length > 0) {
           const { error } = await supabase.from('email_prefixes').insert(backupData.emailPrefixes);
@@ -20990,8 +21018,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                 <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Wer trägt die Kosten für die Schüleraktivierungen?</h4>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
                                   Die Abrechnung läuft grundsätzlich über die Musikschule. Entscheide hier, wer die Kosten für die Schüleraktivierungen übernimmt.
-                                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#b45309', marginTop: '4px', fontWeight: 600 }}>
-                                    ⚠️ Hinweis: Aktivierungen können nur für das Campus-Modul auf Schüler/Eltern umgelegt werden. GrooveLab-Aktivierungen werden immer von der Schule getragen.
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#b45309', marginTop: '4px', fontWeight: 600 }}>
+                                    <AlertCircle size={12} color="#b45309" style={{ flexShrink: 0 }} /> Hinweis: Aktivierungen können nur für das Campus-Modul auf Schüler/Eltern umgelegt werden. GrooveLab-Aktivierungen werden immer von der Schule getragen.
                                   </span>
                                 </p>
                               </div>
