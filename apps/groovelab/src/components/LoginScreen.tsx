@@ -2837,8 +2837,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.day_of_birth = actDay?.day_of_birth || null;
       }
 
-      // Two-step QR-Login logic: require a second scan to finalize login and prevent alerts on first scan
-      if (!qrScanPrompt) {
+      // Two-step QR-Login logic: require a second scan to finalize login on standard Campus logins to prevent alerts on first scan.
+      // GrooveLab Kiosk mode (yellow screen) is a single-scan check-in platform, so it bypasses this prompt.
+      if (!qrScanPrompt && !isGroovelabKiosk) {
         if (!userSchool) {
           throw new Error('Für diesen Nutzer konnte keine Musikschule gefunden werden.');
         }
