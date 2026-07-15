@@ -196,6 +196,7 @@ export const getCleanPageNotes = (notes: any): string => {
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const activePlat = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
 
   const displayedStudentName = useMemo(() => {
     return readOnly
@@ -3008,28 +3009,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <Mic size={14} />
                   <span>Aufnahmen</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveViewMode('loopstation')}
-                  style={{
-                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  className="hover-scale"
-                >
-                  <Sliders size={14} />
-                  <span>Loopstation</span>
-                </button>
+                {activePlat === 'campus' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('loopstation')}
+                    style={{
+                      background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Sliders size={14} />
+                    <span>Loopstation</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setActiveViewMode('practice')}
@@ -3116,26 +3119,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <Mic size={12} />
                 <span>Aufnahmen</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveViewMode('loopstation')}
-                style={{
-                  background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                  border: 'none',
-                  color: '#ffffff',
-                  padding: '6px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Sliders size={12} />
-                <span>Loopstation</span>
-              </button>
+              {activePlat === 'campus' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('loopstation')}
+                  style={{
+                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Sliders size={12} />
+                  <span>Loopstation</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setActiveViewMode('practice')}

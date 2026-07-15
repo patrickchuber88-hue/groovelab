@@ -43,12 +43,24 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     clientInfo += `;user_id=${userId}`;
   }
   
-  const qrToken = sessionStorage.getItem('groovelab_qr_token');
+  let qrToken = sessionStorage.getItem('groovelab_qr_token');
+  if (!qrToken && typeof window !== 'undefined') {
+    const onboardingMatch = window.location.pathname.match(/^\/onboarding\/([^/?#]+)/);
+    if (onboardingMatch) {
+      qrToken = onboardingMatch[1];
+    }
+  }
   if (qrToken) {
     clientInfo += `;qr_token=${qrToken}`;
   }
 
-  const kioskToken = localStorage.getItem('groovelab_kiosk_token');
+  let kioskToken = localStorage.getItem('groovelab_kiosk_token');
+  if (!kioskToken && typeof window !== 'undefined') {
+    const deviceMatch = window.location.pathname.match(/^\/device-onboarding\/([^/?#]+)/);
+    if (deviceMatch) {
+      kioskToken = deviceMatch[1];
+    }
+  }
   if (kioskToken && !qrToken) {
     clientInfo += `;kiosk_token=${kioskToken}`;
   }

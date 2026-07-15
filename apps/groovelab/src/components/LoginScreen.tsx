@@ -2629,6 +2629,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // Intercept login for PIN setup or verification if it's an Ausweis ID login
       const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
       if (!isQrLogin) {
+        if (user.role === 'student' && isGroovelabKiosk) {
+          // Bypass birthday PIN setup and verification completely for students on GrooveLab
+          await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+          return;
+        }
+
         const studentBirthDay = (user.role === 'student' && !isGroovelabKiosk) && user.day_of_birth ? String(user.day_of_birth).padStart(2, '0') : '';
         const isPinActivated = user.role === 'student' ? (!!studentBirthDay || user.is_pin_activated) : user.is_pin_activated;
 

@@ -1,0 +1,21 @@
+{
+  "short_name": "GrooveLab",
+  "name": "GrooveLab",
+  "icons": [
+    {
+      "src": "/pwa-icon-groovelab.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/pwa-icon-groovelab.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/?platform=groovelab",
+  "background_color": "#0c0f12",
+  "theme_color": "#eab308",
+  "display": "standalone",
+  "orientation": "portrait"
+}

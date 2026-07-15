@@ -4327,6 +4327,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       .on('broadcast', { event: 'homework-changed' }, () => {
         fetchStudentProgress();
       })
+      .on('broadcast', { event: 'challenge-approved' }, (payload: any) => {
+        console.log('[Realtime] Challenge approved broadcast received:', payload);
+        fetchStudentProgress();
+        const songTitle = payload.payload?.songTitle || 'einem Song';
+        alert(`Glückwunsch! Deine Challenge für "${songTitle}" wurde von deinem Lehrer bestätigt! 🏆🎉`);
+      })
       .subscribe();
 
     const handleHomeworkUpdate = (e: Event) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -1913,6 +1913,25 @@ export function AdminDashboard({
   useEffect(() => {
     fetchData();
   }, [activeTab, activePlatform, bookingDate, missionFilter]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase.channel(`realtime_teacher_challenges_${userId}`);
+    channel
+      .on('broadcast', { event: 'challenge-submitted' }, (payload: any) => {
+        console.log('[Realtime] Challenge submitted broadcast received:', payload);
+        fetchData();
+        const studentName = payload.payload?.studentName || 'Ein Schüler';
+        const songTitle = payload.payload?.songTitle || 'einem Song';
+        const instrument = payload.payload?.instrument || '';
+        alert(`Neue Challenge von ${studentName} für "${songTitle}" (${instrument}) eingereicht! 🚀`);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (activeTab === 'rooms') {
@@ -11245,16 +11264,16 @@ export function AdminDashboard({
           {/* Left: Challenges per Instrument */}
           <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🏆</span> Gemeisterte Challenges (Stage Ready)
+              <Award size={20} color={brandColor} /> Gemeisterte Challenges (Stage Ready)
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, justifyContent: 'center' }}>
               {[
-                { name: 'E-Gitarre', value: stats.stageReadyPerInst?.guitar || 0, icon: '🎸', color: '#ef4444' }, // Red
-                { name: 'E-Piano / Keys', value: stats.stageReadyPerInst?.keys || 0, icon: '🎹', color: '#a855f7' }, // Purple
-                { name: 'E-Drums', value: stats.stageReadyPerInst?.drums || 0, icon: '🥁', color: '#3b82f6' }, // Blue
-                { name: 'E-Bass', value: stats.stageReadyPerInst?.bass || 0, icon: '🎸', color: '#eab308' }, // Yellow
-                { name: 'Vocals / Gesang', value: stats.stageReadyPerInst?.vocals || 0, icon: '🎤', color: '#ec4899' } // Pink
+                { name: 'E-Gitarre', value: stats.stageReadyPerInst?.guitar || 0, iconKey: 'E-Gitarre', color: '#ef4444' }, // Red
+                { name: 'E-Piano / Keys', value: stats.stageReadyPerInst?.keys || 0, iconKey: 'E-Piano', color: '#a855f7' }, // Purple
+                { name: 'E-Drums', value: stats.stageReadyPerInst?.drums || 0, iconKey: 'E-Drums', color: '#3b82f6' }, // Blue
+                { name: 'E-Bass', value: stats.stageReadyPerInst?.bass || 0, iconKey: 'E-Bass', color: '#eab308' }, // Yellow
+                { name: 'Vocals / Gesang', value: stats.stageReadyPerInst?.vocals || 0, iconKey: 'Vocals', color: '#ec4899' } // Pink
               ].map((inst, idx) => {
                 const maxVal = Math.max(...Object.values(stats.stageReadyPerInst || {}).map(Number), 1);
                 const percent = Math.round((inst.value / maxVal) * 100);
@@ -11262,8 +11281,10 @@ export function AdminDashboard({
                 return (
                   <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', fontWeight: 800, color: '#334155' }}>
-                        <span style={{ fontSize: '1.1rem' }}>{inst.icon}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.875rem', fontWeight: 800, color: '#334155' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', width: '20px', height: '20px', color: inst.color }}>
+                          {ADMIN_INSTRUMENT_ICONS[inst.iconKey]}
+                        </span>
                         <span>{inst.name}</span>
                       </div>
                       <span style={{ background: `${inst.color}15`, color: inst.color, padding: '2px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 900 }}>
@@ -11282,7 +11303,7 @@ export function AdminDashboard({
           {/* Right: Weekday Attendance */}
           <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>📅</span> Auslastung nach Wochentag
+              <Calendar size={20} color={brandColor} /> Auslastung nach Wochentag
             </h3>
             
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '220px', padding: '0 10px 10px 10px', borderBottom: '1px solid #e2e8f0' }}>
@@ -11322,7 +11343,7 @@ export function AdminDashboard({
           {/* XP Leaderboard */}
           <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🔥</span> XP Leaderboard (Top 5 Schüler)
+              <Zap size={20} color={brandColor} /> XP Leaderboard (Top 5 Schüler)
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -11355,7 +11376,7 @@ export function AdminDashboard({
           {/* Popular Songs */}
           <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🎵</span> Beliebteste Songs (Repertoire-Hits)
+              <Music size={20} color={brandColor} /> Beliebteste Songs (Repertoire-Hits)
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -11367,8 +11388,8 @@ export function AdminDashboard({
                 return (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1rem' }}>
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${brandColor}10`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.9rem' }}>
+                        #{idx + 1}
                       </div>
                       <div>
                         <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.9rem' }}>{title}</div>
@@ -11376,7 +11397,7 @@ export function AdminDashboard({
                       </div>
                     </div>
                     <div style={{ background: '#eff6ff', color: '#2563eb', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, border: '1px solid #dbeafe' }}>
-                      🔥 {song.count} Schüler üben
+                      {song.count} Schüler üben
                     </div>
                   </div>
                 );
@@ -11431,11 +11452,29 @@ export function AdminDashboard({
   const handleApproveSubmission = async (subId: string) => {
     setSubmissions(prev => prev.filter(s => s.id !== subId));
     try {
-      const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level').eq('id', subId).single();
+      const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level, songs(title)').eq('id', subId).single();
       
       await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);
       
       if (sub) {
+        // Send a realtime broadcast to the student's dashboard!
+        const songTitle = Array.isArray((sub as any).songs) ? ((sub as any).songs[0] as any)?.title : ((sub as any).songs as any)?.title;
+        const channel = supabase.channel(`realtime_student_progress_${sub.user_id}`);
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'challenge-approved',
+              payload: {
+                songId: sub.song_id,
+                songTitle: songTitle || 'Song',
+                instrument: sub.instrument,
+                difficultyLevel: sub.difficulty_level
+              }
+            });
+            setTimeout(() => supabase.removeChannel(channel), 1000);
+          }
+        });
         const { data: memberships } = await supabase.from('band_members').select('band_id').eq('user_id', sub.user_id);
         
         if (memberships && memberships.length > 0) {
@@ -16532,6 +16571,7 @@ function DeviceSetupScreen({
     sunday: { start: '10:00', end: '16:00', active: false }
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [copiedKioskLink, setCopiedKioskLink] = useState(false);
 
   useEffect(() => {
     if (rooms.length > 0 && !selectedRoomId) {
@@ -16587,6 +16627,78 @@ function DeviceSetupScreen({
     setIsSaving(false);
     if (error) alert('Fehler: ' + error.message);
     else onUpdate();
+  };
+
+  const handleExportAllPresenceCSV = async () => {
+    const schoolId = effectiveSchool?.id || admin?.school_id;
+    if (!schoolId) {
+      alert('Fehler: Keine Schul-ID gefunden.');
+      return;
+    }
+
+    try {
+      const { data: sessData, error } = await supabase
+        .from('sessions')
+        .select('*, users!inner(first_name, last_name, role, school_id), stations(name)')
+        .eq('users.school_id', schoolId)
+        .order('check_in_time', { ascending: false });
+
+      if (error) {
+        alert('Fehler beim Laden der Daten: ' + error.message);
+        return;
+      }
+
+      if (!sessData || sessData.length === 0) {
+        alert('Keine Anwesenheitsdaten zum Exportieren gefunden.');
+        return;
+      }
+
+      const getCW = (date: Date) => {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        return `KW ${weekNo} (${d.getUTCFullYear()})`;
+      };
+
+      let csvContent = "\uFEFF";
+      csvContent += "Name;Rolle;Kalenderwoche;Datum;Station;Check-In;Check-Out;Dauer (Minuten)\n";
+
+      sessData.forEach((s: any) => {
+        const u = s.users;
+        const nameStr = `${u?.first_name || ''} ${u?.last_name || ''}`.trim();
+        const roleStr = u?.role === 'student' ? 'Schüler' : u?.role === 'teacher' ? 'Lehrer' : u?.role || 'Unbekannt';
+        const checkIn = new Date(s.check_in_time);
+        const kw = getCW(checkIn);
+        const datum = checkIn.toLocaleDateString('de-DE');
+        const station = s.stations?.name || 'Unbekannt';
+        const checkInTime = checkIn.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const checkOutTime = s.check_out_time ? new Date(s.check_out_time).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'Aktiv';
+        
+        let durationMins = '';
+        if (s.check_out_time) {
+          const diffMs = new Date(s.check_out_time).getTime() - checkIn.getTime();
+          durationMins = String(Math.max(0, Math.floor(diffMs / 60000)));
+        } else {
+          durationMins = 'Aktiv';
+        }
+
+        csvContent += `"${nameStr}";"${roleStr}";"${kw}";"${datum}";"${station}";"${checkInTime}";"${checkOutTime}";"${durationMins}"\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const fileName = `Anwesenheiten_Gesamt_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.setAttribute("href", url);
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      alert('Export-Fehler: ' + err.message);
+    }
   };
 
   const roomStations = stations.filter(s => s.room_id === selectedRoomId);
@@ -16888,6 +17000,75 @@ function DeviceSetupScreen({
       {/* Subtab 1: Geräte-Setup (Classroom grid kiosk view) */}
       {activeSubTab === 'device' && (
         <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          
+          {/* GrooveLab Kiosk Device Onboarding Link section */}
+          {admin?.schools?.groovelab_kiosk_token && (
+            <div style={{ 
+              background: '#fefce8', 
+              border: '1.5px solid #fef08a', 
+              borderRadius: '20px', 
+              padding: '20px', 
+              marginBottom: '28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#854d0e', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Monitor size={18} /> GrooveLab Kiosk-Geräte Onboarding
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: '#a16207', margin: '4px 0 0 0', fontWeight: 550, lineHeight: 1.4 }}>
+                  Kopiere diesen Link und sende ihn an neue Kiosk-Geräte (z.B. iPads), um diese mit den GrooveLab-Stationen zu verknüpfen. Wird der Link geöffnet, kann die GrooveLab-App direkt installiert und eingerichtet werden (keine PIN erforderlich, Anmeldung erfolgt komplett über Schüler-QR-Codes).
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${window.location.origin}/device-onboarding/${admin.schools.groovelab_kiosk_token}`}
+                  style={{ 
+                    flex: 1, 
+                    padding: '12px 16px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #fef08a', 
+                    background: '#ffffff',
+                    color: '#854d0e',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    outline: 'none'
+                  }} 
+                />
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/device-onboarding/${admin.schools.groovelab_kiosk_token}`;
+                    navigator.clipboard.writeText(link);
+                    setCopiedKioskLink(true);
+                    setTimeout(() => setCopiedKioskLink(false), 2000);
+                  }}
+                  style={{
+                    background: '#eab308',
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px 20px',
+                    fontSize: '0.8rem',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 10px rgba(234,179,8,0.2)',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  {copiedKioskLink ? <Check size={16} /> : <Copy size={16} />}
+                  {copiedKioskLink ? 'Link kopiert!' : 'Link kopieren'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
               <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Räumliche Kiosk-Übersicht</h2>
@@ -17299,24 +17480,69 @@ function DeviceSetupScreen({
               </div>
             </div>
 
-            <button 
-              onClick={handleSaveAcademy}
-              disabled={isSaving}
-              style={{ 
-                width: 'fit-content',
-                background: brandColor, 
-                color: 'white', 
-                border: 'none', 
-                padding: '12px 28px', 
-                borderRadius: '10px', 
-                fontWeight: 800, 
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                opacity: isSaving ? 0.7 : 1
-              }}
-            >
-              {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
-            </button>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button 
+                onClick={handleSaveAcademy}
+                disabled={isSaving}
+                style={{ 
+                  width: 'fit-content',
+                  background: brandColor, 
+                  color: 'white', 
+                  border: 'none', 
+                  padding: '12px 28px', 
+                  borderRadius: '10px', 
+                  fontWeight: 800, 
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  opacity: isSaving ? 0.7 : 1
+                }}
+              >
+                {isSaving ? 'Speichere...' : 'Einstellungen speichern'}
+              </button>
+            </div>
+
+            {/* Sektion: Daten-Export (Anwesenheiten) */}
+            <div style={{ 
+              background: '#f8fafc', 
+              borderRadius: '24px', 
+              padding: '20px 24px', 
+              border: '1.5px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginTop: '16px'
+            }}>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} color={brandColor} /> Anwesenheitsdaten exportieren
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+                Lade alle Anwesenheits- und Check-In-Protokolle von allen Lehrern, Coaches und Schülern dieser Musikschule als CSV-Datei herunter.
+              </p>
+              <button
+                type="button"
+                onClick={handleExportAllPresenceCSV}
+                style={{
+                  width: 'fit-content',
+                  background: brandColor,
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: `0 4px 12px ${brandColor}20`,
+                  transition: 'all 0.15s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = activePlatform === 'campus' ? '#0f5b28' : '#ca8a04'}
+                onMouseLeave={e => e.currentTarget.style.background = brandColor}
+              >
+                <Download size={14} /> Alle Anwesenheiten exportieren (CSV)
+              </button>
+            </div>
           </div>
         </div>
       )}

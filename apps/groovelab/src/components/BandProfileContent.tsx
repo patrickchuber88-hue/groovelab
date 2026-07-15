@@ -58,8 +58,9 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
       width: size, height: size, borderRadius, 
       background: gradient, 
       display: 'flex', alignItems: 'center', justifyContent: 'center', 
-      color: 'white', fontWeight: 950, fontSize: `calc(${size} * 0.35)`,
-      textShadow: '0 2px 4px rgba(0,0,0,0.15)',
+      color: 'white', fontWeight: 950, 
+      fontSize: size === '100%' ? '5.5rem' : `calc(${size} * 0.35)`,
+      textShadow: '0 4px 10px rgba(0,0,0,0.3)',
       flexShrink: 0,
       userSelect: 'none'
     }}>
@@ -287,19 +288,31 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     return assignments;
   }, [allSongs, bSongs, selectedBandForProfile.band_members, bandMembersSkills]);
 
+  const bandUserIds = React.useMemo(() => {
+    return (selectedBandForProfile.band_members || [])
+      .map((m: any) => m.user_id || m.student_id)
+      .filter(Boolean);
+  }, [selectedBandForProfile.band_members]);
+
   useEffect(() => {
     if (bandProfileView === 'backstage') {
       fetchShoutbox();
       fetchSongProposals();
+      if (bandUserIds.length > 0) {
+        fetchBandPlanning();
+      }
       const channel = supabase
         .channel(`band_realtime_${selectedBandForProfile.id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'band_shoutbox', filter: `band_id=eq.${selectedBandForProfile.id}` }, () => fetchShoutbox())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'band_songs', filter: `band_id=eq.${selectedBandForProfile.id}` }, () => fetchSongProposals())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'band_song_slots' }, () => fetchSongProposals())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_song_skills' }, () => fetchSongProposals())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_planning' }, () => fetchBandPlanning())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'band_rehearsals', filter: `band_id=eq.${selectedBandForProfile.id}` }, () => fetchBandPlanning())
         .subscribe();
       return () => { supabase.removeChannel(channel); };
     }
-  }, [bandProfileView, selectedBandForProfile.id]);
+  }, [bandProfileView, selectedBandForProfile.id, bandUserIds]);
 
   // Helper to check if a song is fully mastered by all slot occupiers (100% progress)
   const checkIfFullyMastered = (prop: any) => {
@@ -631,6 +644,27 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 is_pending_approval: true
               });
           }
+
+          // Let's send a realtime broadcast message to the teacher!
+          const teacherId = user.teacher_id;
+          if (teacherId) {
+            const channel = supabase.channel(`realtime_teacher_challenges_${teacherId}`);
+            channel.subscribe((status) => {
+              if (status === 'SUBSCRIBED') {
+                channel.send({
+                  type: 'broadcast',
+                  event: 'challenge-submitted',
+                  payload: {
+                    studentId: user.id,
+                    studentName: `${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`,
+                    songTitle: proposal?.songs?.title || 'Song',
+                    instrument: instrument
+                  }
+                });
+                setTimeout(() => supabase.removeChannel(channel), 1000);
+              }
+            });
+          }
         }
       }
 
@@ -745,11 +779,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
 
 
-  const bandUserIds = React.useMemo(() => {
-    return (selectedBandForProfile.band_members || [])
-      .map((m: any) => m.user_id || m.student_id)
-      .filter(Boolean);
-  }, [selectedBandForProfile.band_members]);
+
 
   const uniqueMembersCount = React.useMemo(() => {
     const ids = (selectedBandForProfile.band_members || [])
@@ -758,11 +788,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     return new Set(ids).size;
   }, [selectedBandForProfile.band_members]);
 
-  useEffect(() => {
-    if (bandProfileView === 'backstage' && bandUserIds.length > 0) {
-      fetchBandPlanning();
-    }
-  }, [bandProfileView, selectedBandForProfile.id, bandUserIds]);
+
 
 
   const maxMatches = React.useMemo(() => {
@@ -1098,7 +1124,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                
                <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 20% 20%, ${brandColor}15 0%, transparent 70%), radial-gradient(circle at 80% 80%, ${brandColor}11 0%, transparent 70%), radial-gradient(circle at 50% 50%, ${brandColor}08 0%, transparent 80%)`, filter: 'blur(80px)', opacity: 0.9 }}></div>
                
-               <img src={selectedBandForProfile.photo_url || "/studio_dark.jpg"} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 35%' }} />
+               <img src={selectedBandForProfile.photo_url || "/campus_login_hero.png"} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 35%' }} />
                {/* Cinematic Vignette - Slightly lighter for overall brightness */}
                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.7) 60%, #0a0a0a 100%)', zIndex: 1 }}></div>
                {/* Brand Glow behind Title */}
@@ -1114,7 +1140,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
              <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%', padding: '0 40px', position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '40px' }}>
                      <div style={{ position: 'relative', width: '220px', height: '220px', borderRadius: '40px', overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', border: '4px solid rgba(255,255,255,0.2)' }}>
-                       {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '100%', '100%')}
+                        {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '100%', '36px')}
 
                        {/* BAND Badge Integrated into Photo - Bottom Left */}
                        <div style={{ position: 'absolute', bottom: '20px', left: '20px', background: 'rgba(35, 35, 35, 0.9)', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 950, textTransform: 'uppercase', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 11, border: '1px solid rgba(255,255,255,0.1)' }}>BAND</div>
@@ -1212,7 +1238,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
              </div>
         </div>
         <div style={{ maxWidth: "1600px", margin: "40px auto 0", width: "100%", padding: "0 40px 80px" }}>
-          {bandProfileView === "backstage" && !isSharedView ? (            <div style={{ display: 'grid', gridTemplateColumns: width < 1200 ? '1fr' : 'minmax(0, 1fr) 400px', gap: '40px', alignItems: 'start' }}>
+          {bandProfileView === "backstage" && !isSharedView ? (            <div style={{ display: 'grid', gridTemplateColumns: width < 1200 ? '1fr' : 'minmax(0, 1fr) 400px', gap: '60px', alignItems: 'start' }}>
               
               {/* LEFT: Band Repertoire-Planer (Compacted & Collapsible) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1242,9 +1268,39 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 {/* Individual Collapsible Songcards */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingLeft: '8px' }}>
                   {sortedActiveProposals.length === 0 ? (
-                    <div style={{ padding: '40px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎵</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'white' }}>Noch keine Song-Vorschläge</div>
+                    <div style={{ 
+                      padding: '60px 40px', 
+                      textAlign: 'center', 
+                      background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)', 
+                      borderRadius: '32px', 
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.05), 0 20px 40px rgba(0,0,0,0.3)',
+                      backdropFilter: 'blur(10px)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px'
+                    }}>
+                      <div style={{ 
+                        width: '64px', 
+                        height: '64px', 
+                        borderRadius: '20px', 
+                        background: `linear-gradient(135deg, ${brandColor}22, ${brandColor}05)`, 
+                        border: `1px solid ${brandColor}33`,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        boxShadow: `0 8px 24px ${brandColor}15`,
+                        animation: 'pulse-subtle 3s infinite ease-in-out'
+                      }}>
+                        <Music size={28} color={brandColor} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '1rem', fontWeight: 950, color: 'white', marginBottom: '6px' }}>Noch keine Song-Vorschläge</div>
+                        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700, maxWidth: '280px', margin: '0 auto', lineHeight: '1.4' }}>
+                          Hier erscheinen Songs, die eure Band als nächstes lernen möchte. Schlagt euren ersten Song vor!
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     sortedActiveProposals.map(({ prop, occupiedCount, masteredCount, totalSlotsCount, uniqueOccupants }) => {
@@ -1627,12 +1683,12 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 display: (width < 1200 && width >= 640) ? 'grid' : 'flex',
                 gridTemplateColumns: (width < 1200 && width >= 640) ? '1fr 1fr' : undefined,
                 flexDirection: (width < 1200 && width >= 640) ? undefined : 'column',
-                gap: '32px',
+                gap: '40px',
                 width: '100%',
-                alignItems: 'start'
+                alignItems: 'stretch'
               }}>
                 {/* Shoutbox */}
-                <div style={{ ...widgetStyle, display: 'flex', flexDirection: 'column', height: '400px', padding: '24px' }}>
+                <div style={{ ...widgetStyle, display: 'flex', flexDirection: 'column', height: '400px', padding: '32px' }}>
                   <h4 style={{ ...widgetHeaderStyle, fontSize: '0.8rem' }}><Zap size={16} /> Shoutbox <span style={{ opacity: 0.5, fontWeight: 700, fontSize: '0.65rem', marginLeft: '4px' }}>(Mitglieder)</span></h4>
                   {shoutboxError && (
                     <div style={{ color: '#ef4444', fontSize: '0.65rem', marginBottom: '8px', padding: '6px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
@@ -1644,25 +1700,37 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                       const msgDate = new Date(msg.created_at);
                       const now = new Date();
                       return (now.getTime() - msgDate.getTime()) < (24 * 60 * 60 * 1000);
-                    }).map((msg: any) => (
-                      <div key={msg.id} style={{ display: "flex", gap: "10px", background: "#1a1a1a", padding: "12px", borderRadius: "14px", border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <img 
-                          src={msg.author?.photo_url || "/avatar_ghost.jpg"} 
-                          style={{ width: "28px", height: "28px", borderRadius: "8px", objectFit: 'cover', cursor: 'pointer' }} 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if ((window as any).openUserProfile) {
-                              (window as any).openUserProfile(msg.author);
-                            }
-                          }}
-                          className="hover-scale-mini"
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "0.7rem", fontWeight: 950, color: "white", marginBottom: '2px' }}>{msg.author?.first_name}</div>
-                          <div style={{ fontSize: "0.8rem", color: "white", lineHeight: 1.3, opacity: 0.9 }}>{msg.content}</div>
-                        </div>
+                    }).length === 0 ? (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', opacity: 0.6, padding: '20px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '1.8rem', animation: 'pulse-subtle 4s infinite ease-in-out' }}>⚡</div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 950, color: 'white' }}>Deine Band wartet auf dich!</div>
+                        <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>Schreibe das erste Shoutout an deine Crew.</div>
                       </div>
-                    ))}
+                    ) : (
+                      shoutboxMessages.filter((msg: any) => {
+                        const msgDate = new Date(msg.created_at);
+                        const now = new Date();
+                        return (now.getTime() - msgDate.getTime()) < (24 * 60 * 60 * 1000);
+                      }).map((msg: any) => (
+                        <div key={msg.id} style={{ display: "flex", gap: "10px", background: "#1a1a1a", padding: "12px", borderRadius: "14px", border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <img 
+                            src={msg.author?.photo_url || "/avatar_ghost.jpg"} 
+                            style={{ width: "28px", height: "28px", borderRadius: "8px", objectFit: 'cover', cursor: 'pointer' }} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if ((window as any).openUserProfile) {
+                                (window as any).openUserProfile(msg.author);
+                              }
+                            }}
+                            className="hover-scale-mini"
+                          />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 950, color: "white", marginBottom: '2px' }}>{msg.author?.first_name}</div>
+                            <div style={{ fontSize: "0.8rem", color: "white", lineHeight: 1.3, opacity: 0.9 }}>{msg.content}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                   <div style={{ marginTop: "12px" }}>
                     <div style={{ position: "relative", display: 'flex', gap: '8px' }}>
@@ -1671,21 +1739,48 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                         onChange={(e) => setNewShoutMessage(e.target.value)} 
                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); postShoutMessage(); } }} 
                         placeholder="Nachricht..." 
-                        style={{ flex: 1, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", color: "white", padding: "10px", borderRadius: "12px", resize: "none", outline: "none", fontSize: '0.8rem', minHeight: '40px' }} 
+                        style={{ 
+                          flex: 1, 
+                          background: "rgba(255,255,255,0.03)", 
+                          border: "1px solid rgba(255,255,255,0.08)", 
+                          color: "white", 
+                          padding: "12px", 
+                          borderRadius: "14px", 
+                          resize: "none", 
+                          outline: "none", 
+                          fontSize: '0.8rem', 
+                          minHeight: '42px',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)',
+                          transition: 'all 0.2s'
+                        }} 
                       />
                       <button 
                         onClick={postShoutMessage}
                         disabled={isPostingShout || !newShoutMessage.trim()}
-                        style={{ background: brandColor, color: 'black', border: 'none', borderRadius: '12px', padding: '0 14px', cursor: (isPostingShout || !newShoutMessage.trim()) ? 'default' : 'pointer', opacity: (isPostingShout || !newShoutMessage.trim()) ? 0.5 : 1 }}
+                        style={{ 
+                          background: `linear-gradient(135deg, ${brandColor}, #facc15)`, 
+                          color: 'black', 
+                          border: 'none', 
+                          borderRadius: '14px', 
+                          padding: '0 16px', 
+                          cursor: (isPostingShout || !newShoutMessage.trim()) ? 'default' : 'pointer', 
+                          opacity: (isPostingShout || !newShoutMessage.trim()) ? 0.4 : 1,
+                          boxShadow: (isPostingShout || !newShoutMessage.trim()) ? 'none' : `0 4px 15px ${brandColor}44`,
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        className="hover-scale"
                       >
-                        <Zap size={16} fill="currentColor" />
+                        <Zap size={16} fill="black" />
                       </button>
                     </div>
                   </div>
                 </div>
 
                 {/* Wochenplaner */}
-                <section style={{ ...widgetStyle, height: '440px', padding: '24px' }}>
+                <section style={{ ...widgetStyle, height: '440px', padding: '32px' }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: '12px' }}>
                     <h3 style={{ ...widgetHeaderStyle, margin: 0, fontSize: '0.8rem' }}><Calendar size={18} color={brandColor} /> Wochenplan</h3>
                     <button onClick={fetchBandPlanning} style={{ background: "none", border: "none", color: "white", cursor: "pointer", opacity: 0.2 }}><RotateCcw size={12} /></button>
@@ -1706,14 +1801,14 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                               <div style={{ height: "12px" }}></div>
                               {timeSlots.map(time => (
-                                <div key={time} style={{ height: "18px", display: "flex", alignItems: "center", justifyContent: "flex-end", fontSize: "0.45rem", color: "rgba(255,255,255,0.3)", fontWeight: 800, paddingRight: "4px" }}>
+                                <div key={time} style={{ height: "22px", display: "flex", alignItems: "center", justifyContent: "flex-end", fontSize: "0.55rem", color: "rgba(255,255,255,0.3)", fontWeight: 800, paddingRight: "4px" }}>
                                   {time}
                                 </div>
                               ))}
                             </div>
                             {weekDays.map(day => (
                               <div key={day.id} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                <div style={{ textAlign: "center", fontSize: "0.5rem", fontWeight: 950, color: "white", height: "12px" }}>{day.label}</div>
+                                <div style={{ textAlign: "center", fontSize: "0.55rem", fontWeight: 950, color: "white", height: "12px" }}>{day.label}</div>
                                 {timeSlots.map(time => {
                                   const h = openingHours[day.dayName];
                                   const isOpen = h && h.active && time >= h.start && time <= h.end;
@@ -1723,11 +1818,11 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   let bg = "rgba(255,255,255,0.03)";
                                   let color = "rgba(255,255,255,0.2)";
                                   if (!isOpen) { bg = "transparent"; color = "transparent"; }
-                                  else if (isFixed) { bg = "#34a853"; color = "black"; }
+                                  else if (isFixed) { bg = "#10b981"; color = "white"; }
                                   else if (isTopMatch) { bg = brandColor; color = "black"; }
                                   else if (count > 0) { bg = "rgba(255,255,255,0.1)"; color = "white"; }
                                   return (
-                                    <div key={time} onClick={() => isOpen && toggleFixedRehearsal(day.id, time)} style={{ height: "18px", background: bg, borderRadius: "4px", display: "flex", alignItems: "center", justifyContent: "center", color: color, fontSize: "0.45rem", fontWeight: 950, cursor: (canEdit && isOpen) ? "pointer" : "default", opacity: isOpen ? 1 : 0.2 }}>
+                                    <div key={time} onClick={() => isOpen && toggleFixedRehearsal(day.id, time)} style={{ height: "22px", background: bg, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", color: color, fontSize: "0.6rem", fontWeight: 950, cursor: (canEdit && isOpen) ? "pointer" : "default", opacity: isOpen ? 1 : 0.2, transition: 'all 0.2s ease-in-out' }}>
                                       {isOpen && (isFixed ? <Zap size={8} fill="currentColor" /> : count > 0 ? count : null)}
                                     </div>
                                   );

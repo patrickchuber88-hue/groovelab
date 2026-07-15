@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2 } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -674,7 +674,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   );
 });
 
-const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void }) => {
+const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout, viewMode }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void, viewMode?: string }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -721,7 +721,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name || ''}</div>
                 <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '2px' }}>{c.session?.stations?.name || 'Lehrer iPad'}</div>
-                {isSelf && onSelfCheckout ? (
+                {viewMode === 'admin' && isSelf && onSelfCheckout ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); onSelfCheckout(); }}
                     title="Vom Lehrer iPad abmelden"
@@ -748,7 +748,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
                   >
                     ✕
                   </button>
-                ) : (!isSelf && onCoachCheckout) ? (
+                ) : (viewMode === 'admin' && !isSelf && onCoachCheckout) ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); onCoachCheckout(c); }}
                     title="Lehrer abmelden"
@@ -839,6 +839,38 @@ export function TeacherDashboard({
   activePlatform = 'groovelab'
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Auto-dismiss toast message after 5 seconds
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // Listen to school-wide Live Lab events (e.g. band founded)
+  useEffect(() => {
+    const schoolId = teacher?.school_id || (session?.users?.school_id);
+    if (!schoolId) return;
+
+    const liveLabChannel = supabase.channel(`realtime_live_lab_${schoolId}`);
+    liveLabChannel
+      .on('broadcast', { event: 'band-founded' }, (payload: any) => {
+        console.log('[Realtime] Band founded broadcast received:', payload);
+        const { bandName, songTitle } = payload.payload || {};
+        if (bandName) {
+          setToastMessage(`Band gegründet: ${bandName}! 🎸🔥 (${songTitle})`);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(liveLabChannel);
+    };
+  }, [teacher?.school_id, session?.users?.school_id]);
   const [schoolData, setSchoolData] = useState<any>(null);
   const isTeacher = viewMode === 'admin';
   // localCheckedIn: flips immediately on check-in so the overlay hides without waiting for parent prop updates
@@ -940,6 +972,25 @@ export function TeacherDashboard({
     }
     setZoomFactor(1.0);
   }, [selectedRoomId, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase.channel(`realtime_teacher_challenges_${userId}`);
+    channel
+      .on('broadcast', { event: 'challenge-submitted' }, (payload: any) => {
+        console.log('[Realtime] Challenge submitted broadcast received:', payload);
+        fetchData();
+        const studentName = payload.payload?.studentName || 'Ein Schüler';
+        const songTitle = payload.payload?.songTitle || 'einem Song';
+        const instrument = payload.payload?.instrument || '';
+        alert(`Neue Challenge von ${studentName} für "${songTitle}" (${instrument}) eingereicht! 🚀`);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   useEffect(() => {
     (window as any).openTageskompass = (std: any) => {
@@ -3509,9 +3560,28 @@ export function TeacherDashboard({
   useEffect(() => {
     const handleResize = () => {
       setWindowHeight(window.innerHeight);
+      const containerElem = document.querySelector('.live-lab-grid') || document.querySelector('.blueprint-viewport');
+      if (containerElem) {
+        setContainerWidth((containerElem as HTMLDivElement).offsetWidth || 1000);
+      }
     };
+    
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleResize();
+      }
+    };
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    document.addEventListener('visibilitychange', handleVisibility);
+    
+    // Initial call to set correct sizes on mount
+    handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -3733,15 +3803,15 @@ export function TeacherDashboard({
             ? Promise.resolve(supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: null, error: null }),
           // forming bands
-          (activeTab === 'briefing')
+          (activeTab === 'briefing' || activeTab === 'live')
             ? Promise.resolve(supabase.from('bands').select('*, band_members(*, profiles:users(id, first_name, last_name, photo_url, created_at, birth_date)), songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, created_at, birth_date)))').eq('school_id', tData.school_id).in('status', ['forming', 'active'])).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // wall songs
-          (activeTab === 'briefing' || activeTab === 'proposals')
+          (activeTab === 'briefing' || activeTab === 'proposals' || activeTab === 'live')
             ? Promise.resolve(wallSongsQuery).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // occupied slots (band_song_slots)
-          (activeTab === 'briefing')
+          (activeTab === 'briefing' || activeTab === 'live')
             ? Promise.resolve(supabase.from('band_song_slots').select('user_id, band_songs(song_id)')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // crisis
@@ -4814,11 +4884,29 @@ export function TeacherDashboard({
   };
 
   const handleApproveSubmission = async (subId: string) => {
-    const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level').eq('id', subId).single();
+    const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level, songs(title)').eq('id', subId).single();
     
     await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);
     
     if (sub) {
+      // Send a realtime broadcast to the student's dashboard!
+      const songTitle = Array.isArray((sub as any).songs) ? ((sub as any).songs[0] as any)?.title : ((sub as any).songs as any)?.title;
+      const channel = supabase.channel(`realtime_student_progress_${sub.user_id}`);
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'challenge-approved',
+            payload: {
+              songId: sub.song_id,
+              songTitle: songTitle || 'Song',
+              instrument: sub.instrument,
+              difficultyLevel: sub.difficulty_level
+            }
+          });
+          setTimeout(() => supabase.removeChannel(channel), 1000);
+        }
+      });
       // Get all bands the student is a member of
       const { data: memberships } = await supabase.from('band_members').select('band_id').eq('user_id', sub.user_id);
       
@@ -10001,7 +10089,7 @@ export function TeacherDashboard({
                                   zIndex: 100
                                 }}
                               >
-                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} currentUserId={userId} onSelfCheckout={handleTeacherSelfCheckout} onCoachCheckout={handleTeacherCheckout} />
+                                <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} currentUserId={userId} onSelfCheckout={handleTeacherSelfCheckout} onCoachCheckout={handleTeacherCheckout} viewMode={viewMode} />
                               </div>
                             );
                           }
@@ -10190,7 +10278,7 @@ export function TeacherDashboard({
                   }}>
                     {/* Coaches Node */}
                     <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                      <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} currentUserId={userId} onSelfCheckout={handleTeacherSelfCheckout} onCoachCheckout={handleTeacherCheckout} />
+                      <CoachesNode coaches={coaches} onProfileSelect={setSelectedCoachProfile} activePlatform={activePlatform} currentUserId={userId} onSelfCheckout={handleTeacherSelfCheckout} onCoachCheckout={handleTeacherCheckout} viewMode={viewMode} />
                     </div>
                     {roomStations.filter(s => {
                       const sName = s.name || '';
@@ -10555,11 +10643,11 @@ export function TeacherDashboard({
                                      className="hero-cta-artistic"
                                      style={{
                                        width: '100%',
-                                       background: 'linear-gradient(135deg, #34a853, #137333)',
+                                       background: 'linear-gradient(135deg, #ca8a04, #eab308)',
                                        border: 'none',
-                                       padding: '12px 18px',
-                                       borderRadius: '14px',
-                                       fontSize: '0.85rem',
+                                       padding: '8px 16px',
+                                       borderRadius: '12px',
+                                       fontSize: '0.8rem',
                                        fontWeight: 900,
                                        color: 'white',
                                        cursor: 'pointer',
@@ -10567,7 +10655,7 @@ export function TeacherDashboard({
                                        alignItems: 'center',
                                        justifyContent: 'center',
                                        gap: '6px',
-                                       boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
+                                       boxShadow: '0 4px 12px rgba(234, 179, 8, 0.2)',
                                        transition: 'all 0.2s',
                                        marginTop: '8px'
                                      }}
@@ -10604,7 +10692,9 @@ export function TeacherDashboard({
                     borderRadius: '24px',
                     border: '1px solid rgba(254, 243, 199, 0.4)'
                   }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '12px', filter: 'grayscale(1)', opacity: 0.5 }}>⌛</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', color: '#94a3b8' }}>
+                      <Hourglass size={32} />
+                    </div>
                     <div style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       Keine passenden<br/>Formationen
                     </div>
@@ -10841,9 +10931,6 @@ export function TeacherDashboard({
                                     • {studentSession.stations?.name}
                                   </span>
                                 )}
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                                 <div style={{ 
                                   background: '#e2e8f0', 
                                   padding: '1px 5px', 
@@ -10851,13 +10938,17 @@ export function TeacherDashboard({
                                   fontSize: '0.55rem', 
                                   fontWeight: 950, 
                                   color: '#475569', 
-                                  display: 'flex', 
+                                  display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '2px', 
+                                  marginLeft: '4px',
                                   flexShrink: 0 
                                 }}>
                                   {(sub.difficulty_level === 'original' || sub.difficulty_level === 'pro') ? '⚡ PRO' : '🚀 STARTER'}
                                 </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                                 <div style={{ 
                                   fontSize: '0.65rem', 
                                   fontWeight: 800, 
@@ -13216,6 +13307,49 @@ export function TeacherDashboard({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Realtime Toast Message Overlay */}
+      {toastMessage && (
+        <div 
+          className="animation-slide-up"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: 'linear-gradient(135deg, #ca8a04, #eab308)',
+            color: 'white',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            boxShadow: '0 10px 30px rgba(234, 179, 8, 0.4)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontWeight: 800,
+            fontSize: '0.95rem',
+            border: '1px solid #fef08a'
+          }}
+        >
+          <span style={{ fontSize: '1.2rem' }}>🎉</span>
+          <span>{toastMessage}</span>
+          <button 
+            onClick={() => setToastMessage(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              marginLeft: '8px',
+              padding: 0,
+              lineHeight: 1
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
     </div>

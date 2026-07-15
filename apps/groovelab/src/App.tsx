@@ -30,6 +30,9 @@ const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
 const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages'));
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
+import { StudentOnboardingPage } from './components/StudentOnboardingPage';
+import { DeviceOnboardingPage } from './components/DeviceOnboardingPage';
+import { ProfileSelector } from './components/ProfileSelector';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -91,35 +94,70 @@ const showMissionsFeature = false;
 const showEnsemblesFeature = false;
 
 // --- Band Name Generator Words ---
-const BAND_ADJECTIVES = [
-  // English – Energy & Sound
+const BAND_ADJECTIVES_EN = [
   "Electric", "Sonic", "Neon", "Atomic", "Static", "Magnetic", "Pulse", "Kinetic", "Turbo", "Hyper",
-  // English – Nature & Cosmos
   "Cosmic", "Lunar", "Solar", "Stellar", "Midnight", "Aurora", "Thunder", "Storm", "Crystal", "Frozen",
-  // English – Mood & Style
   "Golden", "Velvet", "Silver", "Wild", "Mystic", "Royal", "Infinite", "Eternal", "Fearless", "Savage",
-  // English – Music-themed
   "Groovy", "Funky", "Echo", "Reverb", "Loud", "Deep", "Raw", "Broken", "Blazing", "Drifting",
-  // German-inspired
-  "Laut", "Stark", "Frei", "Wilde", "Coole", "Echte", "Neue", "Große", "Junge", "Heiße"
+  "Vibrant", "Quantum", "Astral", "Retro", "Stealth", "Heavy", "Acoustic", "Chilled", "Fierce", "Radiant",
+  "Sublime", "Dynamic", "Slick", "Epic", "Primal", "Liquid", "Shining", "Sparkling", "Virtual", "Glow",
+  "Glitch", "Vintage", "Solaris", "Radioactive", "Gravity", "Techno", "Melodic", "Harmonic", "Synth", "Phantom",
+  "Shadow", "Rogue", "Ghostly", "Crying", "Howling", "Smiling", "Flying", "Silent", "Whispering", "Endless",
+  "Amplified", "Distorted", "Screaming", "Thundering", "Raging", "Fallen", "Rising", "Ignited", "Burning", "Flashing",
+  "Ablaze", "Furious", "Rebellious", "Wicked", "Ripped", "Cracked", "Spiraled", "Twisted", "Haunted", "Blessed"
 ];
-const BAND_NOUNS = [
-  // Classic band words
-  "Rhythm", "Sound", "Vibe", "Beat", "Pulse", "Wave", "Groove", "Theory", "Symphony", "Chord",
-  // Collective nouns
+const BAND_NOUNS_EN = [
+  "Rhythm", "Sound", "Vibe", "Beat", "Pulse", "Wave", "Groove", "Theory", "Symphony", "Note",
   "Collective", "Crew", "Squad", "Gang", "Tribe", "Pack", "Union", "Alliance", "Force", "League",
-  // Places & spaces
   "Studio", "Lab", "Stage", "Arena", "Chamber", "Vault", "Signal", "Circuit", "Grid", "Portal",
-  // Abstract
-  "Flow", "Soul", "Vision", "Quest", "Echo", "Dream", "Mission", "Code", "Spark", "Surge",
-  // German-inspired
-  "Klang", "Band", "Weg", "Kraft", "Geist", "Welle", "Feuer", "Licht", "Raum", "Traum"
+  "Flow", "Soul", "Vision", "Quest", "Flash", "Dream", "Mission", "Code", "Spark", "Surge",
+  "Engine", "Network", "Dimension", "System", "Legacy", "Station", "Horizon", "Infinity", "Focus", "Frequency",
+  "Impact", "Rebel", "Spirit", "Legend", "Ghost", "Genius", "Rider", "Junction", "Engineers", "Project",
+  "Vanguard", "Patriots", "Nomads", "Monsters", "Aliens", "Robots", "Cyborgs", "Wolves", "Shadows", "Astronauts",
+  "Pilots", "Giants", "Wizards", "Knights", "Kings", "Queens", "Lords", "Masters", "Outlaws", "Glitchers",
+  "Riot", "Noise", "Feedback", "Friction", "Fever", "Echoes", "Screams", "Chords", "Melodies", "Anthems",
+  "Riff", "Solo", "Beatbox", "Synthesizer", "Vinyl", "Records", "Basses", "Drums", "Guitars", "Vocals",
+  "Runners", "Chasers", "Seekers", "Hunters", "Finders", "Keepers", "Breakers", "Shakers", "Makers", "Gamers",
+  "Hackers", "Coders", "Agents", "Spies", "Scouts", "Rangers", "Guards", "Warriors", "Phantoms", "Spectres",
+  "Demons", "Angels", "Dragons", "Beasts", "Hawks", "Eagles", "Ravens", "Falcons", "Panthers", "Cats",
+  "Sharks", "Vipers", "Snakes", "Spiders", "Scorpions", "Monkeys", "Gorillas", "Bears", "Foxes", "Coyotes"
+];
+const BAND_ADJECTIVES_DE = [
+  "Laute", "Starke", "Freie", "Wilde", "Coole", "Echte", "Neue", "Große", "Junge", "Heiße",
+  "Kreative", "Magische", "Bunte", "Fette", "Schnelle", "Sanfte", "Kluge", "Helle", "Dunkle", "Fitte",
+  "Mutige", "Leise", "Zahme", "Freche", "Schlaue", "Schöne", "Kleine", "Fröhliche", "Heitere", "Erste",
+  "Beste", "Süße", "Feine", "Reine", "Stille", "Blinde", "Goldene", "Silberne", "Rotierende", "Fliegende",
+  "Singende", "Springende", "Tanzende", "Spielende", "Glückliche", "Stolze", "Schrille", "Fetzige", "Warme", "Kalte",
+  "Schwere", "Finstere", "Glühende", "Tosende", "Bebende", "Flüssige", "Heimliche", "Scharfe", "Wache", "Rebellische",
+  "Zornige", "Uralte", "Geheime", "Heilige", "Fremde", "Lustige", "Düstere", "Schlaflose", "Ruhelose", "Gefährliche",
+  "Unzahme", "Flüchtige", "Riesige", "Winzige", "Grelle", "Verzauberte", "Verlorene", "Versteckte", "Lautlose", "Heißblütige",
+  "Kaltblütige", "Eisige", "Feurige", "Wässrige", "Luftige", "Erdige", "Kosmische", "Galaktische", "Astrale", "Sonnige",
+  "Schattige", "Geisterhafte", "Traumhafte", "Zauberhafte", "Wunderbare", "Sonderbare", "Unglaubliche", "Fabelhafte", "Tapfere", "Furchtlose"
+];
+const BAND_NOUNS_DE = [
+  "Klänge", "Bands", "Wege", "Kräfte", "Geister", "Wellen", "Feuer", "Lichter", "Räume", "Träume",
+  "Schulen", "Helden", "Rebellen", "Rhythmen", "Stimmen", "Töne", "Spieler", "Meister", "Macher", "Freunde",
+  "Sounds", "Songs", "Künstler", "Löwen", "Tiger", "Wölfe", "Vögel", "Sterne", "Monde", "Sonnen",
+  "Blitze", "Wolken", "Welten", "Spuren", "Farben", "Schritte", "Herzen", "Lieder", "Saiten", "Tasten",
+  "Trommeln", "Gitarren", "Bässe", "Pfeile", "Funken", "Stürme", "Winde", "Inseln", "Berge", "Täler",
+  "Riffs", "Gitarristen", "Drummer", "Sänger", "Stürmer", "Sieger", "Gewinner", "Kämpfer", "Reiter", "Jäger",
+  "Sucher", "Entdecker", "Forscher", "Erfinder", "Baumeister", "Magier", "Hexer", "Ritter", "Könige", "Fürsten",
+  "Herrscher", "Götter", "Riesen", "Zwerge", "Drachen", "Monster", "Aliens", "Roboter", "Cyborgs", "Piraten",
+  "Banditen", "Outlaws", "Spione", "Agenten", "Wächter", "Krieger", "Schatten", "Phantome", "Gespenster", "Wunder",
+  "Rätsel", "Geheimnisse", "Legenden", "Mythen", "Geschichten", "Märchen", "Visionen", "Wirbelstürme", "Orkane", "Vulkane"
 ];
 
-const generateRandomBandName = () => {
-  const adj = BAND_ADJECTIVES[Math.floor(Math.random() * BAND_ADJECTIVES.length)];
-  const noun = BAND_NOUNS[Math.floor(Math.random() * BAND_NOUNS.length)];
-  return `${adj} ${noun}`;
+const generateRandomBandName = (lang?: 'de' | 'en') => {
+  const useGerman = lang ? (lang === 'de') : (Math.random() < 0.3);
+  if (useGerman) {
+    const adj = BAND_ADJECTIVES_DE[Math.floor(Math.random() * BAND_ADJECTIVES_DE.length)];
+    const noun = BAND_NOUNS_DE[Math.floor(Math.random() * BAND_NOUNS_DE.length)];
+    return `${adj} ${noun}`;
+  } else {
+    const adj = BAND_ADJECTIVES_EN[Math.floor(Math.random() * BAND_ADJECTIVES_EN.length)];
+    const noun = BAND_NOUNS_EN[Math.floor(Math.random() * BAND_NOUNS_EN.length)];
+    return `${adj} ${noun}`;
+  }
 };
 
 const getRoleColor = (role: string, stationName?: string, stationColor?: string) => {
@@ -1365,6 +1403,12 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [showStandardLogin, setShowStandardLogin] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem('groovelab_local_profiles');
+    const list = stored ? JSON.parse(stored) : [];
+    return list.length === 0;
+  });
 
   const isSignup = location.pathname === '/signup';
   const currentView = (location.pathname === '/login' || location.pathname === '/signup')
@@ -1746,10 +1790,29 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);
-  const [user, setUserRaw] = useState<any>(null);
+  const [user, setUserRaw] = useState<any>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem('groovelab_cached_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      console.error('Failed to parse cached user:', e);
+      return null;
+    }
+  });
   const setUser = React.useCallback((val: any) => {
     React.startTransition(() => {
-      setUserRaw(val);
+      setUserRaw((prev: any) => {
+        const nextVal = typeof val === 'function' ? val(prev) : val;
+        if (typeof window !== 'undefined') {
+          if (nextVal) {
+            localStorage.setItem('groovelab_cached_user', JSON.stringify(nextVal));
+          } else {
+            localStorage.removeItem('groovelab_cached_user');
+          }
+        }
+        return nextVal;
+      });
     });
   }, []);
 
@@ -1761,7 +1824,9 @@ function App() {
       location.pathname === '/' || 
       location.pathname === '/login' || 
       location.pathname === '/signup' || 
-      location.pathname.startsWith('/qr/');
+      location.pathname.startsWith('/qr/') ||
+      location.pathname.startsWith('/onboarding/') ||
+      location.pathname.startsWith('/device-onboarding/');
       
     if (isAuth) {
       // Redirect logged-in users at / or /login or /signup to /dashboard
@@ -2137,6 +2202,7 @@ function App() {
   const [pendingFounding, setPendingFounding] = useState<any | null>(null);
   const [showFoundingModal, setShowFoundingModal] = useState(false);
   const [foundingName, setFoundingName] = useState('');
+  const [foundingLanguage, setFoundingLanguage] = useState<'de' | 'en'>('de');
   const [selectedCoachId, setSelectedCoachId] = useState<string>('');
   const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(sessionStorage.getItem('groovelab_last_form_id'));
   
@@ -2148,11 +2214,11 @@ function App() {
   
   useEffect(() => {
     if (showFoundingModal && !foundingName) {
-      setFoundingName(generateRandomBandName());
+      setFoundingName(generateRandomBandName(foundingLanguage));
     } else if (!showFoundingModal) {
       setFoundingName('');
     }
-  }, [showFoundingModal]);
+  }, [showFoundingModal, foundingLanguage]);
 
   const ignoredFoundingIds = useRef<string[]>([]);
   const gatewayJustClosed = useRef<boolean>(false);
@@ -2524,6 +2590,7 @@ function App() {
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<string[]>([]);
   const [avatarPickerType, setAvatarPickerType] = useState<'band' | 'student'>('band');
   const [avatarInstrumentFilter, setAvatarInstrumentFilter] = useState<'Alle' | 'E-Gitarre' | 'E-Piano' | 'E-Drum' | 'E-Bass' | 'Gesang'>('Alle');
+  const [bandAvatarSizeFilter, setBandAvatarSizeFilter] = useState<'Alle' | '3' | '4' | '5'>('Alle');
 
   const [isSharedView, setIsSharedView] = useState(false);
 
@@ -2864,21 +2931,18 @@ function App() {
       if (isInitial) setLoading(true);
       console.log(`[Dashboard] Fetching data for user: ${userId}`);
       
-      // Stage 1: Fetch user record, current session, and initial memberships (containing user's bands) in parallel
-      const [userRes, sessionRes, allSessionsRes, membershipsRes] = await Promise.all([
+      // Stage 1 light: Fetch user record and current session in parallel
+      const [userRes, sessionRes] = await Promise.all([
         supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
-        supabase.from('sessions').select('*, stations(name, color)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
-        supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))))').eq('user_id', userId)
+        supabase.from('sessions').select('*, stations(name, color)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle()
       ]).catch(err => {
-        console.error('[Dashboard] Critical Fetch Error Stage 1:', err);
-        return [ {error: err}, {error: err}, {error: err}, {error: err} ] as any;
+        console.error('[Dashboard] Critical Fetch Error Stage 1 Light:', err);
+        return [ {error: err}, {error: err} ] as any;
       });
 
-      if (userRes.error) console.error('[Dashboard] User Fetch Error:', userRes.error);
-      if (membershipsRes.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
+      if (userRes?.error) console.error('[Dashboard] User Fetch Error:', userRes.error);
 
-      const userData = userRes.data;
+      const userData = userRes?.data;
       if (userData) {
         const r = (userData.role || '').toLowerCase();
         const rolesArr = userData.roles || [];
@@ -3063,6 +3127,17 @@ function App() {
         }
         return;
       }
+
+      // Stage 1 student heavy: Fetch sessions history and band memberships for students
+      const [allSessionsRes, membershipsRes] = await Promise.all([
+        supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
+        supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))))').eq('user_id', userId)
+      ]).catch(err => {
+        console.error('[Dashboard] Critical Fetch Error Student Stage 1 Heavy:', err);
+        return [ {error: err}, {error: err} ] as any;
+      });
+
+      if (membershipsRes?.error) console.error('[Dashboard] Memberships Fetch Error:', membershipsRes.error);
 
       const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
 
@@ -4828,6 +4903,26 @@ function App() {
       }
 
       console.log('[Founding] Artist Gateway Created for all members!');
+
+      // Send Realtime Broadcast notification that a band has been founded
+      try {
+        const liveLabChannel = supabase.channel(`realtime_live_lab_${user.school_id}`);
+        liveLabChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            liveLabChannel.send({
+              type: 'broadcast',
+              event: 'band-founded',
+              payload: {
+                bandName: newBand.name,
+                songTitle: target.title || target.songs?.title || 'einem Song'
+              }
+            });
+            console.log('[Founding] Sent band-founded broadcast for', newBand.name);
+          }
+        });
+      } catch (bcErr) {
+        console.error('Failed to send band-founded broadcast:', bcErr);
+      }
       
       // 1. Close all triggers/modals first
       localStorage.setItem(`groovelab_founding_done_${user.id}_${target.song_id || target.id}`, 'true');
@@ -5173,6 +5268,27 @@ function App() {
       
       if (updateResult.error) throw new Error('Update-Error: ' + updateResult.error.message);
       
+      // Let's send a realtime broadcast message to the teacher!
+      const teacherId = user.teacher_id;
+      if (teacherId) {
+        const channel = supabase.channel(`realtime_teacher_challenges_${teacherId}`);
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'challenge-submitted',
+              payload: {
+                studentId: loggedInUserId,
+                studentName: `${user.first_name} ${user.last_name ? user.last_name.charAt(0) + '.' : ''}`,
+                songTitle: skill.songs?.title || skill.title || 'Song',
+                instrument: skill.instrument
+              }
+            });
+            setTimeout(() => supabase.removeChannel(channel), 1000);
+          }
+        });
+      }
+
       if (loggedInUserId) await fetchDashboardData(loggedInUserId);
       alert('Challenge eingereicht! Dein Lehrer hat eine Benachrichtigung erhalten.');
 
@@ -5284,19 +5400,29 @@ function App() {
     const currentUser = user;
     const currentSession = session;
 
-    // Resolve school token before clearing any states
+    // Resolve school token and subdomain before clearing any states
     const schoolId = currentUser?.school_id || (currentUser?.schools ? (Array.isArray(currentUser.schools) ? currentUser.schools[0]?.id : currentUser.schools?.id) : null);
     let schoolToken = localStorage.getItem('groovelab_kiosk_token');
-    if (!schoolToken && schoolId) {
+    let schoolSubdomain = null;
+    let resolvedSchoolName = null;
+    let hasCampusSubscription = true;
+    let hasGroovelabSubscription = false;
+    if (schoolId) {
       try {
         const { data: schoolData } = await supabase
           .from('schools')
-          .select('groovelab_kiosk_token, campus_login_token')
+          .select('groovelab_kiosk_token, campus_login_token, subdomain, name, has_campus_subscription, has_groovelab_subscription')
           .eq('id', schoolId)
           .single();
         schoolToken = schoolData?.groovelab_kiosk_token || schoolData?.campus_login_token || null;
+        schoolSubdomain = schoolData?.subdomain || null;
+        resolvedSchoolName = schoolData?.name || null;
+        if (schoolData) {
+          hasCampusSubscription = schoolData.has_campus_subscription !== false;
+          hasGroovelabSubscription = schoolData.has_groovelab_subscription === true;
+        }
       } catch (err) {
-        console.error('[Logout] Error fetching school token:', err);
+        console.error('[Logout] Error fetching school data:', err);
       }
     }
 
@@ -5374,6 +5500,39 @@ function App() {
       }
     }
 
+    const finalSub = schoolSubdomain || (resolvedSchoolName
+      ? resolvedSchoolName
+          .toLowerCase()
+          .trim()
+          .replace(/[äöüß]/g, (match: string) => {
+            const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+            return mapping[match] || match;
+          })
+          .replace(/[^a-z0-9]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '')
+      : '');
+
+    let currentPlatform = activePlatform || localStorage.getItem('groovelab_active_platform') || 'campus';
+    if (hasGroovelabSubscription && !hasCampusSubscription) {
+      currentPlatform = 'groovelab';
+    }
+
+    const getRedirectUrl = (params: string = '') => {
+      let baseUrl = `${window.location.origin}/login`;
+      if (finalSub) {
+        if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
+          baseUrl = `${window.location.origin}/login`;
+          params = params ? `${params}&subdomain=${finalSub}` : `subdomain=${finalSub}`;
+        } else {
+          baseUrl = `https://${finalSub}.campus-groovelab.de/login`;
+        }
+      }
+      const platformParam = `platform=${currentPlatform}`;
+      const finalParams = params ? `${params}&${platformParam}` : platformParam;
+      return `${baseUrl}?${finalParams}`;
+    };
+
     const storedStationIdForCheck = localStorage.getItem('groovelab_station_id');
     const isGeneralKiosk = !storedStationIdForCheck || storedStationIdForCheck === 'skip';
 
@@ -5400,8 +5559,7 @@ function App() {
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
-      const redirectPath = schoolToken ? `/qr/${schoolToken}` : window.location.pathname;
-      window.location.replace(`${window.location.origin}${redirectPath}`);
+      window.location.replace(getRedirectUrl());
       return;
     }
 
@@ -5428,9 +5586,7 @@ function App() {
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
-      // Redirect
-      const redirectPath = schoolToken ? `/qr/${schoolToken}` : window.location.pathname;
-      window.location.replace(`${window.location.origin}${redirectPath}?kiosk_room_id=${roomId}`);
+      window.location.replace(getRedirectUrl(`kiosk_room_id=${roomId}`));
       return;
     }
 
@@ -5455,11 +5611,7 @@ function App() {
     localStorage.removeItem('groovelab_location_mode');
     localStorage.removeItem('groovelab_active_tab');
 
-    if (schoolToken) {
-      window.location.replace(`${window.location.origin}/qr/${schoolToken}`);
-    } else {
-      window.location.replace(`${window.location.origin}/`);
-    }
+    window.location.replace(getRedirectUrl());
   };
 
   const hasInviteSchoolId = searchParams.has('invite_school_id');
@@ -5804,10 +5956,13 @@ function App() {
     updateHeartbeat(); // Immediate heartbeat on load/mount
     const heartbeat = setInterval(updateHeartbeat, 30000);
 
-    // Immediate heartbeat when returning to tab
+    // Immediate heartbeat and layout reflow when returning to tab
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         updateHeartbeat();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('resize'));
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -5996,7 +6151,19 @@ function App() {
     );
   }
 
-  // 0. QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
+  // 0. ONBOARDING PAGE
+  const onboardingPathMatch = location.pathname.match(/^\/onboarding\/([^/?#]+)/);
+  if (onboardingPathMatch) {
+    return <StudentOnboardingPage token={onboardingPathMatch[1]} />;
+  }
+
+  // 0.0 DEVICE ONBOARDING PAGE
+  const deviceOnboardingPathMatch = location.pathname.match(/^\/device-onboarding\/([^/?#]+)/);
+  if (deviceOnboardingPathMatch) {
+    return <DeviceOnboardingPage token={deviceOnboardingPathMatch[1]} />;
+  }
+
+  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
   if (qrPathMatch) {
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
     const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
@@ -6072,6 +6239,16 @@ function App() {
       if (isParentOnboarding) {
         return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
       }
+
+      if (!showStandardLogin) {
+        return (
+          <ProfileSelector 
+            onLoginSuccess={(uid) => handleLogin(uid, false)} 
+            onShowStandardLogin={() => setShowStandardLogin(true)} 
+          />
+        );
+      }
+
       return (
         <LandingPage 
           onLogin={() => navigate('/login')} 
@@ -6080,6 +6257,14 @@ function App() {
       );
     }
     if (location.pathname === '/login') {
+      if (!showStandardLogin) {
+        return (
+          <ProfileSelector 
+            onLoginSuccess={(uid) => handleLogin(uid, false)} 
+            onShowStandardLogin={() => setShowStandardLogin(true)} 
+          />
+        );
+      }
       return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
     }
   }
@@ -8019,7 +8204,7 @@ function App() {
                         formation_group: form.groupKey || form.id,
                         members: form.members
                       });
-                      setFoundingName(generateRandomBandName());
+                      setFoundingName(generateRandomBandName(foundingLanguage));
                     }}
                   />
                 </Suspense>
@@ -10738,17 +10923,19 @@ function App() {
 
                                 return (
                                   <div key={form.id} style={{ 
-                                    background: isProposal ? 'linear-gradient(135deg, #1e1b4b, #0f0728)' : (isGuestSearch ? '#0f172a' : (isMySlot ? '#f0f9ff' : '#f8fafc')), 
-                                    border: isProposal ? '2px dashed #a855f7' : (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #3b82f6' : '1px solid #e2e8f0')),
-                                    borderRadius: '24px', padding: '24px',
-                                    boxShadow: isGuestSearch ? '0 10px 25px -5px rgba(0,0,0,0.3)' : 'none'
+                                    background: isProposal ? 'linear-gradient(135deg, #1e1b4b, #0f0728)' : (isGuestSearch ? '#0f172a' : (isMySlot ? 'linear-gradient(135deg, rgba(254, 252, 232, 0.95), rgba(255, 251, 235, 0.95))' : '#f8fafc')), 
+                                    border: isProposal ? '2px dashed #a855f7' : (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #eab308' : '1px solid #e2e8f0')),
+                                    borderRadius: '28px', padding: '24px',
+                                    boxShadow: isGuestSearch ? '0 10px 25px -5px rgba(0,0,0,0.3)' : (isMySlot ? '0 20px 40px rgba(234, 179, 8, 0.12)' : 'none'),
+                                    backdropFilter: isMySlot ? 'blur(10px)' : 'none',
+                                    WebkitBackdropFilter: isMySlot ? 'blur(10px)' : 'none'
                                   }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         <div style={{ 
                                           fontSize: '0.75rem', 
                                           fontWeight: 950, 
-                                          color: isProposal ? '#a855f7' : (isGuestSearch ? '#a855f7' : (isMySlot ? '#3b82f6' : (form.isInitial ? '#ca8a04' : '#64748b'))), 
+                                          color: isProposal ? '#a855f7' : (isGuestSearch ? '#a855f7' : (isMySlot ? '#ca8a04' : (form.isInitial ? '#ca8a04' : '#64748b'))), 
                                           textTransform: 'uppercase', 
                                           letterSpacing: '0.05em',
                                           display: 'flex',
@@ -10793,7 +10980,7 @@ function App() {
                                         fetchDashboardData(user.id);
                                       }
                                     }}
-                                    style={{ background: form.originBand ? '#8b5cf6' : '#3b82f6', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
+                                    style={{ background: form.originBand ? '#8b5cf6' : '#eab308', color: form.originBand ? 'white' : '#1e293b', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
                                   >
                                     BEITRETEN
                                   </button>
@@ -10825,7 +11012,7 @@ function App() {
                                   </div>
                                 )}
 
-                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', flex: 1 }}>
+                                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', flex: 1 }}>
                                   {(() => {
                                     const req = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1 };
                                     const requiredSlots: any[] = [];
@@ -10852,15 +11039,14 @@ function App() {
                                       const instLabel = (req[inst] || 0) > 1 ? `${inst} ${part}` : inst;
                                       
                                       return (
-                                        <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '80px', position: 'relative' }}>
+                                        <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '88px', position: 'relative' }}>
                                           <div style={{ 
-                                            width: '64px', height: '64px', borderRadius: '18px', 
-                                            background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'), 
-                                            border: (isMe || member?.isMastered) ? `3px solid #ef4444` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed #cbd5e1'),
-                                            boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
+                                            width: '72px', height: '72px', borderRadius: '50%', 
+                                            background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(234, 179, 8, 0.03)'), 
+                                            border: (isMe || member?.isMastered) ? `3.5px solid #eab308` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed rgba(234, 179, 8, 0.25)'),
+                                            boxShadow: (isMe || member?.isMastered) ? '0 0 16px rgba(234, 179, 8, 0.4)' : 'none',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                            filter: member && !member.isMastered ? 'grayscale(100%)' : 'none',
-                                            opacity: member && !member.isMastered ? 0.6 : 1
+                                            opacity: member && !member.isMastered ? 0.75 : 1
                                           }}>
                                             {member ? (
                                               <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -10870,25 +11056,25 @@ function App() {
                                                     e.stopPropagation();
                                                     setSelectedStudentForPreview(member);
                                                   }}
-                                                  style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover', cursor: 'pointer' }} 
+                                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }} 
                                                   alt="" 
                                                 />
                                                 {member.isMastered && (
-                                                  <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
+                                                  <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: '#34a853', color: 'white', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
                                                     <CheckCircle size={12} strokeWidth={4} />
                                                   </div>
                                                 )}
                                               </div>
                                             ) : (
-                                              <div style={{ fontSize: '1.5rem', opacity: 0.2 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
+                                              <div style={{ fontSize: '1.75rem', opacity: 0.35 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
                                             )}
                                           </div>
                                           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
-                                            <div style={{ fontSize: '0.65rem', fontWeight: 950, color: member ? (isGuestSearch ? 'white' : '#1e293b') : (isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                            <div style={{ fontSize: '0.68rem', fontWeight: 950, color: member ? (isGuestSearch ? 'white' : '#1e293b') : (isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                               {member ? member.first_name : instLabel}
                                             </div>
                                             {member && (
-                                              <div style={{ fontSize: '0.45rem', fontWeight: 800, color: isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8', textTransform: 'uppercase' }}>
+                                              <div style={{ fontSize: '0.48rem', fontWeight: 800, color: isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8', textTransform: 'uppercase' }}>
                                                 {instLabel}
                                               </div>
                                             )}
@@ -10904,10 +11090,10 @@ function App() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '24px' }}>
                                   <div className="animation-pulse-subtle" style={{ 
                                     width: '100%', padding: '18px', 
-                                    background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', 
-                                    color: '#b45309', borderRadius: '20px', fontWeight: 900, textAlign: 'center',
-                                    border: '1px solid #fde68a',
-                                    boxShadow: '0 8px 20px rgba(245,158,11,0.1)',
+                                    background: 'linear-gradient(135deg, #fef08a, #fde047)', 
+                                    color: '#854d0e', borderRadius: '20px', fontWeight: 900, textAlign: 'center',
+                                    border: '1px solid #eab308',
+                                    boxShadow: '0 8px 25px rgba(234,179,8,0.2)',
                                     fontSize: '1rem',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                                   }}>
@@ -10939,7 +11125,7 @@ function App() {
                                           formation_group: form.id,
                                           members: form.members
                                         });
-                                        if (!foundingName) setFoundingName(generateRandomBandName());
+                                        if (!foundingName) setFoundingName(generateRandomBandName(foundingLanguage));
                                       }}
                                       className="hero-cta-artistic"
                                       style={{ 
@@ -10948,10 +11134,10 @@ function App() {
                                         fontSize: '1.1rem', 
                                         width: '100%', 
                                         cursor: 'pointer',
-                                        background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                                        background: 'linear-gradient(135deg, #ca8a04, #eab308)',
                                         color: 'white',
                                         border: 'none',
-                                        boxShadow: '0 15px 30px rgba(15,23,42,0.2)'
+                                        boxShadow: '0 12px 28px rgba(234, 179, 8, 0.35)'
                                       }}
                                     >
                                       JETZT BAND GRÜNDEN
@@ -11768,7 +11954,7 @@ function App() {
             textAlign: 'center',
             boxShadow: '0 40px 120px rgba(0,0,0,0.6)'
           }}>
-            <div style={{ width: '100px', height: '100px', borderRadius: '35px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 10px 30px rgba(52, 168, 83, 0.2)' }}>
+            <div style={{ width: '100px', height: '100px', borderRadius: '35px', background: '#fefce8', color: '#eab308', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto', boxShadow: '0 10px 30px rgba(234, 179, 8, 0.2)' }}>
               <Users size={50} />
             </div>
             
@@ -11783,9 +11969,55 @@ function App() {
                   
                   {/* Band Name Section */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Wie soll eure Band heißen?
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Wie soll eure Band heißen?
+                      </label>
+                      <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFoundingLanguage('de');
+                            setFoundingName(generateRandomBandName('de'));
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            borderRadius: '6px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: foundingLanguage === 'de' ? '#eab308' : 'transparent',
+                            color: foundingLanguage === 'de' ? 'white' : '#64748b',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          DE
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFoundingLanguage('en');
+                            setFoundingName(generateRandomBandName('en'));
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            borderRadius: '6px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: foundingLanguage === 'en' ? '#eab308' : 'transparent',
+                            color: foundingLanguage === 'en' ? 'white' : '#64748b',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          EN
+                        </button>
+                      </div>
+                    </div>
                     <div style={{ width: '100%', position: 'relative' }}>
                       <input 
                         type="text"
@@ -11804,11 +12036,11 @@ function App() {
                           outline: 'none',
                           transition: 'all 0.2s'
                         }}
-                        onFocus={e => e.currentTarget.style.borderColor = brandColor}
+                        onFocus={e => e.currentTarget.style.borderColor = '#eab308'}
                         onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
                       />
                       <button 
-                        onClick={(e) => { e.stopPropagation(); setFoundingName(generateRandomBandName()); }}
+                        onClick={(e) => { e.stopPropagation(); setFoundingName(generateRandomBandName(foundingLanguage)); }}
                         style={{ 
                           position: 'absolute', 
                           right: '8px', 
@@ -11816,7 +12048,7 @@ function App() {
                           transform: 'translateY(-50%)', 
                           background: '#f8fafc', 
                           border: '1px solid #cbd5e1', 
-                          color: brandColor, 
+                          color: '#eab308', 
                           width: '36px', 
                           height: '36px', 
                           borderRadius: '10px', 
@@ -11857,13 +12089,13 @@ function App() {
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '16px 10px',
-                                background: isSelected ? `linear-gradient(135deg, ${brandColor}18, ${brandColor}08)` : 'white',
-                                border: isSelected ? `2.5px solid ${brandColor}` : '2px solid #e2e8f0',
+                                background: isSelected ? 'linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.04))' : 'white',
+                                border: isSelected ? '2.5px solid #eab308' : '2px solid #e2e8f0',
                                 borderRadius: '18px',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                                 transform: isSelected ? 'scale(1.04)' : 'scale(1)',
-                                boxShadow: isSelected ? `0 8px 24px ${brandColor}30` : '0 2px 8px rgba(0,0,0,0.06)',
+                                boxShadow: isSelected ? '0 8px 24px rgba(234, 179, 8, 0.2)' : '0 2px 8px rgba(0,0,0,0.06)',
                                 position: 'relative',
                                 minWidth: 0
                               }}
@@ -11875,7 +12107,7 @@ function App() {
                                   right: '8px',
                                   width: '18px',
                                   height: '18px',
-                                  background: brandColor,
+                                  background: '#eab308',
                                   borderRadius: '50%',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -11895,7 +12127,7 @@ function App() {
                                     height: '52px',
                                     borderRadius: '50%',
                                     objectFit: 'cover',
-                                    border: isSelected ? `3px solid ${brandColor}` : '3px solid #e2e8f0',
+                                    border: isSelected ? '3px solid #eab308' : '3px solid #e2e8f0',
                                     transition: 'border 0.2s'
                                   }}
                                 />
@@ -11904,7 +12136,7 @@ function App() {
                                   width: '52px',
                                   height: '52px',
                                   borderRadius: '50%',
-                                  background: isSelected ? `linear-gradient(135deg, ${brandColor}, #d97706)` : 'linear-gradient(135deg, #94a3b8, #64748b)',
+                                  background: isSelected ? 'linear-gradient(135deg, #eab308, #ca8a04)' : 'linear-gradient(135deg, #94a3b8, #64748b)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -11918,11 +12150,11 @@ function App() {
                                 </div>
                               )}
                               <div style={{ textAlign: 'center', lineHeight: 1.2 }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: isSelected ? brandColor : '#1e293b', transition: 'color 0.2s' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: isSelected ? '#eab308' : '#1e293b', transition: 'color 0.2s' }}>
                                   {t.first_name}
                                 </div>
                                 {t.last_name && (
-                                  <div style={{ fontWeight: 600, fontSize: '0.75rem', color: isSelected ? `${brandColor}cc` : '#64748b', transition: 'color 0.2s' }}>
+                                  <div style={{ fontWeight: 600, fontSize: '0.75rem', color: isSelected ? 'rgba(234, 179, 8, 0.8)' : '#64748b', transition: 'color 0.2s' }}>
                                     {t.last_name}
                                   </div>
                                 )}
@@ -11951,7 +12183,7 @@ function App() {
                   className="hero-cta-artistic"
                   style={{ 
                     width: '100%', 
-                    background: `linear-gradient(135deg, ${brandColor}, #d97706)`, 
+                    background: 'linear-gradient(135deg, #ca8a04, #eab308)', 
                     border: 'none', 
                     padding: '20px', 
                     borderRadius: '18px', 
@@ -11963,7 +12195,7 @@ function App() {
                     alignItems: 'center', 
                     justifyContent: 'center', 
                     gap: '8px',
-                    boxShadow: `0 10px 20px ${brandColor}25`,
+                    boxShadow: '0 10px 25px rgba(234, 179, 8, 0.3)',
                     transition: 'all 0.2s'
                   }}
                 >
@@ -13679,6 +13911,40 @@ function App() {
                  </button>
               </div>
 
+              {avatarPickerType === 'band' && (
+                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', minHeight: '62px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                       {(['Alle', '3', '4', '5'] as const).map(size => {
+                          const isSelected = bandAvatarSizeFilter === size;
+                          return (
+                             <button
+                                key={size}
+                                type="button"
+                                onClick={() => setBandAvatarSizeFilter(size)}
+                                style={{
+                                   padding: '10px 20px',
+                                   borderRadius: '14px',
+                                   border: 'none',
+                                   background: isSelected ? brandColor : 'transparent',
+                                   color: isSelected ? 'white' : 'rgba(255,255,255,0.7)',
+                                   fontWeight: 800,
+                                   fontSize: '0.95rem',
+                                   cursor: 'pointer',
+                                   transition: 'all 0.2s ease',
+                                   boxShadow: isSelected ? `0 0 15px ${brandColor}88` : 'none',
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   gap: '6px'
+                                }}
+                             >
+                                {size === 'Alle' ? '🌐 Alle Artworks' : `👥 ${size} Musiker`}
+                             </button>
+                          );
+                       })}
+                    </div>
+                 </div>
+              )}
+
               {avatarPickerType !== 'band' && !(user?.role === 'teacher' || user?.role === 'admin') && (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', minHeight: '62px' }}>
                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
@@ -13730,7 +13996,15 @@ function App() {
                  flex: 1
               }}>
                 {(() => {
-                  if (avatarPickerType === 'band') return BAND_AVATARS;
+                  if (avatarPickerType === 'band') {
+                    let list = BAND_AVATARS;
+                    if (bandAvatarSizeFilter !== 'Alle') {
+                      const numSize = parseInt(bandAvatarSizeFilter, 10);
+                      list = list.filter((av: any) => av.size === numSize);
+                    }
+                    return list.filter((av: any) => !failedAvatarUrls.includes(av.url));
+                  }
+                  
                   const role = (user?.role || '').toLowerCase();
                   let list: any[] = STUDENT_AVATARS;
                   if (activePlatform === 'campus') {
@@ -13786,8 +14060,13 @@ function App() {
                        onClick={async () => {
                           if (avatarPickerType === 'band') {
                             const { error } = await supabase.from('bands').update({ photo_url: av.url }).eq('id', selectedBandForProfile.id);
-                            if (!error) {
+                            if (error) {
+                              alert("Fehler beim Auswählen des Band-Profilbilds: " + error.message);
+                            } else {
                               setSelectedBandForProfile({...selectedBandForProfile, photo_url: av.url});
+                              if (editingBand && editingBand.id === selectedBandForProfile.id) {
+                                setEditingBand({...editingBand, photo_url: av.url});
+                              }
                               setShowAvatarPicker(false);
                               fetchDashboardData(user.id);
                             }

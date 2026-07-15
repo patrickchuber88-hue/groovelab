@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -78,6 +78,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     return 'campus';
   });
   const isPlatformCampus = localTab === 'campus' || !isGroovelabActive;
+
 
   let displayAvatarSrc = student.photo_url || '/avatar_ghost.jpg';
   if ((student.role === 'admin' || student.role === 'secretary') && isPlatformCampus) {
@@ -162,6 +163,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [loading, setLoading] = useState(true);
   const [showFullPhoto, setShowFullPhoto] = useState(false);
   const [sessionsList, setSessionsList] = useState<any[]>([]);
+  const [showPresenceLogOverlay, setShowPresenceLogOverlay] = useState(false);
   const [planningList, setPlanningList] = useState<any[]>([]);
   const [schedulesList, setSchedulesList] = useState<any[]>([]);
   const [avatar, setAvatar] = useState<any>(null);
@@ -207,7 +209,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [localQrToken, setLocalQrToken] = useState<string>(student.qr_token || '');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [copiedOnboardingLink, setCopiedOnboardingLink] = useState(false);
+  const [copiedCampusLink, setCopiedCampusLink] = useState(false);
+  const [copiedGrooveLink, setCopiedGrooveLink] = useState(false);
   const [consentLogs, setConsentLogs] = useState<any[]>([]);
+
+  const isOwnProfile = currentTeacherId === student.id;
+  const isPeerStudent = currentUserRole === 'student' && !isOwnProfile;
+
+  useEffect(() => {
+    if (isPeerStudent) {
+      setLocalTab('groovelab');
+    }
+  }, [isPeerStudent]);
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -893,7 +906,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // Fetch sessions
       const { data: sessData } = await supabase
         .from('sessions')
-        .select('*')
+        .select('*, stations(name, color)')
         .eq('user_id', student.id)
         .order('check_in_time', { ascending: false });
       setSessionsList(sessData || []);
@@ -1091,13 +1104,80 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const focusMinutes = studentStats?.total_focus_minutes || studentStats?.monthly_focus_minutes || 0;
   const streakDays = avatar?.streak_flame || 0;
 
+  const getCalendarWeek = (date: Date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `KW ${weekNo} (${d.getUTCFullYear()})`;
+  };
+
+  const getDurationString = (checkIn: string, checkOut: string | null) => {
+    const start = new Date(checkIn);
+    const end = checkOut ? new Date(checkOut) : null;
+    const startStr = start.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    if (!end) {
+      return `Aktiv... (seit ${startStr})`;
+    }
+    const endStr = end.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const diffMs = end.getTime() - start.getTime();
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+    return `${diffMins} Min. (${startStr} - ${endStr})`;
+  };
+
+  const formatDateDe = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const handleExportPresenceCSV = () => {
+    if (!sessionsList || sessionsList.length === 0) {
+      alert("Keine Anwesenheitsdaten zum Exportieren vorhanden.");
+      return;
+    }
+    
+    let csvContent = "\uFEFF";
+    csvContent += "Schüler;Kalenderwoche;Datum;Station;Check-In;Check-Out;Dauer (Minuten)\n";
+    
+    sessionsList.forEach((s: any) => {
+      const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+      const checkIn = new Date(s.check_in_time);
+      const kw = getCalendarWeek(checkIn);
+      const datum = checkIn.toLocaleDateString('de-DE');
+      const station = s.stations?.name || 'Unbekannt';
+      const checkInTime = checkIn.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const checkOutTime = s.check_out_time ? new Date(s.check_out_time).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'Aktiv';
+      
+      let durationMins = '';
+      if (s.check_out_time) {
+        const diffMs = new Date(s.check_out_time).getTime() - checkIn.getTime();
+        durationMins = String(Math.max(0, Math.floor(diffMs / 60000)));
+      } else {
+        durationMins = 'Aktiv';
+      }
+      
+      csvContent += `"${studentName}";"${kw}";"${datum}";"${station}";"${checkInTime}";"${checkOutTime}";"${durationMins}"\n`;
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const fileName = `Anwesenheit_${student.first_name || 'Schueler'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(242, 242, 247, 0.65)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div className="glass-panel animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)' }}>
         <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
           <X size={20} />
         </button>
-
+        
         {/* iOS-style Segmented Control Switch */}
         <div style={{ 
           marginBottom: '24px', 
@@ -1105,86 +1185,122 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           justifyContent: 'flex-start',
           alignItems: 'center' 
         }}>
-          <div style={{ 
-            background: 'rgba(120, 120, 128, 0.12)', 
-            borderRadius: '99px', 
-            padding: '2px', 
-            display: 'inline-flex', 
-            gap: '2px' 
-          }}>
-            {isCampusActive && (
-              <button
-                onClick={() => handleTabChange('campus')}
-                style={{
-                  border: 'none',
-                  borderRadius: '99px',
-                  padding: '8px 20px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  background: localTab === 'campus' ? '#ffffff' : 'transparent',
-                  color: localTab === 'campus' ? '#000000' : '#636366',
-                  boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-                }}
-              >
-                <GraduationCap size={16} />
-                <span>Campus</span>
-              </button>
-            )}
-            {isGroovelabActive && (
-              <button
-                onClick={() => handleTabChange('groovelab')}
-                style={{
-                  border: 'none',
-                  borderRadius: '99px',
-                  padding: '8px 20px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  background: localTab === 'groovelab' ? '#ffffff' : 'transparent',
-                  color: localTab === 'groovelab' ? '#000000' : '#636366',
-                  boxShadow: localTab === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
-                }}
-              >
-                <Music size={16} />
-                <span>GrooveLab</span>
-              </button>
-            )}
-          </div>
+          {!isPeerStudent && (
+            <div style={{ 
+              background: 'rgba(120, 120, 128, 0.12)', 
+              borderRadius: '99px', 
+              padding: '2px', 
+              display: 'inline-flex', 
+              gap: '2px' 
+            }}>
+              {isCampusActive && (
+                <button
+                  onClick={() => handleTabChange('campus')}
+                  style={{
+                    border: 'none',
+                    borderRadius: '99px',
+                    padding: '8px 20px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    background: localTab === 'campus' ? '#ffffff' : 'transparent',
+                    color: localTab === 'campus' ? '#000000' : '#636366',
+                    boxShadow: localTab === 'campus' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
+                  }}
+                >
+                  <GraduationCap size={16} />
+                  <span>Campus</span>
+                </button>
+              )}
+              {isGroovelabActive && (
+                <button
+                  onClick={() => handleTabChange('groovelab')}
+                  style={{
+                    border: 'none',
+                    borderRadius: '99px',
+                    padding: '8px 20px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    background: localTab === 'groovelab' ? '#ffffff' : 'transparent',
+                    color: localTab === 'groovelab' ? '#000000' : '#636366',
+                    boxShadow: localTab === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 1px rgba(0,0,0,0.08)' : 'none'
+                  }}
+                >
+                  <Music size={16} />
+                  <span>GrooveLab</span>
+                </button>
+              )}
+            </div>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setShowQrOverlay(true)}
-            style={{
-              marginLeft: 'auto',
-              marginRight: '60px',
-              border: '1.5px solid rgba(0, 0, 0, 0.05)',
-              borderRadius: '99px',
-              padding: '6px 14px',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-              background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)' : '#1e293b',
-              color: '#ffffff',
-              boxShadow: localTab === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
-            }}
-            className="hover-scale"
-          >
-            <Award size={14} />
-            <span>{localTab === 'campus' ? 'Campus Pass' : 'Member Pass'}</span>
-          </button>
+          {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+            <button
+              type="button"
+              onClick={() => {
+                const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                navigator.clipboard.writeText(link);
+                alert(`${localTab === 'campus' ? 'Campus' : 'GrooveLab'}-Onboarding-Link in die Zwischenablage kopiert! 📋`);
+              }}
+              style={{
+                marginLeft: 'auto',
+                marginRight: '12px',
+                border: '1.5px solid rgba(0, 0, 0, 0.05)',
+                borderRadius: '99px',
+                padding: '6px 14px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s',
+                background: '#f1f5f9',
+                color: '#475569',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+              }}
+              className="hover-scale"
+            >
+              <Copy size={14} />
+              <span>Onboarding-Link kopieren</span>
+            </button>
+          )}
+
+          {!isPeerStudent && (
+            <button
+              type="button"
+              onClick={() => setShowQrOverlay(true)}
+              style={{
+                marginLeft: (currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') ? '0' : 'auto',
+                marginRight: '60px',
+                border: '1.5px solid rgba(0, 0, 0, 0.05)',
+                borderRadius: '99px',
+                padding: '6px 14px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s',
+                background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)' : '#1e293b',
+                color: '#ffffff',
+                boxShadow: localTab === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
+              }}
+              className="hover-scale"
+            >
+              <Award size={14} />
+              <span>{localTab === 'campus' ? 'Campus Pass' : 'Member Pass'}</span>
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start', marginTop: '20px' }}>
@@ -1283,7 +1399,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     </span>
                   )}
                   {isGroovelabActive && (
-                    <span style={{ background: '#feefe3', color: '#b45309', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
+                    <span style={{ background: '#fefce8', color: '#eab308', border: '1px solid #fef08a', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
                       🎸 GrooveLab
                     </span>
                   )}
@@ -1557,80 +1673,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </div>
             )}
 
-            {/* Meilenstein-Sticker / Badges */}
-            {(streakDays >= 3 || currentXP >= 100 || focusMinutes >= 30) && (
-              <div style={{
-                background: '#ffffff',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: '20px',
-                padding: '16px',
-                marginTop: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Award size={18} style={{ color: '#34a853' }} />
-                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                    Errungenschaften &amp; Badges
-                  </h4>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {streakDays >= 3 && (
-                    <div style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: '#9a3412',
-                      background: '#ffedd5',
-                      border: '1px solid #fed7aa',
-                      padding: '6px 12px',
-                      borderRadius: '12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontFamily: 'Urbanist'
-                    }} title="Übe-Streak aktiv!">
-                      🔥 Streak-Kaiser
-                    </div>
-                  )}
-                  {currentXP >= 100 && (
-                    <div style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: '#1e40af',
-                      background: '#dbeafe',
-                      border: '1px solid #bfdbfe',
-                      padding: '6px 12px',
-                      borderRadius: '12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontFamily: 'Urbanist'
-                    }} title="XP Level Legende">
-                      ⭐ XP-Legende
-                    </div>
-                  )}
-                  {focusMinutes >= 30 && (
-                    <div style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: '#5b21b6',
-                      background: '#ede9fe',
-                      border: '1px solid #ddd6fe',
-                      padding: '6px 12px',
-                      borderRadius: '12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontFamily: 'Urbanist'
-                    }} title="Fokus-Zeit gemeistert">
-                      🎯 Fokus-Meister
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+
 
             {/* View Specific Left Content */}
             {isPlatformCampus ? (
@@ -1924,7 +1967,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 {/* Meine Bands */}
                 <section>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#ec4899', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Users size={16} /> Meine Bands
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1942,16 +1985,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                           alignItems: 'center', 
                           gap: '12px', 
                           padding: '12px', 
-                          background: '#fdf2f8', 
+                          background: '#fefce8', 
                           borderRadius: '16px', 
-                          border: '1px solid #fbcfe8',
+                          border: '1px solid #fef08a',
                           cursor: onOpenBandProfile ? 'pointer' : 'default'
                         }}
                       >
                         <div style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden' }}>
                           <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#9d174d' }}>{b.name}</div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e' }}>{b.name}</div>
                       </div>
                     ))}
                     {bands.length === 0 && !loading && (
@@ -1961,41 +2004,100 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </section>
 
                 {/* Wochenplan-Zeiten */}
-                <section>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={16} /> Wochenplan-Zeiten
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {weekSessions.map((pres, idx) => (
-                      <div key={idx} style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px', 
-                        background: '#fffbeb', 
-                        border: '1px solid #fef3c7', 
-                        padding: '12px 14px', 
-                        borderRadius: '16px',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        color: '#b45309'
-                      }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
-                        <div>
-                          {pres.dayStr}. {pres.rangeStr}
+                {!isPeerStudent && (
+                  <section>
+                    <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Calendar size={16} /> Wochenplan-Zeiten
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {weekSessions.map((pres, idx) => (
+                        <div key={idx} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '10px', 
+                          background: '#fffbeb', 
+                          border: '1px solid #fef3c7', 
+                          padding: '12px 14px', 
+                          borderRadius: '16px',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          color: '#b45309'
+                        }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                          <div>
+                            {pres.dayStr}. {pres.rangeStr}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {weekSessions.length === 0 && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
-                    )}
-                  </div>
-                </section>
+                      ))}
+                      {weekSessions.length === 0 && (
+                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
+                      )}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </div>
 
           {/* RIGHT COLUMN: Pass first, then settings (campus only) */}
-          <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {isPlatformCampus ? (
+            <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* App & Ausweis speichern Widget */}
+              <section style={{
+                background: 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)',
+                borderRadius: '24px',
+                padding: '20px',
+                border: '1.5px solid rgba(52, 168, 83, 0.15)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#137333', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Smartphone size={16} /> App &amp; Ausweis speichern
+                </h4>
+                <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4, fontWeight: 650 }}>
+                  {currentUserRole === 'student' 
+                    ? "Speichere deinen Mitgliedsausweis auf dem Homescreen und installiere die App ganz einfach auf deinem Smartphone."
+                    : "Kopiere den Link und sende ihn dem Schüler, damit er seinen Mitgliedsausweis speichern und die App installieren kann."
+                  }
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                    navigator.clipboard.writeText(link);
+                    setCopiedCampusLink(true);
+                    setTimeout(() => setCopiedCampusLink(false), 2000);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: copiedCampusLink ? '#e6f4ea' : '#137333',
+                    color: copiedCampusLink ? '#137333' : '#ffffff',
+                    border: copiedCampusLink ? '1.5px solid #137333' : 'none',
+                    borderRadius: '14px',
+                    padding: '10px 14px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: copiedCampusLink ? 'none' : '0 4px 12px rgba(19, 115, 51, 0.2)',
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                  className="hover-scale"
+                >
+                  {copiedCampusLink ? <Check size={12} /> : <Copy size={12} />}
+                  <span>
+                    {copiedCampusLink 
+                      ? 'Link kopiert! ✓' 
+                      : (currentUserRole === 'student' ? 'Link für Smartphone kopieren' : 'Link für Schüler kopieren')
+                    }
+                  </span>
+                </button>
+              </section>
 
                 {/* Onboarding-Link button */}
                 {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
@@ -2663,6 +2765,140 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               )}
             </section>
           </aside>
+          ) : (
+            <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* App & Ausweis speichern Widget */}
+              {!isPeerStudent && (
+                <>
+                  <section style={{
+                    background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
+                    borderRadius: '24px',
+                    padding: '20px',
+                    border: '1.5px solid rgba(234, 179, 8, 0.2)',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#854d0e', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Smartphone size={16} /> App &amp; Ausweis speichern
+                    </h4>
+                    <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4, fontWeight: 650 }}>
+                      {currentUserRole === 'student' 
+                        ? "Speichere deinen Mitgliedsausweis auf dem Homescreen und lade die App ganz einfach herunter."
+                        : "Kopiere den Link und sende ihn dem Schüler, damit er seinen Mitgliedsausweis speichern und die App installieren kann."
+                      }
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                        navigator.clipboard.writeText(link);
+                        setCopiedGrooveLink(true);
+                        setTimeout(() => setCopiedGrooveLink(false), 2000);
+                      }}
+                      style={{
+                        width: '100%',
+                        background: copiedGrooveLink ? '#fefce8' : '#eab308',
+                        color: copiedGrooveLink ? '#854d0e' : '#ffffff',
+                        border: copiedGrooveLink ? '1.5px solid #eab308' : 'none',
+                        borderRadius: '14px',
+                        padding: '10px 14px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: copiedGrooveLink ? 'none' : '0 4px 12px rgba(234, 179, 8, 0.2)',
+                        transition: 'all 0.2s ease-in-out'
+                      }}
+                      className="hover-scale"
+                    >
+                      {copiedGrooveLink ? <Check size={12} /> : <Copy size={12} />}
+                      <span>
+                        {copiedGrooveLink 
+                          ? 'Link kopiert! ✓' 
+                          : (currentUserRole === 'student' ? 'Link für Smartphone kopieren' : 'Link für Schüler kopieren')
+                        }
+                      </span>
+                    </button>
+                  </section>
+
+                  {/* 1. Anwesenheits-Logbuch Button */}
+                  <section style={{ 
+                    background: '#ffffff', 
+                    borderRadius: '24px', 
+                    padding: '16px 20px', 
+                    border: '1.5px solid #fef9c3',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+                  }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Clock size={16} style={{ color: '#eab308' }} /> Anwesenheit
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowPresenceLogOverlay(true)}
+                      style={{
+                        width: '100%',
+                        padding: '14px 20px',
+                        fontSize: '0.85rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        background: '#eab308',
+                        border: 'none',
+                        color: '#ffffff',
+                        borderRadius: '18px',
+                        cursor: 'pointer',
+                        boxShadow: '0 8px 24px rgba(234, 179, 8, 0.25)',
+                        transition: 'all 0.25s ease',
+                        fontFamily: 'Urbanist, sans-serif',
+                        letterSpacing: '0.01em'
+                      }}
+                      className="hover-scale"
+                    >
+                      <BookOpen size={16} />
+                      Anwesenheits-Logbuch öffnen
+                    </button>
+                  </section>
+                </>
+              )}
+
+              {/* 2. Skill Radar */}
+              <section style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '16px 20px', 
+                border: '1.5px solid #fef9c3',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <Music size={16} style={{ color: '#eab308' }} /> Skill Radar
+                </h4>
+                
+                <div style={{ width: '100%', height: '240px', display: 'flex', justifyContent: 'center' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="65%" data={studentRadarData}>
+                      <PolarGrid stroke="#f1f5f9" />
+                      <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
+                        <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}>
+                          {payload.value}
+                        </text>
+                      )} />
+                      <Radar name="XP" dataKey="xp" stroke="#eab308" fill="#facc15" fillOpacity={0.5} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            </aside>
+          )}
         </div>
       </div>
 
@@ -2819,6 +3055,43 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                        navigator.clipboard.writeText(link);
+                        alert('Campus-Onboarding-Link in die Zwischenablage kopiert! 📋');
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        color: '#ffffff',
+                        border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                        borderRadius: '16px',
+                        padding: '12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.45)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                      }}
+                    >
+                      <Copy size={14} />
+                      Onboarding-Link kopieren
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleRegenerateQrToken();
                       }}
                       style={{
@@ -2946,7 +3219,37 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 {/* Actions */}
                 {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                  <div style={{ padding: '0 28px 24px 28px' }}>
+                  <div style={{ padding: '0 28px 24px 28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                        navigator.clipboard.writeText(link);
+                        alert('GrooveLab-Onboarding-Link in die Zwischenablage kopiert! 📋');
+                      }}
+                      style={{
+                        width: '100%',
+                        background: '#fefce8',
+                        color: '#854d0e',
+                        border: '1.5px solid #fef3c7',
+                        borderRadius: '16px',
+                        padding: '12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.background = '#fef9c3'}
+                      onMouseOut={e => e.currentTarget.style.background = '#fefce8'}
+                    >
+                      <Copy size={14} />
+                      Onboarding-Link kopieren
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -3007,6 +3310,257 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               border: '4px solid white'
             }} 
           />
+        </div>
+      )}
+      {showPresenceLogOverlay && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 4000,
+            background: 'rgba(0, 0, 0, 0.25)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowPresenceLogOverlay(false)}
+        >
+          {/* Apple-style CSS keyframe animation for the active session glow/pulse */}
+          <style>{`
+            @keyframes apple-pulse {
+              0% { transform: scale(0.9); opacity: 0.4; }
+              50% { transform: scale(1.2); opacity: 1; }
+              100% { transform: scale(0.9); opacity: 0.4; }
+            }
+          `}</style>
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#f5f5f7', // macOS/iOS system secondary background
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '480px',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 30px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif'
+            }}
+          >
+            {/* Header */}
+            <div style={{ 
+              padding: '18px 24px', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              background: 'rgba(245, 245, 247, 0.8)',
+              backdropFilter: 'blur(10px)',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.06)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Clock size={18} style={{ color: '#1d1d1f' }} />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600, color: '#1d1d1f', letterSpacing: '-0.015em' }}>
+                  Anwesenheits-Logbuch
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowPresenceLogOverlay(false)}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.05)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '30px',
+                  height: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#86868b',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Content List */}
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              padding: '16px 20px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '10px' 
+            }}>
+              {sessionsList.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  color: '#86868b', 
+                  fontSize: '0.85rem', 
+                  padding: '40px 0', 
+                  fontWeight: 500 
+                }}>
+                  Bisher keine Anwesenheitszeiten erfasst.
+                </div>
+              ) : (
+                sessionsList.map((s: any, idx) => {
+                  const checkIn = new Date(s.check_in_time);
+                  const kw = getCalendarWeek(checkIn);
+                  const durationStr = getDurationString(s.check_in_time, s.check_out_time);
+                  const isCurrent = !s.check_out_time;
+                  
+                  const stationName = s.stations?.name || 'Unbekannt';
+                  const stationColor = s.stations?.color || '#cbd5e1';
+
+                  // Dynamic theme-compliant accent colors matching platform settings
+                  const activeAccent = localTab === 'campus' ? '#137333' : '#eab308';
+                  const activeAccentBg = localTab === 'campus' ? '#e6f4ea' : '#fefce8';
+
+                  return (
+                    <div 
+                      key={idx}
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '14px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.015)',
+                        border: isCurrent ? `1.5px solid ${activeAccent}` : '1px solid rgba(0, 0, 0, 0.035)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {isCurrent && (
+                        <div style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: '4px',
+                          background: activeAccent
+                        }} />
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ 
+                          fontSize: '0.68rem', 
+                          fontWeight: 600, 
+                          color: '#86868b',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          {kw}
+                        </span>
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px',
+                          background: 'rgba(0,0,0,0.025)',
+                          padding: '3px 8px',
+                          borderRadius: '6px'
+                        }}>
+                          <span style={{ 
+                            display: 'inline-block', 
+                            width: '6px', 
+                            height: '6px', 
+                            borderRadius: '50%', 
+                            background: stationColor 
+                          }}></span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#48484a' }}>
+                            {stationName}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1d1d1f', letterSpacing: '-0.01em' }}>
+                        {formatDateDe(s.check_in_time)}
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.8rem', 
+                        fontWeight: 500, 
+                        color: isCurrent ? activeAccent : '#86868b', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        marginTop: '2px'
+                      }}>
+                        {isCurrent ? (
+                          <span style={{ 
+                            position: 'relative', 
+                            display: 'inline-flex',
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: activeAccent 
+                          }}>
+                            <span style={{
+                              position: 'absolute',
+                              display: 'inline-flex',
+                              borderRadius: '50%',
+                              width: '100%',
+                              height: '100%',
+                              background: activeAccent,
+                              animation: 'apple-pulse 1.6s infinite ease-in-out'
+                            }} />
+                          </span>
+                        ) : (
+                          <Clock size={12} style={{ color: '#86868b' }} />
+                        )}
+                        <span>{durationStr}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer / CSV Export */}
+            <div style={{ 
+              padding: '14px 24px 18px 24px', 
+              borderTop: '1px solid rgba(0, 0, 0, 0.06)', 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              background: 'rgba(245, 245, 247, 0.8)',
+              backdropFilter: 'blur(10px)'
+            }}>
+              {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && sessionsList.length > 0 && (
+                <button
+                  onClick={handleExportPresenceCSV}
+                  style={{
+                    background: '#1d1d1f', // Premium, dark system button style
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 18px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    transition: 'background-color 0.15s, transform 0.15s',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+                  }}
+                  onMouseOver={e => {
+                    e.currentTarget.style.background = '#000000';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = '#1d1d1f';
+                  }}
+                >
+                  <Download size={13} />
+                  Als CSV exportieren
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
       {showTageskompassModal && (
