@@ -1887,14 +1887,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         roomsRes,
         schedulesRes,
         bandsRes,
-        studentsRes
+        studentsRes,
+        stationsRes
       ] = await Promise.all([
         supabase.from('schools').select('*').eq('id', schoolId).single(),
         supabase.from('users').select('*').eq('school_id', schoolId),
         supabase.from('rooms').select('*').eq('school_id', schoolId),
         supabase.from('schedules').select('*').eq('school_id', schoolId),
         supabase.from('bands').select('*').eq('school_id', schoolId),
-        supabase.from('students').select('*').eq('school_id', schoolId)
+        supabase.from('students').select('*').eq('school_id', schoolId),
+        supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', schoolId)
       ]);
 
       if (schoolRes.error) throw schoolRes.error;
@@ -1903,6 +1905,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       if (schedulesRes.error) throw schedulesRes.error;
       if (bandsRes.error) throw bandsRes.error;
       if (studentsRes.error) throw studentsRes.error;
+      if (stationsRes.error) throw stationsRes.error;
 
       const bandIds = (bandsRes.data || []).map((b: any) => b.id);
       const studentIds = (studentsRes.data || []).map((s: any) => s.id);
@@ -1944,6 +1947,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         school: schoolRes.data,
         users: usersRes.data || [],
         rooms: roomsRes.data || [],
+        stations: (stationsRes.data || []).map(({ rooms, ...s }: any) => s),
         schedules: schedulesRes.data || [],
         bands: bandsRes.data || [],
         bandMembers: bandMembersRes.data || [],
@@ -1998,19 +2002,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
         try {
           const [
-            uRes, rRes, sRes, bRes, stRes
+            uRes, rRes, sRes, bRes, stRes, stationsRes
           ] = await Promise.all([
             supabase.from('users').select('*').eq('school_id', schoolId),
             supabase.from('rooms').select('*').eq('school_id', schoolId),
             supabase.from('schedules').select('*').eq('school_id', schoolId),
             supabase.from('bands').select('*').eq('school_id', schoolId),
-            supabase.from('students').select('*').eq('school_id', schoolId)
+            supabase.from('students').select('*').eq('school_id', schoolId),
+            supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', schoolId)
           ]);
           const currentData = {
             schoolId,
             exportDate: new Date().toISOString(),
             users: uRes.data || [],
             rooms: rRes.data || [],
+            stations: (stationsRes.data || []).map(({ rooms, ...s }: any) => s),
             schedules: sRes.data || [],
             bands: bRes.data || [],
             students: stRes.data || []
@@ -2020,6 +2026,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           console.warn('Rollback backup failed, proceeding anyway:', rollBackErr);
         }
 
+        // Delete all current stations explicitly first, then delete rooms
+        await supabase.from('stations').delete().in('room_id', (await supabase.from('rooms').select('id').eq('school_id', schoolId)).data?.map((r: any) => r.id) || []);
         await supabase.from('band_members').delete().in('band_id', (await supabase.from('bands').select('id').eq('school_id', schoolId)).data?.map((b: any) => b.id) || []);
         await supabase.from('bands').delete().eq('school_id', schoolId);
         await supabase.from('schedules').delete().eq('school_id', schoolId);
@@ -2051,6 +2059,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         }
         if (backupData.rooms.length > 0) {
           const { error } = await supabase.from('rooms').insert(backupData.rooms);
+          if (error) throw error;
+        }
+        if (backupData.stations && backupData.stations.length > 0) {
+          const { error } = await supabase.from('stations').insert(backupData.stations);
           if (error) throw error;
         }
         if (backupData.students.length > 0) {
