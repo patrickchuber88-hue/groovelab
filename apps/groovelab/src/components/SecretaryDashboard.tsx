@@ -11154,7 +11154,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           {/* If activeTab is Secretary */}
           {activeTab === 'secretary' && [
             { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
-            { 
+            hasCampusSub && { 
               id: 'crisis', 
               label: 'Krisen-Dashboard', 
               icon: ShieldAlert, 
@@ -11171,14 +11171,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 }).length;
               })()
             },
-            { id: 'duties', label: 'Dienstliche Aufgaben', icon: FileText },
+            hasCampusSub && { id: 'duties', label: 'Dienstliche Aufgaben', icon: FileText },
             { id: 'rooms', label: 'Räume', icon: DoorOpen },
-            { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
+            hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
             { id: 'employees', label: 'Mitarbeiter', icon: Users },
             { id: 'licenses', label: 'Abrechnung & Infrastruktur', icon: Award },
             { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
             { id: 'setup', label: 'Einstellungen', icon: Settings }
-          ].map((item) => {
+          ].filter((item): item is any => !!item).map((item) => {
             const Icon = item.icon;
             const isSelected = secretarySubTab === item.id;
             return (

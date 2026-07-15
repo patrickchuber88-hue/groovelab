@@ -2569,60 +2569,82 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
       const isGroovelabScreen = isGroovelabKiosk;
-      const isBypass = !isGroovelabScreen;
+      const effectiveSchool = schoolData || userSchool;
+      const isBypass = !isGroovelabScreen || !!(effectiveSchool?.opening_hours?.geofence_bypass);
 
       // Geolocation is strictly restricted to GrooveLab Kiosk mode (yellow background)
       if (isGroovelabKiosk) {
-        isWithinAnyRoom = false;
-        let currentPos = userPos;
-        if (!currentPos && navigator.geolocation) {
-          try {
-            currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => reject(err),
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
-              );
-            });
-            setUserPos(currentPos);
-          } catch (e) {
-            console.warn('[Login] Geolocation fetch failed during PIN login:', e);
-          }
-        }
+        const isLocalhost = typeof window !== 'undefined' && (
+          window.location.hostname === 'localhost' || 
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname.endsWith('.local') ||
+          /^192\.168\./.test(window.location.hostname) ||
+          /^10\./.test(window.location.hostname) ||
+          /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
+        );
 
-        if (currentPos) {
-          const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-          let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
-          if (activePlatform === 'campus') {
-            roomsQuery = roomsQuery.eq('is_campus_active', true);
-          } else {
-            roomsQuery = roomsQuery.eq('is_groovelab_active', true);
-          }
-          const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
-          if (rooms) {
-            for (const room of rooms) {
-              const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
-              const allCoords = [...points];
-              if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
-              
-              for (const pt of allCoords) {
-                if (pt && pt.lat && pt.lng) {
-                  const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
-                  if (dist < 100) { 
-                    isWithinAnyRoom = true;
-                    break;
-                  }
-                }
-              }
-              if (isWithinAnyRoom) break;
+        if (isLocalhost) {
+          isWithinAnyRoom = true;
+          console.log('[Login] Localhost detected: geofence check bypassed in PIN login.');
+          setGeoDebug({
+            isWithinAnyRoom: true,
+            userPos: null,
+            schoolCoords: effectiveSchool ? { lat: effectiveSchool.latitude, lng: effectiveSchool.longitude } : null,
+            distToSchool: 0,
+            withinHours: true
+          });
+        } else {
+          isWithinAnyRoom = false;
+          let currentPos = userPos;
+          if (!currentPos && navigator.geolocation) {
+            try {
+              currentPos = await new Promise<{lat: number, lng: number}>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                  (err) => reject(err),
+                  { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
+                );
+              });
+              setUserPos(currentPos);
+            } catch (e) {
+              console.warn('[Login] Geolocation fetch failed during PIN login:', e);
             }
           }
 
-          if (!isWithinAnyRoom && userSchool?.latitude && userSchool?.longitude) {
-            const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(userSchool.latitude), Number(userSchool.longitude));
-            const radius = userSchool.geofence_radius_meters || 150;
-            if (distToSchool < radius) {
-              isWithinAnyRoom = true;
+          if (currentPos) {
+            const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+            let roomsQuery = supabase.from('rooms').select('*').eq('school_id', user.school_id);
+            if (activePlatform === 'campus') {
+              roomsQuery = roomsQuery.eq('is_campus_active', true);
+            } else {
+              roomsQuery = roomsQuery.eq('is_groovelab_active', true);
+            }
+            const { data: rooms } = await roomsQuery.order('sort_order', { ascending: true });
+            if (rooms) {
+              for (const room of rooms) {
+                const points = Array.isArray(room.geofence_points) ? room.geofence_points : [];
+                const allCoords = [...points];
+                if (room.latitude && room.longitude) allCoords.push({ lat: room.latitude, lng: room.longitude });
+                
+                for (const pt of allCoords) {
+                  if (pt && pt.lat && pt.lng) {
+                    const dist = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(pt.lat), Number(pt.lng));
+                    if (dist < 100) { 
+                      isWithinAnyRoom = true;
+                      break;
+                    }
+                  }
+                }
+                if (isWithinAnyRoom) break;
+              }
+            }
+
+            if (!isWithinAnyRoom && effectiveSchool?.latitude && effectiveSchool?.longitude) {
+              const distToSchool = getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(effectiveSchool.latitude), Number(effectiveSchool.longitude));
+              const radius = effectiveSchool.geofence_radius_meters || 150;
+              if (distToSchool < radius) {
+                isWithinAnyRoom = true;
+              }
             }
           }
         }
@@ -2632,7 +2654,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (!isQrLogin) {
         if (user.role === 'student' && isGroovelabKiosk) {
           // Bypass birthday PIN setup and verification completely for students on GrooveLab
-          await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom);
           return;
         }
 
@@ -2641,13 +2663,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (!isPinActivated) {
           setPinSetupUser(user);
-          setPinVerificationIsWithinRoom(isWithinAnyRoom);
+          setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
           setPinSetupInput('');
           setLoading(false);
           return;
         } else {
           setPinVerificationUser(user);
-          setPinVerificationIsWithinRoom(isWithinAnyRoom);
+          setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
           setPinVerificationInput('');
           setPinVerificationAttempts(0);
           setLoading(false);
@@ -2664,7 +2686,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         const isGroovelabScreen = isGroovelabKiosk;
         if (isGroovelabScreen) {
-          await finalizeLogin(user, loginStationId, isWithinAnyRoom, false);
+          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false);
         } else {
           // Campus Login strictly bypasses GrooveLab presence check-in
           await finalizeLogin(user, loginStationId, false, true);
@@ -2673,7 +2695,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       if (isBypass) {
-        await finalizeLogin(user, loginStationId, false);
+        await finalizeLogin(user, loginStationId, true);
       } else {
         await finalizeLogin(user, loginStationId, isWithinAnyRoom);
       }
@@ -2815,8 +2837,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.day_of_birth = actDay?.day_of_birth || null;
       }
 
-      // Two-step QR-Login logic for general login page vs school-specific page
-      if (!schoolData) {
+      // Two-step QR-Login logic: require a second scan to finalize login and prevent alerts on first scan
+      if (!qrScanPrompt) {
         if (!userSchool) {
           throw new Error('Für diesen Nutzer konnte keine Musikschule gefunden werden.');
         }
@@ -2873,7 +2895,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
       let isWithinAnyRoom = true;
       const isGroovelabScreen = isGroovelabKiosk;
-      const isBypass = !isGroovelabScreen;
+      const effectiveSchool = schoolData || userSchool;
+      const isBypass = !isGroovelabScreen || !!(effectiveSchool?.opening_hours?.geofence_bypass);
 
       const isLocalhost = typeof window !== 'undefined' && (
         window.location.hostname === 'localhost' || 
@@ -2892,7 +2915,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           setGeoDebug({
             isWithinAnyRoom: true,
             userPos: null,
-            schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
+            schoolCoords: effectiveSchool ? { lat: effectiveSchool.latitude, lng: effectiveSchool.longitude } : null,
             distToSchool: 0,
             withinHours: true
           });
@@ -2946,12 +2969,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             }
 
             // 2. School Fallback (Single Point + Radius)
-            if (!isWithinAnyRoom && schoolData?.latitude && schoolData?.longitude) {
+            if (!isWithinAnyRoom && effectiveSchool?.latitude && effectiveSchool?.longitude) {
               const distToSchool = getDistanceFromLatLonInM(
                 currentPos.lat, currentPos.lng, 
-                Number(schoolData.latitude), Number(schoolData.longitude)
+                Number(effectiveSchool.latitude), Number(effectiveSchool.longitude)
               );
-              const radius = schoolData.geofence_radius_meters || 150;
+              const radius = effectiveSchool.geofence_radius_meters || 150;
               if (distToSchool < radius) {
                 isWithinAnyRoom = true;
               }
@@ -2963,9 +2986,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           setGeoDebug({
             isWithinAnyRoom,
             userPos: currentPos,
-            schoolCoords: schoolData ? { lat: schoolData.latitude, lng: schoolData.longitude } : null,
-            distToSchool: (currentPos && schoolData?.latitude && schoolData?.longitude)
-              ? Math.round(getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(schoolData.latitude), Number(schoolData.longitude)))
+            schoolCoords: effectiveSchool ? { lat: effectiveSchool.latitude, lng: effectiveSchool.longitude } : null,
+            distToSchool: (currentPos && effectiveSchool?.latitude && effectiveSchool?.longitude)
+              ? Math.round(getDistanceFromLatLonInM(currentPos.lat, currentPos.lng, Number(effectiveSchool.latitude), Number(effectiveSchool.longitude)))
               : null,
             withinHours: true
           });
@@ -2978,7 +3001,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
       if (isGroovelabKiosk && user.role === 'student') {
-        await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+        await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom);
         return;
       }
 
@@ -2987,7 +3010,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (!isPinActivated) {
         setPinSetupUser(user);
-        setPinVerificationIsWithinRoom(isWithinAnyRoom);
+        setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
         setPinSetupInput('');
         setLoading(false);
         return;
@@ -3003,7 +3026,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         const isGroovelabScreen = isGroovelabKiosk;
         if (isGroovelabScreen) {
-          await finalizeLogin(user, loginStationId, isWithinAnyRoom, false);
+          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false);
         } else {
           // Campus Login strictly bypasses GrooveLab presence check-in
           await finalizeLogin(user, loginStationId, false, true);
@@ -3012,7 +3035,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       if (isBypass) {
-        await finalizeLogin(user, loginStationId, false);
+        await finalizeLogin(user, loginStationId, true);
       } else {
         await finalizeLogin(user, loginStationId, isWithinAnyRoom);
       }

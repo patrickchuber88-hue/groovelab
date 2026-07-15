@@ -1200,9 +1200,9 @@ export function TeacherDashboard({
   const handleKioskStationSelect = async (station: any) => {
     if (!userId) return;
 
-    // Check if the student's birthday pin is not set yet
+    // Check if the student's birthday pin is not set yet (bypassed for GrooveLab module)
     const isStudent = teacher?.role?.toLowerCase() === 'student';
-    if (isStudent && !teacher?.day_of_birth) {
+    if (false && isStudent && !teacher?.day_of_birth) {
       setTargetKioskStation(station);
       setKioskPinInput('');
       setShowKioskPinSetup(true);
