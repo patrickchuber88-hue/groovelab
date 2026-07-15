@@ -3012,23 +3012,38 @@ function App() {
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           localStorage.setItem('groovelab_active_platform', startPlat);
-          const startTab = startPlat === 'campus' ? 'briefing' : 'live';
+          
+          const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
+          const storedTab = localStorage.getItem(storageKey);
+          const startTab = storedTab ? storedTab : (startPlat === 'campus' ? 'briefing' : 'live');
+          
           setActiveStudentTab(startTab);
-          localStorage.setItem(startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
+          localStorage.setItem(storageKey, startTab);
         } else if (isTeacher) {
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           localStorage.setItem('groovelab_active_platform', startPlat);
-          setActiveStudentTab('live');
-          localStorage.setItem(startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', 'live');
+          
+          const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
+          const storedTab = localStorage.getItem(storageKey);
+          const startTab = storedTab ? storedTab : 'live';
+          
+          setActiveStudentTab(startTab);
+          localStorage.setItem(storageKey, startTab);
         } else if (isSecretary) {
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           localStorage.setItem('groovelab_active_platform', startPlat);
           localStorage.setItem('groovelab_active_workspace', 'secretary');
-          localStorage.setItem('groovelab_secretary_subtab', 'briefing');
-          setActiveStudentTab('briefing');
-          localStorage.setItem('campus_active_tab', 'briefing');
+          
+          const storedSubtab = localStorage.getItem('groovelab_secretary_subtab');
+          localStorage.setItem('groovelab_secretary_subtab', storedSubtab || 'briefing');
+          
+          const storedTab = localStorage.getItem('campus_active_tab');
+          const startTab = storedTab ? storedTab : 'briefing';
+          
+          setActiveStudentTab(startTab);
+          localStorage.setItem('campus_active_tab', startTab);
         } else {
           setActivePlatform(allowedPlatform);
           localStorage.setItem('groovelab_active_platform', allowedPlatform);
