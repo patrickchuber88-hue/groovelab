@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS public.master_billing_settings (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-    company_name TEXT DEFAULT 'Simplified Work GbR',
+    company_name TEXT DEFAULT 'Patrick Huber (Einzelunternehmer)',
     contact_person TEXT DEFAULT 'Patrick Huber',
     street TEXT DEFAULT 'Karl-Fürstenberg-Str. 59',
     zip_code TEXT DEFAULT '79618',
@@ -28,5 +28,5 @@ CREATE POLICY "Allow master admin update on master_billing_settings"
 
 -- Seed the initial row
 INSERT INTO public.master_billing_settings (id, company_name, contact_person, street, zip_code, city, iban, bic)
-VALUES (1, 'Simplified Work GbR', 'Patrick Huber', 'Karl-Fürstenberg-Str. 59', '79618', 'Rheinfelden', '', '')
+VALUES (1, 'Patrick Huber (Einzelunternehmer)', 'Patrick Huber', 'Karl-Fürstenberg-Str. 59', '79618', 'Rheinfelden', '', '')
 ON CONFLICT (id) DO NOTHING;

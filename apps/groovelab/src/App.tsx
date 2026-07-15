@@ -4,10 +4,11 @@ import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
-import { LandingPage } from './components/LandingPage';
+import { LandingPage2 } from './components/LandingPage2';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
 import { CampusPinUnlockModal } from './components/CampusPinUnlockModal';
+import { PilotOnboardingModal } from './components/PilotOnboardingModal';
 
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
@@ -1400,6 +1401,431 @@ const DashboardLoader = () => (
 );
 
 function App() {
+
+  // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
+  const renderLegalModals = () => {
+    return (
+      <>
+        {/* Privacy Policy Modal */}
+        {showPrivacy && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.40)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '32px',
+              boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+              border: '1px solid #f1f5f9',
+              padding: '36px',
+              maxWidth: '560px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
+              <button 
+                onClick={() => setShowPrivacy(false)} 
+                style={{
+                  position: 'absolute',
+                  top: '24px',
+                  right: '24px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                  <ShieldCheck size={28} />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Datenschutzerklärung</h2>
+                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GrooveLab DSGVO Compliance</p>
+                </div>
+              </div>
+
+              <div style={{ 
+                fontSize: '13px', 
+                color: '#475569', 
+                lineHeight: '1.6', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px',
+                textAlign: 'left'
+              }}>
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>1. Allgemeine Hinweise und Pflichtinformationen</h4>
+                  <p style={{ margin: 0 }}>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. Campus-Groovelab speichert Daten zur Bereitstellung der Übungs- und Klassenzimmerplattform nach den Vorgaben der DSGVO. Verarbeitet werden der Vorname, Nachname sowie der Tag des Geburtstags des Kindes. Um ein Höchstmaß an Sicherheit zu gewährleisten, werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>2. Kamera & QR-Scanner</h4>
+                  <p style={{ margin: 0 }}>Die Kamera deines Endgeräts wird ausschließlich lokal im Browser verwendet, um deinen Campus-Groovelab-QR-Ausweis zu scannen. Es werden zu keinem Zeitpunkt Videostreams oder Bilder an Server übertragen oder dort gespeichert.</p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>3. Standortermittlung (Geofencing)</h4>
+                  <p style={{ margin: 0 }}>Das <strong>Campus-Modul</strong> greift zu keinem zeitpunkt auf Geodaten zu. Lediglich für die Nutzung des <strong>Campus-Groovelab-Moduls</strong> ist die temporäre Freigabe des Standorts (GPS) erforderlich, damit sich Schüler auf dem Live Lab Board der Musikschule einloggen können. Diese Standortdaten werden rein lokal im Browser berechnet, nicht an Server übertragen und dienen ausschließlich der Verifikation der Anwesenheit vor Ort. Ein kontinuierliches Bewegungsprofil wird nicht erstellt.</p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>4. Rechte der Betroffenen</h4>
+                  <p style={{ margin: 0 }}>Sie haben das Recht auf Auskunft, Berichtigung, Sperrung oder Löschung Ihrer Daten. Wenden Sie sich hierzu bitte an die Schulleitung Ihrer Musikakademie.</p>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
+                  <p style={{ margin: 0 }}>Unsere Anwendung wird zu 100% auf Servern in Deutschland (Hetzner Falkenstein) gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) am Standort Falkenstein betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* AGB Modal */}
+        {showAgb && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.40)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '32px',
+              boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+              border: '1px solid #f1f5f9',
+              padding: '36px',
+              maxWidth: '680px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
+              <button 
+                onClick={() => setShowAgb(false)} 
+                style={{
+                  position: 'absolute',
+                  top: '24px',
+                  right: '24px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+                  <FileText size={28} />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Allgemeine Geschäftsbedingungen</h2>
+                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nutzungsbedingungen SaaS-Plattform „Campus-Groovelab“</p>
+                </div>
+              </div>
+
+              <div style={{ 
+                fontSize: '13px', 
+                color: '#475569', 
+                lineHeight: '1.6', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px',
+                textAlign: 'left'
+              }}>
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700 }}>Vertragspartner und Anbieter:</p>
+                  <p style={{ margin: '4px 0 0 0' }}>Patrick Huber (Einzelunternehmer), Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                    <strong>Geltungsbereich:</strong> Ausschließlich für den unternehmerischen Geschäftsverkehr (B2B)<br/>
+                    <strong>Stand und Gültigkeit:</strong> August 2026
+                  </p>
+                </div>
+
+                {/* TEIL A */}
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL A: Allgemeine Nutzungsbedingungen (Gilt für alle Module)</h3>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Dieser Teil regelt die grundlegenden rechtlichen Bedingungen für die Nutzung der Plattform Campus-Groovelab und gilt unabhängig von den gebuchten Modulen.</p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+                      <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs.</p>
+                      <p style={{ margin: '4px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>Souveränitäts-Versprechen:</strong> Die Bereitstellung erfolgt über zertifizierte, deutsche Server (Hetzner Online GmbH, Standort Falkenstein). Der Anbieter garantiert, dass keine außereuropäischen Cloud-Infrastrukturen (wie AWS, Azure oder Google Cloud) zur Kern-Datenhaltung verwendet werden.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LICHTUNG & ÜBERGABEPUNKT</h4>
+                      <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand ist die Bereitstellung der Software zur Nutzung über das Internet im Wege des SaaS-Modells. Die Vergütung versteht sich als reines Infrastruktur- und Serviceentgelt. Das Verhältnis qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag (§§ 535 ff., 611 BGB).</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Modulbezug:</strong> Der konkrete Leistungsumfang ist modulbezogen und beschränkt sich auf die vom Kunden jeweils separat gebuchten Systembestandteile (Modul „Campus“, Modul „GrooveLab“ oder Kombi-Paket).</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Übergabepunkt ist der Ausgang des Rechenzentrums. Für die Internetanbindung und Endgeräte ist der Kunde selbst verantwortlich.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>4. Add-On-Status:</strong> Die Software ersetzt nicht das primäre Verwaltungs- und ERP-System (z. B. iMikel) des Kunden. Der Kunde bleibt verpflichtet, grundlegende Verwaltungsakte, Abrechnung und finale Stundenpläne im führenden ERP-System zu pflegen.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & DEVICE-PAIRING</h4>
+                      <p style={{ margin: 0 }}><strong>1. QR-Code-Login:</strong> Der Zugang erfolgt passwortlos über eindeutige QR-Codes. Der Kunde verpflichtet sich, Mitarbeiter im sorgsamen Umgang mit den Codes zu schulen.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Anti-Theft Device-Pairing (PIN-Schranke):</strong> Um unbefugten Zugriff bei physischem QR-Verlust zu verhindern, fordert das System auf neuen Geräten einmalig ein schülerbezogenes Sicherheitsmerkmal (PIN) an, bevor das Endgerät registriert wird.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 3 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
+                      <p style={{ margin: 0 }}><strong>1. Rollen:</strong> Der Kunde ist „Verantwortlicher“ (Art. 4 Nr. 7 DSGVO), der Anbieter ist „Auftragsverarbeiter“ (Art. 4 Nr. 8 DSGVO). Die Details regelt ein gesonderter AV-Vertrag (AVV) nach Art. 28 DSGVO.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail & Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG & GEWÄHRLEISTUNG</h4>
+                      <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwarelizenzierung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT & RATE-LIMITING</h4>
+                      <p style={{ margin: 0 }}><strong>1. Verfügbarkeit:</strong> Der Anbieter gewährleistet 99,0 % Systemverfügbarkeit im Jahresmittel am Übergabepunkt. Ausgenommen sind angekündigte Wartungsfenster und Ausfälle durch höhere Gewalt.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Rate-Limiting:</strong> Zum Schutz vor Cyberangriffen (DDoS, Bruteforce) blockiert das System auffällige IP-Adressen temporär. Diese Sperren dienen der Datensicherheit und stellen keinen Mangel dar.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 LIZENZGEBÜHRENFREIHEIT & NUTZUNGSRECHTE</h4>
+                      <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
+                      <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ 7,99 € und für das Modul „GrooveLab“ 4,99 €. Werden beide Module gebucht, gilt der Kombi-Vorteil von 9,99 € (Ersparnis von 2,99 €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit 0,49 €/Monat berechnet.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
+                        <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
+                        <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                        <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
+                      </p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>6. Rechnungsstellung:</strong> Die Server- und Servicegebühren werden monatlich zum Monatsende fällig. Der Anbieter wendet die Kleinunternehmerregelung (§ 19 UStG) an, es wird keine Umsatzsteuer ausgewiesen.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 8 GERICHTSSTAND & SALVATORISCHE KLAUSEL</h4>
+                      <p style={{ margin: 0 }}>Es gilt deutsches Recht. Ausschließlicher Gerichtsstand ist Rheinfelden. Sollten Bestimmungen unwirksam sein, bleibt der restliche Vertrag in Kraft.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TEIL B */}
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL B: Besondere Bedingungen für das Modul „Campus“</h3>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das Campus-Modul gebucht ist.</p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 9 LEISTUNGSUMFANG CAMPUS</h4>
+                      <p style={{ margin: 0 }}>Das Campus-Modul umfasst das digitale Hausaufgabenheft mit Übungsstreaks, das Meisterwerk-Protokoll, die Audio-Loopstation, den Stundenplan-Designer sowie die interne Schul- und Raumbelegungs-Engine.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>1. Übe-Timer & Sensorik:</strong> Der Fokus-Timer wertet die Lagesensoren (DeviceOrientation API) aus. Das System gewährt eine 15-sekündige Toleranzzeit (Grace Period). Gewährleistung für Timer-Fehlfunktionen durch inkompatible oder falsch kalibrierte Sensoren ist ausgeschlossen.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Audio-Loopstation:</strong> Die Loopstation verwendet ein 4-Takte-Pause-Verfahren (Variante 1) zur Sicherstellung der Sample-Synchronität und Vermeidung von Signal-Verschluckungen.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 10 SCHNITTSTELLEN & KALENDER-EXPORT</h4>
+                      <p style={{ margin: 0 }}><strong>1. CSV-Import:</strong> Datenimporte aus ERP-Systemen (z. B. iMikel) erfolgen über Copy-and-Paste eines CSV-Textstroms. Bei Import-Formatfehlern bricht das System die Transaktion automatisch ohne Datenverlust ab (Rollback).</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. iCal-Kalender-Kopplung:</strong> Exporte von Kalenderdaten im .ics-Format pseudonymisieren Schülernamen (z. B. „J. M. Musikschule“) zur Einhaltung des Datenschutzes. Für Aktualisierungsverzögerungen externer Kalender-Clients haftet der Anbieter nicht.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
+                      <p style={{ margin: 0 }}><strong>1. Namensmaskierung:</strong> Schülernamen werden im Lehrer-Dashboard auf „Vorname + Anfangsbuchstabe Nachname“ und im Schüler-Dashboard auf generische Begriffe (z. B. „Hausaufgabenheft“) begrenzt.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (analog dem Netflix-Prinzip) im Campus-Modul gestattet.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TEIL C */}
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#a16207', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL C: Besondere Bedingungen für das Modul „GrooveLab“</h3>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das GrooveLab-Modul gebucht ist.</p>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 12 LEISTUNGSUMFANG GROOVELAB</h4>
+                      <p style={{ margin: 0 }}>Das GrooveLab-Modul umfasst die Bandgründung und Band-Mitgliederverwaltung, die Song-Bibliotheken, den Repertoire-Planer, das Skill-Radar, Musiker- und Band-Avatare sowie das Live Lab Echtzeit-Bandmodul.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 13 STANDORTERMITTLUNG (GEOFENCING) & HARDWARE-ZUGRIFF</h4>
+                      <p style={{ margin: 0 }}><strong>1. Lokales Geofencing im Live Lab:</strong> Die Verifikation der Anwesenheit vor Ort zur Echtzeit-Bandkoordination erfolgt über die Standortfreigabe (GPS) des Webbrowsers. Diese Daten werden ausschließlich lokal im Browser verarbeitet, um die Anwesenheit im Umkreis der Musikschule zu berechnen, und werden zu keinem Zeitpunkt dauerhaft auf Servern des Anbieters gespeichert oder als Bewegungsprofil aufgezeichnet.</p>
+                      <p style={{ margin: '4px 0 0 0' }}><strong>2. Kamera- & QR-Scanner:</strong> Die Aktivierung der Gerätekamera dient rein dem lokalen QR-Scan. Es erfolgt keine Übertragung von Bild- oder Videodaten an Server.</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 14 AVATAR-ANZEIGEREGELN</h4>
+                      <p style={{ margin: 0 }}><strong>1. Musiker-Avatare:</strong> Schüler und Lehrer im GrooveLab-Modul erhalten Zugriff auf spielerische Musiker-Avatare (im GrooveLab-Modul als Standard der Geist-Avatar). Administrations- und Sekretariatsprofile (Rollen `admin` und `secretary`) dürfen keine spielerischen Avatare nutzen; sie verwenden systemweit das neutrale Schultafel-Profilbild (`/campus_login_hero.png`).</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Impressum Modal */}
+        {showImpressum && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.40)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '32px',
+              boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
+              border: '1px solid #f1f5f9',
+              padding: '36px',
+              maxWidth: '560px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
+              <button 
+                onClick={() => setShowImpressum(false)} 
+                style={{
+                  position: 'absolute',
+                  top: '24px',
+                  right: '24px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                  <FileText size={28} />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Impressum</h2>
+                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Gesetzliche Anbieterkennzeichnung</p>
+                </div>
+              </div>
+
+              <div style={{ 
+                fontSize: '13px', 
+                color: '#475569', 
+                lineHeight: '1.6', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px',
+                textAlign: 'left'
+              }}>
+                <div>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Anbieter der Plattform & technischer Dienstleister</h4>
+                  <p style={{ margin: 0 }}>
+                    Patrick Huber<br/>
+                    Karl-Fürstenberg-Str. 59<br/>
+                    79618 Rheinfelden
+                  </p>
+                  <p style={{ margin: '6px 0 0 0' }}>
+                    E-Mail: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#eab308', textDecoration: 'underline' }}>patrick.huber@musaek.de</a>
+                  </p>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Vertragspartner & inhaltlich Verantwortlicher</h4>
+                  {school?.opening_hours?.impressum ? (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                      {school.opening_hours.impressum}
+                    </div>
+                  ) : (
+                    <div>
+                      <p style={{ margin: 0 }}>
+                        <strong>{school?.name || 'Die jeweilige Musikschule'}</strong><br/>
+                        {school?.street && <>{school.street}<br/></>}
+                        {school?.zip_code || ''} {school?.city || ''}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
+                  <strong>Hinweis zur Verantwortung:</strong> Für die konkreten Lehrinhalte, Stundenplanungen, die Durchführung des Unterrichts sowie die Erhebung und Verarbeitung personenbezogener Schülerdaten innerhalb dieses Schul-Mandanten ist ausschließlich die oben genannte Musikschule als Ihr direkter Vertragspartner verantwortlich.
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 800, color: '#1e293b' }}>EU-Streitschlichtung / Verbraucherstreitbeilegung</h4>
+                  <p style={{ margin: 0, fontSize: '12px' }}>
+                    Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer" style={{ color: '#eab308', textDecoration: 'underline' }}>https://ec.europa.eu/consumers/odr/</a>.<br/>
+                    Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1642,6 +2068,7 @@ function App() {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showAgb, setShowAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
+  const [showPilotAgreementModal, setShowPilotAgreementModal] = useState(false);
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
   const [isCampusUnlocked, setIsCampusUnlocked] = useState(false);
   const [showCampusPinPrompt, setShowCampusPinPrompt] = useState(false);
@@ -2958,6 +3385,33 @@ function App() {
         return;
       }
 
+      // Check if user needs to accept the pilot phase onboarding agreement
+      const userRole = (userData.role || '').toLowerCase();
+      const userRolesArr = userData.roles || [];
+      const isAdminOrSecUser = userRole === 'admin' || userRole === 'secretary' || userRolesArr.includes('admin') || userRolesArr.includes('secretary');
+      let schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
+      
+      if (isAdminOrSecUser && schoolId) {
+        try {
+          const { data: agreementData, error: agreementError } = await supabase
+            .from('pilot_agreements')
+            .select('id')
+            .eq('school_id', schoolId)
+            .maybeSingle();
+
+          if (agreementError) {
+            console.error('[Dashboard] Error querying pilot agreements:', agreementError);
+          } else if (!agreementData) {
+            console.log('[Dashboard] No pilot agreement found for school. Displaying onboarding modal.');
+            setShowPilotAgreementModal(true);
+          } else {
+            setShowPilotAgreementModal(false);
+          }
+        } catch (err) {
+          console.error('[Dashboard] Catch exception querying pilot agreements:', err);
+        }
+      }
+
 
 
       // STRICT DB SESSION VERIFICATION (Closing the backdoor):
@@ -3062,7 +3516,7 @@ function App() {
         }
       }
 
-      const schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
+      schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
       if (typeof window !== 'undefined') {
         (window as any).debugSchoolId = schoolId;
         (window as any).debugUserId = userId;
@@ -6255,31 +6709,17 @@ function App() {
         return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
       }
 
-      if (!showStandardLogin) {
-        return (
-          <ProfileSelector 
-            onLoginSuccess={(uid) => handleLogin(uid, false)} 
-            onShowStandardLogin={() => setShowStandardLogin(true)} 
-          />
-        );
-      }
-
       return (
-        <LandingPage 
+        <LandingPage2 
           onLogin={() => navigate('/login')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+          onShowPrivacy={() => setShowPrivacy(true)}
+          onShowAgb={() => setShowAgb(true)}
+          onShowImpressum={() => setShowImpressum(true)}
         />
       );
     }
     if (location.pathname === '/login') {
-      if (!showStandardLogin) {
-        return (
-          <ProfileSelector 
-            onLoginSuccess={(uid) => handleLogin(uid, false)} 
-            onShowStandardLogin={() => setShowStandardLogin(true)} 
-          />
-        );
-      }
       return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
     }
   }
@@ -12526,6 +12966,20 @@ function App() {
           }}
         />
       )}
+
+      {/* Pilot Phase Onboarding Agreement Modal */}
+      {showPilotAgreementModal && user?.school_id && user?.id && (
+        <PilotOnboardingModal
+          schoolId={user.school_id}
+          userId={user.id}
+          onComplete={() => setShowPilotAgreementModal(false)}
+          onShowPrivacy={() => setShowPrivacy(true)}
+          onShowAgb={() => setShowAgb(true)}
+        />
+      )}
+
+      {/* Render Legal Modals Helper Call */}
+      {renderLegalModals()}
 
       {/* Privacy Policy Modal */}
       {showPrivacy && (

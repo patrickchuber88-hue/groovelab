@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { AdminDashboard } from './AdminDashboard';
+import { PilotOnboardingModal } from './PilotOnboardingModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
@@ -1106,7 +1107,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [showPrivacy, setShowPrivacy] = useState<boolean>(false);
 
   // Operator Billing Info States (Loaded from MasterAdmin Settings)
-  const [operatorCompany, setOperatorCompany] = useState('Simplified Work GbR');
+  const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
   const [operatorContact, setOperatorContact] = useState('Patrick Huber');
   const [operatorStreet, setOperatorStreet] = useState('Karl-Fürstenberg-Str. 59');
   const [operatorZip, setOperatorZip] = useState('79618');
@@ -1641,6 +1642,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [pendingUserQuota, setPendingUserQuota] = useState<number | null>(null);
 
   // School Data & Subscription
+  const [isAvvSigned, setIsAvvSigned] = useState<boolean>(true);
+  const [showPilotAgreementModalFromDashboard, setShowPilotAgreementModalFromDashboard] = useState<boolean>(false);
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolYearStartMonth, setSchoolYearStartMonth] = useState<number>(9);
   const [schoolYearStartDay, setSchoolYearStartDay] = useState<number>(1);
@@ -1803,10 +1806,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         })
         .eq('id', schoolId);
       if (error) throw error;
+
+      // Reset pilot agreement signature
+      try {
+        await supabase
+          .from('pilot_agreements')
+          .delete()
+          .eq('school_id', schoolId);
+      } catch (err) {
+        console.error("Error resetting pilot agreement signature:", err);
+      }
     } catch (err: any) {
       console.error("Developer reset database error:", err);
     }
 
+    setIsAvvSigned(false);
     setIsBillingBooked(false);
     setBookedExtraUsers(0);
     setExtraUsersSliderVal(0);
@@ -1855,6 +1869,225 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [calendarUrls, setCalendarUrls] = useState<string[]>([]);
   const [newCalendarUrlInput, setNewCalendarUrlInput] = useState<string>('');
   
+  // Backup & Restore States & Functions
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
+  const [lastBackupDate, setLastBackupDate] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(`groovelab_last_backup_${schoolId}`);
+  });
+
+  const handleExportBackup = async () => {
+    setIsExporting(true);
+    try {
+      const [
+        schoolRes,
+        usersRes,
+        roomsRes,
+        schedulesRes,
+        bandsRes,
+        studentsRes
+      ] = await Promise.all([
+        supabase.from('schools').select('*').eq('id', schoolId).single(),
+        supabase.from('users').select('*').eq('school_id', schoolId),
+        supabase.from('rooms').select('*').eq('school_id', schoolId),
+        supabase.from('schedules').select('*').eq('school_id', schoolId),
+        supabase.from('bands').select('*').eq('school_id', schoolId),
+        supabase.from('students').select('*').eq('school_id', schoolId)
+      ]);
+
+      if (schoolRes.error) throw schoolRes.error;
+      if (usersRes.error) throw usersRes.error;
+      if (roomsRes.error) throw roomsRes.error;
+      if (schedulesRes.error) throw schedulesRes.error;
+      if (bandsRes.error) throw bandsRes.error;
+      if (studentsRes.error) throw studentsRes.error;
+
+      const bandIds = (bandsRes.data || []).map((b: any) => b.id);
+      const studentIds = (studentsRes.data || []).map((s: any) => s.id);
+
+      const [
+        bandMembersRes,
+        studentNamesRes,
+        emailPrefixesRes,
+        emailSuffixesRes,
+        activationDaysRes
+      ] = await Promise.all([
+        bandIds.length > 0
+          ? supabase.from('band_members').select('*').in('band_id', bandIds)
+          : Promise.resolve({ data: [], error: null }),
+        studentIds.length > 0
+          ? supabase.from('student_names').select('*').in('student_id', studentIds)
+          : Promise.resolve({ data: [], error: null }),
+        studentIds.length > 0
+          ? supabase.from('email_prefixes').select('*').in('student_id', studentIds)
+          : Promise.resolve({ data: [], error: null }),
+        studentIds.length > 0
+          ? supabase.from('email_suffixes').select('*').in('student_id', studentIds)
+          : Promise.resolve({ data: [], error: null }),
+        studentIds.length > 0
+          ? supabase.from('activation_days').select('*').in('student_id', studentIds)
+          : Promise.resolve({ data: [], error: null })
+      ]);
+
+      if (bandMembersRes.error) throw bandMembersRes.error;
+      if (studentNamesRes.error) throw studentNamesRes.error;
+      if (emailPrefixesRes.error) throw emailPrefixesRes.error;
+      if (emailSuffixesRes.error) throw emailSuffixesRes.error;
+      if (activationDaysRes.error) throw activationDaysRes.error;
+
+      const backupData = {
+        schoolId,
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        school: schoolRes.data,
+        users: usersRes.data || [],
+        rooms: roomsRes.data || [],
+        schedules: schedulesRes.data || [],
+        bands: bandsRes.data || [],
+        bandMembers: bandMembersRes.data || [],
+        students: studentsRes.data || [],
+        studentNames: studentNamesRes.data || [],
+        emailPrefixes: emailPrefixesRes.data || [],
+        emailSuffixes: emailSuffixesRes.data || [],
+        activationDays: activationDaysRes.data || []
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `Backup_Campus_Groovelab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      const nowStr = new Date().toISOString();
+      localStorage.setItem(`groovelab_last_backup_${schoolId}`, nowStr);
+      setLastBackupDate(nowStr);
+    } catch (err) {
+      console.error('[Backup] Export failed:', err);
+      alert('Backup-Export fehlgeschlagen: ' + (err as any).message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleRestoreBackup = async (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const backupData = JSON.parse(e.target?.result as string);
+        
+        if (backupData.schoolId !== schoolId) {
+          alert('Fehler: Dieses Backup gehört zu einer anderen Musikschule und kann hier nicht eingespielt werden.');
+          return;
+        }
+        if (!backupData.users || !backupData.rooms || !backupData.schedules || !backupData.students) {
+          alert('Fehler: Ungültiges Backup-Format.');
+          return;
+        }
+
+        const confirmWord = prompt('WARNUNG: Dies wird ALLE aktuellen Daten dieser Musikschule (Stundenpläne, Räume, Benutzer, Schülerkartei) unwiderruflich überschreiben! Tippen Sie zur Bestätigung das Wort "RESTORE" ein:');
+        if (confirmWord !== 'RESTORE') {
+          alert('Wiederherstellung abgebrochen.');
+          return;
+        }
+
+        setIsRestoring(true);
+
+        try {
+          const [
+            uRes, rRes, sRes, bRes, stRes
+          ] = await Promise.all([
+            supabase.from('users').select('*').eq('school_id', schoolId),
+            supabase.from('rooms').select('*').eq('school_id', schoolId),
+            supabase.from('schedules').select('*').eq('school_id', schoolId),
+            supabase.from('bands').select('*').eq('school_id', schoolId),
+            supabase.from('students').select('*').eq('school_id', schoolId)
+          ]);
+          const currentData = {
+            schoolId,
+            exportDate: new Date().toISOString(),
+            users: uRes.data || [],
+            rooms: rRes.data || [],
+            schedules: sRes.data || [],
+            bands: bRes.data || [],
+            students: stRes.data || []
+          };
+          localStorage.setItem(`groovelab_rollback_backup_${schoolId}`, JSON.stringify(currentData));
+        } catch (rollBackErr) {
+          console.warn('Rollback backup failed, proceeding anyway:', rollBackErr);
+        }
+
+        await supabase.from('band_members').delete().in('band_id', (await supabase.from('bands').select('id').eq('school_id', schoolId)).data?.map((b: any) => b.id) || []);
+        await supabase.from('bands').delete().eq('school_id', schoolId);
+        await supabase.from('schedules').delete().eq('school_id', schoolId);
+        await supabase.from('student_names').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
+        await supabase.from('email_prefixes').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
+        await supabase.from('email_suffixes').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
+        await supabase.from('activation_days').delete().in('student_id', (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || []);
+        await supabase.from('students').delete().eq('school_id', schoolId);
+        await supabase.from('rooms').delete().eq('school_id', schoolId);
+        await supabase.from('users').delete().eq('school_id', schoolId);
+
+        if (backupData.school) {
+          const { id, created_at, ...schoolSettings } = backupData.school;
+          await supabase.from('schools').update(schoolSettings).eq('id', schoolId);
+        }
+
+        if (backupData.users.length > 0) {
+          const { error } = await supabase.from('users').insert(backupData.users);
+          if (error) throw error;
+        }
+        if (backupData.rooms.length > 0) {
+          const { error } = await supabase.from('rooms').insert(backupData.rooms);
+          if (error) throw error;
+        }
+        if (backupData.students.length > 0) {
+          const { error } = await supabase.from('students').insert(backupData.students);
+          if (error) throw error;
+        }
+        if (backupData.studentNames && backupData.studentNames.length > 0) {
+          const { error } = await supabase.from('student_names').insert(backupData.studentNames);
+          if (error) throw error;
+        }
+        if (backupData.emailPrefixes && backupData.emailPrefixes.length > 0) {
+          const { error } = await supabase.from('email_prefixes').insert(backupData.emailPrefixes);
+          if (error) throw error;
+        }
+        if (backupData.emailSuffixes && backupData.emailSuffixes.length > 0) {
+          const { error } = await supabase.from('email_suffixes').insert(backupData.emailSuffixes);
+          if (error) throw error;
+        }
+        if (backupData.activationDays && backupData.activationDays.length > 0) {
+          const { error } = await supabase.from('activation_days').insert(backupData.activationDays);
+          if (error) throw error;
+        }
+        if (backupData.schedules.length > 0) {
+          const { error } = await supabase.from('schedules').insert(backupData.schedules);
+          if (error) throw error;
+        }
+        if (backupData.bands && backupData.bands.length > 0) {
+          const { error } = await supabase.from('bands').insert(backupData.bands);
+          if (error) throw error;
+        }
+        if (backupData.bandMembers && backupData.bandMembers.length > 0) {
+          const { error } = await supabase.from('band_members').insert(backupData.bandMembers);
+          if (error) throw error;
+        }
+
+        alert('Daten erfolgreich wiederhergestellt! Das Dashboard wird neu geladen.');
+        window.location.reload();
+      } catch (err) {
+        console.error('[Backup] Restore failed:', err);
+        alert('Wiederherstellung fehlgeschlagen: ' + (err as any).message);
+      } finally {
+        setIsRestoring(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // Tokens & Settings
   const [kioskToken, setKioskToken] = useState<string>('');
   const [campusToken, setCampusToken] = useState<string>('');
@@ -1893,6 +2126,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
   const mixedTotal_global = currentTotalB2B_global + studentLevyMonthly_global + extraLevyMonthly_global;
+
+  const daysSinceLastBackup = useMemo(() => {
+    if (!lastBackupDate) return null;
+    const lastDate = new Date(lastBackupDate);
+    const diffTime = Math.abs(new Date().getTime() - lastDate.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }, [lastBackupDate]);
+
+  const showBackupAlert = useMemo(() => {
+    return !lastBackupDate || (daysSinceLastBackup !== null && daysSinceLastBackup > 14);
+  }, [lastBackupDate, daysSinceLastBackup]);
+
   const isSettingsDirty = useMemo(() => {
     if (!initialSettings) return false;
     return (
@@ -2733,6 +2978,23 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
     try {
       setLoading(true);
       fetchPendingBookings();
+
+      // Check pilot agreement status
+      try {
+        const { data: agreementData, error: agreementError } = await supabase
+          .from('pilot_agreements')
+          .select('id')
+          .eq('school_id', schoolId)
+          .maybeSingle();
+
+        if (agreementError) {
+          console.error('[Dashboard] Error querying pilot agreement:', agreementError);
+        } else {
+          setIsAvvSigned(!!agreementData);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Error in pilot agreement check:', err);
+      }
 
       // Parallelized fetch of school settings, users, student contract statuses, pending students, activation days, and schedules
       const [
@@ -11561,6 +11823,125 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
+                  {/* Backup Warning Banner */}
+                  {showBackupAlert && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                      border: '1px solid #fde68a',
+                      borderRadius: '24px',
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.08)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                          background: '#fef3c7',
+                          borderRadius: '16px',
+                          padding: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #fcd34d'
+                        }}>
+                          <ShieldAlert size={24} style={{ color: '#d97706' }} />
+                        </div>
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '1rem', color: '#92400e', marginBottom: '4px' }}>
+                            Lokale Datensicherung empfohlen!
+                          </strong>
+                          <span style={{ fontSize: '0.84rem', color: '#78350f', lineHeight: '1.4' }}>
+                            {lastBackupDate 
+                              ? `Dein letztes lokales Daten-Backup ist bereits ${daysSinceLastBackup} Tage alt. Bitte erstelle eine aktuelle Sicherungsdatei, um deine rechtlichen Mitwirkungspflichten zu erfüllen.`
+                              : 'Es wurde noch kein lokales Daten-Backup heruntergeladen. Bitte erstelle eine Sicherungsdatei, um deine rechtlichen Mitwirkungspflichten zu erfüllen.'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSecretarySubTab('setup');
+                          setSettingsTab('security_privacy');
+                        }}
+                        style={{
+                          background: '#d97706',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 20px',
+                          fontSize: '0.84rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 4px 12px rgba(217, 119, 6, 0.2)',
+                          transition: 'transform 0.15s, background-color 0.15s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#b45309'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#d97706'}
+                      >
+                        Jetzt sichern
+                      </button>
+                    </div>
+                  )}
+
+                  {/* AVV Warning Banner */}
+                  {!isAvvSigned && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                      border: '1px solid #fecaca',
+                      borderRadius: '24px',
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.08)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                          background: '#fee2e2',
+                          borderRadius: '16px',
+                          padding: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #fca5a5'
+                        }}>
+                          <ShieldAlert size={24} style={{ color: '#dc2626' }} />
+                        </div>
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '1rem', color: '#991b1b', marginBottom: '4px' }}>
+                            AV-Vertrag (Schul-Vereinbarung) ausstehend!
+                          </strong>
+                          <span style={{ fontSize: '0.84rem', color: '#7f1d1d', lineHeight: '1.4' }}>
+                            Dein gesetzlich vorgeschriebener Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO ist noch nicht digital unterzeichnet. Bitte hole dies umgehend nach, um den rechtssicheren Schulbetrieb zu gewährleisten.
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowPilotAgreementModalFromDashboard(true)}
+                        style={{
+                          background: '#dc2626',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 20px',
+                          fontSize: '0.84rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)',
+                          transition: 'transform 0.15s, background-color 0.15s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
+                      >
+                        Jetzt unterzeichnen
+                      </button>
+                    </div>
+                  )}
+
                   {(() => {
                     if (!isBillingBooked || dismissedInvoiceAlert) return null;
                     
@@ -14680,6 +15061,68 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       Willkommen in der Campus-Verwaltung. Hier koordinierst du die Lehrkräfte, das Onboarding neuer Kolleginnen und Kollegen sowie die Stundenplan-Freigaben für deine Musikschule.
                     </p>
                   </div>
+
+                  {/* Backup Warning Banner (Campus Green Theme) */}
+                  {showBackupAlert && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '24px',
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '16px',
+                      boxShadow: '0 10px 25px -5px rgba(22, 163, 74, 0.08)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                          background: '#dcfce7',
+                          borderRadius: '16px',
+                          padding: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid #86efac'
+                        }}>
+                          <ShieldAlert size={24} style={{ color: '#137333' }} />
+                        </div>
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '1rem', color: '#14532d', marginBottom: '4px' }}>
+                            Lokale Datensicherung empfohlen!
+                          </strong>
+                          <span style={{ fontSize: '0.84rem', color: '#166534', lineHeight: '1.4' }}>
+                            {lastBackupDate 
+                              ? `Dein letztes lokales Daten-Backup ist bereits ${daysSinceLastBackup} Tage alt. Bitte erstelle eine aktuelle Sicherungsdatei in den Einstellungen, um deine rechtlichen Mitwirkungspflichten zu erfüllen.`
+                              : 'Es wurde noch kein lokales Daten-Backup heruntergeladen. Bitte erstelle eine Sicherungsdatei in den Einstellungen, um deine rechtlichen Mitwirkungspflichten zu erfüllen.'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSecretarySubTab('setup');
+                          setSettingsTab('security_privacy');
+                        }}
+                        style={{
+                          background: '#137333',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 20px',
+                          fontSize: '0.84rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 4px 12px rgba(19, 115, 51, 0.2)',
+                          transition: 'transform 0.15s, background-color 0.15s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#14532d'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#137333'}
+                      >
+                        Jetzt sichern
+                      </button>
+                    </div>
+                  )}
 
                   {/* Sicherheitswarnung: Onboarding-Konflikte */}
                   {frozenStudents.length > 0 && (
@@ -25813,51 +26256,155 @@ status: status,
                     {/* AV-Vertrag Statusbereich */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {/* Schule AVV */}
+                      {/* School AVV */}
                       <div style={{ 
-                        background: '#fffbeb', 
-                        border: '1px solid #fde68a', 
+                        background: isAvvSigned ? '#e6f4ea' : '#fef2f2', 
+                        border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fca5a5', 
                         borderRadius: '16px', 
                         padding: '16px', 
                         display: 'flex', 
                         alignItems: 'flex-start', 
                         gap: '12px',
                         fontSize: '0.76rem',
-                        color: '#92400e',
+                        color: isAvvSigned ? '#137333' : '#dc2626',
                         lineHeight: '1.45'
                       }}>
-                        <FileText size={20} style={{ color: '#b45309', flexShrink: 0, marginTop: '2px' }} />
+                        <FileText size={20} style={{ color: isAvvSigned ? '#34a853' : '#dc2626', flexShrink: 0, marginTop: '2px' }} />
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>In Vorbereitung</span>
+                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: isAvvSigned ? '#137333' : '#991b1b' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span style={{ 
+                                fontSize: '0.62rem', 
+                                fontWeight: 900, 
+                                background: isAvvSigned ? '#d1fae5' : '#fee2e2', 
+                                border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fecaca', 
+                                color: isAvvSigned ? '#065f46' : '#dc2626', 
+                                padding: '3px 8px', 
+                                borderRadius: '100px', 
+                                textTransform: 'uppercase' 
+                              }}>
+                                {isAvvSigned ? 'Gezeichnet' : 'Ausstehend'}
+                              </span>
+                              {!isAvvSigned && (
+                                <button
+                                  onClick={() => setShowPilotAgreementModalFromDashboard(true)}
+                                  style={{
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 900, 
+                                    background: '#dc2626', 
+                                    border: 'none', 
+                                    color: '#ffffff', 
+                                    padding: '3.5px 10px', 
+                                    borderRadius: '100px', 
+                                    textTransform: 'uppercase',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 4px rgba(220, 38, 38, 0.15)'
+                                  }}
+                                >
+                                  Jetzt unterzeichnen
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <span style={{ display: 'block', marginTop: '4px' }}>
-                            Für den datenschutzkonformen Betrieb von Campus-Groovelab ist der Abschluss eines Auftragsverarbeitungsvertrags (AVV) nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab erforderlich. Die Vorlage wird freigeschaltet, sobald die Hoster-Vereinbarungen finalisiert sind.
+                          <span style={{ display: 'block', marginTop: '4px', color: isAvvSigned ? '#137333' : '#7f1d1d' }}>
+                            {isAvvSigned 
+                              ? 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab wurde rechtsgültig gezeichnet.' 
+                              : 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab steht zur digitalen Signatur bereit.'}
                           </span>
                         </div>
                       </div>
 
                       {/* Hoster AVV */}
                       <div style={{ 
-                        background: '#fffbeb', 
-                        border: '1px solid #fde68a', 
+                        background: '#e6f4ea', 
+                        border: '1px solid #a7f3d0', 
                         borderRadius: '16px', 
                         padding: '16px', 
                         display: 'flex', 
                         alignItems: 'flex-start', 
                         gap: '12px',
                         fontSize: '0.76rem',
-                        color: '#92400e',
+                        color: '#137333',
                         lineHeight: '1.45'
                       }}>
-                        <Shield size={20} style={{ color: '#b45309', flexShrink: 0, marginTop: '2px' }} />
+                        <ShieldCheck size={20} style={{ color: '#34a853', flexShrink: 0, marginTop: '2px' }} />
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#78350f' }}>AV-Vertrag mit Hoster (Hetzner Online GmbH)</strong>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#fef3c7', border: '1px solid #fde68a', color: '#b45309', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>In Zeichnung</span>
+                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#137333' }}>AV-Vertrag mit Hoster (Hetzner Online GmbH)</strong>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#d1fae5', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>Gezeichnet</span>
                           </div>
                           <span style={{ display: 'block', marginTop: '4px' }}>
-                            Der übergeordnete Infrastruktur-AVV für das Hosten personenbezogener Daten in deutschen Rechenzentren der Hetzner Online GmbH wird derzeit durch Campus-Groovelab abgeschlossen.
+                            Der übergeordnete Infrastruktur-AVV für das Hosten personenbezogener Daten in deutschen Rechenzentren der Hetzner Online GmbH wurde am 15.07.2026 von Campus-Groovelab rechtsgültig gezeichnet.
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Eltern-Infoblatt Vorlage */}
+                      <div style={{ 
+                        background: '#fefce8', 
+                        border: '1px solid #fef08a', 
+                        borderRadius: '16px', 
+                        padding: '16px', 
+                        display: 'flex', 
+                        alignItems: 'flex-start', 
+                        gap: '12px',
+                        fontSize: '0.76rem',
+                        color: '#854d0e',
+                        lineHeight: '1.45'
+                      }}>
+                        <FileText size={20} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#854d0e' }}>Eltern-Information & Einwilligung (Vorlage)</strong>
+                            <button 
+                              onClick={() => {
+                                const isGrooveOnly = !hasCampusSub && hasGroovelabSub;
+                                const isCampusOnly = hasCampusSub && !hasGroovelabSub;
+                                
+                                let appName = 'Campus-Groovelab';
+                                let subjectPhrase = 'Instrumental- und Groovelab-Unterrichts';
+                                if (isGrooveOnly) {
+                                  appName = 'GrooveLab';
+                                  subjectPhrase = 'Groovelab-Unterrichts';
+                                } else if (isCampusOnly) {
+                                  appName = 'Campus';
+                                  subjectPhrase = 'Instrumentalunterrichts';
+                                }
+
+                                const filename = isGrooveOnly 
+                                  ? 'Eltern_Information_Einwilligung_Groovelab.txt' 
+                                  : isCampusOnly
+                                    ? 'Eltern_Information_Einwilligung_Campus.txt'
+                                    : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
+
+                                const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR ERPROBUNG DER LERN-APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos.\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.\n- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Teilnahme an der Pilotphase willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
+                                const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              }}
+                              style={{ 
+                                fontSize: '0.62rem', 
+                                fontWeight: 900, 
+                                background: '#fef08a', 
+                                border: '1px solid #ca8a04', 
+                                color: '#854d0e', 
+                                padding: '3px 8px', 
+                                borderRadius: '100px', 
+                                textTransform: 'uppercase',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Herunterladen
+                            </button>
+                          </div>
+                          <span style={{ display: 'block', marginTop: '4px' }}>
+                            Lade dir hier die rechtssichere Eltern-Informationsvorlage und Einverständniserklärung zur Verteilung an deine Schüler herunter.
                           </span>
                         </div>
                       </div>
@@ -25881,47 +26428,70 @@ status: status,
                       </select>
                     </div>
 
-                    {/* JSON Data Export */}
-                    <div style={{ background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ flex: 1, marginRight: '16px' }}>
-                        <strong style={{ fontSize: '0.82rem', color: '#1e293b', display: 'block' }}>Schuldaten exportieren (Backup)</strong>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginTop: '2px', lineHeight: '1.3' }}>
-                          Lade alle Stammdaten, Raumbelegungen, Verträge und Konfigurationen deiner Musikschule als strukturierte JSON-Sicherungsdatei herunter.
+                    {/* JSON Data Export & Import */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Lokale Datensicherung (Backup &amp; Wiederherstellung)</strong>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
+                          Lade alle Stammdaten, Benutzer, Räume, Stundenpläne und Bands deiner Musikschule als strukturierte JSON-Sicherungsdatei herunter oder spiele ein bestehendes Backup wieder ein.
                         </span>
                       </div>
-                      <button 
-                        onClick={() => {
-                          const exportData = {
-                            schoolId,
-                            schoolName,
-                            logoUrl,
-                            calendarUrl,
-                            studentsCount: students.length,
-                            roomsCount: rooms.length,
-                            kioskPinLength,
-                            kioskAutoLogout,
-                            limitsEnabled,
-                            paymentMethod: 'Rechnung (14 Tage)',
-                            exportDate: new Date().toISOString(),
-                            gdprStatus: 'AV-Vertrag Hetzner aktiv'
-                          };
-                          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-                          const downloadAnchor = document.createElement('a');
-                          downloadAnchor.setAttribute("href", dataStr);
-                          downloadAnchor.setAttribute("download", `Backup_Campus_Groovelab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
-                          document.body.appendChild(downloadAnchor);
-                          downloadAnchor.click();
-                          downloadAnchor.remove();
-                        }}
-                        style={{ 
-                          padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                          border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
-                          display: 'flex', alignItems: 'center', gap: '6px'
-                        }}
-                        className="google-btn-secondary hover-scale"
-                      >
-                        <Download size={14} style={{ color: '#64748b' }} /> Backup (JSON) laden
-                      </button>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#1e293b' }}>Letztes lokales Backup</span>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+                            {lastBackupDate ? `Gesichert am ${new Date(lastBackupDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${new Date(lastBackupDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr` : 'Bisher kein lokales Backup erstellt.'}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={handleExportBackup}
+                          disabled={isExporting}
+                          style={{ 
+                            padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
+                            border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', cursor: 'pointer', transition: 'all 0.15s',
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                          }}
+                          className="google-btn-secondary hover-scale"
+                        >
+                          <Download size={14} style={{ color: '#64748b' }} /> {isExporting ? 'Exportiert...' : 'Backup herunterladen'}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#fef2f2', border: '1px dashed #fca5a5', borderRadius: '12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginRight: '16px' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#991b1b' }}>Daten aus Backup wiederherstellen</span>
+                          <span style={{ fontSize: '0.7rem', color: '#7f1d1d', marginTop: '2px', lineHeight: '1.3' }}>
+                            WICHTIG: Das Einspielen überschreibt alle aktuellen Daten dieser Schule unwiderruflich mit dem Stand des Backups.
+                          </span>
+                        </div>
+                        <div>
+                          <input
+                            type="file"
+                            id="restore-file-input"
+                            accept=".json"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleRestoreBackup(file);
+                              }
+                            }}
+                            style={{ display: 'none' }}
+                          />
+                          <button 
+                            onClick={() => document.getElementById('restore-file-input')?.click()}
+                            disabled={isRestoring}
+                            style={{ 
+                              padding: '10px 18px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
+                              border: 'none', background: '#ea4335', color: '#ffffff', cursor: 'pointer', transition: 'all 0.15s',
+                              display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(234, 67, 53, 0.15)'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Upload size={14} style={{ color: '#ffffff' }} /> {isRestoring ? 'Wiederherstellung...' : 'Backup einspielen'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -27118,93 +27688,134 @@ status: status,
             }}>
               <div>
                 <p style={{ margin: 0, fontWeight: 700 }}>Vertragspartner und Anbieter:</p>
-                <p style={{ margin: '4px 0 0 0' }}>Simplified Work GbR, Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
+                <p style={{ margin: '4px 0 0 0' }}>Patrick Huber (Einzelunternehmer), Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
                 <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>
                   <strong>Geltungsbereich:</strong> Ausschließlich für den unternehmerischen Geschäftsverkehr (B2B)<br/>
                   <strong>Stand und Gültigkeit:</strong> August 2026
                 </p>
               </div>
 
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
-                <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales, jedoch rein komplementäres Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs, der organisatorischen Infrastruktur sowie zur pädagogischen Lernbegleitung mittels Gamification-Elementen.</p>
-                <p style={{ margin: '8px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, die Service-Bereitstellung, das Hosting, die Härtung der Datenbank-Infrastruktur sowie für die administrativen Service-, Support- und Betriebsleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>Souveränitäts-Versprechen (100 % Made & Hosted in Germany):</strong> Die technische Bereitstellung dieser Infrastruktur erfolgt über gehärtete Systeme auf in Deutschland befindlichen, ISO-27001-zertifizierten Servern. Der Anbieter garantiert, dass zu keinem Zeitpunkt US-amerikanische oder sonstige außereuropäische Cloud-Infrastrukturen (wie z. B. AWS, Microsoft Azure oder Google Cloud) für die Kern-Datenhaltung verwendet werden.</p>
+              {/* TEIL A */}
+              <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL A: Allgemeine Nutzungsbedingungen (Gilt für alle Module)</h3>
+                <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Dieser Teil regelt die grundlegenden rechtlichen Bedingungen für die Nutzung der Plattform Campus-Groovelab und gilt unabhängig von den gebuchten Modulen.</p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+                    <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs.</p>
+                    <p style={{ margin: '4px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>Souveränitäts-Versprechen:</strong> Die Bereitstellung erfolgt über zertifizierte, deutsche Server (Hetzner Online GmbH, Standort Falkenstein). Der Anbieter garantiert, dass keine außereuropäische Cloud-Infrastrukturen (wie AWS, Azure oder Google Cloud) zur Kern-Datenhaltung verwendet werden.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG & ÜBERGABEPUNKT</h4>
+                    <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand ist die Bereitstellung der Software zur Nutzung über das Internet im Wege des SaaS-Modells. Die Vergütung versteht sich als reines Infrastruktur- und Serviceentgelt. Das Verhältnis qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag (§§ 535 ff., 611 BGB).</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Modulbezug:</strong> Der konkrete Leistungsumfang ist modulbezogen und beschränkt sich auf die vom Kunden jeweils separat gebuchten Systembestandteile (Modul „Campus“, Modul „GrooveLab“ oder Kombi-Paket).</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Übergabepunkt ist der Ausgang des Rechenzentrums. Für die Internetanbindung und Endgeräte ist der Kunde selbst verantwortlich.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>4. Add-On-Status:</strong> Die Software ersetzt nicht das primäre Verwaltungs- und ERP-System (z. B. iMikel) des Kunden. Der Kunde bleibt verpflichtet, grundlegende Verwaltungsakte, Abrechnung und finale Stundenpläne im führenden ERP-System zu pflegen.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & DEVICE-PAIRING</h4>
+                    <p style={{ margin: 0 }}><strong>1. QR-Code-Login:</strong> Der Zugang erfolgt passwortlos über eindeutige QR-Codes. Der Kunde verpflichtet sich, Mitarbeiter im sorgsamen Umgang mit den Codes zu schulen.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Anti-Theft Device-Pairing (PIN-Schranke):</strong> Um unbefugten Zugriff bei physischem QR-Verlust zu verhindern, fordert das System auf neuen Geräten einmalig ein schülerbezogenes Sicherheitsmerkmal (PIN) an, bevor das Endgerät registriert wird.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 3 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
+                    <p style={{ margin: 0 }}><strong>1. Rollen:</strong> Der Kunde ist „Verantwortlicher“ (Art. 4 Nr. 7 DSGVO), der Anbieter ist „Auftragsverarbeiter“ (Art. 4 Nr. 8 DSGVO). Die Details regelt ein gesonderter AV-Vertrag (AVV) nach Art. 28 DSGVO.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail & Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG & GEWÄHRLEISTUNG</h4>
+                    <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwarelizenzierung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT & RATE-LIMITING</h4>
+                    <p style={{ margin: 0 }}><strong>1. Verfügbarkeit:</strong> Der Anbieter gewährleistet 99,0 % Systemverfügbarkeit im Jahresmittel am Übergabepunkt. Ausgenommen sind angekündigte Wartungsfenster und Ausfälle durch höhere Gewalt.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Rate-Limiting:</strong> Zum Schutz vor Cyberangriffen (DDoS, Bruteforce) blockiert das System auffällige IP-Adressen temporär. Diese Sperren dienen der Datensicherheit und stellen keinen Mangel dar.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 LIZENZGEBÜHRENFREIHEIT & NUTZUNGSRECHTE</h4>
+                    <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
+                    <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ 7,99 € und für das Modul „GrooveLab“ 4,99 €. Werden beide Module gebucht, gilt der Kombi-Vorteil von 9,99 € (Ersparnis von 2,99 €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit 0,49 €/Monat berechnet.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
+                      <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
+                      <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                      <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
+                    </p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>6. Rechnungsstellung:</strong> Die Server- und Servicegebühren werden monatlich zum Monatsende fällig. Der Anbieter wendet die Kleinunternehmerregelung (§ 19 UStG) an, es wird keine Umsatzsteuer ausgewiesen.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 8 GERICHTSSTAND & SALVATORISCHE KLAUSEL</h4>
+                    <p style={{ margin: 0 }}>Es gilt deutsches Recht. Ausschließlicher Gerichtsstand ist Rheinfelden. Sollten Bestimmungen unwirksam sein, bleibt der restliche Vertrag in Kraft.</p>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG & ÜBERGABEPUNKT</h4>
-                <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand dieses Vertrages ist die dauerhaft kostenlose (lizenzgebührenfreie) Bereitstellung der Software zur Nutzung über das Internet im Wege des Software-as-a-Service (SaaS)-Modells sowie die Einräumung der entsprechenden Nutzungsrechte nach Maßgabe dieses Vertrages. Die vom Kunden zu entrichtende Vergütung versteht sich ausdrücklich und ausschließlich als Entgelt für den Server-Betrieb und die Service-Bereitstellung (Infrastruktur-Leistung) sowie für die vereinbarten laufenden Service-, Betriebs- und Wartungsleistungen des Anbieters. Das Vertragsverhältnis über die Server- und Servicebereitstellung qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag gemäß §§ 535 ff., 611 BGB.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Leistungsumfang:</strong> Der genaue Funktionsumfang der Software sowie die Spezifikationen der Server-Infrastruktur und Serviceleistungen ergeben sich aus der zum Zeitpunkt des Vertragsabschlusses gültigen Produkt- und Leistungsbeschreibung. Schulungen, individueller Support vor Ort, Datenmigrationen oder kundenspezifische Programmierungen sind nicht geschuldet, es sei denn, sie wurden ausdrücklich als kostenpflichtige Zusatzleistung vereinbart.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Anbieter stellt dem Kunden die Software am Ausgang des vom Anbieter genutzten Rechenzentrums (Schnittstelle zum öffentlichen Internet, nachfolgend „Übergabepunkt“) zur Nutzung auf den bereitgestellten Servern bereit. Für die Netzanbindung des Kunden, die Bereitstellung geeigneter Endgeräte sowie die Beschaffung kompatibler Browser-Software ist ausschließlich der Kunde verantwortlich.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>4. Add-On-Status & Führendes System:</strong> Die Software versteht sich ausdrücklich als komplementäres Zusatz- und Kommunikationswerkzeug (Add-On) und ersetzt nicht das primäre Verwaltungs- und ERP-System des Kunden (wie z. B. iMikel, nachfolgend „führendes System“). Der Kunde bleibt uneingeschränkt verpflichtet, alle grundlegenden und rechtsverbindlichen Verwaltungsakte, die vertragliche Abrechnung, die Stammdatenpflege sowie die finale Stundenplan- und Raumbelegung eigenständig in seinem führenden System zu pflegen und zu verwalten. Die Software dient lediglich der operativen Erleichterung und Visualisierung im Alltag von Verwaltung, Lehrkräften und Endnutzern.</p>
+              {/* TEIL B */}
+              <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL B: Besondere Bedingungen für das Modul „Campus“</h3>
+                <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das Campus-Modul gebucht ist.</p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 9 LEISTUNGSUMFANG CAMPUS</h4>
+                    <p style={{ margin: 0 }}>Das Campus-Modul umfasst das digitale Hausaufgabenheft mit Übungsstreaks, das Meisterwerk-Protokoll, die Audio-Loopstation, den Stundenplan-Designer sowie die interne Schul- und Raumbelegungs-Engine.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>1. Übe-Timer & Sensorik:</strong> Der Fokus-Timer wertet die Lagesensoren (DeviceOrientation API) aus. Das System gewährt eine 10-sekündige Toleranzzeit (Grace Period), die erst nach Ablauf der Fokus-Minuten greift. Gewährleistung für Timer-Fehlfunktionen durch inkompatible oder falsch kalibrierte Sensoren ist ausgeschlossen.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Audio-Loopstation:</strong> Die Loopstation verwendet ein 4-Takte-Pause-Verfahren (Variante 1) zur Sicherstellung der Sample-Synchronität und Vermeidung von Signal-Verschluckungen.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 10 SCHNITTSTELLEN & KALENDER-EXPORT</h4>
+                    <p style={{ margin: 0 }}><strong>1. CSV-Import:</strong> Datenimporte aus ERP-Systemen (z. B. iMikel) erfolgen über Copy-and-Paste eines CSV-Textstroms. Bei Import-Formatfehlern bricht das System die Transaktion automatisch ohne Datenverlust ab (Rollback).</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. iCal-Kalender-Kopplung:</strong> Exporte von Kalenderdaten im .ics-Format pseudonymisieren Schülernamen (z. B. „Jonas M.“ statt „Jonas Müller“) zur Einhaltung des Datenschutzes. Für Aktualisierungsverzögerungen externer Kalender-Clients haftet der Anbieter nicht.</p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
+                    <p style={{ margin: 0 }}><strong>1. Namensmaskierung:</strong> Schülernamen werden im Lehrer-Dashboard auf „Vorname + Anfangsbuchstabe Nachname“ und im Schüler-Dashboard auf generische Begriffe (z. B. „Hausaufgabenheft“) begrenzt.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (analog dem Netflix-Prinzip) im Campus-Modul gestattet.</p>
+                  </div>
+                </div>
               </div>
 
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 2 SPEZIFISCHE SCHNITTSTELLEN- & LEISTUNGSPATHEN</h4>
-                <p style={{ margin: 0 }}><strong>1. iMikel-CSV-Schnittstelle & Import-Spezifikationen:</strong> Der Anbieter stellt dem Kunden im Rahmen seiner Serviceleistungen ein Import-Modul zur Einlesung von CSV-Stammdaten aus Altsystemen (z. B. iMikel) zur Verfügung. Die Datenerfassung erfolgt über ein dafür vorgesehenes Textfeld innerhalb der Benutzeroberfläche der Software, in welches der Kunde die Rohdaten mittels Kopieren und Einfügen (Copy-and-Paste) überträgt. Der Kunde ist verpflichtet, die Textdaten vorab auf Formatkompatibilität zu prüfen. Der Kunde trägt die alleinige Verantwortung dafür, dass die eingefügten Textdaten dem geforderten CSV-Format entsprechen sowie frei von manipulativen Inhalten oder schädlichen Skripten sind.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>Transaktionales Rollback-Verfahren:</strong> Das System arbeitet mit einer transaktionalen Absicherung. Tritt während der Verarbeitung des eingefügten CSV-Textes ein Daten- oder Formatfehler auf, wird die gesamte Import-Transaktion automatisch abgebrochen und der vorherige, konsistente Datenbankzustand wiederhergestellt (Rollback). Eine Haftung des Anbieters für Mehraufwände durch fehlerhaft formatierte Importdaten ist ausgeschlossen.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Kalender-Kopplung & iCal-Schnittstelle:</strong> Die Software ermöglicht es Endnutzern, personalisierte, abonnierbare Kalender-Feeds (.ics) in externen Kalender-Anwendungen (z. B. Apple Calendar, Google Calendar) einzubinden. Um die Privatsphäre minderjähriger Schüler bei der Übertragung von iCal-Links über unverschlüsselte Kalender-Protokolle zu sichern, werden Schülernamen im exportierten Kalendertext automatisch pseudonymisiert (z. B. „J. M. Musikschule“ statt „Jonas Müller“). Der Kunde wird darauf hingewiesen, dass iCal-Feeds auf dem Pull-Prinzip basieren. Die Synchronisations- und Aktualisierungsfrequenz wird ausschließlich durch das Endgerät bzw. den Kalender-Provider des Endnutzers bestimmt. Der Anbieter haftet nicht für verspätete oder fehlerhafte Darstellungen von Terminänderungen im Kalender des Endnutzers.</p>
-              </div>
+              {/* TEIL C */}
+              <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#a16207', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL C: Besondere Bedingungen für das Modul „GrooveLab“</h3>
+                <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das GrooveLab-Modul gebucht ist.</p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 12 LEISTUNGSUMFANG GROOVELAB</h4>
+                    <p style={{ margin: 0 }}>Das GrooveLab-Modul umfasst die Bandgründung und Band-Mitgliederverwaltung, die Song-Bibliotheken, den Repertoire-Planer, das Skill-Radar, Musiker- und Band-Avatare sowie das Live Lab Echtzeit-Bandmodul.</p>
+                  </div>
 
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 3 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & COMPLIANCE</h4>
-                <p style={{ margin: 0 }}><strong>1. Passwortlose QR-Code-Authentifizierung:</strong> Der Zugang für Endnutzer erfolgt passwortlos über eine eindeutige URL, die als scanbarer QR-Code verschlüsselt ist. Der Kunde verpflichtet sich, seine Lehrkräfte und Mitarbeiter im sorgsamen Umgang mit den QR-Codes zu schulen. Die QR-Codes dürfen ausschließlich den jeweils berechtigten Endnutzern persönlich oder durch Aufkleben auf das physische Noten-/Hausaufgabenheft zur Verfügung gestellt werden.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Zweistufige Verifikations-Schranke (Anti-Theft Device-Pairing):</strong> Um unbefugten Zugriff auf personenbezogene Logistik- und Schülerdaten bei physischem Verlust des QR-Codes auszuschließen, erzwingt die Software beim Aufruf auf einem neuen, nicht registrierten Endgerät die Eingabe eines dem Endnutzer bekannten, schülerbezogenen Sicherheitsmerkmals (PIN) als einmaligen Freischalt-Code. Nach erfolgreicher Eingabe wird auf dem Endgerät ein kryptografischer Schlüssel zur permanenten Autorisierung hinterlegt (Device-Pairing), wodurch nachfolgende Scans ohne erneute Code-Eingabe ermöglicht werden. Der Kunde is verpflichtet, seine Endnutzer darüber zu informieren, dass bei Verlust des physischen QR-Codes oder des registrierten Endgeräts unverzüglich eine Sperrung des Tokens über das Lehrer-Cockpit oder die Verwaltung zu veranlassen ist. Der Anbieter sperrt den betroffenen Token in Echtzeit nach Eingang der Sperraufforderung im System.</p>
-              </div>
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 13 STANDORTERMITTLUNG (GEOFENCING) & HARDWARE-ZUGRIFF</h4>
+                    <p style={{ margin: 0 }}><strong>1. Lokales Geofencing im Live Lab:</strong> Die Verifikation der Anwesenheit vor Ort zur Echtzeit-Bandkoordination erfolgt über die Standortfreigabe (GPS) des Webbrowsers. Diese Daten werden ausschließlich lokal im Browser verarbeitet, um die Anwesenheit im Umkreis der Musikschule zu berechnen, und werden zu keinem Zeitpunkt dauerhaft auf Servern des Anbieters gespeichert oder als Bewegungsprofil aufgezeichnet.</p>
+                    <p style={{ margin: '4px 0 0 0' }}><strong>2. Kamera- & QR-Scanner:</strong> Die Aktivierung der Gerätekamera dient rein dem lokalen QR-Scan. Es erfolgt keine Übertragung von Bild- oder Videodaten an Server.</p>
+                  </div>
 
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 4 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
-                <p style={{ margin: 0 }}><strong>1. Rollenverteilung:</strong> Die Parteien stimmen überein, dass der Kunde im Sinne des Art. 4 Nr. 7 DSGVO „Verantwortlicher“ für die Verarbeitung personenbezogener Daten der Endnutzer ist. Der Anbieter verarbeitet diese Daten ausschließlich im Auftrag und auf Weisung des Kunden als „Auftragsverarbeiter“ im Sinne des Art. 4 Nr. 8 DSGVO.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. AV-Vertrag:</strong> Die Einzelheiten der Datenverarbeitung werden in einer gesonderten Vereinbarung über die Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO geregelt, die bei Vertragsabschluss zwingend zu unterzeichnen ist.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Schülerdaten-Fragment-Prinzip (Privacy by Design):</strong> Der Anbieter betreibt die Softwarearchitektur so, dass identifizierende Klarnamen der Schüler physisch isoliert auf dem deutschen Host-System verarbeitet werden. Systembenachrichtigungen (z. B. Push-Mitteilungen) werden verschlüsselt und fragmentiert übertragen, sodass Dritte zu keinem Zeitpunkt Einblick in vollständige Klarnamen oder Unterrichtsinhalte erhalten.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>4. Lokaler Kommunikations-Workflow (Zero-Mail-Infrastruktur):</strong> Da der Anbieter zum Schutz personenbezogener Daten auf die Einbindung externer E-Mail-Versanddienstleister verzichtet, erfolgt der Versand administrativer Korrespondenzen (z. B. Benachrichtigungen an Eltern) lokal über das E-Mail-Programm des Kunden via mailto:-Protokoll, wodurch der Anbieter vollständig von der datenschutzrechtlichen Haftung für den Mail-Transport befreit ist.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>5. Anti-CLOUD-Act-Garantie:</strong> Der Anbieter garantiert dem Kunden vertraglich, dass sämtliche personenbezogenen Daten ausschließlich in zertifizierten Rechenzentren auf dem Staatsgebiet der Bundesrepublik Deutschland gespeichert und verarbeitet werden. Da der Anbieter ein rein deutsches Unternehmen ohne außereuropäische Muttergesellschaften ist, unterliegt die Infrastruktur weder direkt noch indirekt den Zugriffsbefugnissen von Drittstaaten-Behörden (z. B. über den US-amerikanischen CLOUD Act).</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>6. Ausschluss von Drittlandübermittlungen:</strong> Eine Übermittlung personenbezogener Daten in ein Drittland außerhalb der Europäischen Union (EU) bzw. des Europäischen Wirtschaftsraums (EWR) findet nicht statt. Der Einsatz von Subunternehmern mit Kooperationssitz oder Datenverarbeitung in einem Drittland ist für den Bereich der personenbezogenen Datenhaltung ausgeschlossen.</p>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 5 GEWÄHRLEISTUNG (MÄNGELHAFTUNG) & HAFTUNGSBEGRENZUNG</h4>
-                <p style={{ margin: 0 }}><strong>1. Display-Down-Zwangstimer & Gerätesensorik:</strong> Der integrierte Übe-Timer nutzt die Lagesensoren der Endgeräte (DeviceOrientation API). Zur Vermeidung von Frustration und Drucksituationen für Kinder gewährt das System eine 15-sekündige Toleranzzeit (Grace Period) bei Lageveränderungen. Eine Gewährleistung für die korrekte Funktion des Timers auf Endgeräten, deren physikalische Sensoren fehlerhaft kalibriert sind oder deren Betriebssystem die Sensorabfrage blockiert, ist ausgeschlossen.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit, die auf einer vorsätzlichen oder fahrlässigen Pflichtverletzung des Anbieters oder seiner Erfüllungsgehilfen beruhen. Für sonstige Schäden haftet der Anbieter nur bei Vorsatz oder grober Fahrlässigkeit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung einer wesentlichen Vertragspflicht (Kardinalpflicht). Die Haftung bei Verletzung einer Kardinalpflicht ist auf den vertragstypischen, bei Vertragsabschluss vorhersehbaren Schaden begrenzt. Die Haftung für entgangenen Gewinn, Betriebsunterbrechungsschäden oder sonstige mittelbare Schäden des Kunden ist ausgeschlossen.</p>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 6 VERFÜGBARKEIT & AUTOMATISIERTE SICHERHEITSSPERREN</h4>
-                <p style={{ margin: 0 }}><strong>1. Systemverfügbarkeit:</strong> Der Anbieter garantiert eine Verfügbarkeit der Software und Server-Infrastruktur von 99,0 % im Jahresmittel am Übergabepunkt.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Berechnungsgrundlage:</strong> Bei der Berechnung der Verfügbarkeit bleiben Zeiten außer Betracht, in denen die Software aufgrund von (a) angekündigten Wartungsarbeiten, (b) notwendigen unangekündigten Sicherheits-Updates zur Gefahrenabwehr, (c) höherer Gewalt oder (d) Störungen in der Netz-Infrastruktur des Kunden oder dessen Endnutzer nicht erreichbar ist.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Automatisierte IP-Sperren (Rate-Limiting):</strong> Zur Abwehr von Cyber-Angriffen verfügt das System über ein automatisiertes Rate-Limiting. Bei mehr als 5 fehlgeschlagenen Authentifizierungsversuchen innerhalb einer Minute auf der /qr/:token-Route wird die anfragende IP-Adresse vollautomatisch für 1 Stunde gesperrt. Derartige Sperren dienen der Datensicherheit, stellen keinen Mangel dar und begründen keinen Anspruch des Kunden auf Minderung oder Schadensersatz.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>4. Ausfall-Fallback & Aufrechterhaltung des Kernbetriebs:</strong> Da es sich bei der Software um ein rein komplementäres Zusatzsystem (Add-On) handelt, führt ein temporärer Ausfall der Software oder der Server-Infrastruktur zu keinerlei Stilllegung der betrieblichen Kernprozesse des Kunden. Für den Fall einer temporären Nichtverfügbarkeit ist der Kunde verpflichtet, seine bewährten, klassischen Kommunikations- und Organisationskanäle (z. B. telefonische Absprachen, manuelle Stundenplanerstellung, direkter E-Mail-Versand) eigenverantwortlich als Ausweichlösung fortzuführen.</p>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 7 GAMIFICATION-ELEMENTE & PÄDAGOGISCHE RECHTE</h4>
-                <p style={{ margin: 0 }}><strong>1. Pädagogische Motivationselemente:</strong> Die Software enthält spielerische Motivationselemente (XP-Punkte, Aktivitäts-Ringe, Streak-Flammen und Reaktivierungs-Quests).</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Keine Gewährleistung auf Spielstände:</strong> Der Kunde und die Endnutzer haben keinen rechtlichen Anspruch auf die ununterbrochene Speicherung oder fehlerfreie Wiederherstellung von Spielständen, virtuellen Auszeichnungen, historischen Übe-Streaks oder statistischen Scores.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Anpassungsrecht:</strong> Der Anbieter behält sich das Recht vor, die spielerischen Mechanismen, mathematischen Berechnungsformeln und grafischen Darstellungen der Gamification-Infrastruktur jederzeit zwecks pädagogischer Optimierung anzupassen.</p>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 8 NUTZUNGSRECHTE & LIZENZGEBÜHRENFREIHEIT</h4>
-                <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Anbieter räumt dem Kunden für die Laufzeit dieses Vertrages ein einfaches, nicht übertragbares, nicht unterlizensierbares und auf die Anzahl der gebuchten Schüler limitiertes Nutzungsrecht an der Software ein.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Lizenzgebührenfreiheit:</strong> Diese Einräumung des Nutzungsrechts erfolgt dauerhaft zu 100 % kostenlos und lizenzgebührenfrei. Das vom Kunden entrichtete Entgelt stellt zu keinem Zeitpunkt eine Lizenzgebühr für den Programmcode dar.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Modifikationsverbot:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zu dekompilieren, zurückzuentwickeln (Reverse Engineering) oder den Programmcode in irgendeiner Weise zu modifizieren. Sämtliche Urheber- und Leistungsschutzrechte an der Software verbleiben beim Anbieter.</p>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 9 VERTRAGSLAUFZEIT, PREISE, ZAHLUNGSBEDINGUNGEN & KÜNDIGUNG</h4>
-                <p style={{ margin: 0 }}><strong>1. Laufzeit gekoppelt an das Schuljahr:</strong> Das Vertragsverhältnis über die Server- & Servicebereitstellung ist fest an den Zyklus des Schuljahres (September bis August des Folgejahres) gebunden. Die Mindestlaufzeit beträgt ein volles Schuljahr (bzw. bei unterjährigem Einstieg die verbleibende Laufzeit bis zum nächsten 31. August).</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Automatische Verlängerung:</strong> Der Vertrag verlängert sich automatisch um ein weiteres Schuljahr (12 Monate bis zum 31. August des Folgejahres), sofern er nicht mit einer Frist von 1 Monat zum Schuljahresende (d. h. spätestens bis zum 31. Juli) gekündigt wird.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Preise & Kleinunternehmerregelung:</strong> Alle angegebenen Server- & Servicegebühren sind Endpreise. Da der Anbieter als Kleinunternehmer agiert, wird gemäß § 19 UStG keine Umsatzsteuer berechnet oder ausgewiesen.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>4. Rechnungsstellung & Zahlungsfrist:</strong> Die Abrechnung der Server- & Servicegebühren erfolgt monatlich zum Monatsende. Rechnungen werden in elektronischer Form per E-Mail an die vom Kunden hinterlegte E-Mail-Adresse zugestellt. Der Rechnungsbetrag ist innerhalb von 14 Tagen nach Rechnungserhalt per manueller Banküberweisung auf das Geschäftskonto des Anbieters zu zahlen.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>5. Außerordentliche Kündigung:</strong> Das Recht zur außerordentlichen Kündigung aus wichtigem Grund (§ 543 BGB) bleibt unberührt. Ein wichtiger Grund für den Anbieter liegt insbesondere vor, wenn der Kunde mit der Zahlung der Server- & Servicegebühren für zwei aufeinanderfolgende Monate in Verzug gerät.</p>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>§ 10 GERICHTSSTAND & SCHLUSSBESTIMMUNGEN</h4>
-                <p style={{ margin: 0 }}><strong>1. Rechtswahl:</strong> Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts.</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>2. Gerichtsstand:</strong> Ausschließlicher Gerichtsstand für alle Streitigkeiten aus oder im Zusammenhang mit diesem Vertrag ist der Geschäftssitz des Anbieters (Rheinfelden).</p>
-                <p style={{ margin: '8px 0 0 0' }}><strong>3. Salvatorische Klausel:</strong> Sollten einzelne Bestimmungen dieses Vertrages unwirksam oder undurchführbar sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen davon unberührt. Die Parteien verpflichten sich, die unwirksame Bestimmung durch eine wirksame Regelung zu ersetzen, die dem wirtschaftlichen und rechtlichen Zweck der unwirksamen Bestimmung am nächsten kommt.</p>
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 14 AVATAR-ANZEIGEREGELN</h4>
+                    <p style={{ margin: 0 }}><strong>1. Musiker-Avatare:</strong> Schüler und Lehrer im GrooveLab-Modul erhalten Zugriff auf spielerische Musiker-Avatare (im GrooveLab-Modul als Standard der Geist-Avatar). Administrations- und Sekretariatsprofile (Rollen `admin` and `secretary`) dürfen keine spielerischen Avatare nutzen; sie verwenden systemweit das neutrale Schultafel-Profilbild (`/campus_login_hero.png`).</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -27303,7 +27914,7 @@ status: status,
 
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>5. Hosting & Datenbank-Infrastruktur</h4>
-                <p style={{ margin: 0 }}>Campus-Groovelab wird auf Servern in Deutschland gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) betrieben. Mit diesem Dienstleister wird ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) abgeschlossen (derzeit in Zeichnung), um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
+                <p style={{ margin: 0 }}>Campus-Groovelab wird zu 100% auf Servern in Deutschland (Hetzner Falkenstein) gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) am Standort Falkenstein betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
             </div>
           </div>
@@ -27350,6 +27961,18 @@ status: status,
       {/* Modal: QR Code anzeigen */}
       {showOwnQrModal && currentUserProfile && (
         <QRCodeModal user={currentUserProfile} activePlatform="campus" onClose={() => setShowOwnQrModal(false)} />
+      )}
+      {showPilotAgreementModalFromDashboard && userId && (
+        <PilotOnboardingModal
+          schoolId={schoolId}
+          userId={userId}
+          onComplete={() => {
+            setShowPilotAgreementModalFromDashboard(false);
+            fetchDashboardData();
+          }}
+          onShowPrivacy={() => setShowPrivacy(true)}
+          onShowAgb={() => setShowAgb(true)}
+        />
       )}
     </div>
   </div>

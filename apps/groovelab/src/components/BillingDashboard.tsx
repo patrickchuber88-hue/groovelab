@@ -105,7 +105,7 @@ export function BillingDashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedSchoolId, setExpandedSchoolId] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<any>(null);
-  const [operatorCompany, setOperatorCompany] = useState('Simplified Work GbR');
+  const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
   const [operatorContact, setOperatorContact] = useState('Patrick Huber');
   const [operatorStreet, setOperatorStreet] = useState('Karl-Fürstenberg-Str. 59');
   const [operatorZip, setOperatorZip] = useState('79618');

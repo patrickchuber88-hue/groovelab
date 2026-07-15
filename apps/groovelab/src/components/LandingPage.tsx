@@ -1612,6 +1612,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>Zielgruppen</span>
             <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('usps')}>Features</span>
             <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('pricing')}>Preise</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('terms')}>AGB</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('privacy')}>Datenschutz</span>
+            <span style={{ cursor: 'pointer', fontWeight: 700 }} onClick={() => setActiveDocument('impressum' as any)}>Impressum</span>
           </div>
         </div>
       </footer>
@@ -1636,8 +1639,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             background: '#ffffff',
             borderRadius: '32px',
             width: '100%',
-            maxWidth: '640px',
-            maxHeight: '80vh',
+            maxWidth: '700px',
+            maxHeight: '85vh',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             display: 'flex',
             flexDirection: 'column',
@@ -1657,7 +1660,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                  {activeDocument === 'terms' ? '📜 Nutzungsbedingungen (AGB)' : '🛡️ Datenschutzerklärung'}
+                  {activeDocument === 'terms' ? '📜 Allgemeine Geschäftsbedingungen (AGB)' : activeDocument === 'privacy' ? '🛡️ Datenschutzerklärung (DSGVO & COPPA)' : '🏛️ Impressum'}
                 </h3>
                 <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Campus-Groovelab Plattform
@@ -1682,7 +1685,6 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 &times;
               </button>
             </div>
-
             {/* Modal Content */}
             <div style={{
               padding: '32px',
@@ -1695,31 +1697,183 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               {activeDocument === 'terms' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>1. Geltungsbereich & Dienste</h4>
-                    <p style={{ margin: 0 }}>Diese Nutzungsbedingungen regeln die Bereitstellung und Verwendung der Webanwendung Campus-Groovelab. Durch das Erstellen eines Profils erklären Sie sich mit diesen Bedingungen einverstanden.</p>
+                    <p style={{ margin: 0, fontWeight: 700 }}>Vertragspartner und Anbieter:</p>
+                    <p style={{ margin: '4px 0 0 0' }}>Patrick Huber (Einzelunternehmer), Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                      <strong>Geltungsbereich:</strong> Ausschließlich für den unternehmerischen Geschäftsverkehr (B2B)<br/>
+                      <strong>Stand und Gültigkeit:</strong> August 2026
+                    </p>
+                  </div>
+
+                  {/* TEIL A */}
+                  <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL A: Allgemeine Nutzungsbedingungen (Gilt für alle Module)</h3>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Dieser Teil regelt die grundlegenden rechtlichen Bedingungen für die Nutzung der Plattform Campus-Groovelab und gilt unabhängig von den gebuchten Modulen.</p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>📋 PRÄAMBEL</h4>
+                        <p style={{ margin: 0 }}>Der Anbieter betreibt und vertreibt die mandantenfähige, cloudbasierte Software-as-a-Service (SaaS)-Plattform „Campus-Groovelab“ (bestehend aus den Modulen „Campus“ und „GrooveLab“, nachfolgend einheitlich „Software“). Die Software dient als integriertes, digitales Zusatz- und Kommunikationssystem (Add-On) für Musikschulen zur Optimierung des Lehrbetriebs.</p>
+                        <p style={{ margin: '4px 0 0 0' }}>Die Software-Lizenz selbst wird dem Kunden dauerhaft zu 100 % kostenlos und lizenzgebührenfrei zur Verfügung gestellt. Der Kunde entrichtet das vertraglich vereinbarte Entgelt ausschließlich für den Server-Betrieb, das Hosting sowie Service- und Supportleistungen (nachfolgend „Server- & Servicegebühren“) durch den Anbieter.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>Souveränitäts-Versprechen:</strong> Die Bereitstellung erfolgt über zertifizierte, deutsche Server (Hetzner Online GmbH, Standort Falkenstein). Der Anbieter garantiert, dass keine außereuropäische Cloud-Infrastrukturen (wie AWS, Azure oder Google Cloud) zur Kern-Datenhaltung verwendet werden.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 1 VERTRAGSGEGENSTAND, LEISTUNGSUMFANG & ÜBERGABEPUNKT</h4>
+                        <p style={{ margin: 0 }}><strong>1. Vertragsgegenstand:</strong> Gegenstand ist die Bereitstellung der Software zur Nutzung über das Internet im Wege des SaaS-Modells. Die Vergütung versteht sich als reines Infrastruktur- und Serviceentgelt. Das Verhältnis qualifiziert sich rechtlich als gemischter Miet- und Dienstleistungsvertrag (§§ 535 ff., 611 BGB).</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Modulbezug:</strong> Der konkrete Leistungsumfang ist modulbezogen und beschränkt sich auf die vom Kunden jeweils separat gebuchten Systembestandteile (Modul „Campus“, Modul „GrooveLab“ oder Kombi-Paket).</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>3. Übergabepunkt:</strong> Der Übergabepunkt ist der Ausgang des Rechenzentrums. Für die Internetanbindung und Endgeräte ist der Kunde selbst verantwortlich.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>4. Add-On-Status:</strong> Die Software ersetzt nicht das primäre Verwaltungs- und ERP-System (z. B. iMikel) des Kunden. Der Kunde bleibt verpflichtet, grundlegende Verwaltungsakte, Abrechnung und finale Stundenpläne im führenden ERP-System zu pflegen.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 2 AUTHENTIFIZIERUNG, DIEBSTAHLSCHUTZ & DEVICE-PAIRING</h4>
+                        <p style={{ margin: 0 }}><strong>1. QR-Code-Login:</strong> Der Zugang erfolgt passwortlos über eindeutige QR-Codes. Der Kunde verpflichtet sich, Mitarbeiter im sorgsamen Umgang mit den Codes zu schulen.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Anti-Theft Device-Pairing (PIN-Schranke):</strong> Um unbefugten Zugriff bei physischem QR-Verlust zu verhindern, fordert das System auf neuen Geräten einmalig ein schülerbezogenes Sicherheitsmerkmal (PIN) an, bevor das Endgerät registriert wird.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 3 DATENSCHUTZ UND GEHEIMHALTUNG (DSGVO)</h4>
+                        <p style={{ margin: 0 }}><strong>1. Rollen:</strong> Der Kunde ist „Verantwortlicher“ (Art. 4 Nr. 7 DSGVO), der Anbieter ist „Auftragsverarbeiter“ (Art. 4 Nr. 8 DSGVO). Die Details regelt ein gesonderter AV-Vertrag (AVV) nach Art. 28 DSGVO.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Zero-Mail & Anti-CLOUD-Act:</strong> Administrative Benachrichtigungen erfolgen lokal via `mailto:` ohne externe E-Mail-Dienstleister. Da der Anbieter ein deutsches Unternehmen ohne US-Muttergesellschaft ist, besteht Schutz vor dem US-amerikanischen CLOUD Act.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 4 HAFTUNG & GEWÄHRLEISTUNG</h4>
+                        <p style={{ margin: 0 }}><strong>1. Gesetzliche Haftungsschranken:</strong> Der Anbieter haftet unbeschränkt für Vorsatz, grobe Fahrlässigkeit sowie Verletzung von Leben, Körper oder Gesundheit. Bei einfacher Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten), begrenzt auf vertragstypisch vorhersehbare Schäden.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schenkungshaftung (§ 599 BGB):</strong> Da die Softwarelizenzierung vollständig unentgeltlich erfolgt, haftet der Anbieter für Mängel der Software selbst (mit Ausnahme von kostenpflichtigen Server- und Verbindungsleistungen gemäß § 7) nur für Vorsatz und grobe Fahrlässigkeit.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 5 SYSTEMVERFÜGBARKEIT & RATE-LIMITING</h4>
+                        <p style={{ margin: 0 }}><strong>1. Verfügbarkeit:</strong> Der Anbieter gewährleistet 99,0 % Systemverfügbarkeit im Jahresmittel am Übergabepunkt. Ausgenommen sind angekündigte Wartungsfenster und Ausfälle durch höhere Gewalt.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Rate-Limiting:</strong> Zum Schutz vor Cyberangriffen (DDoS, Bruteforce) blockiert das System auffällige IP-Adressen temporär. Diese Sperren dienen der Datensicherheit und stellen keinen Mangel dar.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 6 LIZENZGEBÜHRENFREIHEIT & NUTZUNGSRECHTE</h4>
+                        <p style={{ margin: 0 }}><strong>1. Nutzungsrechte:</strong> Der Kunde erhält ein einfaches, nicht übertragbares, zeitlich auf die Vertragslaufzeit beschränktes Nutzungsrecht an der Software.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Schutzrechte:</strong> Dem Kunden ist es untersagt, die Software zu kopieren, zurückzuentwickeln (Reverse Engineering) oder zu modifizieren.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 7 VERTRAGSLAUFZEIT, PREISE &amp; KÜNDIGUNG</h4>
+                        <p style={{ margin: 0 }}><strong>1. Schuljahres-Kopplung &amp; Kündigung:</strong> Die Vertragslaufzeit für den Serverbetrieb orientiert sich am Schuljahr (Kündigungsfrist 1 Monat zum 31. August). Ohne Kündigung verlängert sich die Laufzeit automatisch um ein weiteres Schuljahr.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Kostenlose Software-Lizenz:</strong> Die Bereitstellung der Basis-Softwarelizenz von Campus-Groovelab ist dauerhaft 100 % kostenlos. Der Kunde entrichtet Entgelte ausschließlich für Server-Hosting, gebuchte Zusatzmodule, Teammitglieder-Zusatzlizenzen und aktive Schüler-Freischaltungen.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>3. Modulpreise &amp; Kombi-Vorteil:</strong> Die monatliche Server-Hosting-Pauschale pro Musikschule beträgt für das Modul „Campus“ 7,99 € und für das Modul „GrooveLab“ 4,99 €. Werden beide Module gebucht, gilt der Kombi-Vorteil von 9,99 € (Ersparnis von 2,99 €/Monat). Administrations- und Sekretariats-Nutzer sind inklusive. Jede aktive Lehrkraft bzw. jeder Verwaltungs-Mitarbeiter wird mit 0,49 €/Monat berechnet.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>4. Schüleraktivierungs-Modelle (Campus-Modul):</strong> Für Schülerfreischaltungen stehen zwei Zahlungswege zur Verfügung:
+                          <br />a) <em>Sammelzahler (Schule trägt Kosten):</em> Abrechnung über die Musikschule mit 0,49 €/Monat je aktivem Schüler. Bei Nicht-Nutzung von über 2 Monaten erfolgt eine automatische Inaktivierung zur Kostenvermeidung. Alternativ wird ein Jahresbeitrag bei Aktivierung mit 10 % Rabatt oder eine Einmal-Aktivierung zum Schuljahresstart im September mit 20 % Rabatt angeboten.
+                          <br />b) <em>Direktabrechnung (Eltern/Schüler zahlen):</em> Die Abrechnung erfolgt direkt mit den Eltern/Schülern (0,49 €/Monat bzw. 5,88 € Jahresbeitrag) oder teilsubventioniert (Eltern zahlen 0,40 €/Monat, Schule trägt 0,09 €/Monat). Härtefälle/Geschwisterrabatte können von der Schule manuell befreit werden.
+                          <br /><em>Hinweis:</em> GrooveLab-Schülerfreischaltungen werden immer vollumfänglich von der Musikschule getragen (keine Direktabrechnung mit Eltern).
+                        </p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>5. Schüler-Deaktivierung:</strong> Bei monatlicher Abrechnung entfällt die Gebühr ab dem Folgemonat der Deaktivierung. Bei jährlicher Vorauszahlung verbleiben das Profil und alle Funktionen bis zum Ende des laufenden Schuljahres aktiv und erlöschen erst zum Schuljahreswechsel.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>6. Rechnungsstellung:</strong> Die Server- und Servicegebühren werden monatlich zum Monatsende fällig. Der Anbieter wendet die Kleinunternehmerregelung (§ 19 UStG) an, es wird keine Umsatzsteuer ausgewiesen.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#1e293b' }}>§ 8 GERICHTSSTAND & SALVATORISCHE KLAUSEL</h4>
+                        <p style={{ margin: 0 }}>Es gilt deutsches Recht. Ausschließlicher Gerichtsstand ist Rheinfelden. Sollten Bestimmungen unwirksam sein, bleibt der restliche Vertrag in Kraft.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TEIL B */}
+                  <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL B: Besondere Bedingungen für das Modul „Campus“</h3>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das Campus-Modul gebucht ist.</p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 9 LEISTUNGSUMFANG CAMPUS</h4>
+                        <p style={{ margin: 0 }}>Das Campus-Modul umfasst das digitale Hausaufgabenheft mit Übungsstreaks, das Meisterwerk-Protokoll, die Audio-Loopstation, den Stundenplan-Designer sowie die interne Schul- und Raumbelegungs-Engine.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>1. Übe-Timer & Sensorik:</strong> Der Fokus-Timer wertet die Lagesensoren (DeviceOrientation API) aus. Das System gewährt eine 10-sekündige Toleranzzeit (Grace Period), die erst nach Ablauf der Fokus-Minuten greift. Gewährleistung für Timer-Fehlfunktionen durch inkompatible oder falsch kalibrierte Sensoren ist ausgeschlossen.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Audio-Loopstation:</strong> Die Loopstation verwendet ein 4-Takte-Pause-Verfahren (Variante 1) zur Sicherstellung der Sample-Synchronität und Vermeidung von Signal-Verschluckungen.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 10 SCHNITTSTELLEN & KALENDER-EXPORT</h4>
+                        <p style={{ margin: 0 }}><strong>1. CSV-Import:</strong> Datenimporte aus ERP-Systemen (z. B. iMikel) erfolgen über Copy-and-Paste eines CSV-Textstroms. Bei Import-Formatfehlern bricht das System die Transaktion automatisch ohne Datenverlust ab (Rollback).</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. iCal-Kalender-Kopplung:</strong> Exporte von Kalenderdaten im .ics-Format pseudonymisieren Schülernamen (z. B. „Jonas M.“ statt „Jonas Müller“) zur Einhaltung des Datenschutzes. Für Aktualisierungsverzögerungen externer Kalender-Clients haftet der Anbieter nicht.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
+                        <p style={{ margin: 0 }}><strong>1. Namensmaskierung:</strong> Schülernamen werden im Lehrer-Dashboard auf „Vorname + Anfangsbuchstabe Nachname“ und im Schüler-Dashboard auf generische Begriffe (z. B. „Hausaufgabenheft“) begrenzt.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (analog dem Netflix-Prinzip) im Campus-Modul gestattet.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TEIL C */}
+                  <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#a16207', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL C: Besondere Bedingungen für das Modul „GrooveLab“</h3>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das GrooveLab-Modul gebucht ist.</p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 12 LEISTUNGSUMFANG GROOVELAB</h4>
+                        <p style={{ margin: 0 }}>Das GrooveLab-Modul umfasst die Bandgründung und Band-Mitgliederverwaltung, die Song-Bibliotheken, den Repertoire-Planer, das Skill-Radar, Musiker- und Band-Avatare sowie das Live Lab Echtzeit-Bandmodul.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 13 STANDORTERMITTLUNG (GEOFENCING) & HARDWARE-ZUGRIFF</h4>
+                        <p style={{ margin: 0 }}><strong>1. Lokales Geofencing im Live Lab:</strong> Die Verifikation der Anwesenheit vor Ort zur Echtzeit-Bandkoordination erfolgt über die Standortfreigabe (GPS) des Webbrowsers. Diese Daten werden ausschließlich lokal im Browser verarbeitet, um die Anwesenheit im Umkreis der Musikschule zu berechnen, und werden zu keinem Zeitpunkt dauerhaft auf Servern des Anbieters gespeichert oder als Bewegungsprofil aufgezeichnet.</p>
+                        <p style={{ margin: '4px 0 0 0' }}><strong>2. Kamera- & QR-Scanner:</strong> Die Aktivierung der Gerätekamera dient rein dem lokalen QR-Scan. Es erfolgt keine Übertragung von Bild- oder Videodaten an Server.</p>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                        <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#a16207' }}>§ 14 AVATAR-ANZEIGEREGELN</h4>
+                        <p style={{ margin: 0 }}><strong>1. Musiker-Avatare:</strong> Schüler und Lehrer im GrooveLab-Modul erhalten Zugriff auf spielerische Musiker-Avatare (im GrooveLab-Modul als Standard der Geist-Avatar). Administrations- und Sekretariatsprofile (Rollen <code>admin</code> und <code>secretary</code>) dürfen keine spielerischen Avatare nutzen; sie verwenden systemweit das neutrale Schultafel-Profilbild (<code>/campus_login_hero.png</code>).</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : activeDocument === 'privacy' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>1. Grundlagen der DSGVO &amp; COPPA-Konformität</h4>
+                    <p style={{ margin: 0 }}>Als deutscher Betreiber stellen wir den Schutz personenbezogener Daten von Minderjährigen in den Mittelpunkt. Unsere Software basiert auf strikter Datenminimierung: Es werden keine Bankdaten, SEPA-Mandate, Vertragsdaten oder E-Mail-Adressen von Schülern erhoben oder auf unseren Systemen verarbeitet.</p>
+                    <p style={{ margin: '8px 0 0 0' }}>Für die Bereitstellung der Übungs- und Klassenzimmerplattform „GrooveLab“ werden ausschließlich der Vorname, der Anfangsbuchstabe des Nachnamens, das Instrument, erspielte XP-Punkte, Songs, das Band-Matching sowie das Band-Repertoire verarbeitet. Zur Gewährleistung eines Höchstmaßes an Sicherheit werden die Vornamen im System explizit verschlüsselt gespeichert.</p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>2. Kostenfreie Basis-Softwarelizenz</h4>
-                    <p style={{ margin: 0 }}>Die Basis-Softwarelizenz der Plattform Campus-Groovelab ist dauerhaft 100% kostenlos. Für Hosting-Infrastruktur, zusätzliche Teammitglieder oder Schüleraktivierungen können zusätzliche variable oder fixe Tarife gemäß Preisliste anfallen.</p>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>2. Symmetrische Verschlüsselung & E-Mail-Vermeidung (Art. 32 DSGVO)</h4>
+                    <p style={{ margin: 0 }}>Zur Gewährleistung der Vertraulichkeit werden Schülervornamen in der SQL-Datenbank symmetrisch mittels PGP verschlüsselt gespeichert (<code>pgp_sym_encrypt</code>). Plaintext-E-Mails von Schülern sind vollständig eliminiert. Um den absoluten Datenschutzstandard für Schulsoftware einzuhalten, werden derzeit keinerlei E-Mail-Adressen von Erziehungsberechtigten erhoben oder verarbeitet. Sollte zu einem späteren Zeitpunkt eine E-Mail-Kommunikation mit Erziehungsberechtigten eingeführt werden, wird diese kryptografisch streng getrennt: Nur die anonyme Domain-Endung (z.B. <code>@gmail.com</code>) wird für statistische Zwecke im Klartext vorgehalten, während die eigentliche Adresse getrennt und verschlüsselt geschützt wird.</p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>3. Gewährleistung und Haftung</h4>
-                    <p style={{ margin: 0 }}>Der Plattform-Betreiber bemüht sich um eine kontinuierliche Verfügbarkeit der Web-App. Die Nutzung erfolgt auf eigene Gefahr. Für Datenverluste oder Ausfälle wird keine Haftung übernommen, es sei denn, es liegt grobe Fahrlässigkeit vor.</p>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>3. Server-Standort Deutschland und Auftragsverarbeitung (AVV)</h4>
+                    <p style={{ margin: 0 }}>Sämtliche Datenverarbeitungsprozesse finden auf ISO 27001 zertifizierten und nach BSI C5 Typ 2 geprüften dedizierten Infrastrukturen unseres Vertragspartners Hetzner Online GmbH statt. Der Serverstandort liegt zu 100% in Deutschland (Falkenstein/Sachsen). Ein datenschutzkonformer AVV gem. Art. 28 DSGVO liegt vor.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>4. Hardware-Sicherheit und Audio-Uploads</h4>
+                    <p style={{ margin: 0 }}>Kamera- und Mikrofonzugriffe dienen ausschließlich lokalen Anwendungsfunktionen (QR-Login, Einspielen von Übe-Protokollen) und werden beim Schließen des jeweiligen Moduls sofort physisch freigegeben. Audio-Aufnahmen werden verschlüsselt an ein geschütztes Supabase Storage-Bucket übermittelt und bei Löschung durch den Benutzer physisch und unwiderruflich vom Datenträger entfernt.</p>
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>5. Betroffenenrechte & Auskunft</h4>
+                    <p style={{ margin: 0 }}>Lizenznehmer und Erziehungsberechtigte können jederzeit unentgeltlich Auskunft, Berichtigung, Sperrung oder vollständige Löschung der dem Profil zugeordneten Fortschrittsdaten verlangen.</p>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>1. Erhebung und Speicherung personenbezogener Daten</h4>
-                    <p style={{ margin: 0 }}>Wir erheben Ihre E-Mail-Adresse zum Zweck der Systemregistrierung. Personenbezogene Profildaten von Schülern (Name, Vorname, Geburtsdatum) werden zur Bereitstellung der Stundenplan- und Homework-Funktionen verwendet. Vornamen werden verschlüsselt in der Datenbank abgelegt.</p>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Angaben gemäß § 5 TMG</h4>
+                    <p style={{ margin: 0 }}>
+                      Patrick Huber<br />
+                      Karl-Fürstenberg Str. 59<br />
+                      79618 Rheinfelden<br />
+                      Deutschland
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>2. Lokale Kamera-Verarbeitung</h4>
-                    <p style={{ margin: 0 }}>Das Einscannen der QR-Ausweise geschieht vollständig lokal in Ihrem Webbrowser. Videodaten, Einzelbilder oder biometrische Merkmale werden zu keinem Zeitpunkt an externe Server übertragen oder dort dauerhaft gespeichert.</p>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Kontakt</h4>
+                    <p style={{ margin: 0 }}>
+                      E-Mail: patrick.huber@musaek.de
+                    </p>
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>3. Auskunftsrecht & Löschung</h4>
-                    <p style={{ margin: 0 }}>Sie haben jederzeit das Recht, unentgeltlich Auskunft über Herkunft, Empfänger und Zweck Ihrer gespeicherten personenbezogenen Daten zu erhalten. Sie haben außerdem ein Recht, die Berichtigung oder Löschung dieser Daten zu verlangen.</p>
+                    <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontWeight: 800 }}>Haftungsausschluss (Disclaimer)</h4>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                      Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen. Bei Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.
+                    </p>
                   </div>
                 </div>
               )}
@@ -1890,8 +2044,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                     desc: 'Auf gemeinsam genutzten Geräten in den Unterrichtsräumen (Lab-Modus) meldet die App inaktive Nutzer nach 20 Minuten automatisch ab (inkl. 30s Warn-Countdown), um unbefugten Zugriff Dritter zu verhindern.'
                   },
                   {
-                    title: '12. Server-Standort Deutschland (ISO 27001)',
-                    desc: 'Das Hosting erfolgt ausschließlich in nach ISO 27001 zertifizierten Hochsicherheits-Rechenzentren in Deutschland (Falkenstein/Sachsen) – kein US-Schrems-II-Haftungsrisiko.'
+                    title: '12. Server-Standort 100% in Deutschland (ISO 27001)',
+                    desc: 'Das Hosting erfolgt ausschließlich in nach ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der Hetzner Online GmbH in Deutschland (Standort Falkenstein/Sachsen) – somit besteht keinerlei US-Haftungsrisiko.'
                   },
                   {
                     title: '13. Modul-Kapselung & QR-Sperre vor Ort (Schulbetrieb)',

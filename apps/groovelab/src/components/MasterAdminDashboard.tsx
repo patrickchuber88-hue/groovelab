@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
-  Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
+  Shield, ShieldCheck, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
   Edit2, Settings, Sliders, Search, Tag, Percent,
   Activity, Cpu, Database, AlertTriangle, QrCode, UserPlus, Key, Eye, EyeOff,
@@ -154,7 +154,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [newOfferActive, setNewOfferActive] = useState(true);
 
   // Master Billing Settings State
-  const [billingCompany, setBillingCompany] = useState('Simplified Work GbR');
+  const [billingCompany, setBillingCompany] = useState('Patrick Huber (Einzelunternehmer)');
   const [billingContact, setBillingContact] = useState('Patrick Huber');
   const [billingStreet, setBillingStreet] = useState('Karl-Fürstenberg-Str. 59');
   const [billingZip, setBillingZip] = useState('79618');
@@ -2902,7 +2902,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         type="text"
                         value={billingCompany}
                         onChange={(e) => setBillingCompany(e.target.value)}
-                        placeholder="z.B. Simplified Work GbR"
+                        placeholder="z.B. Patrick Huber (Einzelunternehmer)"
                         required
                         style={{
                           width: '100%',
@@ -3441,6 +3441,80 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               >
                                 {copiedId === school.id ? <Check size={11} /> : <Copy size={11} />}
                                 <span>{copiedId === school.id ? 'Kopiert' : 'Link'}</span>
+                              </button>
+
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    const { data: records, error } = await supabase
+                                      .from('pilot_agreements')
+                                      .select('*, users(first_name, last_name, email)')
+                                      .eq('school_id', school.id);
+                                    
+                                    if (error) throw error;
+                                    if (!records || records.length === 0) {
+                                      alert('Für diese Schule liegt noch keine unterzeichnete Pilot-Vereinbarung vor.');
+                                      return;
+                                    }
+
+                                    const agreement = records[0];
+                                    const signee = agreement.users;
+                                    const proofText = `PILOT-VEREINBARUNG & AVV BEWEISDOKUMENT
+
+============================================================
+SCHUL-DETAILS:
+Schul-ID: ${school.id}
+Schul-Name: ${school.name}
+============================================================
+UNTERZEICHNER-DETAILS:
+Vorname: ${signee?.first_name || 'N/A'}
+Nachname: ${signee?.last_name || 'N/A'}
+E-Mail: ${signee?.email || 'N/A'}
+User-ID: ${agreement.user_id}
+============================================================
+SIGNATUR-METADATEN:
+Signiert am: ${new Date(agreement.signed_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} (Europe/Berlin)
+IP-Adresse: ${agreement.ip_address} (anonymisiert)
+User-Agent: ${agreement.user_agent}
+Signatur-ID: ${agreement.id}
+============================================================
+
+Dieses Dokument dient als Nachweis für den Abschluss der unentgeltlichen
+Pilotphase-Vereinbarung und des Auftragsverarbeitungsvertrags (AVV)
+gemäß Art. 28 DSGVO.`;
+
+                                    const blob = new Blob([proofText], { type: 'text/plain;charset=utf-8' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `Beweis_Pilotvertrag_${school.name.replace(/\s+/g, '_')}.txt`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                  } catch (err: any) {
+                                    alert('Fehler beim Laden des Beweismaterials: ' + err.message);
+                                  }
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '100px',
+                                  background: '#e6f4ea',
+                                  border: '1px solid #a7f3d0',
+                                  color: '#137333',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s'
+                                }}
+                                className="hover-scale-mini"
+                                title="Pilot-Vertrag Beweisdokument herunterladen"
+                              >
+                                <ShieldCheck size={11} />
+                                <span>Beweis</span>
                               </button>
 
                               <button

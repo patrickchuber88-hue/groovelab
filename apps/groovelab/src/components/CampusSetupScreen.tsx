@@ -32,7 +32,7 @@ export function CampusSetupScreen({
   const sId = effectiveSchool?.id || admin?.school_id;
 
   const [isSaving, setIsSaving] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'calendar' | 'communication' | 'gamification'>('calendar');
+  const [settingsTab, setSettingsTab] = useState<'calendar' | 'communication' | 'gamification' | 'datenschutz'>('calendar');
   const [initialConfig, setInitialConfig] = useState<any>(null);
 
   // --- States for Settings ---
@@ -212,7 +212,8 @@ export function CampusSetupScreen({
           {[
             { id: 'calendar', label: 'Stundenplan & Kalender' },
             { id: 'communication', label: 'Kommunikation' },
-            { id: 'gamification', label: 'Motivation & Spiel' }
+            { id: 'gamification', label: 'Motivation & Spiel' },
+            { id: 'datenschutz', label: 'Datenschutz & AVV' }
           ].map((item) => {
             const isSelected = settingsTab === item.id;
             const activeColor = isSelected ? brandColor : '#64748b';
@@ -222,6 +223,7 @@ export function CampusSetupScreen({
                 case 'calendar': return <Clock size={14} color={activeColor} />;
                 case 'communication': return <MessageSquare size={14} color={activeColor} />;
                 case 'gamification': return <Award size={14} color={activeColor} />;
+                case 'datenschutz': return <Users size={14} color={activeColor} />;
                 default: return null;
               }
             };
@@ -373,6 +375,125 @@ export function CampusSetupScreen({
                   setShowDetailedStats,
                   <Clock size={18} />
                 )}
+              </div>
+            </div>
+          )}
+
+          {settingsTab === 'datenschutz' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Datenschutz &amp; Rechtliches</h3>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>AVV-Status einsehen und Unterlagen zur Schüler-Einwilligung herunterladen.</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ 
+                  background: '#f8fafc', 
+                  border: '1px solid #e2e8f0', 
+                  borderRadius: '16px', 
+                  padding: '16px', 
+                  fontSize: '0.8rem',
+                  lineHeight: '1.5',
+                  color: '#475569'
+                }}>
+                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b', fontSize: '0.88rem' }}>Rechtssicherer Pilotbetrieb</strong>
+                  Um den gesetzlichen Anforderungen an Schulsoftware gerecht zu werden, müssen vor dem Eintragen von Schülernamen (nur Vorname + erster Buchstabe Nachname) die Einverständniserklärungen der Erziehungsberechtigten vorliegen. Nutze dafür unser vorbereitetes Infoblatt.
+                </div>
+
+                {/* Download Card */}
+                <div style={{ 
+                  background: '#fefce8', 
+                  border: '1px solid #fef08a', 
+                  borderRadius: '16px', 
+                  padding: '16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ fontSize: '0.84rem', color: '#854d0e', display: 'block', marginBottom: '2px' }}>Eltern-Information &amp; Einwilligung (Vorlage)</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#a16207', display: 'block' }}>Rechtssichere Vorlage als Textdatei zum Ausdrucken oder Versenden.</span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const hasCampus = effectiveSchool?.has_campus_subscription ?? false;
+                      const hasGroove = effectiveSchool?.has_groovelab_subscription ?? false;
+                      
+                      const isGrooveOnly = !hasCampus && hasGroove;
+                      const isCampusOnly = hasCampus && !hasGroove;
+
+                      let appName = 'Campus-Groovelab';
+                      let subjectPhrase = 'Instrumental- und Groovelab-Unterrichts';
+                      if (isGrooveOnly) {
+                        appName = 'GrooveLab';
+                        subjectPhrase = 'Groovelab-Unterrichts';
+                      } else if (isCampusOnly) {
+                        appName = 'Campus';
+                        subjectPhrase = 'Instrumentalunterrichts';
+                      }
+
+                      const filename = isGrooveOnly 
+                        ? 'Eltern_Information_Einwilligung_Groovelab.txt' 
+                        : isCampusOnly
+                          ? 'Eltern_Information_Einwilligung_Campus.txt'
+                          : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
+
+                      const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR ERPROBUNG DER LERN-APP ${appName.toUpperCase()}
+
+Sehr geehrte Eltern, liebe Erziehungsberechtigte,
+
+im Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).
+
+DATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:
+- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos.
+- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.
+- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.
+- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH) statt.
+- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.
+
+Mit der Teilnahme an der Pilotphase willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.
+
+Vielen Dank für Ihre Unterstützung!`;
+                      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = filename;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                    }}
+                    style={{ 
+                      padding: '8px 16px',
+                      background: '#eab308',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(234, 179, 8, 0.2)',
+                      transition: 'transform 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    Download
+                  </button>
+                </div>
+
+                <div style={{ 
+                  background: '#e6f4ea', 
+                  border: '1px solid #a7f3d0', 
+                  borderRadius: '16px', 
+                  padding: '16px', 
+                  fontSize: '0.76rem',
+                  color: '#137333',
+                  lineHeight: '1.45'
+                }}>
+                  <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#137333' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong>
+                  Der AVV nach Art. 28 DSGVO (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Pilotphasen-Freischaltung digital gezeichnet.
+                </div>
               </div>
             </div>
           )}
