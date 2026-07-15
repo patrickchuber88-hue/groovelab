@@ -337,6 +337,11 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   return '#64748b';
 };
 
+const isMusaekSchool = (id: string | null | undefined) => {
+  if (!id) return false;
+  return id === 'cc05137f-5904-4774-80be-6a172c52bf99' || id === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+};
+
 export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 800 : false);
@@ -1452,7 +1457,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             setLoading(false);
             return;
           }
-          if (user.school_id !== effectiveSchool.id) {
+          const isFinalSchoolMatch = user.school_id === effectiveSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(effectiveSchool.id));
+          if (!isFinalSchoolMatch) {
             alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.");
             localStorage.removeItem('groovelab_station_id');
             await supabase.auth.signOut();
@@ -2573,7 +2579,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
         }
-        if (user.school_id !== effectiveSchool.id) {
+        const isStudentSchoolMatch = user.school_id === effectiveSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(effectiveSchool.id));
+        if (!isStudentSchoolMatch) {
           throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule.');
         }
       }
@@ -2889,7 +2896,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       // If a school context is already active, strictly enforce school matching
-      if (schoolData && user.school_id !== schoolData.id) {
+      const isSchoolMatch = user.school_id === schoolData?.id || (isMusaekSchool(user.school_id) && isMusaekSchool(schoolData?.id));
+      if (schoolData && !isSchoolMatch) {
         throw new Error(`Login verweigert. Dieser QR-Code gehört nicht zur Schule "${schoolName}".`);
       }
 
@@ -2898,7 +2906,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
         }
-        if (user.school_id !== effectiveSchool.id) {
+        const isStudentSchoolMatch = user.school_id === effectiveSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(effectiveSchool.id));
+        if (!isStudentSchoolMatch) {
           localStorage.removeItem('groovelab_station_id');
           throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.');
         }
