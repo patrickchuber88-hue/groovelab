@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Smartphone, Monitor, Check, ArrowRight, Loader2 } from 'lucide-react';
+import { Smartphone, Monitor, Check, ArrowRight, Loader2, AlertTriangle, Share2 } from 'lucide-react';
 
 interface DeviceOnboardingPageProps {
   token: string;
@@ -183,7 +183,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090b', color: '#ef4444', padding: '24px', textAlign: 'center', fontFamily: 'system-ui' }}>
         <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '50%', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-          <span style={{ fontSize: '2rem' }}>⚠️</span>
+          <AlertTriangle size={32} color="#ef4444" />
         </div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '8px', color: '#fca5a5' }}>Ungültiger Link</h3>
         <p style={{ color: '#94a3b8', fontSize: '0.85rem', maxWidth: '320px', marginBottom: '24px', lineHeight: 1.5 }}>{error || 'Der Setup-Link konnte nicht verifiziert werden.'}</p>
@@ -342,7 +342,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
               <span style={{ background: 'rgba(255,255,255,0.08)', color: '#eab308', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800 }}>1</span>
               <div>
-                <span style={{ fontWeight: 800, color: '#ffffff' }}>iOS (Safari):</span> Tippe auf das Teilen-Symbol <span style={{ fontSize: '0.85rem' }}>📤</span> und wähle <span style={{ fontWeight: 800, color: '#ffffff' }}>"Zum Home-Bildschirm"</span>.
+                <span style={{ fontWeight: 800, color: '#ffffff' }}>iOS (Safari):</span> Tippe auf das Teilen-Symbol <Share2 size={13} style={{ display: 'inline', verticalAlign: 'middle', margin: '0 2px', color: '#cbd5e1' }} /> und wähle <span style={{ fontWeight: 800, color: '#ffffff' }}>"Zum Home-Bildschirm"</span>.
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
