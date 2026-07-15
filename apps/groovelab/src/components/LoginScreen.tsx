@@ -428,6 +428,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
   const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
+  const [qrScanPrompt, setQrScanPrompt] = useState<string | null>(null);
 
   useEffect(() => {
     setBiometricsAvailable(isWebAuthnSupported());
@@ -2814,13 +2815,50 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.day_of_birth = actDay?.day_of_birth || null;
       }
 
-      // Automatically resolve schoolData from the database if not present in the URL parameter
-      if (!schoolData && userSchool) {
+      // Two-step QR-Login logic for general login page vs school-specific page
+      if (!schoolData) {
+        if (!userSchool) {
+          throw new Error('Für diesen Nutzer konnte keine Musikschule gefunden werden.');
+        }
+        
+        // 1. Set school state directly to transition the UI branding & color schemes
         setSchoolData(userSchool);
         setSchoolName(userSchool.name);
+
+        // 2. Update URL query parameter without triggering full reload, so refresh keeps the school
+        const slugify = (name: string) => {
+          return name
+            .toLowerCase()
+            .trim()
+            .replace(/[äöüß]/g, (match) => {
+              const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+              return mapping[match] || match;
+            })
+            .replace(/[^a-z0-9]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        };
+        const schoolSlug = slugify(userSchool.name);
+        try {
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('school', schoolSlug);
+          window.history.replaceState({}, '', newUrl.toString());
+        } catch (e) {
+          console.warn("Failed to update window URL state", e);
+        }
+
+        // 3. Prompt user for the second secure scan
+        setQrScanPrompt(`Schule "${userSchool.name}" erkannt. Bitte scanne deinen QR-Code erneut.`);
+        setLoading(false);
+        return;
       }
 
-       if (user.role === 'student') {
+      // If a school context is already active, strictly enforce school matching
+      if (schoolData && user.school_id !== schoolData.id) {
+        throw new Error(`Login verweigert. Dieser QR-Code gehört nicht zur Schule "${schoolName}".`);
+      }
+
+      if (user.role === 'student') {
         const effectiveSchool = schoolData || userSchool;
         if (!effectiveSchool?.id) {
           throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
@@ -3507,7 +3545,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
         </h1>
         <p style={{ 
-          color: isGroovelabKiosk ? '#78350f' : '#e6f4ea', 
+          color: isGroovelabKiosk ? '#78350f' : (qrScanPrompt ? '#fde047' : '#e6f4ea'), 
           textAlign: 'center', 
           fontSize: '14px', 
           marginBottom: '32px', 
@@ -3517,7 +3555,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           textShadow: isGroovelabKiosk ? 'none' : '0 1px 2px rgba(0,0,0,0.1)',
           transition: 'color 0.5s ease'
         }}>
-          {schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`}
+          {qrScanPrompt || (schoolName && !schoolData?.logo_url ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`)}
         </p>
 
       {/* Main Standard QR-Scanner Card */}

@@ -5990,11 +5990,17 @@ function App() {
     const getRedirectUrl = (params: string = '') => {
       let baseUrl = `${window.location.origin}/login`;
       if (finalSub) {
-        if (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1')) {
+        const host = window.location.hostname;
+        if (host.includes('localhost') || host.includes('127.0.0.1')) {
           baseUrl = `${window.location.origin}/login`;
           params = params ? `${params}&subdomain=${finalSub}` : `subdomain=${finalSub}`;
+        } else if (host.startsWith(`${finalSub}.`)) {
+          // If already on the correct subdomain, stay on it
+          baseUrl = `${window.location.origin}/login`;
         } else {
-          baseUrl = `https://${finalSub}.campus-groovelab.de/login`;
+          // Stay on the current working domain and pass the school/subdomain parameter to avoid DNS/proxy failures
+          baseUrl = `${window.location.origin}/login`;
+          params = params ? `${params}&school=${finalSub}` : `school=${finalSub}`;
         }
       }
       const platformParam = `platform=${currentPlatform}`;
