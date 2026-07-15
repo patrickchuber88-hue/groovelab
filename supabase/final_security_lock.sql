@@ -54,10 +54,21 @@ ON user_song_skills FOR ALL USING (user_id = auth.uid());
 CREATE POLICY "Users can see bands from their own school" 
 ON bands FOR SELECT USING (school_id = (auth.jwt()->>'school_id')::uuid);
 
-CREATE POLICY "Band members can manage their bands" 
-ON bands FOR ALL USING (
+CREATE POLICY "Band members can update their bands" 
+ON bands FOR UPDATE USING (
   EXISTS (SELECT 1 FROM band_members WHERE band_id = bands.id AND user_id = auth.uid())
 );
+
+CREATE POLICY "Band members can delete their bands" 
+ON bands FOR DELETE USING (
+  EXISTS (SELECT 1 FROM band_members WHERE band_id = bands.id AND user_id = auth.uid())
+);
+
+CREATE POLICY "Band members can insert their bands" 
+ON bands FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM band_members WHERE band_id = bands.id AND user_id = auth.uid())
+);
+
 
 -- Band Members
 CREATE POLICY "Users can see band members from their own school" 
