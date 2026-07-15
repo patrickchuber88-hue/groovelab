@@ -31,7 +31,7 @@ Karl-Fürstenberg Str. 59
 79618 Rheinfelden
 
 Kontakt
-E-Mail: patrick.c.huber88@gmail.com
+E-Mail: patrick.huber@musaek.de
 
 EU-Streitschlichtung
 Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.

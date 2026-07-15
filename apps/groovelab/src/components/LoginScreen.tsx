@@ -6207,13 +6207,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', fontWeight: 800, color: '#1e293b' }}>Anbieter der Plattform & technischer Dienstleister</h4>
                 <p style={{ margin: 0 }}>
-                  Simplified Work GbR<br/>
+                  Patrick Huber<br/>
                   Karl-Fürstenberg-Str. 59<br/>
                   79618 Rheinfelden
                 </p>
                 <p style={{ margin: '6px 0 0 0' }}>
-                  Vertreten durch: Patrick Huber<br/>
-                  E-Mail: <a href="mailto:patrick.c.huber88@gmail.com" style={{ color: '#eab308', textDecoration: 'underline' }}>patrick.c.huber88@gmail.com</a>
+                  E-Mail: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#eab308', textDecoration: 'underline' }}>patrick.huber@musaek.de</a>
                 </p>
               </div>
 
