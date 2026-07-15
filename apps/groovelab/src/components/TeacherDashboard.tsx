@@ -1098,8 +1098,20 @@ export function TeacherDashboard({
   }, [viewMode, showKioskView]);
 
   const handleGeofenceCheck = () => {
-    // 1. Bypass check on localhost
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    // 1. Bypass check on localhost or if geofence bypass is active in the school's database settings
+    const schoolData = Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools;
+    const hasGeofenceBypass = !!(schoolData?.opening_hours?.geofence_bypass);
+    const isLocalhost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.local') ||
+      /^192\.168\./.test(window.location.hostname) ||
+      /^10\./.test(window.location.hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
+    );
+
+    if (isLocalhost || hasGeofenceBypass) {
+      console.log('[Geofence] Bypassing location check (localhost or database bypass active).');
       if (isTeacher) {
         performDirectTeacherCheckin();
       } else {
