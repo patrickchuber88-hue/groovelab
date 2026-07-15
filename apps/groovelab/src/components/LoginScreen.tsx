@@ -1258,10 +1258,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           if (sub) {
             const cleanSub = sub.toLowerCase().trim();
-            // Map variants of musaek / muasek subdomain to the correct 'musaek-bad-saeckingen' slug
+            // Map variants of muasek-bad-saeckingen subdomain to the correct 'musaek-bad-saeckingen' slug
             const musaekVariants = [
-              'musaek', 
-              'muasek', 
               'muasek-bad-saeckingen', 
               'musaek-bad-saeckingen'
             ];
