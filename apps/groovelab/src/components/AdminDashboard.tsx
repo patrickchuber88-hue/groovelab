@@ -2007,14 +2007,20 @@ export function AdminDashboard({
       }
       const adminData = currentAdmin;
 
-      if (activeTab === 'live') {
-        const { data: sData } = await supabase
+      // Unconditionally fetch active sessions to keep online indicators and Live Lab realtime
+      try {
+        const { data: activeSessionsData } = await supabase
           .from('sessions')
           .select('*, profiles:users!inner(*), stations(*)')
           .eq('profiles.school_id', adminData.school_id)
-          .is('check_out_time', null)
-          .order('check_in_time', { ascending: false });
-        setActiveSessions(sData || []);
+          .is('check_out_time', null);
+        setActiveSessions(activeSessionsData || []);
+      } catch (err) {
+        console.warn('Failed to fetch active sessions:', err);
+      }
+
+      if (activeTab === 'live') {
+        // Already fetched above
       } else if (activeTab === 'students') {
         // ─── Student Visibility Rules ──────────────────────────────────────────
         //  • Admin / Secretary in Campus:    is_campus_active = true (all school)
@@ -9275,7 +9281,7 @@ export function AdminDashboard({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 400px), 1fr))', gap: '24px' }}>
             {rooms.map((room, index) => (
               <div 
                 key={room.id} 
@@ -12063,7 +12069,7 @@ export function AdminDashboard({
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
                   {filteredSubmissions.map(sub => {
                     const isInLab = activeSessions.some(sess => sess.user_id === sub.user_id);
                     const norm = normalizeInstrument(sub.instrument);

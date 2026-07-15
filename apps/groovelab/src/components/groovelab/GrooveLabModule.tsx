@@ -41,7 +41,7 @@ export const GrooveLabModule: React.FC<GrooveLabModuleProps> = (props) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ background: 'white', borderRadius: '24px', padding: '24px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 900, color: '#fbc02d', fontFamily: 'Urbanist' }}>
             🎸 GrooveLab Gamified Band &amp; Practice
@@ -125,7 +125,7 @@ export const GrooveLabModule: React.FC<GrooveLabModuleProps> = (props) => {
               />
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '20px' }}>
               {filteredStudents.map((student: any) => {
                 const isOnline = props.activeSessions.some(sess => sess.user_id === student.id);
                 return (

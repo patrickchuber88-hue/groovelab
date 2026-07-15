@@ -2522,6 +2522,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           showRealtimeNotification('Neue vorläufige Raumbuchung erhalten!');
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
+        fetchLiveStatusData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'help_requests' }, () => {
+        fetchLiveStatusData();
+      })
       .subscribe();
 
     return () => {
