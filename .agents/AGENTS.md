@@ -76,3 +76,6 @@
 ## Campus & GrooveLab Isolation Rules
 - **Cross-Module Side Effects**: Any code modification, feature addition, or configuration change in the Campus module must never affect the visual styling, code structures, or backend logic of the GrooveLab module, and vice versa.
 - **Strict Verification**: Before finalizing any code edits, verify that no unintended side effects have been introduced to the sibling module. Any shared components or database changes that bridge both modules must be explicitly reviewed and highlighted to the user.
+
+## Future Plans & Notes (Zukünftige Vorhaben)
+- **Profilauswahl-Sicherheit im Campus-Modul**: Das Netflix-Prinzip (Schnellwahl lokaler Profile ohne PIN-Abfrage) ist für Familien mit mehreren Kindern im Campus-Modul gewollt. Im GrooveLab-Modul wird dies nicht benötigt. Bei zukünftigen Modifikationen des Campus-Moduls soll dieses Prinzip dort verankert und gepflegt werden.
