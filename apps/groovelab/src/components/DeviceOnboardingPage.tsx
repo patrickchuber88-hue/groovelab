@@ -43,6 +43,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
           .from('rooms')
           .select('id, name')
           .eq('school_id', schoolData.id)
+          .eq('is_groovelab_active', true)
           .order('name');
         if (roomsErr) throw roomsErr;
         setRooms(roomsData || []);
@@ -155,11 +156,12 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         localStorage.setItem('groovelab_kiosk_token', kioskRecord.secret_token);
         localStorage.setItem('groovelab_station_id', selectedStation.id);
         localStorage.setItem('groovelab_kiosk_room_id', selectedStation.room_id);
+        localStorage.setItem('groovelab_active_platform', 'groovelab');
         
         setSetupSuccess(true);
         setTimeout(() => {
           // Redirect to home and trigger auto-login
-          window.location.replace('/');
+          window.location.replace('/?platform=groovelab');
         }, 1500);
       }
     } catch (err: any) {
