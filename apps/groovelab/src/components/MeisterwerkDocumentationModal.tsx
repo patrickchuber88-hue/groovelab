@@ -28,7 +28,7 @@ export const ALL_STICKERS = [
   { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true },
   { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
   { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
-  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#137333', bg: 'rgba(19, 115, 51, 0.1)', auto: true },
+  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#34a853', bg: 'rgba(19, 115, 51, 0.1)', auto: true },
 
   // Manuell
   { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false },
@@ -2783,7 +2783,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
         }}
         style={{
-          background: isHistoryActive ? '#137333' : 'rgba(255,255,255,0.15)',
+          background: isHistoryActive ? '#34a853' : 'rgba(255,255,255,0.15)',
           border: '1px solid rgba(255,255,255,0.08)',
           color: '#ffffff',
           padding: '6px 12px',
@@ -2969,7 +2969,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   type="button"
                   onClick={() => setActiveViewMode('document')}
                   style={{
-                    background: activeViewMode === 'document' ? '#137333' : 'rgba(255,255,255,0.15)',
+                    background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 14px',
@@ -3083,7 +3083,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 type="button"
                 onClick={() => setActiveViewMode('document')}
                 style={{
-                  background: activeViewMode === 'document' ? '#137333' : 'rgba(255,255,255,0.15)',
+                  background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
                   border: 'none',
                   color: '#ffffff',
                   padding: '6px 12px',
@@ -3854,7 +3854,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           📖 {book.totalPages || 50} Seiten • {pct}% gemeistert
                         </span>
                         <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #137333)', transition: 'width 0.4s ease' }} />
+                          <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #34a853)', transition: 'width 0.4s ease' }} />
                         </div>
                       </div>
                     </div>
@@ -4745,7 +4745,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               </span>
                             </div>
                             <div style={{ width: '100%', height: '6px', background: '#f3f3f6', borderRadius: '3px', overflow: 'hidden', marginTop: '6px' }}>
-                              <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #137333)', transition: 'width 0.3s ease' }} />
+                              <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #34a853)', transition: 'width 0.3s ease' }} />
                             </div>
                           </div>
                         </div>
@@ -6908,7 +6908,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       disabled={saving}
                       style={{
                         flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
                         boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
                         transition: 'all 0.15s ease'
                       }}
@@ -7902,7 +7902,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     onClick={() => downloadShareCard(st)}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '16px',
@@ -8009,7 +8009,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <button
                   onClick={() => setAwardedStickerToAnimate(null)}
                   style={{
-                    background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                    background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '14px',
@@ -8490,7 +8490,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     } else if (status === 'mastered') {
                       borderColor = '#34a853';
                       bg = '#e6f4ea';
-                      textColor = '#137333';
+                      textColor = '#34a853';
                     } else if (status === 'purple') {
                       borderColor = '#af52de';
                       bg = '#f5f3ff';

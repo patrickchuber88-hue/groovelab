@@ -1340,7 +1340,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 alignItems: 'center',
                 gap: '6px',
                 transition: 'all 0.2s',
-                background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)' : '#1e293b',
+                background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)' : '#1e293b',
                 color: '#ffffff',
                 boxShadow: localTab === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
               }}
@@ -1596,7 +1596,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 {/* Card 2: Campus Songs (Green) */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #34a853, #137333)',
+                  background: 'linear-gradient(135deg, #34a853, #34a853)',
                   color: 'white',
                   borderRadius: '16px',
                   padding: '12px 16px',
@@ -2078,12 +2078,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             justifyContent: 'space-between',
                             fontSize: '0.82rem'
                           }}>
-                            <span style={{ fontWeight: 800, color: '#137333' }}>
-                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#137333', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                            <span style={{ fontWeight: 800, color: '#34a853' }}>
+                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
                             </span>
                             <span style={{ 
                               background: '#e6f4ea', 
-                              color: '#137333', 
+                              color: '#34a853', 
                               padding: '2px 8px', 
                               borderRadius: '6px', 
                               fontWeight: 900,
@@ -2195,7 +2195,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 flexDirection: 'column',
                 gap: '12px'
               }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#137333', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Smartphone size={16} /> App &amp; Ausweis speichern
                 </h4>
                 <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4, fontWeight: 650 }}>
@@ -2214,9 +2214,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   }}
                   style={{
                     width: '100%',
-                    background: copiedCampusLink ? '#e6f4ea' : '#137333',
-                    color: copiedCampusLink ? '#137333' : '#ffffff',
-                    border: copiedCampusLink ? '1.5px solid #137333' : 'none',
+                    background: copiedCampusLink ? '#e6f4ea' : '#34a853',
+                    color: copiedCampusLink ? '#34a853' : '#ffffff',
+                    border: copiedCampusLink ? '1.5px solid #34a853' : 'none',
                     borderRadius: '14px',
                     padding: '10px 14px',
                     fontSize: '0.75rem',
@@ -3560,7 +3560,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   const stationColor = s.stations?.color || '#cbd5e1';
 
                   // Dynamic theme-compliant accent colors matching platform settings
-                  const activeAccent = localTab === 'campus' ? '#137333' : '#eab308';
+                  const activeAccent = localTab === 'campus' ? '#34a853' : '#eab308';
                   const activeAccentBg = localTab === 'campus' ? '#e6f4ea' : '#fefce8';
 
                   return (

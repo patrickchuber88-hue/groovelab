@@ -19,7 +19,8 @@ import {
   Clipboard,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  Info
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 interface ScheduleOccurrence {
@@ -68,6 +69,7 @@ interface ScheduleCalendarViewProps {
   currentUserRole?: string;
   hasSubmittedSchedule?: boolean;
   scheduleStatus?: 'none' | 'pending' | 'approved';
+  onStartTour?: () => void;
 }
 
 export function ScheduleCalendarView({ 
@@ -81,7 +83,8 @@ export function ScheduleCalendarView({
   setSelectedTeacherId,
   currentUserRole,
   hasSubmittedSchedule = true,
-  scheduleStatus = 'none'
+  scheduleStatus = 'none',
+  onStartTour
 }: ScheduleCalendarViewProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
@@ -94,10 +97,32 @@ export function ScheduleCalendarView({
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showWeekend, setShowWeekend] = useState(false);
+  const [focusedDayOffset, setFocusedDayOffset] = useState<number | null>(null);
   const [currentMinutes, setCurrentMinutes] = useState(() => {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
   });
+
+  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
+  const isAdminView = currentUserRole === 'admin' || currentUserRole === 'secretary';
+
+  let brandColor = '#34a853'; // Campus Green
+  let lightBg = 'rgba(52, 168, 83, 0.06)';
+  let hoverBg = 'rgba(52, 168, 83, 0.12)';
+  let textAccentColor = '#34a853';
+
+  if (isAdminView) {
+    brandColor = '#ea4335'; // Admin Red
+    lightBg = 'rgba(234, 67, 53, 0.06)';
+    hoverBg = 'rgba(234, 67, 53, 0.12)';
+    textAccentColor = '#ea4335';
+  } else if (isGroovelab) {
+    brandColor = '#eab308'; // GrooveLab Yellow
+    lightBg = 'rgba(234, 179, 8, 0.06)';
+    hoverBg = 'rgba(234, 179, 8, 0.12)';
+    textAccentColor = '#ca8a04'; // Dark yellow text
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -2124,6 +2149,45 @@ export function ScheduleCalendarView({
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'SELECT' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      )) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevWeek();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextWeek();
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        jumpToToday();
+      } else if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleCopyWeek();
+      } else if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (localStorage.getItem('groovelab_copied_week_data')) {
+          handlePasteWeek();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleResetWeek();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentDate, occurrences, pendingChanges, weekStart]);
+
   const cleanupDragGhost = () => {
     const ghost = document.getElementById('drag-preview-ghost');
     if (ghost && ghost.parentNode) {
@@ -2843,13 +2907,13 @@ export function ScheduleCalendarView({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#137333' };
+      case 'scheduled': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#34a853' };
       case 'cancelled':
       case 'teacher_sick':
       case 'canceled_by_teacher_sick':
         return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#137333' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#34a853' };
       default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
     }
   };
@@ -2860,6 +2924,31 @@ export function ScheduleCalendarView({
     const h = parseInt(parts[0]) || 0;
     const m = parseInt(parts[1]) || 0;
     return h * 60 + m;
+  };
+
+  const isOccurrenceAGap = (occ: ScheduleOccurrence, dayOccs: ScheduleOccurrence[]) => {
+    const isVacantOrBreak = !occ.student_id || occ.student_id === 'vacant';
+    if (!isVacantOrBreak) return false;
+    if (occ.status === 'cancelled') return false;
+
+    // Filter to find active lessons of that day
+    const activeLessons = dayOccs.filter(o => o.student_id && o.student_id !== 'vacant' && o.status !== 'cancelled');
+    if (activeLessons.length < 2) return false;
+
+    const occStart = timeToMinutes(occ.start_time);
+    
+    // Find earliest start time and latest end time of active lessons
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    activeLessons.forEach(l => {
+      const start = timeToMinutes(l.start_time);
+      const end = start + (l.duration || 45);
+      if (start < minStart) minStart = start;
+      if (end > maxEnd) maxEnd = end;
+    });
+
+    const occEnd = occStart + (occ.duration || 45);
+    return occStart >= minStart && occEnd <= maxEnd;
   };
 
   const onMouseEnterHelper = (e: React.MouseEvent, isResetPending: boolean, occ: any) => {
@@ -2980,6 +3069,67 @@ export function ScheduleCalendarView({
         .pulse-yellow-indicator {
           animation: pulse-yellow 2s infinite;
         }
+        .apple-btn-group {
+          background: rgba(0, 0, 0, 0.03);
+          border: 1px solid rgba(0, 0, 0, 0.05);
+          border-radius: 10px;
+          padding: 3px;
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          backdrop-filter: blur(10px);
+        }
+        .apple-btn {
+          background: transparent;
+          border: none;
+          color: #475569;
+          border-radius: 7px;
+          padding: 6px 12px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 30px;
+          outline: none;
+        }
+        .apple-btn:hover {
+          background: rgba(0, 0, 0, 0.04);
+          color: #1d1d1f;
+        }
+        .apple-btn:active {
+          transform: scale(0.97);
+        }
+        .apple-btn.active {
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          font-weight: 700;
+        }
+        .apple-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          pointer-events: none;
+        }
+        .schedule-gap-slot {
+          background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.01) 0px, rgba(0,0,0,0.01) 10px, rgba(0,0,0,0.03) 10px, rgba(0,0,0,0.03) 20px) !important;
+          border: 1.5px dashed rgba(0,0,0,0.15) !important;
+          box-shadow: none !important;
+        }
+        .schedule-gap-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.65rem;
+          font-weight: 800;
+          color: #64748b;
+          background: rgba(0, 0, 0, 0.04);
+          padding: 2px 6px;
+          border-radius: 4px;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+        }
       `}</style>
       
       <div style={{ 
@@ -3040,21 +3190,48 @@ export function ScheduleCalendarView({
 
           {/* Center: Tab switch */}
           {activeTab && setActiveTab && (
-            <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
-              <button 
-                onClick={() => setActiveTab('calendar')}
-                className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-              >
-                Stundenplan
-              </button>
-              <button 
-                onClick={() => setActiveTab('designer')}
-                className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-              >
-                Stundenplan-Designer
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+                <button 
+                  onClick={() => setActiveTab('calendar')}
+                  className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                >
+                  Stundenplan
+                </button>
+                <button 
+                  onClick={() => setActiveTab('designer')}
+                  className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                >
+                  Stundenplan-Designer
+                </button>
+              </div>
+              {currentUserRole === 'teacher' && onStartTour && (
+                <button
+                  type="button"
+                  onClick={onStartTour}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.65)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#86868b',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                  }}
+                  title="Anleitung / Tour starten"
+                  onMouseOver={e => e.currentTarget.style.color = '#1d1d1f'}
+                  onMouseOut={e => e.currentTarget.style.color = '#86868b'}
+                >
+                  <Info size={16} />
+                </button>
+              )}
             </div>
           )}
 
@@ -3124,220 +3301,137 @@ export function ScheduleCalendarView({
           </div>
 
           {/* Right: Actions */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setShowWeekend(prev => !prev)}
-              style={{
-                background: isWeekendVisible ? '#ffffff' : 'rgba(0,0,0,0.03)',
-                color: '#475569',
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                minHeight: '36px',
-                boxShadow: isWeekendVisible ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
-              }}
-            >
-              <CalendarIcon size={14} /> {isWeekendVisible ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
-            </button>
-            {Object.keys(pendingChanges).length > 0 && (
-              <button 
-                onClick={savePendingChanges}
-                style={{ background: '#34a853', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', boxShadow: '0 2px 4px rgba(52, 168, 83, 0.25)', minHeight: '36px', display: 'flex', alignItems: 'center' }}
-                onMouseOver={e => e.currentTarget.style.background = '#137333'}
-                onMouseOut={e => e.currentTarget.style.background = '#34a853'}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Group A: Ansicht & Filter */}
+            <div className="apple-btn-group">
+              <button
+                type="button"
+                onClick={() => setShowWeekend(prev => !prev)}
+                className={`apple-btn ${isWeekendVisible ? 'active' : ''}`}
+                style={isWeekendVisible ? { color: textAccentColor } : {}}
+                title={isWeekendVisible ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
               >
-                Änderungen speichern ({Object.keys(pendingChanges).length})
+                <CalendarIcon size={13} />
+                <span>Wochenende</span>
               </button>
-            )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setIsGroupModeActive(prev => !prev);
-                setSelectedForGroup([]);
-              }}
-              style={{
-                background: isGroupModeActive ? '#2563eb' : 'transparent',
-                color: isGroupModeActive ? 'white' : '#64748b',
-                border: `1px solid ${isGroupModeActive ? '#2563eb' : '#cbd5e1'}`,
-                fontWeight: 600,
-                padding: '8px 12px',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.15s',
-                minHeight: '36px'
-              }}
-            >
-              <Users size={13} />
-              {isGroupModeActive ? 'Gruppen-Modus aktiv' : 'Gruppentermine'}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsGroupModeActive(prev => !prev);
+                  setSelectedForGroup([]);
+                }}
+                className={`apple-btn ${isGroupModeActive ? 'active' : ''}`}
+                style={isGroupModeActive ? { color: textAccentColor } : {}}
+                title="Gruppenunterricht organisieren"
+              >
+                <Users size={13} />
+                <span>Gruppen</span>
+              </button>
+            </div>
 
+            {/* Merge Selected Action (Floating outside groups since it's a primary CTA) */}
             {isGroupModeActive && selectedForGroup.length >= 2 && (
               <button
                 type="button"
                 onClick={handleMergeSelectedOccurrences}
+                className="apple-btn active"
                 style={{
-                  background: localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#ea4335',
-                  color: 'white',
-                  border: 'none',
-                  fontWeight: 650,
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.15s',
-                  minHeight: '36px',
-                  boxShadow: `0 2px 4px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? 'rgba(52, 168, 83, 0.3)' : 'rgba(234, 67, 53, 0.3)'}`
+                  background: brandColor,
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  boxShadow: `0 2px 8px ${brandColor}33`,
+                  borderRadius: '8px'
                 }}
               >
-                Zusammenführen ({selectedForGroup.length})
+                <span>Zusammenführen ({selectedForGroup.length})</span>
               </button>
             )}
 
-            {/* Datumsauswahl */}
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input 
-                type="date"
-                value={toLocalYYYYMMDD(currentDate)}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setCurrentDate(new Date(e.target.value));
-                  }
-                }}
-                style={{
-                  position: 'absolute',
-                  opacity: 0,
-                  width: '100%',
-                  height: '100%',
-                  cursor: 'pointer',
-                  zIndex: 2
-                }}
-              />
-              <button 
-                style={{ 
-                  background: 'transparent', 
-                  color: '#2563eb', 
-                  border: '1px solid rgba(37, 99, 235, 0.15)', 
-                  padding: '8px 12px', 
-                  borderRadius: '8px', 
-                  fontSize: '0.78rem', 
-                  fontWeight: 600, 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  pointerEvents: 'none',
-                  minHeight: '36px'
-                }}
+            {/* Group B: Wochen-Aktionen */}
+            <div className="apple-btn-group">
+              <button
+                onClick={handleCopyWeek}
+                className="apple-btn"
+                title="Kopiert alle aktiven Unterrichtstermine dieser Woche"
               >
-                <CalendarIcon size={13} />
-                {currentDate.toLocaleDateString('de-DE')}
+                <Copy size={13} />
+                <span>Kopieren</span>
+              </button>
+
+              <button
+                onClick={handlePasteWeek}
+                className="apple-btn"
+                disabled={!localStorage.getItem('groovelab_copied_week_data')}
+                title="Fügt die kopierten Unterrichtstermine in diese Woche ein (überschreibt bestehende)"
+              >
+                <Clipboard size={13} />
+                <span>Einfügen</span>
+              </button>
+
+              <button
+                onClick={handleResetWeek}
+                className="apple-btn"
+                style={{ color: '#ef4444' }}
+                title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
+              >
+                <Trash2 size={13} />
+                <span>Zurücksetzen</span>
               </button>
             </div>
 
-            {/* Wochen-Kopierer */}
-            <button 
-              onClick={handleCopyWeek}
-              style={{ 
-                background: 'transparent', 
-                color: '#0891b2', 
-                border: '1px solid rgba(8, 145, 178, 0.15)', 
-                padding: '8px 12px', 
-                borderRadius: '8px', 
-                fontSize: '0.78rem', 
-                fontWeight: 600, 
-                cursor: 'pointer', 
-                transition: 'all 0.15s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                minHeight: '36px'
-              }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)'}
-              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-              title="Kopiert alle aktiven Unterrichtstermine dieser Woche"
-            >
-              <Copy size={13} />
-              Woche kopieren
-            </button>
+            {/* Save Pending Changes Action (Floating primary CTA) */}
+            {Object.keys(pendingChanges).length > 0 && (
+              <button 
+                onClick={savePendingChanges}
+                className="apple-btn active"
+                style={{
+                  background: brandColor,
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  boxShadow: `0 2px 8px ${brandColor}33`,
+                  borderRadius: '8px'
+                }}
+              >
+                <span>Speichern ({Object.keys(pendingChanges).length})</span>
+              </button>
+            )}
 
-            <button 
-              onClick={handlePasteWeek}
-              style={{ 
-                background: 'transparent', 
-                color: localStorage.getItem('groovelab_copied_week_data') ? '#0891b2' : '#94a3b8', 
-                border: `1px solid ${localStorage.getItem('groovelab_copied_week_data') ? 'rgba(8, 145, 178, 0.15)' : 'rgba(148, 163, 184, 0.15)'}`, 
-                padding: '8px 12px', 
-                borderRadius: '8px', 
-                fontSize: '0.78rem', 
-                fontWeight: 600, 
-                cursor: localStorage.getItem('groovelab_copied_week_data') ? 'pointer' : 'not-allowed', 
-                transition: 'all 0.15s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5,
-                minHeight: '36px'
-              }}
-              onMouseOver={e => {
-                if (localStorage.getItem('groovelab_copied_week_data')) {
-                  e.currentTarget.style.background = 'rgba(8, 145, 178, 0.04)';
-                }
-              }}
-              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-              disabled={!localStorage.getItem('groovelab_copied_week_data')}
-              title="Fügt die kopierten Unterrichtstermine in diese Woche ein (überschreibt bestehende)"
-            >
-              <Clipboard size={13} />
-              Woche einfügen
-            </button>
+            {/* Group C: Navigation & Datum */}
+            <div className="apple-btn-group">
+              <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
+              <button onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen">Heute</button>
+              <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
+              
+              <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
 
-            <button 
-              onClick={handleResetWeek}
-              style={{ background: 'transparent', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)'}
-              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-              title="Alle ungespeicherten Änderungen in dieser Woche verwerfen"
-            >
-              Woche zurücksetzen
-            </button>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type="date"
+                  value={toLocalYYYYMMDD(currentDate)}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setCurrentDate(new Date(e.target.value));
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    opacity: 0,
+                    width: '100%',
+                    height: '100%',
+                    cursor: 'pointer',
+                    zIndex: 2
+                  }}
+                />
+                <button className="apple-btn" style={{ pointerEvents: 'none' }}>
+                  <CalendarIcon size={13} />
+                  <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+                </button>
+              </div>
 
-            <button 
-              onClick={jumpToToday}
-              style={{ background: 'transparent', color: '#34a853', border: '1px solid rgba(52, 168, 83, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.04)'}
-              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-            >
-              Heute
-            </button>
-            
-            <button 
-              onClick={jumpToMonthStart}
-              style={{ background: 'transparent', color: '#2563eb', border: '1px solid rgba(37, 99, 235, 0.15)', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', minHeight: '36px' }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.04)'}
-              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-            >
-              Zum Monatsanfang
-            </button>
-            
-            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', padding: '2px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px', alignItems: 'center' }}>
-              <button onClick={prevWeek} style={{ background: 'transparent', border: 'none', padding: '6px 8px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronLeft size={15} /></button>
-              <button onClick={nextWeek} style={{ background: 'transparent', border: 'none', padding: '6px 8px', cursor: 'pointer', borderRadius: '6px', color: '#1d1d1f', display: 'flex', alignItems: 'center' }}><ChevronRight size={15} /></button>
+              <button onClick={jumpToMonthStart} className="apple-btn" title="Zum Monatsanfang springen">
+                <span>Monat</span>
+              </button>
             </div>
           </div>
         </div>
@@ -3421,16 +3515,17 @@ export function ScheduleCalendarView({
 
         <div ref={gridRef} style={{ 
           display: 'grid', 
-          gridTemplateColumns: isWeekendVisible ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))', 
+          gridTemplateColumns: focusedDayOffset !== null ? '1fr' : (isWeekendVisible ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))'), 
           gap: '0px',
           background: '#ffffff',
           borderRadius: '24px',
           border: '1px solid #e2e8f0',
           padding: '20px 8px',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          transition: 'all 0.3s ease'
         }}>
-        {[0, 1, 2, 3, 4, 5, 6].filter(offset => isWeekendVisible || offset < 5).map(offset => {
+        {[0, 1, 2, 3, 4, 5, 6].filter(offset => focusedDayOffset !== null ? offset === focusedDayOffset : (isWeekendVisible || offset < 5)).map(offset => {
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
@@ -3520,6 +3615,7 @@ export function ScheduleCalendarView({
             });
           }
 
+          const isLastCol = focusedDayOffset !== null || offset === 6 || (!isWeekendVisible && offset === 4);
           return (
             <div 
               key={offset} 
@@ -3530,18 +3626,55 @@ export function ScheduleCalendarView({
                 flexDirection: 'column', 
                 gap: '8px', 
                 minHeight: '400px',
-                borderRight: offset < 6 ? '1px solid #e2e8f0' : 'none'
+                borderRight: isLastCol ? 'none' : '1px solid #e2e8f0',
+                transition: 'all 0.3s ease'
               }}
             >
-              <div style={{
-                textAlign: 'center',
-                paddingBottom: '8px',
-                borderBottom: '1px solid rgba(0,0,0,0.05)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '2px'
-              }}>
+              <div 
+                onClick={() => setFocusedDayOffset(focusedDayOffset === offset ? null : offset)}
+                style={{
+                  textAlign: 'center',
+                  paddingBottom: '8px',
+                  borderBottom: '1px solid rgba(0,0,0,0.05)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '2px',
+                  cursor: 'pointer',
+                  borderRadius: '12px',
+                  padding: '6px',
+                  transition: 'background 0.2s',
+                  userSelect: 'none',
+                  position: 'relative'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
+                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                title={focusedDayOffset === offset ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
+              >
+                {focusedDayOffset === offset && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFocusedDayOffset(null);
+                    }}
+                    className="apple-btn"
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.05)',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.68rem',
+                      marginBottom: '6px',
+                      color: '#475569',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      minHeight: '24px'
+                    }}
+                  >
+                    <X size={10} />
+                    <span>Wochenansicht</span>
+                  </button>
+                )}
                 {(() => {
                   const todayStr = toLocalYYYYMMDD(new Date());
                   const isToday = dateStr === todayStr;
@@ -3550,7 +3683,7 @@ export function ScheduleCalendarView({
                       <div style={{ 
                         fontSize: '0.7rem', 
                         fontWeight: 800, 
-                        color: isToday ? '#34a853' : '#86868b', 
+                        color: isToday ? textAccentColor : '#86868b', 
                         textTransform: 'uppercase', 
                         letterSpacing: '0.05em' 
                       }}>
@@ -3560,10 +3693,10 @@ export function ScheduleCalendarView({
                         fontSize: '0.9rem',
                         fontWeight: 900,
                         color: isToday ? '#ffffff' : '#1d1d1f',
-                        background: isToday ? '#34a853' : 'transparent',
+                        background: isToday ? brandColor : 'transparent',
                         padding: isToday ? '3px 10px' : '0px',
                         borderRadius: isToday ? '12px' : '0px',
-                        boxShadow: isToday ? '0 2px 6px rgba(52, 168, 83, 0.2)' : 'none',
+                        boxShadow: isToday ? `0 2px 6px ${brandColor}33` : 'none',
                         marginTop: isToday ? '2px' : '0px',
                         display: 'inline-block',
                         lineHeight: isToday ? '1.4' : 'inherit'
@@ -3577,8 +3710,8 @@ export function ScheduleCalendarView({
                   <div style={{
                     fontSize: '0.62rem',
                     fontWeight: 900,
-                    color: '#137333',
-                    background: 'rgba(52, 168, 83, 0.08)',
+                    color: textAccentColor,
+                    background: lightBg,
                     padding: '2px 6px',
                     borderRadius: '4px',
                     textTransform: 'uppercase',
@@ -3919,9 +4052,13 @@ export function ScheduleCalendarView({
                     : isSick 
                       ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
                       : isVacant
-                        ? { bg: 'rgba(52, 168, 83, 0.02)', border: '#34a853', text: '#137333' }
+                        ? { bg: 'rgba(52, 168, 83, 0.02)', border: '#34a853', text: '#34a853' }
                         : getStatusColor(occ.status);
-                  const finalColors = { ...colors };
+                  
+                  const isGap = isOccurrenceAGap(occ, dayOccurrences);
+                  const finalColors = isGap 
+                    ? { bg: 'rgba(148, 163, 184, 0.03)', border: 'rgba(148, 163, 184, 0.3)', text: '#64748b' }
+                    : (isVacant ? { bg: `${brandColor}03`, border: brandColor, text: textAccentColor } : { ...colors });
                   let cardBackground = '';
  
                   const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
@@ -4113,33 +4250,38 @@ export function ScheduleCalendarView({
                           // Dispatch custom event to sync date with sickUntilDate state in TeacherDashboard
                           window.dispatchEvent(new CustomEvent('select-appointment-date', { detail: { date: occ.date } }));
                         }}
+                        className={isGap ? 'schedule-gap-slot' : ''}
                         style={{ 
-                          background: cardBackground || finalColors.bg, 
-                          border: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `2px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#007aff'}`
-                            : (isRescheduled 
-                              ? (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`) 
-                              : isVacant 
-                                ? '1px dashed #34a853' 
-                                : isBreak 
-                                  ? '1px dashed #f97316' 
-                                  : (isSick || isCancelled)
-                                    ? '1px solid rgba(239, 68, 68, 0.15)' 
-                                    : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`)),
-                          borderLeft: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `4px solid ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#007aff'}`
-                            : (isRescheduled 
-                              ? `4px solid ${finalColors.border}` 
-                              : isVacant 
-                                ? '3px dashed #34a853' 
-                                : isBreak 
-                                  ? '4px solid #f97316' 
-                                  : (isSick || isCancelled)
-                                    ? '3px solid #ef4444'
-                                    : `4px solid ${finalColors.border}`),
+                          background: isGap ? undefined : (cardBackground || finalColors.bg), 
+                          border: isGap 
+                            ? undefined
+                            : ((isGroupModeActive && selectedForGroup.includes(occ.id))
+                              ? `2px solid ${brandColor}`
+                              : (isRescheduled 
+                                ? (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`) 
+                                : isVacant 
+                                  ? `1px dashed ${brandColor}` 
+                                  : isBreak 
+                                    ? '1px dashed #f97316' 
+                                    : (isSick || isCancelled)
+                                      ? '1px solid rgba(239, 68, 68, 0.15)' 
+                                      : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`))),
+                          borderLeft: isGap 
+                            ? undefined
+                            : ((isGroupModeActive && selectedForGroup.includes(occ.id))
+                              ? `4px solid ${brandColor}`
+                              : (isRescheduled 
+                                ? `4px solid ${finalColors.border}` 
+                                : isVacant 
+                                  ? `3px dashed ${brandColor}` 
+                                  : isBreak 
+                                    ? '4px solid #f97316' 
+                                    : (isSick || isCancelled)
+                                      ? '3px solid #ef4444'
+                                      : `4px solid ${finalColors.border}`)),
                           borderRadius: '8px', 
                           padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
-                          cursor: (isSick || isCancelled) ? 'pointer' : isVacant ? 'pointer' : isBreak ? 'default' : 'grab',
+                          cursor: (isSick || isCancelled) ? 'pointer' : (isVacant || isBreak) ? 'pointer' : 'grab',
                           opacity: draggedId 
                              ? (draggedId === occ.id ? 1 : 0.6) 
                              : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
@@ -4149,11 +4291,11 @@ export function ScheduleCalendarView({
                           left: '8px',
                           right: '8px',
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `0 0 10px ${localStorage.getItem('groovelab_active_platform') === 'campus' ? '#34a853' : '#007aff'}`
+                            ? `0 0 10px ${brandColor}55`
                             : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
                           transition: 'all 0.2s',
                           userSelect: 'none',
-                          visibility: isVacant ? 'hidden' : 'visible',
+                          visibility: isVacant ? (isGap ? 'visible' : 'hidden') : 'visible',
                           height: `${(occ.duration || 30) * 2.5 - 8}px`,
                           flexShrink: 0,
                           boxSizing: 'border-box',
@@ -4165,6 +4307,14 @@ export function ScheduleCalendarView({
 
                           // 1. VERY COMPACT HEIGHT (<= 15 Min, height ~29.5px)
                           if (duration <= 15) {
+                            if (isGap) {
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '100%', width: '100%', color: '#64748b' }}>
+                                  <Clock size={10} style={{ opacity: 0.8, flexShrink: 0 }} />
+                                  <span style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>Lücke • {duration}m</span>
+                                </div>
+                              );
+                            }
                             return (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', width: '100%', gap: '4px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', minWidth: 0, flex: 1 }}>
@@ -4279,6 +4429,19 @@ export function ScheduleCalendarView({
 
                           // 2. STANDARD HEIGHT (16 - 30 Min, height ~67px)
                           if (duration <= 30) {
+                            if (isGap) {
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center', gap: '2px', paddingLeft: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={11} style={{ color: '#64748b', flexShrink: 0 }} />
+                                    <span className="schedule-gap-badge">Lücke</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 700 }}>
+                                    {occ.start_time.substring(0, 5)} ({duration} Min)
+                                  </div>
+                                </div>
+                              );
+                            }
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -4418,6 +4581,19 @@ export function ScheduleCalendarView({
                           }
 
                           // 3. GENEROUS HEIGHT (> 30 Min, height >= 104.5px)
+                          if (isGap) {
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '4px', justifyContent: 'center', paddingLeft: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <Clock size={13} style={{ color: '#64748b', flexShrink: 0 }} />
+                                  <span className="schedule-gap-badge" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>Lücke / Freistunde</span>
+                                </div>
+                                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginLeft: '18px' }}>
+                                  {occ.start_time.substring(0, 5)} Uhr ({duration} Min)
+                                </div>
+                              </div>
+                            );
+                          }
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -4703,8 +4879,8 @@ export function ScheduleCalendarView({
                     boxSizing: 'border-box',
                     textAlign: 'center'
                   }}>
-                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Neuer Termin</span>
-                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#137333', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>{newAppointmentText}</span>
+                    <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Neuer Termin</span>
+                    <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#34a853', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>{newAppointmentText}</span>
                   </div>
                 ) : (
                   <div style={{ 
@@ -4735,7 +4911,7 @@ export function ScheduleCalendarView({
                     boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
                     transition: 'all 0.2s'
                   }}
-                  onMouseOver={e => e.currentTarget.style.background = '#137333'}
+                  onMouseOver={e => e.currentTarget.style.background = '#34a853'}
                   onMouseOut={e => e.currentTarget.style.background = '#34a853'}
                 >
                   Schließen
@@ -4829,7 +5005,7 @@ export function ScheduleCalendarView({
               <div style={{ 
                 background: isEnsembleOcc 
                   ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
-                  : 'linear-gradient(135deg, #137333 0%, #137333 100%)', 
+                  : 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
                 padding: '20px 28px', 
                 display: 'flex', 
                 justifyContent: 'space-between', 
@@ -4975,7 +5151,7 @@ export function ScheduleCalendarView({
                         width: '100%',
                         padding: '11px 14px',
                         borderRadius: '12px',
-                        border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#137333'}` : '1px solid rgba(0, 0, 0, 0.15)',
+                        border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#34a853'}` : '1px solid rgba(0, 0, 0, 0.15)',
                         background: '#ffffff',
                         fontSize: '0.92rem',
                         fontFamily: 'inherit',
@@ -5071,7 +5247,7 @@ export function ScheduleCalendarView({
                                 justifyContent: 'space-between',
                                 cursor: 'pointer',
                                 background: isSelected ? (isEnsembleOcc ? 'rgba(0, 122, 255, 0.08)' : 'rgba(19, 115, 51, 0.08)') : 'transparent',
-                                color: isSelected ? (isEnsembleOcc ? '#007aff' : '#137333') : '#1d1d1f',
+                                color: isSelected ? (isEnsembleOcc ? '#007aff' : '#34a853') : '#1d1d1f',
                                 fontWeight: isSelected ? 700 : 500,
                                 fontSize: '0.9rem',
                                 marginTop: '2px',
@@ -5093,7 +5269,7 @@ export function ScheduleCalendarView({
                                 <span>{r.name}</span>
                               </div>
                               {isSelected && (
-                                <span style={{ color: isEnsembleOcc ? '#007aff' : '#137333', fontWeight: 'bold' }}>✓</span>
+                                <span style={{ color: isEnsembleOcc ? '#007aff' : '#34a853', fontWeight: 'bold' }}>✓</span>
                               )}
                             </div>
                           );
@@ -5253,9 +5429,9 @@ export function ScheduleCalendarView({
                       </button>
                       <button 
                         onClick={handleSaveEdit} 
-                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#137333', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                        onMouseOver={e => e.currentTarget.style.background = isEnsembleOcc ? '#0055d4' : '#137333'}
-                        onMouseOut={e => e.currentTarget.style.background = isEnsembleOcc ? '#007aff' : '#137333'}
+                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#34a853', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                        onMouseOver={e => e.currentTarget.style.background = isEnsembleOcc ? '#0055d4' : '#34a853'}
+                        onMouseOut={e => e.currentTarget.style.background = isEnsembleOcc ? '#007aff' : '#34a853'}
                       >
                         Speichern
                       </button>
@@ -5504,7 +5680,7 @@ export function ScheduleCalendarView({
                                     </span>
                                   )}
                                   <div style={{ 
-                                    background: isMe ? (isEnsembleOcc ? '#007aff' : '#137333') : '#f5f5f7', 
+                                    background: isMe ? (isEnsembleOcc ? '#007aff' : '#34a853') : '#f5f5f7', 
                                     color: isMe ? 'white' : '#1d1d1f', 
                                     padding: '8px 12px', 
                                     borderRadius: '12px', 
@@ -5536,7 +5712,7 @@ export function ScheduleCalendarView({
                             onChange={e => setChatTypedMessage(e.target.value)}
                             style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
                           />
-                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isEnsembleOcc ? '#007aff' : '#137333'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
+                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isEnsembleOcc ? '#007aff' : '#34a853'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
                             <Send size={14} />
                           </button>
                         </form>
@@ -5842,7 +6018,7 @@ export function ScheduleCalendarView({
                   gap: '6px'
                 }}
                 onMouseOver={e => {
-                  e.currentTarget.style.background = '#137333';
+                  e.currentTarget.style.background = '#34a853';
                   e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 168, 83, 0.45)';
                 }}
                 onMouseOut={e => {

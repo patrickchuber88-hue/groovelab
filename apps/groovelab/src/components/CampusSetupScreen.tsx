@@ -25,8 +25,8 @@ export function CampusSetupScreen({
   admin, 
   onUpdate 
 }: CampusSetupScreenProps) {
-  // As per styling rules, Campus module uses green (#137333, #e6f4ea)
-  const brandColor = '#137333';
+  // As per styling rules, Campus module uses green (#34a853, #e6f4ea)
+  const brandColor = '#34a853';
   const activeBgColor = '#e6f4ea';
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
   const sId = effectiveSchool?.id || admin?.school_id;
@@ -488,10 +488,10 @@ Vielen Dank für Ihre Unterstützung!`;
                   borderRadius: '16px', 
                   padding: '16px', 
                   fontSize: '0.76rem',
-                  color: '#137333',
+                  color: '#34a853',
                   lineHeight: '1.45'
                 }}>
-                  <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#137333' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong>
+                  <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#34a853' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong>
                   Der AVV nach Art. 28 DSGVO (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Pilotphasen-Freischaltung digital gezeichnet.
                 </div>
               </div>

@@ -955,7 +955,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 <Check size={36} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#137333' }}>Registrierung erfolgreich!</h3>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 900, color: '#34a853' }}>Registrierung erfolgreich!</h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b', fontWeight: 600 }}>Die Schule „{onboardCreatedUser.schoolName}“ wurde erfolgreich angelegt.</p>
               </div>
 
@@ -3165,9 +3165,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               background: isSecretary ? '#e6f4ea' : '#34a85320',
               display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'
             }}>
-              <Check size={36} color={isSecretary ? '#137333' : '#34a853'} strokeWidth={3} />
+              <Check size={36} color={isSecretary ? '#34a853' : '#34a853'} strokeWidth={3} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#137333' : '#34a853', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: isSecretary ? '#34a853' : '#34a853', margin: '0 0 10px 0', textAlign: 'center', letterSpacing: '-0.02em' }}>
               Registrierung erfolgreich!
             </h1>
             <p style={{ color: isSecretary ? '#5f6368' : '#94a3b8', fontSize: '13px', textAlign: 'center', lineHeight: '1.5', margin: '0 0 24px 0', fontWeight: 600 }}>
@@ -3210,7 +3210,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
                 
                 <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Schule</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#137333' : '#eab308' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#34a853' : '#eab308' }}>
                   {schoolName || 'GrooveLab Academy'}
                 </div>
               </div>
@@ -3220,7 +3220,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={() => onLogin(registeredUser.id, true)}
               style={{
                 width: '100%', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#34a853' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
                 cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 24px rgba(234, 179, 8, 0.25)',
                 transition: 'all 0.2s', outline: 'none'
@@ -3259,12 +3259,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
             }}>
               {isSecretary ? (
-                <School size={24} color="#137333" strokeWidth={2.5} />
+                <School size={24} color="#34a853" strokeWidth={2.5} />
               ) : (
                 <Music size={24} color="#0f172a" />
               )}
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#137333' : '#ffffff' }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: isSecretary ? '#34a853' : '#ffffff' }}>
               {isSecretary ? 'Campus-Groovelab Admin Einladung' : 'Campus-Groovelab Coach Einladung'}
             </div>
           </div>
@@ -3276,7 +3276,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {isSecretary 
               ? `Du wurdest eingeladen, als Administrator/Verwaltung für die Schule `
               : `Du wurdest eingeladen, als Coach für die Schule `}
-            <strong style={{ color: isSecretary ? '#137333' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
+            <strong style={{ color: isSecretary ? '#34a853' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
           </p>
 
           <form onSubmit={async (e) => {
@@ -3360,7 +3360,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${firstNameFocused ? '#137333' : '#dadce0'}` 
+                    ? `1px solid ${firstNameFocused ? '#34a853' : '#dadce0'}` 
                     : `1px solid ${firstNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
                   boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
@@ -3384,7 +3384,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: '8px',
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
-                    ? `1px solid ${lastNameFocused ? '#137333' : '#dadce0'}` 
+                    ? `1px solid ${lastNameFocused ? '#34a853' : '#dadce0'}` 
                     : `1px solid ${lastNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
                   boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
@@ -3399,7 +3399,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={signingUp}
               style={{
                 marginTop: '8px', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#137333' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#34a853' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
                 cursor: 'pointer', boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.2)' : '0 8px 20px rgba(234, 179, 8, 0.2)',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -4391,7 +4391,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         {/* Progress Bar & Steps */}
         <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', width: '100%', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
               <Calendar size={20} />
             </div>
             <div style={{ textAlign: 'left' }}>
@@ -4815,7 +4815,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                         borderRadius: '12px',
                         border: activeParentChildIndex === index ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
                         background: activeParentChildIndex === index ? '#e6f4ea' : '#ffffff',
-                        color: activeParentChildIndex === index ? '#137333' : '#475569',
+                        color: activeParentChildIndex === index ? '#34a853' : '#475569',
                         fontWeight: 800,
                         fontSize: '11.5px',
                         cursor: 'pointer',
@@ -5134,7 +5134,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                           <div style={{ width: '12px', height: '12px', background: '#f4fbf7', border: '1px solid #a7f3d0', borderRadius: '4px', flexShrink: 0 }} />
-                          <span style={{ fontWeight: 700, color: '#137333' }}>Regulärer Unterricht</span>
+                          <span style={{ fontWeight: 700, color: '#34a853' }}>Regulärer Unterricht</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                           <div style={{ width: '12px', height: '12px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', flexShrink: 0 }} />
@@ -5181,7 +5181,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                   flexDirection: 'column',
                                   alignItems: 'center',
                                   gap: '2px',
-                                  color: isTeacherDay ? '#137333' : '#64748b'
+                                  color: isTeacherDay ? '#34a853' : '#64748b'
                                 }}
                               >
                                 <span>{dayNames[dayNum]}</span>
@@ -5189,7 +5189,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                   <span style={{ 
                                     fontSize: '7px', 
                                     background: '#e6f4ea', 
-                                    color: '#137333', 
+                                    color: '#34a853', 
                                     padding: '1px 3px', 
                                     borderRadius: '4px',
                                     fontWeight: 800,
@@ -5227,7 +5227,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                 
                                 if (selection === 'wunsch') {
                                   bg = '#34a853';
-                                  border = '1px solid #137333';
+                                  border = '1px solid #34a853';
                                   labelColor = '#ffffff';
                                 } else if (selection === 'gesperrt') {
                                   bg = '#ef4444';
@@ -5283,14 +5283,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 })()}
 
                 {/* Live Progress Info */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#137333', textAlign: 'left' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#34a853', textAlign: 'left' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={16} />
                     <span>
                       Ausgewählte Wunschzeit: <strong>{((Object.values(parentChildren[activeParentChildIndex].selectedSlots).filter(v => v === 'wunsch').length * 30) / 60).toFixed(1)} Std.</strong>
                     </span>
                   </div>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#137333' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#34a853' }}>
                     (mind. 2,0 Std. benötigt)
                   </span>
                 </div>
@@ -5366,7 +5366,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px' }}>
                 <span style={{ color: '#64748b', fontWeight: 700 }}>Ausweis-Nr:</span>
-                <strong style={{ color: '#137333', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
+                <strong style={{ color: '#34a853', fontWeight: 800 }}>{verifiedStudentDetails.ausweis_nummer}</strong>
               </div>
             </div>
 
@@ -5410,7 +5410,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 textAlign: 'left'
               }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ background: '#e6f4ea', color: '#137333', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: '#e6f4ea', color: '#34a853', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Fingerprint size={18} />
                   </div>
                   <div>
@@ -5435,7 +5435,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       background: '#34a853', color: '#ffffff', fontWeight: 800, fontSize: '11.5px',
                       cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                     }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#137333'}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
                     onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
                   >
                     Fingerabdruck-Login aktivieren
@@ -5443,7 +5443,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 )}
 
                 {biometricsStatus === 'registering' && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '11px', color: '#137333', fontWeight: 700, padding: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '11px', color: '#34a853', fontWeight: 700, padding: '6px' }}>
                     <RotateCw size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
                     Warte auf Bestätigung des Geräts...
                   </div>
@@ -5492,7 +5492,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               textAlign: 'left'
             }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <div style={{ background: '#e6f4ea', color: '#137333', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: '#e6f4ea', color: '#34a853', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Smartphone size={18} />
                 </div>
                 <div>
@@ -5519,7 +5519,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   background: '#34a853', color: '#ffffff', fontWeight: 800, fontSize: '11px',
                   cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#137333'}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
                 onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
               >
                 App jetzt installieren
@@ -5530,13 +5530,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={() => onLogin(verifiedStudentDetails.id, false)}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                background: '#137333',
+                background: '#34a853',
                 color: '#ffffff',
                 fontWeight: 900, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', 
                 boxShadow: '0 4px 12px rgba(19, 115, 51, 0.2)'
               }}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#137333'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#34a853'}
             >
               Direkt zum Profil einloggen
             </button>
@@ -5880,15 +5880,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         gap: '16px', 
         fontSize: '11px', 
         fontWeight: 800, 
-        color: '#137333',
+        color: '#34a853',
         textTransform: 'uppercase',
         letterSpacing: '0.05em'
       }}>
         <span 
           onClick={() => setShowPrivacy(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#137333'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#137333'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
         >
           Datenschutz
         </span>
@@ -5896,8 +5896,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowAgb(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#137333'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#137333'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
         >
           AGB
         </span>
@@ -5905,8 +5905,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         <span 
           onClick={() => setShowImpressum(true)} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
-          onMouseOver={(e) => { e.currentTarget.style.color = '#137333'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#137333'; }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
         >
           Impressum
         </span>
@@ -5966,7 +5966,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -6131,7 +6131,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
                 <FileText size={28} />
               </div>
               <div>
@@ -6859,7 +6859,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#137333'
+                color: '#34a853'
               }}>
                 <span style={{ fontSize: '28px' }}>👋</span>
               </div>
@@ -6901,7 +6901,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%',
                   padding: '16px',
                   borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                   color: '#ffffff',
                   border: 'none',
                   fontSize: '1rem',

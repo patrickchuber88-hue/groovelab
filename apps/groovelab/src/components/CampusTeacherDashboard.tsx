@@ -2010,7 +2010,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               {/* Card 2: Cockpit Auslastung (Green) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
                 borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.4)',
                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                 padding: '14px 16px', boxSizing: 'border-box',

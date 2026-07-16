@@ -919,7 +919,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
                   Campus-Groovelab
                 </h1>
-                <span style={{ fontSize: '0.68rem', color: '#137333', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   Admin Leitstand
                 </span>
               </div>
@@ -928,10 +928,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             {/* Sidebar Navigation */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
-                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#137333', bg: 'rgba(52, 168, 83, 0.1)' },
+                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)' },
                 { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' },
                 { id: 'billing', label: 'Abrechnung & Abonnements', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' },
-                { id: 'banking', label: 'System & Master-Admins', icon: <Shield size={18} />, color: '#137333', bg: 'rgba(52, 168, 83, 0.1)' },
+                { id: 'banking', label: 'System & Master-Admins', icon: <Shield size={18} />, color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)' },
                 { id: 'pricing', label: 'System-Preise', icon: <Tag size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.1)' }
               ].map((tab) => {
                 const isActive = activePortalTab === tab.id;
@@ -2239,7 +2239,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
                   }}>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      <Percent size={20} color="#137333" /> Rabatt-Kampagne erstellen
+                      <Percent size={20} color="#34a853" /> Rabatt-Kampagne erstellen
                     </h3>
 
                     <form onSubmit={handleAddSpecialOffer} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -2359,7 +2359,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         style={{
                           padding: '12px',
                           borderRadius: '12px',
-                          background: '#137333',
+                          background: '#34a853',
                           color: '#ffffff',
                           border: 'none',
                           fontSize: '0.88rem',
@@ -2414,7 +2414,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                               <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
                                 {offer.name}
                               </div>
-                              <div style={{ fontSize: '0.78rem', color: '#137333', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '0.78rem', color: '#34a853', marginTop: '4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span style={{ background: 'rgba(19, 115, 51, 0.08)', padding: '2px 8px', borderRadius: '100px' }}>
                                   {offer.discount_percent}% Rabatt
                                 </span>
@@ -2890,7 +2890,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   boxShadow: '0 10px 30px rgba(15, 23, 42, 0.02)'
                 }}>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 28px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                    <Settings size={20} color="#137333" /> Betreiber Rechnungsdaten
+                    <Settings size={20} color="#34a853" /> Betreiber Rechnungsdaten
                   </h3>
 
                   <form onSubmit={handleUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -3083,7 +3083,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         borderRadius: '12px',
                         background: 'rgba(19, 115, 51, 0.1)',
                         border: '1px solid rgba(19, 115, 51, 0.25)',
-                        color: '#137333',
+                        color: '#34a853',
                         fontSize: '0.9rem',
                         fontWeight: 800,
                         cursor: 'pointer',
@@ -3095,12 +3095,12 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         marginTop: '12px'
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#137333';
+                        e.currentTarget.style.background = '#34a853';
                         e.currentTarget.style.color = '#ffffff';
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.background = 'rgba(19, 115, 51, 0.1)';
-                        e.currentTarget.style.color = '#137333';
+                        e.currentTarget.style.color = '#34a853';
                       }}
                     >
                       {updatingBilling ? 'Speichern...' : 'Rechnungsdaten aktualisieren'}
@@ -3366,7 +3366,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                                   {school.has_campus_subscription && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#137333', background: '#e6f4ea', padding: '2px 8px', borderRadius: '100px' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', padding: '2px 8px', borderRadius: '100px' }}>
                                       🎓 Campus
                                     </span>
                                   )}
@@ -3501,7 +3501,7 @@ gemäß Art. 28 DSGVO.`;
                                   borderRadius: '100px',
                                   background: '#e6f4ea',
                                   border: '1px solid #a7f3d0',
-                                  color: '#137333',
+                                  color: '#34a853',
                                   fontSize: '0.72rem',
                                   fontWeight: 800,
                                   cursor: 'pointer',

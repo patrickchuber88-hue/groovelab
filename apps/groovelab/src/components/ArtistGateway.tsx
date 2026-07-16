@@ -262,7 +262,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
           <button 
             onClick={onClose}
             style={{ 
-              background: 'linear-gradient(135deg, #34a853, #137333)', 
+              background: 'linear-gradient(135deg, #34a853, #34a853)', 
               border: 'none', 
               padding: '18px 45px', 
               borderRadius: '20px', 

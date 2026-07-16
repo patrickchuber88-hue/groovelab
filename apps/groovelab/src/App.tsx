@@ -1256,7 +1256,7 @@ if (typeof window !== 'undefined') {
       }
     }
     let titleText = isCampus ? 'Campus' : 'Campus-Groovelab';
-    let btnBackground = 'linear-gradient(135deg, #34a853, #137333)';
+    let btnBackground = 'linear-gradient(135deg, #34a853, #34a853)';
     let btnShadow = '0 4px 12px rgba(52, 168, 83, 0.2)';
     
     if (isError) {
@@ -1561,7 +1561,7 @@ function App() {
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#137333' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
                   <FileText size={28} />
                 </div>
                 <div>
@@ -1662,25 +1662,25 @@ function App() {
 
                 {/* TEIL B */}
                 <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL B: Besondere Bedingungen für das Modul „Campus“</h3>
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TEIL B: Besondere Bedingungen für das Modul „Campus“</h3>
                   <p style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>Die Bestimmungen dieses Teils gelten zusätzlich zu Teil A, sofern das Campus-Modul gebucht ist.</p>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 9 LEISTUNGSUMFANG CAMPUS</h4>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#34a853' }}>§ 9 LEISTUNGSUMFANG CAMPUS</h4>
                       <p style={{ margin: 0 }}>Das Campus-Modul umfasst das digitale Hausaufgabenheft mit Übungsstreaks, das Meisterwerk-Protokoll, die Audio-Loopstation, den Stundenplan-Designer sowie die interne Schul- und Raumbelegungs-Engine.</p>
                       <p style={{ margin: '4px 0 0 0' }}><strong>1. Übe-Timer & Sensorik:</strong> Der Fokus-Timer wertet die Lagesensoren (DeviceOrientation API) aus. Das System gewährt eine 15-sekündige Toleranzzeit (Grace Period). Gewährleistung für Timer-Fehlfunktionen durch inkompatible oder falsch kalibrierte Sensoren ist ausgeschlossen.</p>
                       <p style={{ margin: '4px 0 0 0' }}><strong>2. Audio-Loopstation:</strong> Die Loopstation verwendet ein 4-Takte-Pause-Verfahren (Variante 1) zur Sicherstellung der Sample-Synchronität und Vermeidung von Signal-Verschluckungen.</p>
                     </div>
 
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 10 SCHNITTSTELLEN & KALENDER-EXPORT</h4>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#34a853' }}>§ 10 SCHNITTSTELLEN & KALENDER-EXPORT</h4>
                       <p style={{ margin: 0 }}><strong>1. CSV-Import:</strong> Datenimporte aus ERP-Systemen (z. B. iMikel) erfolgen über Copy-and-Paste eines CSV-Textstroms. Bei Import-Formatfehlern bricht das System die Transaktion automatisch ohne Datenverlust ab (Rollback).</p>
                       <p style={{ margin: '4px 0 0 0' }}><strong>2. iCal-Kalender-Kopplung:</strong> Exporte von Kalenderdaten im .ics-Format pseudonymisieren Schülernamen (z. B. „J. M. Musikschule“) zur Einhaltung des Datenschutzes. Für Aktualisierungsverzögerungen externer Kalender-Clients haftet der Anbieter nicht.</p>
                     </div>
 
                     <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#137333' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: '#34a853' }}>§ 11 NAMENSANONYMISIERUNG & PROFILAUSWAHL</h4>
                       <p style={{ margin: 0 }}><strong>1. Namensmaskierung:</strong> Schülernamen werden im Lehrer-Dashboard auf „Vorname + Anfangsbuchstabe Nachname“ und im Schüler-Dashboard auf generische Begriffe (z. B. „Hausaufgabenheft“) begrenzt.</p>
                       <p style={{ margin: '4px 0 0 0' }}><strong>2. Profilauswahl (Familien-Sharing):</strong> Zur Vereinfachung des Zugangs für Familien mit mehreren Kindern im Haushalt wird eine PIN-lose Profil-Schnellwahl (analog dem Netflix-Prinzip) im Campus-Modul gestattet.</p>
                     </div>
@@ -6575,7 +6575,7 @@ function App() {
           {/* Brand header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <div style={{ width: '32px', height: '32px', background: '#e6f4ea', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#137333', fontWeight: 900, fontSize: '1.2rem' }}>C</span>
+              <span style={{ color: '#34a853', fontWeight: 900, fontSize: '1.2rem' }}>C</span>
             </div>
             <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>CAMPUS PASS</div>
           </div>
@@ -7042,8 +7042,8 @@ function App() {
     }
     if (nameLower.includes('boris')) {
       return {
-        solidBg: '#34a853', solidBorder: '#137333',
-        lightBg: 'rgba(52, 168, 83, 0.12)', lightBorder: 'rgba(52, 168, 83, 0.5)', lightText: '#137333'
+        solidBg: '#34a853', solidBorder: '#34a853',
+        lightBg: 'rgba(52, 168, 83, 0.12)', lightBorder: 'rgba(52, 168, 83, 0.5)', lightText: '#34a853'
       };
     }
     
@@ -7051,7 +7051,7 @@ function App() {
       { solidBg: '#3b82f6', solidBorder: '#2563eb', lightBg: 'rgba(59, 130, 246, 0.12)', lightBorder: 'rgba(59, 130, 246, 0.5)', lightText: '#2563eb' }, // Blue
       { solidBg: '#8b5cf6', solidBorder: '#7c3aed', lightBg: 'rgba(139, 92, 246, 0.12)', lightBorder: 'rgba(139, 92, 246, 0.5)', lightText: '#7c3aed' }, // Violet
       { solidBg: '#ec4899', solidBorder: '#db2777', lightBg: 'rgba(236, 72, 153, 0.12)', lightBorder: 'rgba(236, 72, 153, 0.5)', lightText: '#db2777' }, // Pink
-      { solidBg: '#34a853', solidBorder: '#137333', lightBg: 'rgba(52, 168, 83, 0.12)', lightBorder: 'rgba(52, 168, 83, 0.5)', lightText: '#137333' }, // Teal
+      { solidBg: '#34a853', solidBorder: '#34a853', lightBg: 'rgba(52, 168, 83, 0.12)', lightBorder: 'rgba(52, 168, 83, 0.5)', lightText: '#34a853' }, // Teal
       { solidBg: '#f43f5e', solidBorder: '#e11d48', lightBg: 'rgba(244, 63, 94, 0.12)', lightBorder: 'rgba(244, 63, 94, 0.5)', lightText: '#e11d48' }, // Rose
     ];
     
@@ -7426,7 +7426,7 @@ function App() {
                 width: '44px',
                 height: '44px',
                 borderRadius: '11px',
-                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -8090,7 +8090,7 @@ function App() {
                 borderRadius: '14px', 
                 border: `1.5px solid ${activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.18)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.18)' : 'rgba(234, 179, 8, 0.25)'}`, 
                 background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.05)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(234, 179, 8, 0.05)', 
-                color: activePlatform === 'campus' ? '#137333' : activePlatform === 'ensembles' ? '#2563eb' : '#a16207', 
+                color: activePlatform === 'campus' ? '#34a853' : activePlatform === 'ensembles' ? '#2563eb' : '#a16207', 
                 fontWeight: 800, 
                 fontSize: '0.82rem',
                 cursor: 'pointer',
@@ -8546,7 +8546,7 @@ function App() {
                     const hasNumber = stationNumber.length > 0;
                     
                     const isHome = locationMode !== 'lab';
-                    const badgeColor = isTeacherStation ? '#137333' : stationColor;
+                    const badgeColor = isTeacherStation ? '#34a853' : stationColor;
                     const displayBg = isHome 
                       ? 'rgba(100, 116, 139, 0.06)' 
                       : `${badgeColor}12`;
@@ -8927,7 +8927,7 @@ function App() {
                     {/* Badges row */}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
                       <span style={{
-                        background: 'linear-gradient(135deg, #34a853, #137333)',
+                        background: 'linear-gradient(135deg, #34a853, #34a853)',
                         color: 'white',
                         padding: '4px 14px',
                         borderRadius: '10px',
@@ -8969,7 +8969,7 @@ function App() {
                           gap: '6px',
                           background: 'rgba(52, 168, 83, 0.07)',
                           border: '1px solid rgba(52, 168, 83, 0.18)',
-                          color: '#137333',
+                          color: '#34a853',
                           padding: '5px 14px',
                           borderRadius: '12px',
                           fontSize: '0.8rem',
@@ -8988,7 +8988,7 @@ function App() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            background: 'linear-gradient(135deg, #34a853, #137333)',
+                            background: 'linear-gradient(135deg, #34a853, #34a853)',
                             color: 'white',
                             padding: '6px 14px',
                             borderRadius: '12px',
@@ -11010,7 +11010,7 @@ function App() {
                               padding: '4px 10px', 
                               borderRadius: '8px', 
                               background: parsed.target_type === 'all' ? '#e0f2fe' : parsed.target_type === 'students' ? '#dbeafe' : parsed.target_type === 'teachers' ? '#e6f4ea' : '#f3e8ff',
-                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#137333' : '#7e22ce'
+                              color: parsed.target_type === 'all' ? '#0369a1' : parsed.target_type === 'students' ? '#1d4ed8' : parsed.target_type === 'teachers' ? '#34a853' : '#7e22ce'
                             }}>
                               {parsed.target_type === 'all' ? 'ALLE' : parsed.target_type === 'students' ? 'SCHÜLER' : parsed.target_type === 'teachers' ? 'LEHRER' : 'EINZELNE'}
                             </span>
@@ -11528,10 +11528,10 @@ function App() {
                                           <CheckCircle size={24} />
                                         </div>
                                         <div>
-                                           <div style={{ fontSize: '1rem', fontWeight: 900, color: '#137333', marginBottom: '2px' }}>
+                                           <div style={{ fontSize: '1rem', fontWeight: 900, color: '#34a853', marginBottom: '2px' }}>
                                              Du spielst bereits {myInstrument} in der Band "{activeBandForSong.name}" für diesen Song! 🚀
                                            </div>
-                                           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#137333', opacity: 0.85 }}>
+                                           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#34a853', opacity: 0.85 }}>
                                              Dein Repertoire-Beitrag ist aktiv und verifiziert.
                                            </div>
                                          </div>
@@ -12406,7 +12406,7 @@ function App() {
                               display: 'flex', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              color: '#137333', 
+                              color: '#34a853', 
                               fontWeight: 900, 
                               fontSize: '0.85rem' 
                             }}>
@@ -13604,7 +13604,7 @@ function App() {
               style={{
                 width: '100%',
                 padding: '12px',
-                background: activePlatform === 'campus' ? '#137333' : (activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'),
+                background: activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'),
                 color: activePlatform === 'groovelab' ? '#09090b' : 'white',
                 border: 'none',
                 borderRadius: '14px',
@@ -14029,7 +14029,7 @@ function App() {
                   setShowAutoLockWarning(false);
                 }}
                 style={{
-                  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                   color: 'white',
                   border: 'none',
                   padding: '16px 24px',

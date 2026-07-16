@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
@@ -901,6 +902,35 @@ export function TeacherDashboard({
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
   const [docStudent, setDocStudent] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches'>(initialTab || (hideHeader ? 'live' : 'briefing'));
+
+  // --- Guided Tour ---
+  const tourSteps = useMemo<TourStep[]>(() => {
+    switch(activeTab) {
+      case 'briefing':
+        return [
+          { title: "Dein Briefing 👋", description: "Hier findest du eine Übersicht über deinen Tag und alle wichtigen Kennzahlen.", selector: "tour-teacher-briefing" },
+          { title: "Kennzahlen 📊", description: "Diese Karten zeigen dir auf einen Blick, wie viele Schüler du heute hast und wie lange deine durchschnittliche Übe-Streak ist.", selector: "tour-teacher-kpis" },
+          { title: "Dein Tagesplan 📅", description: "Hier siehst du deine anstehenden Unterrichtstermine für heute.", selector: "tour-teacher-schedule" }
+        ];
+      case 'live':
+        return [
+          { title: "Das Live Lab 🎸", description: "Hier hast du die volle Kontrolle über den Live-Unterricht und die Raumbelegung.", selector: "tour-teacher-livelab" },
+          { title: "Räume verwalten 🚪", description: "Wähle hier einen Raum aus, um die interaktive Sitzverteilung und die angemeldeten Schüler zu sehen.", selector: "tour-teacher-livelab-rooms" }
+        ];
+      case 'bands':
+        return [
+          { title: "Band-Verwaltung 🎤", description: "Hier kannst du neue Bands gründen, Mitglieder verwalten und euren Fortschritt verfolgen.", selector: "tour-teacher-bands" }
+        ];
+      default:
+        return [];
+    }
+  }, [activeTab]);
+
+  const { TourComponent, startTour } = usePremiumOnboardingTour({
+    tourKey: `campus_groovelab_tour_completed_${activeTab}_${userId}`,
+    steps: tourSteps,
+    platformTheme: activePlatform === 'campus' ? 'campus' : 'groovelab'
+  });
   const [teacherSettingsTab, setTeacherSettingsTab] = useState<'fokus' | 'profile'>('fokus');
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -925,14 +955,14 @@ export function TeacherDashboard({
     app_usage_mode: 'student_only'
   });
   const [showInviteStudent, setShowInviteStudent] = useState(false);
-  const [teachersManageStudents] = useState<boolean>(() => {
-    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_students');
-    return saved !== 'false';
-  });
-  const [teachersManageTeachers] = useState<boolean>(() => {
-    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_teachers');
-    return saved !== 'false';
-  });
+  const op = teacher?.schools?.opening_hours || session?.users?.schools?.opening_hours || {};
+  const glTeachersManageStudents = op.gl_setting_groovelab_teachers_manage_students === true;
+  const glTeachersManageTeachers = op.gl_setting_groovelab_teachers_manage_teachers === true;
+  const campusTeachersManageStudents = op.gl_setting_campus_teachers_manage_students === true;
+  const campusTeachersManageTeachers = op.gl_setting_campus_teachers_manage_teachers === true;
+
+  const teachersManageStudents = activePlatform === 'campus' ? campusTeachersManageStudents : glTeachersManageStudents;
+  const teachersManageTeachers = activePlatform === 'campus' ? campusTeachersManageTeachers : glTeachersManageTeachers;
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFirstName, setInviteFirstName] = useState('');
   const [inviteLastName, setInviteLastName] = useState('');
@@ -5388,7 +5418,7 @@ export function TeacherDashboard({
                       <span style={{ color: 'white', fontSize: '1rem' }}>✓</span>
                     </div>
                     <div>
-                      <div style={{ fontWeight: 900, color: '#137333' }}>Profil angelegt!</div>
+                      <div style={{ fontWeight: 900, color: '#34a853' }}>Profil angelegt!</div>
                       <div style={{ fontSize: '0.78rem', color: '#34a853' }}>Teile den Link mit dem Schüler</div>
                     </div>
                   </div>
@@ -5511,6 +5541,7 @@ export function TeacherDashboard({
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <TourStartButton onClick={startTour} platformTheme={activePlatform === 'campus' ? 'campus' : 'groovelab'} />
               {activeTab === 'live' && (
                 <>
                   <button
@@ -5707,7 +5738,7 @@ export function TeacherDashboard({
                       <div style={{
                         background: 'rgba(52, 168, 83, 0.08)',
                         border: '1.5px solid rgba(52, 168, 83, 0.12)',
-                        color: '#137333',
+                        color: '#34a853',
                         padding: '10px',
                         borderRadius: '12px',
                         display: 'flex',
@@ -5722,7 +5753,7 @@ export function TeacherDashboard({
                           <span style={{
                             fontSize: '0.62rem',
                             fontWeight: 900,
-                            color: '#137333',
+                            color: '#34a853',
                             background: 'rgba(52, 168, 83, 0.08)',
                             padding: '2px 6px',
                             borderRadius: '5px',
@@ -5736,7 +5767,7 @@ export function TeacherDashboard({
                           </h4>
                         </div>
                         <p style={{ margin: '3px 0 0 0', fontSize: '0.8rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-                          Vom <strong style={{ color: '#137333', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#137333', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
+                          Vom <strong style={{ color: '#34a853', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#34a853', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
                         </p>
                       </div>
                     </div>
@@ -5931,7 +5962,7 @@ export function TeacherDashboard({
                         <button
                           onClick={handleEndSick}
                           style={{
-                            background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                            background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '12px 28px',
@@ -5953,7 +5984,7 @@ export function TeacherDashboard({
                     <>
                       {/* Gamified KPI Cards row */}
                       {(!teacher?.sick_until || bypassSickView) && (
-                        <div style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
+                        <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
 
                       {/* Card 1: Heutige Schüler (Blue-purple matching Level XP) */}
                       <div style={{
@@ -5980,7 +6011,7 @@ export function TeacherDashboard({
                       {/* Card 2: Ø Übe-Streak Heute (Green matching Songs) */}
                       <div style={{
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
                         borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.3)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                         padding: '16px', boxSizing: 'border-box',
@@ -6049,7 +6080,7 @@ export function TeacherDashboard({
                   <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch', width: '100%' }}>
                     
                     {/* LEFT COLUMN: Greeting Banner & Schüler Notizen */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: (isWeekend || isFreeDay) ? '1 1 100%' : '1 1 350px', minWidth: '300px' }}>
+                    <div id="tour-teacher-briefing" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: (isWeekend || isFreeDay) ? '1 1 100%' : '1 1 350px', minWidth: '300px' }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
                       {(!teacher?.sick_until || bypassSickView) && (
                         <div style={{
@@ -6546,7 +6577,7 @@ export function TeacherDashboard({
                                         width: '42px',
                                         height: '42px',
                                         borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                                         color: 'white',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -7634,7 +7665,7 @@ export function TeacherDashboard({
                                       {slot.isGroup ? (
                                         <span style={{ 
                                           fontWeight: 900, 
-                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#137333' : '#0f172a'), 
+                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
                                           fontSize: '0.9rem', 
                                           whiteSpace: 'nowrap',
                                           marginRight: '12px'
@@ -7644,7 +7675,7 @@ export function TeacherDashboard({
                                       ) : slot.student ? (
                                         <span style={{ 
                                           fontWeight: 900, 
-                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#137333' : '#0f172a'), 
+                                          color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
                                           fontSize: '0.9rem', 
                                           width: (isCanceled || isRescheduledAway) ? 'auto' : '140px',
                                           maxWidth: (isCanceled || isRescheduledAway) ? '120px' : '140px',
@@ -8074,7 +8105,7 @@ export function TeacherDashboard({
                           }}
                           disabled={reportingSick}
                           style={{
-                            background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                            background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                             color: '#ffffff',
                             border: 'none',
                             padding: '8px 16px',
@@ -8262,7 +8293,7 @@ export function TeacherDashboard({
                               onClick={handleEndSick}
                               disabled={reportingSick}
                               style={{
-                                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                                background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                                 color: '#ffffff',
                                 border: 'none',
                                 padding: '12px 14px',
@@ -9092,7 +9123,7 @@ export function TeacherDashboard({
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#e6f4ea', color: '#137333', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#e6f4ea', color: '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                   <CheckCircle size={11} /> Erledigt
                                 </span>
                                 <span style={{ fontSize: '10px', color: '#8e8e93', fontWeight: 500 }}>
@@ -9592,7 +9623,7 @@ export function TeacherDashboard({
             </aside>
           </div>
         ) : activeTab === 'live' ? (
-        <div className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+        <div id="tour-teacher-livelab" className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
           {(() => {
             const activeRoom = rooms.find(r => r.id === selectedRoomId);
             const roomStations = stations.filter(s => s.room_id === selectedRoomId);
@@ -9668,7 +9699,7 @@ export function TeacherDashboard({
                         
                         {/* Room Switcher inline next to title */}
                         {rooms.length > 1 && (
-                          <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
+                          <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
                             {rooms.map((room, idx) => {
                               const isSelected = room.id === selectedRoomId;
                               return (
@@ -9815,7 +9846,7 @@ export function TeacherDashboard({
                   ) : (
                     <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '16px', flexWrap: 'wrap' }}>
                       {rooms.length > 1 ? (
-                        <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
+                        <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
                           {rooms.map((room, idx) => {
                             const isSelected = room.id === selectedRoomId;
                             return (
@@ -10154,7 +10185,7 @@ export function TeacherDashboard({
               <div style={{ display: 'flex', flexDirection: 'column', gap: rooms.length > 1 ? '16px' : '0px', flex: 1 }}>
                 {/* Room Switcher */}
                 {rooms.length > 1 && (
-                  <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
+                  <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
                     {rooms.map((room, idx) => {
                       const isSelected = room.id === selectedRoomId;
                       return (
@@ -10454,7 +10485,7 @@ export function TeacherDashboard({
                   <div style={{ background: '#34a853', color: 'white', padding: '8px', borderRadius: '10px' }}>
                     <Clock size={18} />
                   </div>
-                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#137333', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -10469,12 +10500,12 @@ export function TeacherDashboard({
                       justifyContent: 'space-between',
                       gap: '12px'
                     }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#137333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#34a853', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ 
                           fontSize: '0.62rem', 
                           fontWeight: 950, 
-                          color: s.count === (s.totalMembers || s.count) ? '#137333' : '#a16207',
+                          color: s.count === (s.totalMembers || s.count) ? '#34a853' : '#a16207',
                           background: s.count === (s.totalMembers || s.count) ? '#e6f4ea' : '#fef9c3',
                           padding: '2px 6px',
                           borderRadius: '6px',
@@ -10683,7 +10714,7 @@ export function TeacherDashboard({
                                  <div style={{ 
                                    fontSize: '0.75rem', 
                                    fontWeight: 1000, 
-                                   color: '#137333', 
+                                   color: '#34a853', 
                                    textTransform: 'uppercase',
                                    letterSpacing: '0.08em',
                                    display: 'flex',
@@ -11229,7 +11260,7 @@ export function TeacherDashboard({
 
                 {/* Room Selector inside Kiosk */}
                 {rooms.length > 0 && (
-                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
                     {rooms.map((room, idx) => (
                       <button
                         key={room.id}
@@ -12426,7 +12457,7 @@ export function TeacherDashboard({
                 { id: 'profile', label: 'Mein Profil' }
               ].map((item) => {
                 const isSelected = teacherSettingsTab === item.id;
-                const brandColor = '#137333';
+                const brandColor = '#34a853';
                 const activeColor = isSelected ? brandColor : '#64748b';
                 
                 const renderIcon = () => {
@@ -12595,7 +12626,7 @@ export function TeacherDashboard({
           {(() => {
             const isSettingsDirty = initialSchoolData && schoolData && 
               JSON.stringify(schoolData.opening_hours?.fokus_levels) !== JSON.stringify(initialSchoolData.opening_hours?.fokus_levels);
-            const brandColor = '#137333';
+            const brandColor = '#34a853';
 
             return (
               <div style={{
@@ -13392,6 +13423,10 @@ export function TeacherDashboard({
           </button>
         </div>
       )}
+      <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
+        <TourStartButton onClick={startTour} platformTheme={activePlatform === 'campus' ? 'campus' : 'groovelab'} />
+      </div>
+      <TourComponent />
     </div>
   );
 }

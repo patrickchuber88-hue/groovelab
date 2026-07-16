@@ -121,7 +121,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
             height: '60px',
             borderRadius: '16px',
             background: 'rgba(19, 115, 51, 0.08)',
-            color: '#137333',
+            color: '#34a853',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -160,10 +160,10 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               type="checkbox" 
               checked={agbChecked}
               onChange={(e) => setAgbChecked(e.target.checked)}
-              style={{ accentColor: '#137333', marginTop: '3px' }}
+              style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              Ich akzeptiere die <strong onClick={(e) => { e.preventDefault(); onShowAgb(); }} style={{ color: '#137333', textDecoration: 'underline', cursor: 'pointer' }}>Allgemeinen Geschäftsbedingungen (B2B)</strong> des Betreibers Patrick Huber (Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) für die Nutzung der Plattform Campus-Groovelab.
+              Ich akzeptiere die <strong onClick={(e) => { e.preventDefault(); onShowAgb(); }} style={{ color: '#34a853', textDecoration: 'underline', cursor: 'pointer' }}>Allgemeinen Geschäftsbedingungen (B2B)</strong> des Betreibers Patrick Huber (Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) für die Nutzung der Plattform Campus-Groovelab.
             </span>
           </label>
 
@@ -172,7 +172,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               type="checkbox" 
               checked={liabilityChecked}
               onChange={(e) => setLiabilityChecked(e.target.checked)}
-              style={{ accentColor: '#137333', marginTop: '3px' }}
+              style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
               <strong>Haftungsausschluss (§ 599 BGB):</strong> Ich bestätige, dass der Betreiber während der kostenlosen Pilotphase nur für Vorsatz und grobe Fahrlässigkeit haftet. Eine Haftung für einfache Fahrlässigkeit, Datenverlust oder Systemausfälle ist ausgeschlossen.
@@ -184,7 +184,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               type="checkbox" 
               checked={parentChecked}
               onChange={(e) => setParentChecked(e.target.checked)}
-              style={{ accentColor: '#137333', marginTop: '3px' }}
+              style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
               <strong>Datenschutz (Minderjährige):</strong> Ich versichere, dass die Musikschule vor dem Eintragen von Schülernamen (Vorname + Nachname-Initial) die Einwilligung der Erziehungsberechtigten eingeholt hat. Schüler-E-Mail-Adressen werden nicht erfasst.
@@ -196,10 +196,10 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               type="checkbox" 
               checked={avvChecked}
               onChange={(e) => setAvvChecked(e.target.checked)}
-              style={{ accentColor: '#137333', marginTop: '3px' }}
+              style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              Ich zeichne hiermit die <strong onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} style={{ color: '#137333', textDecoration: 'underline', cursor: 'pointer' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong> gemäß Art. 28 DSGVO zur Absicherung des Server-Hostings in Deutschland (Hetzner Online GmbH) mit dem Betreiber.
+              Ich zeichne hiermit die <strong onClick={(e) => { e.preventDefault(); onShowPrivacy(); }} style={{ color: '#34a853', textDecoration: 'underline', cursor: 'pointer' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong> gemäß Art. 28 DSGVO zur Absicherung des Server-Hostings in Deutschland (Hetzner Online GmbH) mit dem Betreiber.
             </span>
           </label>
 
@@ -216,7 +216,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
           onClick={handleAccept}
           disabled={loading}
           style={{
-            background: loading ? '#a1a1aa' : '#137333',
+            background: loading ? '#a1a1aa' : '#34a853',
             color: '#ffffff',
             border: 'none',
             borderRadius: '12px',

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { 
   Calendar, 
@@ -258,6 +259,72 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
   const [otherTeachersSchedules, setOtherTeachersSchedules] = useState<any[]>([]);
   const [siblingInfo, setSiblingInfo] = useState<any | null>(null);
+
+  // Focus Day Zoom state
+  const [focusedDayOfWeek, setFocusedDayOfWeek] = useState<number | null>(null);
+
+  // Dynamic Theme calculations
+  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
+  const isAdminView = currentUserRole === 'admin' || currentUserRole === 'secretary';
+
+  let brandColor = '#34a853'; // Campus Green
+  let lightBg = 'rgba(52, 168, 83, 0.06)';
+  let hoverBg = 'rgba(52, 168, 83, 0.12)';
+  let textAccentColor = '#34a853';
+
+  if (isAdminView) {
+    brandColor = '#ea4335'; // Admin Red
+    lightBg = 'rgba(234, 67, 53, 0.06)';
+    hoverBg = 'rgba(234, 67, 53, 0.12)';
+    textAccentColor = '#ea4335';
+  } else if (isGroovelab) {
+    brandColor = '#eab308'; // GrooveLab Yellow
+    lightBg = 'rgba(234, 179, 8, 0.06)';
+    hoverBg = 'rgba(234, 179, 8, 0.12)';
+    textAccentColor = '#ca8a04'; // Dark yellow text
+  }
+
+  // Guided Tour Configuration & State
+  const tourSteps = useMemo(() => [
+    {
+      title: "Willkommen bei Campus-Groovelab! 👋",
+      description: "Lass uns kurz durchgehen, wie du deinen Stundenplan hier erstellst und verwaltest. Die Plattform hilft dir, deine Schüler optimal einzuteilen und Raumkonflikte zu vermeiden.",
+      selector: undefined
+    },
+    {
+      title: "Der Schüler-Pool 👥",
+      description: "Hier findest du all deine Schüler. Die Karten zeigen dir die Instrumente und die Unterrichtsdauer an. Nicht eingeteilte Schüler haben ein graues Label links. Du kannst sie per Drag & Drop auf die Wochentage ziehen.",
+      selector: "tour-student-pool"
+    },
+    {
+      title: "Deine Wochen-Boards 📅",
+      description: "Das ist deine Arbeitsfläche. Jeder Wochentag hat ein eigenes Spalten-Board, dem ein Unterrichtsraum zugewiesen ist. Die Zeiten passen sich beim Ziehen automatisch an.",
+      selector: "tour-day-boards"
+    },
+    {
+      title: "Pausen & Gruppen-Modus ☕",
+      description: "Ziehe einfach einen Pausen-Block auf deine Boards, um unterrichtsfreie Zeiten einzuplanen, oder nutze den Gruppen-Modus, um mehrere Schüler gemeinsam zu unterrichten.",
+      selector: "tour-special-features"
+    },
+    {
+      title: "Echtzeit-Konflikterkennung ⚠️",
+      description: "Das System prüft im Hintergrund automatisch auf Raumkollisionen mit anderen Lehrern und eigene Doppelbelegungen. Konflikt-Karten werden rot hervorgehoben.",
+      selector: "tour-day-boards"
+    },
+    {
+      title: "Absenden zur Freigabe 🚀",
+      description: "Wenn dein Stundenplan-Entwurf fertig ist, klicke auf 'Einloggen & Senden'. Die Musikschul-Verwaltung erhält ihn dann zur Prüfung und Freigabe.",
+      selector: "tour-submit-section"
+    }
+  ], []);
+
+  const { TourComponent, startTour } = usePremiumOnboardingTour({
+    tourKey: `campus_groovelab_tour_completed_${selectedTeacherId}`,
+    steps: tourSteps,
+    platformTheme: localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'
+  });
+
 
   // ── Optimized Conflict Detection Caching (Map Lookups) ──
   const teacherBusyIntervals = useMemo(() => {
@@ -1058,12 +1125,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setBoards(reconstructedBoards);
       setStudents(finalGroupedStudents);
       
-      // Force activeTab to designer if not submitted and role is teacher
-      if (currentUserRole === 'teacher' && !(schedData && schedData.length > 0)) {
-        setActiveTab('designer');
+      // Set activeTab dynamically based on submission status and whether the schedule is empty
+      if (currentUserRole === 'teacher') {
+        const isSubmitted = !!(schedData && schedData.length > 0);
+        const totalAssigned = reconstructedBoards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak).length, 0);
+        setActiveTab((isSubmitted && totalAssigned > 0) ? 'calendar' : 'designer');
       }
       
       setIsInitialLoadDone(true);
+
+      // Auto-trigger is now handled by usePremiumOnboardingTour
     } catch (err) {
       console.error('Error loading schedule board data:', err);
     } finally {
@@ -1163,6 +1234,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Add a new planned lesson day board
   const handleAddBoard = (e: React.FormEvent) => {
     e.preventDefault();
+    const exists = boards.some(b => b.dayOfWeek === newBoardDay);
+    if (exists) {
+      const dayName = DAYS_OF_WEEK.find(d => d.value === newBoardDay)?.name || '';
+      showAlert(`Der Unterrichtstag "${dayName}" wurde bereits hinzugefügt.`);
+      return;
+    }
     const newBoard: DayBoard = {
       id: `board-${crypto.randomUUID()}`,
       dayOfWeek: newBoardDay,
@@ -2833,6 +2910,50 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'SELECT' || 
+        activeEl.getAttribute('contenteditable') === 'true'
+      )) {
+        return;
+      }
+
+      if (e.key === 'a' || e.key === 'A') {
+        const canAutoAssign = students.filter(s => !s.assignedDay && !s.isBreak).length > 0;
+        if (canAutoAssign) {
+          e.preventDefault();
+          handleAutoAssign();
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        const canReset = students.filter(s => !!s.assignedDay).length > 0;
+        if (canReset) {
+          e.preventDefault();
+          handleResetAllAssignments();
+        }
+      } else if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
+        if (availableDays.length > 0) {
+          setNewBoardDay(availableDays[0].value);
+          setShowAddBoardForm(true);
+        } else {
+          showAlert("Alle Wochentage wurden bereits hinzugefügt.");
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowAddBoardForm(false);
+        setSelectedStudentId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [students, boards, handleAutoAssign, handleResetAllAssignments]);
+
   if (loading) {
     return (
       <div className="flex h-[400px] items-center justify-center text-slate-400">
@@ -2863,6 +2984,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   const showOnboardingOverlay = !isOnboardingCompleted && (currentUserRole === 'teacher') && (selectedTeacherId === userId);
 
+  let onboardingOverlayContent = null;
   if (showOnboardingOverlay) {
     const timeOptions = [
       '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -2871,7 +2993,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       '22:00'
     ];
 
-    return (
+    onboardingOverlayContent = (
       <div style={{
         background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
         borderRadius: '24px',
@@ -2883,7 +3005,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
       }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ height: '64px', width: '64px', background: '#e6f4ea', color: '#137333', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+          <div style={{ height: '64px', width: '64px', background: '#e6f4ea', color: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
             <Calendar size={32} />
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
@@ -3023,7 +3145,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             justifyContent: 'center',
             gap: '8px'
           }}
-          onMouseOver={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#137333'; }}
+          onMouseOver={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#34a853'; }}
           onMouseOut={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#34a853'; }}
         >
           {onboardingSubmitting ? 'Wird gespeichert...' : 'Verfügbarkeit speichern & Stundenplan freischalten'}
@@ -3034,6 +3156,55 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
+      <style>{`
+        .apple-btn-group {
+          background: rgba(0, 0, 0, 0.03);
+          border: 1px solid rgba(0, 0, 0, 0.05);
+          border-radius: 10px;
+          padding: 3px;
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          backdrop-filter: blur(10px);
+        }
+        .apple-btn {
+          background: transparent;
+          border: none;
+          color: #475569;
+          border-radius: 7px;
+          padding: 6px 12px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 30px;
+          outline: none;
+        }
+        .apple-btn:hover {
+          background: rgba(0, 0, 0, 0.04);
+          color: #1d1d1f;
+        }
+        .apple-btn:active {
+          transform: scale(0.97);
+        }
+        .apple-btn.active {
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+          font-weight: 700;
+        }
+        .apple-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          pointer-events: none;
+        }
+        @keyframes pulse-glowing-line {
+          0% { opacity: 0.6; }
+          100% { opacity: 1; }
+        }
+      `}</style>
       
       {activeTab === 'calendar' ? (
         <ScheduleCalendarView 
@@ -3048,33 +3219,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           currentUserRole={currentUserRole}
           hasSubmittedSchedule={hasSubmittedSchedule}
           scheduleStatus={scheduleStatus}
+          onStartTour={() => {
+            setActiveTab('designer');
+            startTour();
+          }}
         />
       ) : (
-        <>
-          {showCelebration ? (
-        <div className="animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(30px) saturate(190%)', WebkitBackdropFilter: 'blur(30px) saturate(190%)', borderRadius: '28px', padding: '40px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.5)', boxShadow: '0 20px 50px rgba(0,0,0,0.04)', maxWidth: '480px', margin: '40px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: '1px solid rgba(52, 168, 83, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
-            <CheckCircle size={36} strokeWidth={2.5} />
-          </div>
-          <div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Erfolgreich eingeloggt! 🎉</h3>
-            <p style={{ color: '#86868b', fontSize: '0.85rem', fontWeight: 500, marginTop: '8px', lineHeight: 1.4 }}>
-              Dein dynamischer Stundenplan wurde sicher gespeichert und zur Freigabe an die Verwaltung übermittelt. Eltern erhalten automatisch Push-Benachrichtigungen zur Bestätigung.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setShowCelebration(false);
-              loadInitialData();
-            }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
-          >
-            Zurück zur Ansicht
-          </button>
-        </div>
-      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-          
           {/* Header Panel */}
           <div style={{ 
             background: 'rgba(255, 255, 255, 0.55)', 
@@ -3090,7 +3241,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             gap: '16px'
           }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: '#e6f4ea', color: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={20} />
               </div>
               <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -3126,7 +3277,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </div>
             </div>
 
-            {!(currentUserRole === 'teacher' && !hasSubmittedSchedule) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
                 <button 
                   onClick={() => setActiveTab('calendar')}
@@ -3143,114 +3294,153 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   Stundenplan-Designer
                 </button>
               </div>
-            ) : (
-              <div />
-            )}
+              {currentUserRole === 'teacher' && (
+                <TourStartButton onClick={startTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
+              )}
+            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={async () => {
-                  const inviteLink = window.location.origin + "?onboarding=parent";
-                  await navigator.clipboard.writeText(inviteLink);
-                  await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
-                }}
-                style={{
-                  background: '#e6f4ea',
-                  color: '#137333',
-                  border: '1px solid rgba(52, 168, 83, 0.2)',
-                  fontWeight: 700,
-                  padding: '6px 12px',
-                  borderRadius: '10px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                }}
-              >
-                <Send size={14} /> Onboarding-Link kopieren
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {/* Group A: Onboarding & Setup */}
+              <div className="apple-btn-group">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const inviteLink = window.location.origin + "?onboarding=parent";
+                    await navigator.clipboard.writeText(inviteLink);
+                    await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
+                  }}
+                  className="apple-btn"
+                  title="Onboarding-Link kopieren"
+                >
+                  <Send size={13} />
+                  <span>Onboarding-Link</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
+                    if (availableDays.length === 0) {
+                      showAlert("Alle Wochentage wurden bereits hinzugefügt.");
+                      return;
+                    }
+                    setNewBoardDay(availableDays[0].value);
+                    setShowAddBoardForm(true);
+                  }}
+                  className="apple-btn"
+                  title="Tag anlegen"
+                >
+                  <Plus size={13} />
+                  <span>Tag anlegen</span>
+                </button>
+                <label 
+                  htmlFor="pdf-upload"
+                  className="apple-btn"
+                  style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                  title="Backup aus PDF wiederherstellen"
+                >
+                  <Upload size={13} />
+                  <span>Backup</span>
+                </label>
+                <input 
+                  id="pdf-upload" 
+                  type="file" 
+                  accept="application/pdf" 
+                  style={{ display: 'none' }} 
+                  onChange={handleRestoreFromPDF} 
+                />
+              </div>
+
+              {/* Group B: Options */}
+              <div className="apple-btn-group">
+                <button
+                  type="button"
+                  onClick={() => toggleRealNames()}
+                  className={`apple-btn ${showRealNames ? 'active' : ''}`}
+                  style={{ color: showRealNames ? '#ea4335' : undefined }}
+                  title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+                >
+                  {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+                  <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+                </button>
+              </div>
+
+              {/* Status information */}
               {hasSubmittedSchedule && scheduleStatus === 'approved' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.5)', border: '1px solid rgba(52, 168, 83, 0.15)', color: '#137333', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.65)', border: '1px solid rgba(52, 168, 83, 0.25)', color: '#34a853', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
                   <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span> 
                   <span>Freigegeben</span>
                 </div>
               )}
               {hasSubmittedSchedule && scheduleStatus === 'pending' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(254, 243, 199, 0.5)', border: '1px solid rgba(245, 158, 11, 0.15)', color: '#92400e', padding: '6px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(254, 243, 199, 0.65)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#92400e', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
                   <span style={{ color: '#d97706', fontSize: '0.8rem' }}>⏳</span> 
                   <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
                 </div>
               )}
-              {/* Eye icon for toggling pupil last names */}
-              <button
-                type="button"
-                onClick={() => toggleRealNames()}
-                style={{
-                  background: showRealNames ? '#fce8e6' : 'rgba(255, 255, 255, 0.6)',
-                  color: showRealNames ? '#ea4335' : '#1d1d1f',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
-                  fontWeight: 600,
-                  padding: '6px 10px',
-                  borderRadius: '10px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                }}
-                onMouseOver={e => e.currentTarget.style.background = showRealNames ? '#fce8e6' : 'rgba(255,255,255,0.9)'}
-                onMouseOut={e => e.currentTarget.style.background = showRealNames ? '#fce8e6' : 'rgba(255,255,255,0.6)'}
-                title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
-              >
-                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddBoardForm(true)}
-                style={{ background: 'rgba(255, 255, 255, 0.6)', color: '#1d1d1f', border: '1px solid rgba(0, 0, 0, 0.08)', fontWeight: 600, padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.9)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.6)'}
-              >
-                <Plus size={13} />
-                Tag anlegen
-              </button>
-              
-              <label 
-                htmlFor="pdf-upload"
-                style={{ background: 'rgba(255, 255, 255, 0.6)', color: '#1d1d1f', border: '1px solid rgba(0, 0, 0, 0.08)', fontWeight: 600, padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.9)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.6)'}
-              >
-                <Upload size={13} />
-                Backup
-              </label>
-              <input 
-                id="pdf-upload" 
-                type="file" 
-                accept="application/pdf" 
-                style={{ display: 'none' }} 
-                onChange={handleRestoreFromPDF} 
-              />
 
+              {/* Group C: Submit Action */}
               <button
+                id="tour-submit-section"
                 type="button"
                 onClick={handleLockAndSend}
                 disabled={submitting || boards.length === 0}
-                style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '6px 14px', borderRadius: '10px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', opacity: (submitting || boards.length === 0) ? 0.5 : 1, pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto', boxShadow: '0 6px 16px rgba(234, 179, 8, 0.15)', transition: 'all 0.2s' }}
+                style={{
+                  background: isCampus 
+                    ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                    : (isGroovelab 
+                      ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
+                      : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 800,
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: (submitting || boards.length === 0) ? 0.5 : 1,
+                  pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto',
+                  boxShadow: `0 4px 12px ${brandColor}30`,
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                onMouseOut={e => e.currentTarget.style.transform = 'none'}
               >
                 <Send size={13} />
-                {submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}
+                <span>{submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}</span>
               </button>
             </div>
           </div>
 
+
+          {onboardingOverlayContent ? (
+            onboardingOverlayContent
+          ) : showCelebration ? (
+        <div className="animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(30px) saturate(190%)', WebkitBackdropFilter: 'blur(30px) saturate(190%)', borderRadius: '28px', padding: '40px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.5)', boxShadow: '0 20px 50px rgba(0,0,0,0.04)', maxWidth: '480px', margin: '40px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: '1px solid rgba(52, 168, 83, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+            <CheckCircle size={36} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Erfolgreich eingeloggt! 🎉</h3>
+            <p style={{ color: '#86868b', fontSize: '0.85rem', fontWeight: 500, marginTop: '8px', lineHeight: 1.4 }}>
+              Dein dynamischer Stundenplan wurde sicher gespeichert und zur Freigabe an die Verwaltung übermittelt. Eltern erhalten automatisch Push-Benachrichtigungen zur Bestätigung.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setShowCelebration(false);
+              loadInitialData();
+            }}
+            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: 'white', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 8px 20px rgba(234, 179, 8, 0.2)' }}
+          >
+            Zurück zur Ansicht
+          </button>
+        </div>
+          ) : (
+            <>
           {/* Draft Management Toolbar */}
           <div style={{ 
             background: 'rgba(255, 255, 255, 0.55)', 
@@ -3423,7 +3613,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   onChange={e => setNewBoardDay(parseInt(e.target.value))}
                   style={{ width: '100%', background: 'rgba(255, 255, 255, 0.5)', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '10px', padding: '8px 10px', fontSize: '0.8rem', fontWeight: 600, outline: 'none' }}
                 >
-                  {DAYS_OF_WEEK.map(d => (
+                  {DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value)).map(d => (
                     <option key={d.value} value={d.value}>{d.name}</option>
                   ))}
                 </select>
@@ -3462,7 +3652,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 240px', gap: '14px', alignItems: 'start' }}>
             
             {/* Trello Board List Column Area */}
-            <div style={{ 
+            <div id="tour-day-boards" style={{ 
               display: 'flex', 
               gap: '0px', 
               width: '100%', 
@@ -3475,7 +3665,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
               overflow: 'hidden'
             }}>
-              {boards.map((board, index) => {
+              {boards.filter(b => focusedDayOfWeek === null || b.dayOfWeek === focusedDayOfWeek).map((board, index, arr) => {
                 const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
                 const PX_PER_MIN = 2.5;
                 const [anchorH, anchorM] = parseTime(board.startAnchor);
@@ -3500,9 +3690,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     onDrop={() => handleDropOnBoard(board.id)}
                     style={{ 
                       flex: 1,
-                      minWidth: '170px',
+                      minWidth: focusedDayOfWeek !== null ? '100%' : '170px',
                       background: 'transparent', 
-                      borderRight: index < boards.length - 1 ? '1px solid #e2e8f0' : 'none', 
+                      borderRight: index < arr.length - 1 ? '1px solid #e2e8f0' : 'none', 
                       padding: '0 10px', 
                       display: 'flex', 
                       flexDirection: 'column', 
@@ -3511,26 +3701,54 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     }}
                   >
                     {/* Day Column Header */}
-                    <div style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                    <div 
+                      style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', position: 'relative', cursor: 'pointer' }}
+                      onClick={() => setFocusedDayOfWeek(focusedDayOfWeek === board.dayOfWeek ? null : board.dayOfWeek)}
+                      title={focusedDayOfWeek === board.dayOfWeek ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
+                    >
+                      {focusedDayOfWeek === board.dayOfWeek && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFocusedDayOfWeek(null);
+                          }}
+                          className="apple-btn"
+                          style={{
+                            position: 'absolute',
+                            top: '0px',
+                            right: '4px',
+                            padding: '4px 8px',
+                            fontSize: '0.65rem',
+                            background: 'rgba(0,0,0,0.05)',
+                            borderRadius: '6px',
+                            minHeight: '22px'
+                          }}
+                        >
+                          Wochenansicht
+                        </button>
+                      )}
                       <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
                       <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f', marginBottom: '8px' }}>{dayLabel}</div>
                       
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                         {/* Apple iOS-Style Time Pill */}
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          background: 'rgba(0, 122, 255, 0.08)',
-                          borderRadius: '6px',
-                          padding: '2px 5px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          color: '#007aff',
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 122, 255, 0.15)'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 122, 255, 0.08)'; }}
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: lightBg,
+                            borderRadius: '6px',
+                            padding: '2px 5px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: textAccentColor,
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.background = hoverBg; }}
+                          onMouseOut={(e) => { e.currentTarget.style.background = lightBg; }}
                         >
                           <input 
                             type="time" 
@@ -3543,10 +3761,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 return recalculateBoardTimes({ ...b, startAnchor: newVal || '14:00' });
                               }));
                             }}
-                            style={{ fontSize: '0.78rem', fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: '#007aff', padding: 0, width: '42px', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ fontSize: '0.78rem', fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: textAccentColor, padding: 0, width: '42px', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}
                             title="Startzeit ändern"
                           />
-                          <span style={{ fontSize: '0.65rem', fontWeight: 600, marginLeft: '1px', color: '#007aff' }}>Uhr</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 600, marginLeft: '1px', color: textAccentColor }}>Uhr</span>
                         </div>
                       </div>
                     </div>
@@ -4007,7 +4226,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBg = hasConflict
                           ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
                           : (isInsideWunsch
-                              ? '#137333'
+                              ? '#34a853'
                               : (isSelected 
                                   ? (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
                                   : (isSubmitted 
@@ -4017,7 +4236,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBorder = hasConflict
                           ? '1.5px solid #ef4444'
                           : (isInsideWunsch
-                              ? '1px solid #137333'
+                              ? '1px solid #34a853'
                               : (isSelected 
                                   ? (isCampus ? `1.5px solid ${campusPrimary}` : '1.5px solid #007aff') 
                                   : (isSubmitted 
@@ -4038,7 +4257,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               ? '#ffffff'
                               : (isSelected 
                                   ? (isCampus ? campusText : '#007aff') 
-                                  : (isSubmitted ? '#137333' : (isCampus ? campusText : '#1e3a8a'))));
+                                  : (isSubmitted ? '#34a853' : (isCampus ? campusText : '#1e3a8a'))));
 
                         const badgeBg = hasConflict
                           ? 'rgba(239, 68, 68, 0.1)'
@@ -4054,7 +4273,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               ? '#ffffff'
                               : (isSelected 
                                   ? (isCampus ? campusText : '#007aff') 
-                                  : (isSubmitted ? '#137333' : (isCampus ? campusText : '#1d4ed8'))));
+                                  : (isSubmitted ? '#34a853' : (isCampus ? campusText : '#1d4ed8'))));
 
                         const shadowColor = isSubmitted 
                           ? 'rgba(52,168,83,0.06)' 
@@ -4258,7 +4477,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {bs.first_name} {maskLastName(bs.last_name)}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#137333' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#34a853' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                           )}
                         </div>
                       );
@@ -4266,8 +4485,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       {/* Drag insertion indicator line */}
                       {(() => {
                         if (dragOverBoardId !== board.id || dragOverIndex === null) return null;
-                        const isGreenTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-                        const lineColor = isGreenTheme ? '#34a853' : '#007aff';
+                        const lineColor = brandColor;
                         
                         let topPx = 0;
                         if (dragOverIndex < board.students.length) {
@@ -4284,17 +4502,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           <div 
                             style={{
                               position: 'absolute',
-                              left: 0,
-                              right: 0,
+                              left: '4px',
+                              right: '4px',
                               top: `${Math.max(topPx - 2, 0)}px`,
-                              height: '4px',
+                              height: '3px',
                               background: lineColor,
-                              borderRadius: '2px',
+                              borderRadius: '1.5px',
                               zIndex: 10,
                               pointerEvents: 'none',
-                              boxShadow: `0 0 8px ${lineColor}`
+                              boxShadow: `0 0 12px ${lineColor}`,
+                              animation: 'pulse-glowing-line 1.5s infinite alternate'
                             }}
-                          />
+                          >
+                            <div style={{ position: 'absolute', left: '-4px', top: '-2px', width: '7px', height: '7px', borderRadius: '50%', background: lineColor, boxShadow: `0 0 6px ${lineColor}` }} />
+                            <div style={{ position: 'absolute', right: '-4px', top: '-2px', width: '7px', height: '7px', borderRadius: '50%', background: lineColor, boxShadow: `0 0 6px ${lineColor}` }} />
+                          </div>
                         );
                       })()}
                     </div>
@@ -4329,7 +4551,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
 
             {/* Sidebar Student Pool */}
-            <div style={{ 
+            <div id="tour-student-pool" style={{ 
               background: 'rgba(255, 255, 255, 0.55)', 
               backdropFilter: 'blur(20px) saturate(190%)', 
               WebkitBackdropFilter: 'blur(20px) saturate(190%)',
@@ -4355,6 +4577,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
               {/* Draggable Pause item */}
               <div
+                id="tour-special-features"
                 draggable
                 onDragStart={() => handleDragStart('sidebar-pause', 'sidebar')}
                 onDragEnd={handleDragEnd}
@@ -4488,7 +4711,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </span>
 
                         {isAssigned && (
-                          <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#137333', background: 'rgba(230, 244, 234, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>
+                          <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#34a853', background: 'rgba(230, 244, 234, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>
                             {assignedDayLabel} {s.assignedTime}
                           </span>
                         )}
@@ -4557,9 +4780,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
           </div>
 
-        </div>
-      )}
         </>
+      )}
+        </div>
       )}
 
       {dropDecisionState && (() => {
@@ -5148,6 +5371,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           </div>
         );
       })()}
+
+            <TourComponent />
+
     </div>
   );
 }

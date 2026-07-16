@@ -54,7 +54,7 @@
 ## Platform Modules Design & Styling
 - **Primary Theme Colors**: 
   - In the **Administration and Secretariat modules**, the primary color for buttons, active accents, selectors, and interactive highlights must always be red (e.g., `#ea4335`, `#fce8e6` for backgrounds).
-  - In the **Campus module**, the primary color for buttons, active accents, selectors, and interactive highlights must always be green (e.g., `#137333`, `#e6f4ea`/`#d1fae5` for backgrounds).
+  - In the **Campus module**, the primary color for buttons, active accents, selectors, and interactive highlights must always be green (e.g., `#34a853`, `#e6f4ea`/`#d1fae5` for backgrounds).
   - In the **GrooveLab module**, the primary color for buttons, active accents, selectors, and interactive highlights must always be yellow (e.g., `#eab308`/`#facc15`, `#fefce8`/`#fefce8` for backgrounds).
 - **Monochrome Icons & Emojis**: Across all modules (Admin, Secretariat, Campus, and GrooveLab), all icons and emojis must be monochrome/single color ("unifarben") in active UI components to maintain a professional, cohesive, and modern look. Colored or multi-color graphics/emojis must be avoided.
 

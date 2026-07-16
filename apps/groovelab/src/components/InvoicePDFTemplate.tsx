@@ -502,7 +502,7 @@ export const InvoicePDFTemplate: React.FC<InvoicePDFTemplateProps> = ({
                   borderRadius: '16px', 
                   border: '1px solid #e6f4ea', 
                   fontSize: '0.74rem', 
-                  color: '#137333', 
+                  color: '#34a853', 
                   fontWeight: 700,
                   width: '100%', 
                   textAlign: 'center'

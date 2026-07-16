@@ -414,7 +414,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
-      background: 'radial-gradient(circle at 50% 50%, #137333 0%, #022c22 100%)',
+      background: 'radial-gradient(circle at 50% 50%, #34a853 0%, #022c22 100%)',
       color: '#ffffff',
       zIndex: 9999,
       overflowY: 'auto',
@@ -597,7 +597,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
               <div style={{ marginTop: '6px', fontSize: '12px' }}>
                 {checkingSubdomain && <span style={{ color: '#64748b' }}>Prüfe Verfügbarkeit...</span>}
                 {!checkingSubdomain && subdomainAvailable === true && (
-                  <span style={{ color: '#137333', fontWeight: 600 }}>✓ Subdomain ist frei und verfügbar!</span>
+                  <span style={{ color: '#34a853', fontWeight: 600 }}>✓ Subdomain ist frei und verfügbar!</span>
                 )}
                 {!checkingSubdomain && subdomainAvailable === false && (
                   <span style={{ color: '#dc2626', fontWeight: 600 }}>✗ Diese Subdomain ist bereits vergeben.</span>
@@ -1030,7 +1030,7 @@ const nextButtonStyle: React.CSSProperties = {
   flex: 1.5,
   padding: '14px 20px',
   borderRadius: '16px',
-  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
   border: 'none',
   color: '#ffffff',
   fontWeight: 800,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff } from 'lucide-react';
 import { 
@@ -250,6 +251,7 @@ export function AdminDashboard({
   onSwitchPlatform
 }: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
+  const schoolObj = Array.isArray((admin as any)?.schools) ? (admin as any)?.schools[0] : (admin as any)?.schools;
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -595,11 +597,11 @@ export function AdminDashboard({
   };
 
   useEffect(() => {
-    const calendarUrl = admin?.schools?.calendar_url;
+    const calendarUrl = schoolObj?.calendar_url;
     if (calendarUrl) {
       loadHolidays(calendarUrl);
     }
-  }, [admin?.schools?.calendar_url]);
+  }, [schoolObj?.calendar_url]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1462,17 +1464,22 @@ export function AdminDashboard({
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [newTeacher, setNewTeacher] = useState({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' });
 
-  const [teachersManageStudents] = useState<boolean>(() => {
-    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_students');
-    return saved !== 'false';
-  });
-  const [teachersManageTeachers] = useState<boolean>(() => {
-    const saved = localStorage.getItem('gl_setting_groovelab_teachers_manage_teachers');
-    return saved !== 'false';
-  });
+  const op = schoolObj?.opening_hours || {};
+  const teachersManageStudents = op.gl_setting_groovelab_teachers_manage_students === true;
+  const teachersManageTeachers = op.gl_setting_groovelab_teachers_manage_teachers === true;
+  const campusTeachersManageStudents = op.gl_setting_campus_teachers_manage_students === true;
+  const campusTeachersManageTeachers = op.gl_setting_campus_teachers_manage_teachers === true;
 
-  const canManageStudents = admin?.role === 'admin' || admin?.role === 'secretary' || (admin?.role === 'teacher' && teachersManageStudents);
-  const canManageTeachers = admin?.role === 'admin' || admin?.role === 'secretary' || (admin?.role === 'teacher' && teachersManageTeachers);
+  const currentPlatformTeachersManageStudents = activePlatform === 'campus' ? campusTeachersManageStudents : teachersManageStudents;
+  const currentPlatformTeachersManageTeachers = activePlatform === 'campus' ? campusTeachersManageTeachers : teachersManageTeachers;
+
+  const isOrgAdminOrSecretary = 
+    admin?.role === 'admin' || 
+    admin?.role === 'secretary' || 
+    (Array.isArray(admin?.roles) && (admin.roles.includes('admin') || admin.roles.includes('secretary')));
+
+  const canManageStudents = isOrgAdminOrSecretary || (admin?.role === 'teacher' && currentPlatformTeachersManageStudents);
+  const canManageTeachers = isOrgAdminOrSecretary || (admin?.role === 'teacher' && currentPlatformTeachersManageTeachers);
 
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
@@ -1719,7 +1726,7 @@ export function AdminDashboard({
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [editingRoomName, setEditingRoomName] = useState('');
 
-  const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+  const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
 
   const getStatusColor = (studentId: string, lastSeen: string | null, createdAt?: string | null) => {
     const hasLiveSession = activeSessions.some(se => se.user_id === studentId);
@@ -2578,7 +2585,7 @@ export function AdminDashboard({
 
   const fetchStats = async (schoolId: string, customOpeningHours?: any) => {
     // Calculate required date ranges upfront to avoid querying historical records
-    const openingHours = customOpeningHours || admin?.schools?.opening_hours;
+    const openingHours = customOpeningHours || schoolObj?.opening_hours;
     const resetDateStr = activePlatform === 'campus'
       ? (openingHours?.campus_stats_reset_at || openingHours?.stats_reset_at)
       : (openingHours?.groovelab_stats_reset_at || openingHours?.stats_reset_at);
@@ -2914,7 +2921,7 @@ export function AdminDashboard({
       });
     }
 
-    const currentHours = admin?.schools?.opening_hours || {};
+    const currentHours = schoolObj?.opening_hours || {};
     const updatedHours = {
       ...currentHours,
       weekly_targets: {
@@ -2926,10 +2933,17 @@ export function AdminDashboard({
     // 2. Update admin state immediately
     setAdmin({
       ...admin,
-      schools: {
-        ...admin.schools,
-        opening_hours: updatedHours
-      }
+      schools: Array.isArray(admin.schools)
+        ? [
+            {
+              ...admin.schools[0],
+              opening_hours: updatedHours
+            }
+          ]
+        : {
+            ...admin.schools,
+            opening_hours: updatedHours
+          }
     });
     setIsEditingTarget(false);
 
@@ -2972,8 +2986,8 @@ export function AdminDashboard({
     if (!admin?.school_id) return;
     
     // Check limits if enabled
-    if (admin?.schools?.limits_enabled) {
-      const maxStudents = admin.schools.max_students ?? 6;
+    if (schoolObj?.limits_enabled) {
+      const maxStudents = schoolObj.max_students ?? 6;
       if (students.length >= maxStudents) {
         alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
         return;
@@ -3148,8 +3162,8 @@ export function AdminDashboard({
     if (!studentToDelete) return;
 
     const actionText = activePlatform === 'campus'
-      ? 'Möchtest du diesen Schüler wirklich vom Campus entfernen?'
-      : 'Möchtest du diesen Schüler wirklich von GrooveLab entfernen?';
+      ? 'Möchtest du diesen Schüler wirklich von Campus-Groovelab (Campus) entfernen?'
+      : 'Möchtest du diesen Schüler wirklich von Campus-Groovelab (GrooveLab) entfernen?';
 
     if (window.confirm(actionText)) {
       try {
@@ -3307,8 +3321,8 @@ export function AdminDashboard({
     if (!admin?.school_id) return;
 
     // Check limits if enabled
-    if (admin?.schools?.limits_enabled) {
-      const maxTeachers = admin.schools.max_teachers ?? 2;
+    if (schoolObj?.limits_enabled) {
+      const maxTeachers = schoolObj.max_teachers ?? 2;
       if (teachers.length >= maxTeachers) {
         alert(`Limit erreicht! Deine Schule darf maximal ${maxTeachers} Lehrer/Admins registrieren. Kontaktiere deinen Master-Admin.`);
         return;
@@ -4088,7 +4102,7 @@ export function AdminDashboard({
       .eq('user_id', student.id);
     
     if (allSessions) {
-      const openingHours = admin?.schools?.opening_hours;
+      const openingHours = schoolObj?.opening_hours;
       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       
       // Filter for "Logbuch" (must be at station AND on active day)
@@ -4209,7 +4223,7 @@ export function AdminDashboard({
   );
 
   const renderBandsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     
     const filteredBands = allBands.filter(band => {
@@ -4737,7 +4751,7 @@ export function AdminDashboard({
   };
 
   const renderStudentsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     return (
       <div style={{ marginTop: '0px' }}>
         <div 
@@ -5065,7 +5079,7 @@ export function AdminDashboard({
 
           {editingStudent && (
             <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#e6f4ea', border: `1px solid #e6f4ea`, borderRadius: '20px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#137333' }}>Schüler bearbeiten</h3>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#34a853' }}>Schüler bearbeiten</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                 <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
@@ -5198,7 +5212,7 @@ export function AdminDashboard({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '14px', width: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%' }}>
             {students.filter(s => {
               const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
               if (listType === 'active' && isArchived) return false;
@@ -5224,14 +5238,14 @@ export function AdminDashboard({
                   key={s.id} 
                   className="glass-panel" 
                   style={{ 
-                    padding: '14px 18px', 
+                    padding: '18px 22px', 
                     background: 'white', 
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center', 
                     borderRadius: '24px', 
                     border: '1px solid #e2e8f0', 
-                    borderLeft: `5px solid ${brandColor}`, 
+                    borderLeft: `6px solid ${brandColor}`, 
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
                     transition: 'transform 0.2s, box-shadow 0.2s', 
                     cursor: 'default' 
@@ -5239,13 +5253,13 @@ export function AdminDashboard({
                 >
                   <div 
                     onClick={() => fetchStudentProfile(s)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', flex: 1 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
                   >
                     <div style={{ position: 'relative' }}>
                       <div style={{ 
-                        width: '48px', 
-                        height: '48px', 
-                        borderRadius: '12px', 
+                        width: '56px', 
+                        height: '56px', 
+                        borderRadius: '16px', 
                         background: `${brandColor}15`,
                         display: 'flex',
                         alignItems: 'center',
@@ -5255,7 +5269,7 @@ export function AdminDashboard({
                         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                         position: 'relative'
                       }}>
-                        <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
                         <img 
                           src={resolveUserAvatar(s, activePlatform)} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
@@ -5263,54 +5277,75 @@ export function AdminDashboard({
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {maskLastName(s.last_name)}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1.1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {maskLastName(s.last_name)}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {s.is_trial ? (
-                          <div style={{ padding: '1px 5px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          <div style={{ padding: '2px 6px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
                             ⏳ PROBE
                           </div>
                         ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
-                          <div style={{ padding: '1px 5px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#eab308', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          <div style={{ padding: '2px 6px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#eab308', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
                             Aktiv
                           </div>
                         ) : (
-                          <div style={{ padding: '1px 5px', background: '#f1f3f4', color: '#5f6368', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
+                          <div style={{ padding: '2px 6px', background: '#f1f3f4', color: '#5f6368', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
                             Inaktiv
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', marginLeft: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginLeft: '8px' }}>
                     {canManageStudents && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
-                        style={{ 
-                          background: "#ffffff", 
-                          border: "1px solid #cbd5e1", 
-                          padding: "8px", 
-                          borderRadius: "10px", 
-                          cursor: "pointer", 
-                          color: "#475569", 
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }} 
-                        className="hover-scale-mini"
-                        title="Bearbeiten"
-                      >
-                        <Pencil size={16} />
-                      </button>
+                      <>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setEditingStudent(s); }} 
+                          style={{ 
+                            background: "#ffffff", 
+                            border: "1px solid #cbd5e1", 
+                            padding: "10px", 
+                            borderRadius: "12px", 
+                            cursor: "pointer", 
+                            color: "#475569", 
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }} 
+                          className="hover-scale-mini"
+                          title="Bearbeiten"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
+                          style={{ 
+                            background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', 
+                            border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', 
+                            padding: "10px", 
+                            borderRadius: "12px", 
+                            cursor: "pointer", 
+                            color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', 
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }} 
+                          className="hover-scale-mini"
+                          title="Löschen"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
                     )}
                     <button 
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
                       style={{ 
                         background: "#ffffff", 
                         border: "1px solid #cbd5e1", 
-                        padding: "8px", 
-                        borderRadius: "10px", 
+                        padding: "10px", 
+                        borderRadius: "12px", 
                         cursor: "pointer", 
                         color: "#475569", 
                         transition: 'all 0.2s',
@@ -5321,7 +5356,7 @@ export function AdminDashboard({
                       className="hover-scale-mini"
                       title="QR Code"
                     >
-                      <QrCode size={16} />
+                      <QrCode size={18} />
                     </button>
                   </div>
                 </div>
@@ -5334,7 +5369,7 @@ export function AdminDashboard({
   };
 
   const renderTeachersTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     return (
       <div style={{ marginTop: '0px' }}>
       <div 
@@ -5721,7 +5756,7 @@ export function AdminDashboard({
   };
 
   const renderCampusRoomsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     
     const handleQuickDuration = (mins: number) => {
@@ -5975,7 +6010,7 @@ export function AdminDashboard({
     // Merge consecutive schedules for this campus view
     const mergedSchedules = (() => {
       const virtualGroovelabSchedules: any[] = [];
-      const opHours = admin?.schools?.opening_hours || {};
+      const opHours = schoolObj?.opening_hours || {};
       const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
       const DAYS_MAP = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       for (let d = 1; d <= 7; d++) {
@@ -9515,7 +9550,7 @@ export function AdminDashboard({
   };
 
   const renderSongsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const filteredLehrwerke = lehrwerke.filter(item => 
       item.title.toLowerCase().includes(songSearch.toLowerCase()) || 
       (item.author || '').toLowerCase().includes(songSearch.toLowerCase())
@@ -10617,7 +10652,7 @@ export function AdminDashboard({
                     <span style={{ 
                       fontSize: '0.72rem', 
                       fontWeight: 800, 
-                      color: isCopied ? '#137333' : '#1e293b', 
+                      color: isCopied ? '#34a853' : '#1e293b', 
                       display: '-webkit-box', 
                       WebkitLineClamp: 2, 
                       WebkitBoxOrient: 'vertical', 
@@ -10702,7 +10737,7 @@ export function AdminDashboard({
       : null;
 
     if (activePlatform === 'campus') {
-      const brandColor = '#137333';
+      const brandColor = '#34a853';
       const myClassMins = stats.myClassMins || 0;
       const otherClassMins = stats.otherClassMins || 0;
       const totalSchoolMins = myClassMins + otherClassMins;
@@ -10800,7 +10835,7 @@ export function AdminDashboard({
                   { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
                   { label: 'Klassen-Übezeit (Woche)', value: formatMins(classWeeklyMins), icon: TrendingUp, color: brandColor, bg: '#f8fafc', isNeutral: true },
                   { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#137333' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
+                  { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
                   { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: brandColor, bg: '#f8fafc', isNeutral: true },
                   { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (classWeeklyMins / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
                   { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
@@ -11175,27 +11210,27 @@ export function AdminDashboard({
                           if (minutes <= 15) {
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                           } else if (minutes <= 60) {
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                           } else if (minutes <= 180) {
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                           } else {
-                            bg = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
-                            border = '1px solid #137333';
+                            bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
+                            border = '1px solid #34a853';
                             labelColor = 'rgba(255, 255, 255, 0.8)';
                             textColor = 'rgba(255, 255, 255, 0.9)';
                             numColor = '#ffffff';
@@ -11241,7 +11276,7 @@ export function AdminDashboard({
                         { color: '#e6f4ea', label: '<15m', border: '#e6f4ea' },
                         { color: '#e6f4ea', label: '<1h', border: '#e6f4ea' },
                         { color: '#e6f4ea', label: '<3h', border: '#e6f4ea' },
-                        { color: '#34a853', label: '3h+', border: '#137333' }
+                        { color: '#34a853', label: '3h+', border: '#34a853' }
                       ].map(pill => (
                         <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: pill.color, border: `1px solid ${pill.border}` }} />
@@ -11472,7 +11507,7 @@ export function AdminDashboard({
     <div style={{ marginTop: '0px' }}>
       {activePlatform === 'campus' ? (
         <CampusSetupScreen 
-          school={admin?.schools} 
+          school={schoolObj} 
           admin={admin} 
           brandColor={brandColor} 
           onUpdate={() => fetchData()} 
@@ -11484,7 +11519,7 @@ export function AdminDashboard({
           brandColor={brandColor} 
           activeSessions={activeSessions}
           students={students}
-          school={admin?.schools}
+          school={schoolObj}
           admin={admin}
           kiosks={kiosks || []}
           onUpdate={() => fetchData()}
@@ -11699,7 +11734,7 @@ export function AdminDashboard({
   };
 
   const renderMissionsTab = () => {
-    const brandColor = activePlatform === 'campus' ? '#137333' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     
     const filteredSubmissions = submissions.filter(sub => {
       const studentName = `${sub.users?.first_name || ''} ${sub.users?.last_name || ''}`.toLowerCase();
@@ -11835,7 +11870,7 @@ export function AdminDashboard({
                                   onClick={() => handleGeneratePin(student.id, progress.current_level)}
                                   style={{
                                     background: '#e6f4ea',
-                                    color: '#137333',
+                                    color: '#34a853',
                                     border: '1.5px solid #e6f4ea',
                                     padding: '6px 12px',
                                     borderRadius: '10px',
@@ -12138,7 +12173,7 @@ export function AdminDashboard({
                             top: '16px',
                             right: '16px',
                             background: isInLab ? '#e6f4ea' : '#f1f5f9',
-                            color: isInLab ? '#137333' : '#64748b',
+                            color: isInLab ? '#34a853' : '#64748b',
                             padding: '4px 10px',
                             borderRadius: '8px',
                             fontSize: '0.65rem',
@@ -12473,7 +12508,7 @@ export function AdminDashboard({
         const dataUrl = await toJpeg(qrCardRef.current, { 
           quality: 0.95, 
           backgroundColor: (activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) 
-            ? (isQRAdminOrSecretary ? '#7f1d1d' : '#137333') 
+            ? (isQRAdminOrSecretary ? '#7f1d1d' : '#34a853') 
             : '#ffffff',
           cacheBust: true,
           pixelRatio: 2,
@@ -16377,7 +16412,8 @@ export function AdminDashboard({
 function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any[], brandColor: string, onShowQR: (user: any) => void, activePlatform?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'teacher' | 'student' | 'vocalist'>('all');
-  
+  const [selectedPrintIds, setSelectedPrintIds] = useState<Record<string, boolean>>({});
+
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           u.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -16395,6 +16431,113 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
     return true;
   });
 
+  const toggleSelectForPrint = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedPrintIds(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  const selectAllForPrint = () => {
+    const next: Record<string, boolean> = {};
+    filteredUsers.forEach(u => {
+      next[u.id] = true;
+    });
+    setSelectedPrintIds(next);
+  };
+
+  const clearAllForPrint = () => {
+    setSelectedPrintIds({});
+  };
+
+  const selectedUsers = filteredUsers.filter(u => selectedPrintIds[u.id]);
+  const selectedCount = selectedUsers.length;
+  const pageCount = Math.ceil(selectedCount / 9);
+
+  const getPrintAvatarSrc = (u: any): string => {
+    const role = (u.role || '').toLowerCase();
+    const plat = activePlatform || 'groovelab';
+    
+    if (plat === 'secretary') {
+      return '/campus_login_hero.png';
+    }
+    
+    if (plat === 'campus') {
+      const src = u.photo_url;
+      const isMusicianOrInstrumentAvatar = src && (
+        src.includes('student_') ||
+        src.includes('bandstyle_') ||
+        src.includes('teen_') ||
+        src.includes('avatar_boy') ||
+        src.includes('avatar_girl') ||
+        src.includes('avatar.png') || 
+        src.includes('avatar_new') ||
+        src.includes('_avatar') ||
+        src.includes('guitar_avatar') || 
+        src.includes('gitarre_avatar') || 
+        src.includes('ebass_avatar') || 
+        src.includes('egitarre_avatar') || 
+        src.includes('kontrabass_avatar') || 
+        src.includes('bass_avatar') || 
+        src.includes('drums_avatar') || 
+        src.includes('schlagzeug_avatar') || 
+        src.includes('piano_avatar') || 
+        src.includes('klavier_avatar') || 
+        src.includes('vocals_avatar') || 
+        src.includes('gesang_avatar') || 
+        src.includes('trumpet_avatar') || 
+        src.includes('trompete_avatar') || 
+        src.includes('trombone_avatar') || 
+        src.includes('posaune_avatar') || 
+        src.includes('horn_avatar') || 
+        src.includes('cello_avatar') || 
+        src.includes('violin_avatar') || 
+        src.includes('violine_avatar') || 
+        src.includes('clarinet_avatar') || 
+        src.includes('klarinette_avatar') || 
+        src.includes('flute_avatar') || 
+        src.includes('querfloete_avatar') || 
+        src.includes('saxophone_avatar') || 
+        src.includes('saxophon_avatar') || 
+        src.includes('blockfloete_avatar') || 
+        src.includes('bariton_avatar') || 
+        src.includes('oboe_avatar') ||
+        src.includes('teacher_') ||
+        src.includes('avatar_teacher') ||
+        src === '/campus_login_hero.png'
+      );
+      if (!src || isMusicianOrInstrumentAvatar) {
+        return getInstrumentAvatarUrl(u.instrument);
+      }
+      return src;
+    } else {
+      const src = u.photo_url;
+      const isStudentAvatar = src && (
+        src.includes('student_') ||
+        src.includes('bandstyle_') ||
+        src.includes('teen_') ||
+        src.includes('avatar_boy') ||
+        src.includes('avatar_girl')
+      );
+      const isTeacherAvatar = src && (
+        src.includes('teacher_') ||
+        src.includes('avatar_teacher')
+      );
+      
+      if (role === 'teacher') {
+        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
+      } else if (role === 'student') {
+        if (!src || src === '/avatar_ghost.jpg') {
+          return '/avatar_ghost.jpg';
+        }
+        return src;
+      } else {
+        return !src || src === '/campus_login_hero.png' ? '/avatar_ghost.jpg' : src;
+      }
+    }
+  };
+
   return (
     <div style={{ marginTop: '0px' }}>
       <style>{`
@@ -16405,6 +16548,69 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
           transform: translateY(-12px) scale(1.02);
           box-shadow: 0 30px 60px rgba(0,0,0,0.15) !important;
           z-index: 10;
+        }
+
+        #print-id-cards-container {
+          display: none !important;
+        }
+
+        @media print {
+          #root {
+            display: none !important;
+          }
+          
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+          
+          #print-id-cards-container {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+          }
+
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            box-shadow: none !important;
+          }
+
+          #print-id-cards-container img {
+            opacity: 1 !important;
+          }
+
+          .print-page {
+            width: 210mm !important;
+            height: 297mm !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            box-sizing: border-box !important;
+            padding: 15mm 15mm !important;
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            grid-template-rows: repeat(3, 1fr) !important;
+            gap: 12px !important;
+            background: white !important;
+          }
+
+          .print-page:not(:last-child) {
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+
+          .print-card-wrapper {
+            box-sizing: border-box !important;
+            border: 1px dashed #cbd5e1 !important;
+            padding: 6px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: white !important;
+          }
         }
       `}</style>
       
@@ -16488,6 +16694,31 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
               }}
               onClick={() => onShowQR(u)}
             >
+              {/* Checkbox overlay for printing */}
+              <div 
+                onClick={(e) => toggleSelectForPrint(u.id, e)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: selectedPrintIds[u.id] ? '#ea4335' : 'rgba(255,255,255,0.85)',
+                  border: `2px solid ${selectedPrintIds[u.id] ? '#ea4335' : '#cbd5e1'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  zIndex: 20,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  transition: 'all 0.2s',
+                  opacity: selectedPrintIds[u.id] ? 1 : 0.8
+                }}
+              >
+                {selectedPrintIds[u.id] && <Check size={16} color="white" strokeWidth={3} />}
+              </div>
+
               {/* Lanyard Hole Mockup */}
               <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
                 <div style={{ width: '30px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
@@ -16567,6 +16798,246 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
           ))}
         </div>
       </div>
+
+      {/* Floating Action Panel for printing */}
+      {selectedCount > 0 && (
+        <div style={{
+          position: 'fixed',
+          bottom: '32px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.95)',
+          backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '16px 28px',
+          borderRadius: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '24px',
+          zIndex: 9999,
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
+          color: 'white',
+          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <style>{`
+            @keyframes slideUp {
+              from { transform: translate(-50%, 50px); opacity: 0; }
+              to { transform: translate(-50%, 0); opacity: 1; }
+            }
+          `}</style>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>
+              {selectedCount} {selectedCount === 1 ? 'Ausweis' : 'Ausweise'} ausgewählt
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>
+              Benötigt {pageCount} {pageCount === 1 ? 'DIN A4 Seite' : 'DIN A4 Seiten'}
+            </span>
+          </div>
+
+          <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)' }} />
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={selectAllForPrint}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#f8fafc',
+                padding: '10px 16px',
+                borderRadius: '12px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+            >
+              Alle auswählen
+            </button>
+            
+            <button
+              onClick={clearAllForPrint}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                padding: '10px 16px',
+                borderRadius: '12px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+            >
+              Auswahl aufheben
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              style={{
+                background: '#ea4335',
+                border: 'none',
+                color: 'white',
+                padding: '10px 20px',
+                borderRadius: '12px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.3)'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#d93025'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#ea4335'}
+            >
+              <Printer size={16} />
+              Drucken
+            </button>
+
+            <button
+              onClick={clearAllForPrint}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: 'none',
+                color: '#cbd5e1',
+                padding: '10px',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Print Container */}
+      {selectedCount > 0 && createPortal(
+        <div id="print-id-cards-container">
+          {Array.from({ length: pageCount }).map((_, pageIdx) => {
+            const pageUsers = selectedUsers.slice(pageIdx * 9, (pageIdx + 1) * 9);
+            return (
+              <div key={pageIdx} className="print-page">
+                {pageUsers.map(u => {
+                  const isQRAdminOrSec = u.role === 'admin' || u.role === 'secretary';
+                  const cardHeaderColor = isQRAdminOrSec ? '#ea4335' : (u.role === 'student' ? '#eab308' : '#34a853');
+                  const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (u.role === 'student' ? 'Member Access' : 'Staff / Coach');
+                  return (
+                    <div key={u.id} className="print-card-wrapper">
+                      <div style={{
+                        width: '54mm',
+                        height: '86mm',
+                        background: 'white',
+                        borderRadius: '12px',
+                        border: '1px solid #cbd5e1',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        boxSizing: 'border-box'
+                      }}>
+                        {/* Card Lanyard Slot */}
+                        <div style={{ height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
+                          <div style={{ width: '15px', height: '3px', borderRadius: '1.5px', background: '#0f172a' }}></div>
+                        </div>
+                        
+                        {/* Card Status Header */}
+                        <div style={{ 
+                          background: cardHeaderColor, 
+                          padding: '3px', 
+                          textAlign: 'center',
+                          textTransform: 'uppercase'
+                        }}>
+                          <div style={{ color: 'white', fontSize: '0.45rem', fontWeight: 1000, letterSpacing: '0.15em' }}>
+                            {cardBadgeLabel}
+                          </div>
+                        </div>
+
+                        {/* Card Body */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 8px 12px 8px', gap: '8px', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+                          {/* Card Portrait */}
+                          <div style={{ 
+                            width: '64px', 
+                            height: '64px', 
+                            borderRadius: '50%', 
+                            border: `2px solid ${u.role === 'student' ? '#eab308' : (u.role === 'admin' || u.role === 'secretary') ? '#ea4335' : '#34a853'}`,
+                            padding: '3px',
+                            background: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              borderRadius: '50%', 
+                              overflow: 'hidden'
+                            }}>
+                              <img 
+                                src={getPrintAvatarSrc(u)} 
+                                style={{ 
+                                  width: '100%', 
+                                  height: '100%', 
+                                  objectFit: 'cover',
+                                  display: 'block'
+                                }}
+                                alt=""
+                                onError={(e) => { (e.target as HTMLImageElement).src = '/avatar_ghost.jpg'; }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Card Name */}
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1 }}>{u.first_name}</div>
+                            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#64748b', marginTop: '1px' }}>{u.last_name || 'Member'}</div>
+                          </div>
+
+                          {/* Card QR Code */}
+                          <div style={{ 
+                            background: '#f8fafc', 
+                            padding: '6px', 
+                            borderRadius: '8px',
+                            border: '1px solid #f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <QRCode value={`${window.location.origin}/qr/${u.qr_token || u.id || ''}`} size={56} />
+                          </div>
+                        </div>
+
+                        {/* Card Bottom Stripe */}
+                        <div style={{ 
+                          height: '5px', 
+                          background: `linear-gradient(90deg, ${u.role === 'student' ? '#eab308' : '#34a853'}, #1e293b, ${u.role === 'student' ? '#eab308' : '#34a853'})` 
+                        }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -17049,7 +17520,7 @@ function DeviceSetupScreen({
         <div className="glass-panel" style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
           
           {/* GrooveLab Kiosk Device Onboarding Link section */}
-          {admin?.schools?.groovelab_kiosk_token && (
+          {effectiveSchool?.groovelab_kiosk_token && (
             <div style={{ 
               background: '#fefce8', 
               border: '1.5px solid #fef08a', 
@@ -17073,7 +17544,7 @@ function DeviceSetupScreen({
                 <input 
                   type="text" 
                   readOnly 
-                  value={`${window.location.origin}/device-onboarding/${admin.schools.groovelab_kiosk_token}`}
+                  value={`${window.location.origin}/device-onboarding/${effectiveSchool.groovelab_kiosk_token}`}
                   style={{ 
                     flex: 1, 
                     padding: '12px 16px', 
@@ -17088,7 +17559,7 @@ function DeviceSetupScreen({
                 />
                 <button
                   onClick={() => {
-                    const link = `${window.location.origin}/device-onboarding/${admin.schools.groovelab_kiosk_token}`;
+                    const link = `${window.location.origin}/device-onboarding/${effectiveSchool.groovelab_kiosk_token}`;
                     navigator.clipboard.writeText(link);
                     setCopiedKioskLink(true);
                     setTimeout(() => setCopiedKioskLink(false), 2000);

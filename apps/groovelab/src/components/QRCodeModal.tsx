@@ -338,7 +338,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
       const { toJpeg } = await import('html-to-image');
       const dataUrl = await toJpeg(cardRef.current, { 
         quality: 0.95,
-        backgroundColor: activePlatform === 'campus' ? (isAdminOrSecretary ? '#7f1d1d' : '#137333') : '#ffffff',
+        backgroundColor: activePlatform === 'campus' ? (isAdminOrSecretary ? '#7f1d1d' : '#34a853') : '#ffffff',
         cacheBust: true,
         pixelRatio: 2
       });

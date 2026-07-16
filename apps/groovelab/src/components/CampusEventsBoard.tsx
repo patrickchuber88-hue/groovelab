@@ -6443,7 +6443,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     fontSize: '0.68rem',
                     fontWeight: 800,
                     background: hasUnanswered ? '#fef3c7' : '#e6f4ea',
-                    color: hasUnanswered ? '#d97706' : '#137333',
+                    color: hasUnanswered ? '#d97706' : '#34a853',
                     padding: '4px 10px',
                     borderRadius: '100px',
                     textTransform: 'uppercase'
@@ -6713,7 +6713,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       padding: '3px 8px',
                       borderRadius: '6px',
                       background: isScheduled ? '#e6f4ea' : '#fef3c7',
-                      color: isScheduled ? '#137333' : '#b45309'
+                      color: isScheduled ? '#34a853' : '#b45309'
                     }}>
                       {isScheduled ? 'Eingeteilt' : 'Wartet auf Einteilung'}
                     </span>
@@ -6997,7 +6997,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     let statusLabel = 'Eingereicht';
                     if (pp.status === 'approved') {
                       statusBg = '#e6f4ea';
-                      statusColor = '#137333';
+                      statusColor = '#34a853';
                       statusLabel = 'Freigegeben';
                     } else if (pp.status === 'rejected') {
                       statusBg = '#fef2f2';
@@ -10054,7 +10054,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         transition: 'all 0.2s',
                         outline: 'none'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#137333'}
+                      onMouseEnter={e => e.currentTarget.style.background = '#34a853'}
                       onMouseLeave={e => e.currentTarget.style.background = '#34a853'}
                     >
                       <span>Speichern</span>
@@ -10962,7 +10962,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                      background: '#e6f4ea', border: '1.5px solid #e6f4ea', color: '#137333',
+                      background: '#e6f4ea', border: '1.5px solid #e6f4ea', color: '#34a853',
                       padding: '10px', borderRadius: '12px', cursor: 'pointer',
                       fontWeight: 800, fontSize: '0.82rem',
                       transition: 'all 0.15s',
@@ -11354,7 +11354,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             >
               {/* Header */}
               <div style={{
-                background: `linear-gradient(135deg, ${brandColor || '#34a853'} 0%, #137333 100%)`,
+                background: `linear-gradient(135deg, ${brandColor || '#34a853'} 0%, #34a853 100%)`,
                 padding: '24px',
                 color: '#ffffff',
                 display: 'flex',
@@ -11426,7 +11426,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         gap: '2px'
                       }}>
                         <div style={{
-                          background: isMe ? 'linear-gradient(135deg, #34a853, #137333)' : '#ffffff',
+                          background: isMe ? 'linear-gradient(135deg, #34a853, #34a853)' : '#ffffff',
                           color: isMe ? '#ffffff' : '#1e293b',
                           padding: '10px 14px',
                           borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
@@ -11536,7 +11536,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                        type="submit"
                        disabled={isDisabled || !chatTypedMessage.trim()}
                        style={{
-                         background: isDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #137333)',
+                         background: isDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #34a853)',
                          color: '#ffffff',
                          border: 'none',
                          borderRadius: '12px',

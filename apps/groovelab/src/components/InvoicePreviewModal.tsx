@@ -13,6 +13,7 @@ export interface InvoiceData {
   hasCampus: boolean;
   hasGroovelab: boolean;
   totalTeachersCount: number;
+  totalAdminsCount?: number;
   passiveStudentsCount: number;
   activeStudentFee: number;
   
@@ -355,7 +356,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
                             <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
-                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>{invoice.totalTeachersCount} Team-Mitglieder (Lehrkräfte/Verwaltung) (0,49 € / Mo. pro User){freeLabel}</span>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
+                              {invoice.totalTeachersCount} Lehrkräfte (0,49 € / Mo. pro User)
+                              {invoice.totalAdminsCount !== undefined && invoice.totalAdminsCount > 0 && ` | ${invoice.totalAdminsCount} Verwalter (kostenfrei)`}
+                              {freeLabel}
+                            </span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                             {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
@@ -492,11 +497,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   borderRadius: '16px', 
                   border: '1px solid #e6f4ea', 
                   fontSize: '0.74rem', 
-                  color: '#137333', 
+                  color: '#34a853', 
                   width: '100%',
                   textAlign: 'left'
                 }}>
-                  <strong style={{ display: 'block', color: '#137333', marginBottom: '4px', fontSize: '0.8rem' }}>
+                  <strong style={{ display: 'block', color: '#34a853', marginBottom: '4px', fontSize: '0.8rem' }}>
                     Auszahlungs- &amp; Verrechnungshinweis:
                   </strong>
                   Dieser Betrag wird Ihrem Kundenkonto gutgeschrieben und mit zukünftigen Forderungen verrechnet oder auf Ihr hinterlegtes Bankkonto erstattet. Sie müssen keine Zahlung veranlassen.

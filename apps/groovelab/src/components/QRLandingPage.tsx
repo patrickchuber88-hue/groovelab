@@ -2055,7 +2055,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <defs>
               <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#34a853" />
-                <stop offset="100%" stopColor="#137333" />
+                <stop offset="100%" stopColor="#34a853" />
               </linearGradient>
             </defs>
           </svg>
@@ -2091,11 +2091,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         {/* Text descriptions */}
         <div>
-          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#137333' }}>
+          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#34a853' }}>
             {isGoalMet ? 'Tagesziel erreicht!' : 'Übung eingetragen!'}
           </h3>
-          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#137333', fontWeight: 650, lineHeight: 1.4 }}>
-            Heute geübt: <strong style={{ color: '#137333', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#137333', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#34a853', fontWeight: 650, lineHeight: 1.4 }}>
+            Heute geübt: <strong style={{ color: '#34a853', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#34a853', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
           </p>
           <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#4f5e53', fontWeight: 650, lineHeight: 1.4 }}>
             {isGoalMet 
@@ -2485,7 +2485,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {activationStep === 'landing' && (
           <div style={{width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
             {/* Header / Profile Card */}
-            <div style={{...styles.card, padding: '24px 20px', gap: '16px', background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', border: 'none', color: 'white', position: 'relative', overflow: 'hidden'}}>
+            <div style={{...styles.card, padding: '24px 20px', gap: '16px', background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', border: 'none', color: 'white', position: 'relative', overflow: 'hidden'}}>
               <div style={{position: 'absolute', top: '-20px', right: '-20px', width: '120px', height: '120px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none'}} />
               <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
                 <div style={{width: '56px', height: '56px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid rgba(255, 255, 255, 0.3)', flexShrink: 0, overflow: 'hidden'}}>
@@ -2614,7 +2614,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
                       <Timer size={20} color="#34a853" /> Fokus-Timer
                     </h3>
-                    <p style={{margin: 0, fontSize: '0.82rem', color: '#137333', lineHeight: 1.5, fontWeight: 550}}>
+                    <p style={{margin: 0, fontSize: '0.82rem', color: '#34a853', lineHeight: 1.5, fontWeight: 550}}>
                       Starte deine tägliche Übe-Session direkt hier, um deine Streaks fortzusetzen und Abzeichen zu sammeln!
                     </p>
                   </div>
@@ -2649,8 +2649,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               activationAllowed ? (
                 <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #e6f4ea', background: '#e6f4ea', textAlign: 'center'}}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#137333'}}>Jetzt Campus testen</h3>
-                    <p style={{margin: 0, fontSize: '0.85rem', color: '#137333', lineHeight: 1.5, fontWeight: 550}}>
+                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#34a853'}}>Jetzt Campus testen</h3>
+                    <p style={{margin: 0, fontSize: '0.85rem', color: '#34a853', lineHeight: 1.5, fontWeight: 550}}>
                       Schalte deinen Online-Campus mit Übe-Timer, Hausaufgaben, Statistiken und Badges für 7 Tage kostenlos frei!
                     </p>
                   </div>
@@ -2779,10 +2779,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#e6f4ea', padding: '16px', borderRadius: '16px', border: '1px solid #e6f4ea'}}>
               Die Aktivierung deines Schülerkontos erfordert die Begleichung der GrooveLab-Jahresgebühr für dieses Schuljahr.
-              <div style={{ marginTop: '10px', fontWeight: 900, color: '#137333', fontSize: '0.95rem' }}>
+              <div style={{ marginTop: '10px', fontWeight: 900, color: '#34a853', fontSize: '0.95rem' }}>
                 Betrag: {price.toFixed(2).replace('.', ',')} € (einmalig für dieses Schuljahr)
               </div>
-              <span style={{ fontSize: '0.7rem', color: '#137333', display: 'block', marginTop: '6px', fontWeight: 550 }}>
+              <span style={{ fontSize: '0.7rem', color: '#34a853', display: 'block', marginTop: '6px', fontWeight: 550 }}>
                 * Bisher wird diese Gebühr über die Schule abgerechnet. Direktzahlung der Eltern über Lastschrift/Kreditkarte wird zu einem späteren Zeitpunkt eingeführt.
               </span>
             </div>
@@ -3339,7 +3339,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {/* Header Banner */}
           {!timerRunning && (
             <div style={{
-              background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+              background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
               padding: 'calc(env(safe-area-inset-top, 0px) + 24px) 20px 24px 20px',
               display: 'flex',
               alignItems: 'center',
@@ -3836,7 +3836,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               padding: '16px 8px',
                               borderRadius: '20px',
                               border: 'none',
-                              background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                              background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                               color: '#ffffff',
                               fontSize: '0.95rem',
                               fontWeight: 900,
@@ -3875,7 +3875,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Key size={16} style={{ color: '#34a853' }} /> Berechtigungen verwalten
                     </h4>
-                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#137333', fontWeight: 650, lineHeight: 1.4 }}>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#34a853', fontWeight: 650, lineHeight: 1.4 }}>
                       Du kannst die Kommunikationsrechte auf dein Kind übertragen oder einzelne Funktionen gezielt freigeben.
                     </p>
                     
@@ -3899,12 +3899,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     </button>
 
                     <div style={{ borderTop: '1px solid #e6f4ea', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#137333', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Settings size={14} style={{ color: '#137333' }} /> Einzelne Funktionen freigeben:
+                      <h5 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: '#34a853', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Settings size={14} style={{ color: '#34a853' }} /> Einzelne Funktionen freigeben:
                       </h5>
                       
                       {/* Toggle 1: Chat */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_chat ?? true}
@@ -3920,7 +3920,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </label>
 
                       {/* Toggle 2: Timer */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_timer ?? true}
@@ -3936,7 +3936,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </label>
 
                       {/* Toggle 3: Leaderboard */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_leaderboard ?? true}
@@ -3952,7 +3952,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </label>
 
                       {/* Toggle 4: Groups */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_groups ?? true}
@@ -3968,7 +3968,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </label>
 
                       {/* Toggle 5: Proposals */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#137333', fontWeight: 700, cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#34a853', fontWeight: 700, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
                           checked={profile.parent_allow_proposals ?? true}
@@ -4074,7 +4074,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     ) : (
                       <div style={{
                         background: timerRunning 
-                          ? (isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)' : '#000000') 
+                          ? (isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)' : '#000000') 
                           : '#ffffff',
                         border: timerRunning ? 'none' : '1px solid #e5e5ea',
                         borderRadius: '28px',
@@ -4245,7 +4245,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 padding: '16px',
                                 borderRadius: '18px',
                                 border: 'none',
-                                background: '#137333',
+                                background: '#34a853',
                                 color: '#ffffff',
                                 fontSize: '0.95rem',
                                 fontWeight: 800,
@@ -4417,7 +4417,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       type="button"
                       onClick={handleFinishFocusSession}
                       style={{
-                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                         color: 'white',
                         border: 'none',
                         padding: '12px 28px',
@@ -4621,7 +4621,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     width: '72px',
                     height: '72px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                    background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

@@ -137,7 +137,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     if (!ctx) return;
 
     const isCampus = student.is_campus_active && !student.is_groovelab_active;
-    const themeColor = isCampus ? '#137333' : '#eab308';
+    const themeColor = isCampus ? '#34a853' : '#eab308';
     const displayAvatar = student.photo_url || '/avatar_ghost.jpg';
 
     const avatarImg = new Image();
@@ -294,7 +294,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const urlParams = new URLSearchParams(window.location.search);
   const platformParam = urlParams.get('platform');
   const isCampus = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
-  const activeColor = isCampus ? '#137333' : '#eab308';
+  const activeColor = isCampus ? '#34a853' : '#eab308';
   const displayAvatar = student.photo_url || '/avatar_ghost.jpg';
 
   return (

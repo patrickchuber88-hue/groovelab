@@ -13,6 +13,7 @@ import { CampusEventsBoard } from './CampusEventsBoard';
 import { createPortal } from 'react-dom';
 import { QRCodeModal } from './QRCodeModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 
 const showMissionsFeature = false;
 
@@ -632,7 +633,7 @@ function MobileBriefingView({
         )}
         
         {/* Songs Kachel */}
-        <div style={{ flex: '1 1 0px', minWidth: 0, background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.08)' }} className="kpi-card">
+        <div style={{ flex: '1 1 0px', minWidth: 0, background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', borderRadius: '20px', color: 'white', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.08)' }} className="kpi-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }} className="kpi-card-title">Songs</span>
             <Award size={15} />
@@ -1276,7 +1277,7 @@ function MobileBriefingView({
                   cardBg = '#e6f4ea';
                   cardBorder = '#e6f4ea';
                   badgeText = '❇️ Wieder regulär';
-                  badgeColor = '#137333';
+                  badgeColor = '#34a853';
                 }
                 
                 return (
@@ -1292,7 +1293,7 @@ function MobileBriefingView({
                         {occ.start_time?.substring(0,5)} Uhr
                       </div>
                       {(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) && (
-                        <div style={{ fontSize: '0.7rem', color: '#137333', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#34a853', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
                           Dieser Termin wurde wieder auf die ursprüngliche reguläre Zeit zurückgesetzt. Bitte bestätige, dass du dies gesehen hast.
                         </div>
                       )}
@@ -1858,7 +1859,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                     borderRadius: '8px',
                     textTransform: 'uppercase',
                     background: inv.status === 'paid' || inv.status === 'Bezahlt' ? '#e6f4ea' : '#fee2e2',
-                    color: inv.status === 'paid' || inv.status === 'Bezahlt' ? '#137333' : '#991b1b'
+                    color: inv.status === 'paid' || inv.status === 'Bezahlt' ? '#34a853' : '#991b1b'
                   }}>
                     {inv.status === 'paid' || inv.status === 'Bezahlt' ? 'Bezahlt' : 'Offen'}
                   </span>
@@ -2254,7 +2255,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                   gap: '6px',
                   transition: 'background 0.2s'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#137333'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#34a853'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = '#34a853'; }}
               >
                 <FileText size={16} /> PDF drucken / speichern
@@ -2281,6 +2282,32 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const showLeaderboard = campusSettings.show_leaderboard !== false;
   const showDetailedStats = campusSettings.show_detailed_stats !== false;
   const studentToTeacherChat = campusSettings.student_to_teacher_chat !== false;
+
+  const tourSteps: TourStep[] = useMemo(() => {
+    return [
+      {
+        selector: 'tour-student-hero',
+        title: 'Dein Profil & Level',
+        description: 'Hier siehst du deinen aktuellen Fortschritt, gesammelte XP und deine aktuelle Liga im Campus Cup.'
+      },
+      {
+        selector: 'tour-student-practice',
+        title: 'Dein Übungsboard',
+        description: 'Verwalte deine Hausaufgaben, starte den Fokus-Timer und erhalte Belohnungen für dein tägliches Üben.'
+      },
+      {
+        selector: 'tour-student-songs',
+        title: 'Campus Cup & Meisterwerke',
+        description: 'Messe dich mit anderen im Campus Cup, entdecke neue Songs und teile deine aufgenommenen Meisterwerke.'
+      }
+    ];
+  }, []);
+
+  const { TourComponent, startTour } = usePremiumOnboardingTour({
+    tourKey: `campus_student_tour_${studentId}`,
+    steps: tourSteps,
+    platformTheme: 'campus'
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -6100,7 +6127,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           <div style={{
             background: 'rgba(52, 168, 83, 0.08)',
             border: '1.5px solid rgba(52, 168, 83, 0.12)',
-            color: '#137333',
+            color: '#34a853',
             padding: '12px',
             borderRadius: '16px',
             display: 'flex',
@@ -6117,7 +6144,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <span style={{
                 fontSize: '0.68rem',
                 fontWeight: 900,
-                color: '#137333',
+                color: '#34a853',
                 background: 'rgba(52, 168, 83, 0.08)',
                 padding: '3px 8px',
                 borderRadius: '6px',
@@ -6131,7 +6158,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </h4>
             </div>
             <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-              Vom <strong style={{ color: '#137333', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#137333', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
+              Vom <strong style={{ color: '#34a853', fontWeight: 800 }}>{new Date(isTodayHoliday.start).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> bis zum <strong style={{ color: '#34a853', fontWeight: 800 }}>{new Date(isTodayHoliday.end).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})}</strong> findet kein regulärer Unterricht statt. Genieße die Ferien!
             </p>
           </div>
         </div>
@@ -6260,7 +6287,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         </button>
       </div>
 
-      <div style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start' }} className="animation-slide-up">
+      <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start' }} className="animation-slide-up">
           
           {/* Left Pane (2/3 width) - KPIs and Fokus-Timer */}
           <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -6295,7 +6322,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <div style={{ 
                   flex: '1 1 0px',
                   minWidth: 0,
-                  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
+                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
                   borderRadius: '20px', 
                   color: 'white', 
                   padding: '16px', 
@@ -6455,7 +6482,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               position: 'fixed',
               inset: 0,
               zIndex: 9998,
-              background: isExtraTime ? 'linear-gradient(135deg, #137333 0%, #022c22 100%)' : '#000000',
+              background: isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #022c22 100%)' : '#000000',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -6986,7 +7013,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           <defs>
                             <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                               <stop offset="0%" stopColor="#34a853" />
-                              <stop offset="100%" stopColor="#137333" />
+                              <stop offset="100%" stopColor="#34a853" />
                             </linearGradient>
                             <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                               <stop offset="0%" stopColor="#f87171" />
@@ -7289,7 +7316,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               width: '72px',
                               height: '72px',
                               borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                              background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -7406,7 +7433,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             <defs>
                               <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" stopColor="#34a853" />
-                                <stop offset="100%" stopColor="#137333" />
+                                <stop offset="100%" stopColor="#34a853" />
                               </linearGradient>
                             </defs>
                           </svg>
@@ -7546,7 +7573,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           }}
                           style={{
                             width: '100%',
-                            background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                            background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '14px 20px',
@@ -7573,8 +7600,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         flex: 1,
                         background: isExtraTime 
                           ? 'linear-gradient(135deg, #ffffff 0%, #f4f4f5 100%)' 
-                          : 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
-                        color: isExtraTime ? '#137333' : 'white',
+                          : 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                        color: isExtraTime ? '#34a853' : 'white',
                         border: 'none',
                         padding: '16px',
                         borderRadius: '20px',
@@ -7753,30 +7780,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             // Level 1: ultra light green
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                           } else if (minutes <= 60) {
                             // Level 2: soft green
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                           } else if (minutes <= 180) {
                             // Level 3: medium green
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                           } else {
                             // Level 4 (Master): Solid emerald jewel
-                            bg = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
-                            border = '1px solid #137333';
+                            bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
+                            border = '1px solid #34a853';
                             labelColor = 'rgba(255, 255, 255, 0.8)';
                             textColor = 'rgba(255, 255, 255, 0.9)';
                             numColor = '#ffffff';
@@ -8237,8 +8264,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   return (
                                     <div 
                                       style={{ 
-                                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', 
-                                        border: '1px solid #137333', 
+                                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
+                                        border: '1px solid #34a853', 
                                         borderRadius: '16px', 
                                         padding: '12px 14px',
                                         display: 'flex',
@@ -8397,7 +8424,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
         </div>
 
-      <div style={{ display: activeTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+      <div id="tour-student-songs" style={{ display: activeTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
         {activeTab === 'songs' && (
           progressLoading ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
@@ -8794,7 +8821,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 }}>
                                   <Music size={14} />
                                 </div>
-                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#137333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.78rem', fontWeight: 800, color: '#34a853', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {artist} - {title}
                                 </div>
                               </div>
@@ -8884,7 +8911,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               
               {/* Top Section: Header & Contribution */}
               {(() => {
-                const brandColor = studentUser?.schools?.brand_color || '#137333';
+                const brandColor = studentUser?.schools?.brand_color || '#34a853';
                 const activeSessionMins = sessionActive ? Math.round(secondsElapsed / 60) : 0;
                 const liveClassMins = classMins + activeSessionMins;
                 const liveClassWeeklyFocus = classWeeklyFocus + activeSessionMins;
@@ -8972,7 +8999,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Klassen-Übezeit (Woche)', value: formatMins(liveClassWeeklyFocus), icon: TrendingUp, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Beitrag zur Schule', value: `${contributionPercent}%`, icon: Shield, color: brandColor, bg: '#f8fafc', isNeutral: true },
-                          { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#137333' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
+                          { label: 'Trend zum Vormonat', value: momPercent >= 0 ? `+${momPercent}%` : `${momPercent}%`, icon: Activity, color: momPercent >= 0 ? '#34a853' : '#ea4335', bg: momPercent >= 0 ? '#e6f4ea' : '#fce8e6', isNeutral: false },
                           { label: 'Klassen-Aktivität', value: `${activityRate}%`, icon: Zap, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
@@ -9351,27 +9378,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               if (minutes <= 15) {
                                 bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
                                 border = '1px solid #e6f4ea';
-                                labelColor = '#137333';
-                                textColor = '#137333';
-                                numColor = '#137333';
+                                labelColor = '#34a853';
+                                textColor = '#34a853';
+                                numColor = '#34a853';
                                 shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                               } else if (minutes <= 60) {
                                 bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                                 border = '1px solid #e6f4ea';
-                                labelColor = '#137333';
-                                textColor = '#137333';
-                                numColor = '#137333';
+                                labelColor = '#34a853';
+                                textColor = '#34a853';
+                                numColor = '#34a853';
                                 shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                               } else if (minutes <= 180) {
                                 bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                                 border = '1px solid #e6f4ea';
-                                labelColor = '#137333';
-                                textColor = '#137333';
-                                numColor = '#137333';
+                                labelColor = '#34a853';
+                                textColor = '#34a853';
+                                numColor = '#34a853';
                                 shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                               } else {
-                                bg = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
-                                border = '1px solid #137333';
+                                bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
+                                border = '1px solid #34a853';
                                 labelColor = 'rgba(255, 255, 255, 0.8)';
                                 textColor = 'rgba(255, 255, 255, 0.9)';
                                 numColor = '#ffffff';
@@ -9417,7 +9444,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             { color: '#e6f4ea', label: '<15m', border: '#e6f4ea' },
                             { color: '#e6f4ea', label: '<1h', border: '#e6f4ea' },
                             { color: '#e6f4ea', label: '<3h', border: '#e6f4ea' },
-                            { color: '#34a853', label: '3h+', border: '#137333' }
+                            { color: '#34a853', label: '3h+', border: '#34a853' }
                           ].map(pill => (
                             <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: pill.color, border: `1px solid ${pill.border}` }} />
@@ -9545,7 +9572,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   flex: '1 1 0px',
                   minWidth: 0,
                   position: 'relative', overflow: 'hidden',
-                  background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white',
+                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
                   borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.3)',
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                   padding: '16px', boxSizing: 'border-box',
@@ -9773,14 +9800,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           alignItems: 'center', 
                           gap: '8px', 
                           background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-                          color: '#137333', 
+                          color: '#34a853', 
                           padding: '6px 14px', 
                           borderRadius: '12px', 
                           fontSize: '0.75rem', 
                           fontWeight: 800,
                           border: '1px solid rgba(52, 168, 83, 0.15)'
                         }}>
-                          <Calendar size={13} color="#137333" />
+                          <Calendar size={13} color="#34a853" />
                           <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
                             if(!nextOcc) return 'Demnächst';
                             const d = new Date(nextOcc.date);
@@ -10808,7 +10835,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           cardBg = '#e6f4ea';
                           cardBorder = '#e6f4ea';
                           badgeText = '❇️ Wieder regulär';
-                          badgeColor = '#137333';
+                          badgeColor = '#34a853';
                         }
                         
                         return (
@@ -10862,7 +10889,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 )}
                               </div>
                               {(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) && (
-                                <div style={{ fontSize: '0.7rem', color: '#137333', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#34a853', fontWeight: 500, marginTop: '4px', lineHeight: '1.2' }}>
                                   Findet wieder regulär statt.
                                 </div>
                               )}
@@ -11440,7 +11467,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       
       <div style={{ display: activeTab === 'hero' ? 'block' : 'none' }}>
         {activeTab === 'hero' && (
-          <div style={{
+          <div id="tour-student-hero" style={{
           background: '#ffffff',
           border: '1px solid #e2e8f0',
           borderRadius: '24px',
@@ -11470,6 +11497,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             borderRadius: '100px'
           }}>
             <Trophy size={11} /> {avatar.instrument_type}
+          </div>
+          
+          <div style={{ position: 'absolute', top: '20px', left: '20px' }}>
+            <TourStartButton onClick={startTour} platformTheme="campus" />
           </div>
 
           {/* Avatar Showcase */}
@@ -11662,17 +11693,17 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {(studentMissionProgress?.current_level || 1) >= 2 && (
                 <div style={{ border: '2px dashed #e6f4ea', background: '#e6f4ea', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
-                    <h4 style={{ margin: '0 0 4px 0', fontWeight: 900, color: '#137333', fontSize: '1rem' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontWeight: 900, color: '#34a853', fontSize: '1rem' }}>
                       🔓 Custom Avatar / Instrument Upload freigeschaltet!
                     </h4>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#137333', lineHeight: 1.4 }}>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#34a853', lineHeight: 1.4 }}>
                       Trage deine einmalige PIN ein, die du von deinem Lehrer erhalten hast, um dein eigenes Profilbild/Instrumenten-Foto hochzuladen.
                     </p>
                   </div>
 
                   {/* AI Prompt Assistant helper */}
                   <div style={{ background: '#ffffff', border: '1px solid #e6f4ea', padding: '12px', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#137333', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
                       💡 Prompt-Assistent für KI-Generatoren (z.B. Midjourney, DALL-E)
                     </span>
                     <div style={{ fontSize: '0.75rem', color: '#1e293b', fontStyle: 'italic', background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
@@ -11693,7 +11724,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   <form onSubmit={handleUploadAvatarWithPin} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#137333' }}>6-stellige Einmal-PIN</label>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853' }}>6-stellige Einmal-PIN</label>
                       <input
                         type="text"
                         placeholder="z.B. 123456"
@@ -11705,7 +11736,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1.5, minWidth: '200px' }}>
-                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#137333' }}>Foto auswählen</label>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853' }}>Foto auswählen</label>
                       <input
                         type="file"
                         accept="image/*"
@@ -12067,27 +12098,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           if (minutes <= 15) {
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
                           } else if (minutes <= 60) {
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
                           } else if (minutes <= 180) {
                             bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                             border = '1px solid #e6f4ea';
-                            labelColor = '#137333';
-                            textColor = '#137333';
-                            numColor = '#137333';
+                            labelColor = '#34a853';
+                            textColor = '#34a853';
+                            numColor = '#34a853';
                             shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
                           } else {
-                            bg = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
-                            border = '1px solid #137333';
+                            bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
+                            border = '1px solid #34a853';
                             labelColor = 'rgba(255, 255, 255, 0.8)';
                             textColor = 'rgba(255, 255, 255, 0.9)';
                             numColor = '#ffffff';
@@ -12477,7 +12508,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   <button 
                     type="submit" 
                     disabled={savingProfile}
-                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)' }}
+                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)' }}
                   >
                     {savingProfile ? 'Wird gespeichert...' : 'Änderungen speichern'}
                   </button>
@@ -12521,7 +12552,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   { id: 'billing', label: 'Abrechnung & Rechnungen' }
                 ].map((item) => {
                   const isSelected = settingsSubTab === item.id;
-                  const brandColor = '#137333';
+                  const brandColor = '#34a853';
                   const activeColor = isSelected ? brandColor : '#64748b';
                   
                   const renderIcon = () => {
@@ -12585,7 +12616,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       {/* Push-Benachrichtigungen Haupt-Toggle */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s', opacity: isPremiumUser ? 1 : 0.6 }}>
                         <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                          <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#13733315' : '#f1f5f9', color: pushEnabled ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                          <div style={{ padding: '10px', borderRadius: '12px', background: pushEnabled ? '#34a85315' : '#f1f5f9', color: pushEnabled ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
                             <Bell size={18} />
                           </div>
                           <div>
@@ -12619,7 +12650,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               }
                             }}
                             className={`app-binary-switch ${pushEnabled ? 'active' : ''}`}
-                            style={{ backgroundColor: pushEnabled ? '#137333' : undefined }}
+                            style={{ backgroundColor: pushEnabled ? '#34a853' : undefined }}
                           >
                             <div className="app-binary-switch-knob" />
                           </button>
@@ -12662,7 +12693,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           ].map((row) => (
                             <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
                               <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                                <div style={{ padding: '10px', borderRadius: '12px', background: row.val ? '#13733315' : '#f1f5f9', color: row.val ? '#137333' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
+                                <div style={{ padding: '10px', borderRadius: '12px', background: row.val ? '#34a85315' : '#f1f5f9', color: row.val ? '#34a853' : '#94a3b8', display: 'flex', transition: 'all 0.2s' }}>
                                   {row.icon}
                                 </div>
                                 <div>
@@ -12678,7 +12709,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                   await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
                                 }}
                                 className={`app-binary-switch ${row.val ? 'active' : ''}`}
-                                style={{ backgroundColor: row.val ? '#137333' : undefined }}
+                                style={{ backgroundColor: row.val ? '#34a853' : undefined }}
                               >
                                 <div className="app-binary-switch-knob" />
                               </button>
@@ -12746,7 +12777,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               borderRadius: '20px',
               marginTop: '8px'
             }}>
-              <span style={{ fontSize: '0.82rem', color: '#137333', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: '#34a853', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 ✓ Alle Änderungen gespeichert.
               </span>
               <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
@@ -12967,7 +12998,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           badgeText = 'Theorie';
                         } else if (page.status === 'MASTERED') {
                           badgeBg = '#e6f4ea';
-                          badgeColor = '#137333';
+                          badgeColor = '#34a853';
                           badgeText = 'Erledigt';
                         }
 
@@ -13558,7 +13589,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               {/* Close Button */}
               <button 
                 onClick={() => setContributionsModalData(null)}
-                style={{ background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)', color: 'white', border: 'none', borderRadius: '14px', padding: '12px 20px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', marginTop: '28px', width: '100%', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)', transition: 'all 0.2s' }}
+                style={{ background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', border: 'none', borderRadius: '14px', padding: '12px 20px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', marginTop: '28px', width: '100%', boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)', transition: 'all 0.2s' }}
                 onMouseOver={e => e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 168, 83, 0.25)'}
                 onMouseOut={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 168, 83, 0.15)'}
               >
@@ -13641,13 +13672,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* Joker Info */}
             <div style={{ background: '#e6f4ea', border: '1px solid #e6f4ea', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#137333', fontWeight: 800, fontSize: '0.85rem', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34a853', fontWeight: 800, fontSize: '0.85rem', marginBottom: '6px' }}>
                 🎯 Der wöchentliche Joker & Fehltage
               </div>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: '#137333', lineHeight: 1.45 }}>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#34a853', lineHeight: 1.45 }}>
                 Jede Woche (Montag bis Sonntag) erhältst du <strong>1 Joker</strong>. Wenn du das Üben an einem Tag verpasst, wird der Joker am Tagesende automatisch eingesetzt, um deinen Streak zu retten. Hast du keinen Joker mehr, wird <strong>jeder Fehltag als -1 auf deinen Streak</strong> gewertet (z. B. fällt ein 5-Tage-Streak nach einem Fehltag auf 4 Tage).
               </p>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#137333', lineHeight: 1.45 }}>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#34a853', lineHeight: 1.45 }}>
                 <strong>Wichtig:</strong> Um die Kleine Flamme zum Brennen zu bringen, benötigst du mindestens <strong>1 Übe-Tag (Streak &gt;= 1)</strong>. Wenn der Streak durch Fehltage auf 0 fällt, leuchtet keine Flamme mehr.
               </p>
             </div>
@@ -13790,7 +13821,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             }}>
               <div style={{
                 background: isReinstated 
-                  ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)'
+                  ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)'
                   : 'linear-gradient(135deg, #ef4444 0%, #be123c 100%)',
                 color: 'white', width: '56px', height: '56px', borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -13807,7 +13838,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   margin: 0, 
                   fontSize: '1.25rem', 
                   fontWeight: 900, 
-                  color: isReinstated ? '#137333' : '#9f1239', 
+                  color: isReinstated ? '#34a853' : '#9f1239', 
                   fontFamily: '"Outfit", "Inter", sans-serif' 
                 }}>
                   {isReinstated ? 'Gute Neuigkeiten: Unterricht findet statt!' : 'Wichtige Mitteilung: Unterrichtsausfall'}
@@ -13839,13 +13870,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <div style={{ 
                         fontSize: '0.82rem', 
                         fontWeight: 800, 
-                        color: isReinstated ? '#137333' : '#991b1b' 
+                        color: isReinstated ? '#34a853' : '#991b1b' 
                       }}>
                         {isReinstated ? `☀️ Findet statt: ${dateStr}` : `🚫 Ausfall: ${dateStr}`}
                       </div>
                       <div style={{ 
                         fontSize: '0.75rem', 
-                        color: isReinstated ? '#137333' : '#7f1d1d', 
+                        color: isReinstated ? '#34a853' : '#7f1d1d', 
                         fontWeight: 600, 
                         display: 'flex', 
                         gap: '8px', 
@@ -13878,7 +13909,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 }}
                 style={{
                   background: isReinstated
-                    ? 'linear-gradient(135deg, #34a853 0%, #137333 100%)'
+                    ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)'
                     : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: 'white', border: 'none', borderRadius: '16px',
                   padding: '16px', fontWeight: 900, fontSize: '0.88rem',
@@ -13897,6 +13928,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         );
       })()}
       
+      <TourComponent />
     </div>
   );
 }
