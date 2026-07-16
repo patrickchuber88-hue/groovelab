@@ -6453,7 +6453,7 @@ export function AdminDashboard({
           date: occ.date,
           startTime: startTimeStr,
           endTime: endTimeStr,
-          purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name}` : 'Unterricht',
+          purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name)}` : 'Unterricht',
           teacherId: occ.teacher_id,
           teacherName: teacherName,
           isSchedule: true,

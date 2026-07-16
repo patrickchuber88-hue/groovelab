@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -2318,6 +2318,7 @@ function App() {
   const [globalSongs, setGlobalSongs] = useState<any[]>([]);
   const [plannedSlots, setPlannedSlots] = useState<string[]>([]);
   const [globalPlannedSlots, setGlobalPlannedSlots] = useState<any[]>([]);
+  const [showMobileInfo, setShowMobileInfo] = useState(false);
   const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab' | 'ensembles'>(() => {
     const isCampusDomain = typeof window !== 'undefined' && window.location.hostname.includes('campus');
     const defaultPlat = isCampusDomain ? 'campus' : 'groovelab';
@@ -8172,14 +8173,14 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 1024 ? '0 16px' : '0 32px', height: '80px', background: 'transparent' }}>
+        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 1024 ? '0 16px' : '0 32px', height: windowWidth <= 768 ? '56px' : '80px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'flex-end', 
-            gap: windowWidth <= 1024 ? '4px' : '6px', 
+            gap: windowWidth <= 640 ? '2px' : (windowWidth <= 1024 ? '4px' : '6px'), 
             height: '100%',
-            paddingTop: '20px',
+            paddingTop: windowWidth <= 768 ? '10px' : '20px',
             boxSizing: 'border-box'
           }}>
             {/* Campus Tab */}
@@ -8201,14 +8202,14 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 640 ? '6px 10px 4px' : (windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px'),
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.05)',
                   color: activePlatform === 'campus' ? '#ffffff' : '#34a853',
                   border: activePlatform === 'campus' ? '1px solid #34a853' : '1px solid rgba(52, 168, 83, 0.18)',
                   borderBottom: 'none',
                   fontWeight: 750,
-                  fontSize: '0.82rem',
+                  fontSize: windowWidth <= 768 ? '0.75rem' : '0.82rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   cursor: 'pointer',
@@ -8216,18 +8217,20 @@ function App() {
                   transform: activePlatform === 'campus' ? 'translateY(1px)' : 'translateY(0)',
                   boxShadow: activePlatform === 'campus' ? '0 -4px 16px rgba(52, 168, 83, 0.18)' : 'none',
                   transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  height: '44px',
+                  height: windowWidth <= 768 ? '36px' : '44px',
                   boxSizing: 'border-box',
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
                 <GraduationCap size={15} color={activePlatform === 'campus' ? '#ffffff' : '#34a853'} />
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  {locationMode === 'lab' && user?.role === 'student' && activePlatform !== 'campus' && (
-                    <Lock size={12} style={{ color: 'inherit' }} />
-                  )}
-                  Campus
-                </span>
+                {windowWidth > 640 && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {locationMode === 'lab' && user?.role === 'student' && activePlatform !== 'campus' && (
+                      <Lock size={12} style={{ color: 'inherit' }} />
+                    )}
+                    Campus
+                  </span>
+                )}
               </div>
             )}
 
@@ -8241,14 +8244,14 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 640 ? '6px 10px 4px' : (windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px'),
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'groovelab' ? '#facc15' : 'rgba(250, 204, 21, 0.05)',
                   color: activePlatform === 'groovelab' ? '#09090b' : '#eab308',
                   border: activePlatform === 'groovelab' ? '1px solid #facc15' : '1px solid rgba(250, 204, 21, 0.18)',
                   borderBottom: 'none',
                   fontWeight: 750,
-                  fontSize: '0.82rem',
+                  fontSize: windowWidth <= 768 ? '0.75rem' : '0.82rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   cursor: 'pointer',
@@ -8256,13 +8259,13 @@ function App() {
                   transform: activePlatform === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
                   boxShadow: activePlatform === 'groovelab' ? '0 -4px 16px rgba(250, 204, 21, 0.18)' : 'none',
                   transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  height: '44px',
+                  height: windowWidth <= 768 ? '36px' : '44px',
                   boxSizing: 'border-box',
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
                 <Music size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#eab308'} />
-                <span>GrooveLab</span>
+                {windowWidth > 640 && <span>GrooveLab</span>}
               </div>
             )}
 
@@ -8276,14 +8279,14 @@ function App() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px',
+                  padding: windowWidth <= 640 ? '6px 10px 4px' : (windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px'),
                   borderRadius: '12px 12px 0 0',
                   background: activePlatform === 'ensembles' ? '#3b82f6' : 'rgba(59, 130, 246, 0.05)',
                   color: activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6',
                   border: activePlatform === 'ensembles' ? '1px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.18)',
                   borderBottom: 'none',
                   fontWeight: 750,
-                  fontSize: '0.82rem',
+                  fontSize: windowWidth <= 768 ? '0.75rem' : '0.82rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   cursor: 'pointer',
@@ -8291,13 +8294,13 @@ function App() {
                   transform: activePlatform === 'ensembles' ? 'translateY(1px)' : 'translateY(0)',
                   boxShadow: activePlatform === 'ensembles' ? '0 -4px 16px rgba(59, 130, 246, 0.18)' : 'none',
                   transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  height: '44px',
+                  height: windowWidth <= 768 ? '36px' : '44px',
                   boxSizing: 'border-box',
                   fontFamily: "'Plus Jakarta Sans', sans-serif"
                 }}
               >
                 <Users size={15} color={activePlatform === 'ensembles' ? '#ffffff' : '#3b82f6'} />
-                <span>Ensembles & Bands</span>
+                {windowWidth > 640 && <span>Ensembles & Bands</span>}
               </div>
             )}
           </div>
@@ -8309,7 +8312,29 @@ function App() {
             marginLeft: windowWidth <= 1024 ? '24px' : '48px'
           }}>
             {/* Status Pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
+            {windowWidth <= 640 ? (
+              <button
+                onClick={() => setShowMobileInfo(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.08)' : (activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(250, 204, 21, 0.08)'),
+                  border: `1px solid ${activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#facc15')}30`,
+                  color: activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'),
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  borderWidth: '1px',
+                  padding: 0,
+                  outline: 'none'
+                }}
+              >
+                <Info size={18} />
+              </button>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
               {activePlatform === 'campus' ? (
                 <>
                   {/* Trial Pill */}
@@ -8653,7 +8678,8 @@ function App() {
                   })()}
                 </>
               )}
-            </div>
+              </div>
+            )}
 
             {/* Removed header Ausweis button (moved to sidebar) */}
 
@@ -13510,6 +13536,86 @@ function App() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Info Overlay Modal for Consolidated Status Pills */}
+      {showMobileInfo && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(9, 9, 11, 0.40)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '380px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            border: '1px solid rgba(0,0,0,0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#09090b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status & Details</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Musikschule:</span>
+                <span style={{ fontSize: '0.85rem', color: '#09090b', fontWeight: 800 }}>{school?.name || 'Meine Musikschule'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Benutzer:</span>
+                <span style={{ fontSize: '0.85rem', color: '#09090b', fontWeight: 800 }}>{user?.first_name} {user?.last_name}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Rolle:</span>
+                <span style={{ fontSize: '0.85rem', color: '#09090b', fontWeight: 800, textTransform: 'uppercase' }}>
+                  {user?.role === 'admin' ? 'Administrator' : user?.role === 'teacher' ? 'Lehrer' : user?.role === 'secretary' ? 'Sekretariat' : 'Schüler'}
+                </span>
+              </div>
+              {school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Probezeit:</span>
+                  <span style={{ fontSize: '0.85rem', color: '#eab308', fontWeight: 800 }}>
+                    {trialDaysLeft > 0 ? `${trialDaysLeft} Tage verbleibend` : 'Abgelaufen'}
+                  </span>
+                </div>
+              )}
+              {locationMode === 'lab' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Station:</span>
+                  <span style={{ fontSize: '0.85rem', color: '#34a853', fontWeight: 800 }}>
+                    {session?.stations?.name || 'Labor iPad'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowMobileInfo(false)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: activePlatform === 'campus' ? '#137333' : (activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'),
+                color: activePlatform === 'groovelab' ? '#09090b' : 'white',
+                border: 'none',
+                borderRadius: '14px',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                fontFamily: "'Plus Jakarta Sans', sans-serif"
+              }}
+            >
+              Schließen
+            </button>
           </div>
         </div>
       )}
