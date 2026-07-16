@@ -503,7 +503,7 @@ function MobileBriefingView({
           </div>
 
           <h2 style={{ fontSize: '24px', fontWeight: 900, margin: 0, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-            Willkommen zurück!
+            Willkommen zurück, {studentUser?.first_name || ''}! 👋
           </h2>
 
           <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45, margin: 0, fontWeight: 550 }}>
