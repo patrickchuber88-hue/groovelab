@@ -82,6 +82,19 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
     }
   };
 
+  const handleLogoDoubleClick = () => {
+    if (typeof window !== 'undefined') {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocalhost) {
+        window.location.href = `http://${window.location.hostname}:${window.location.port}/?platform=campus`;
+      } else {
+        const parts = window.location.hostname.replace('www.', '').split('.');
+        const baseDomain = parts.slice(-2).join('.');
+        window.location.href = `${window.location.protocol}//${baseDomain}/?platform=campus`;
+      }
+    }
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -285,21 +298,25 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         
         {/* Header / Brand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', marginBottom: '16px' }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '0.75rem',
-            fontWeight: 800,
-            color: '#10b981',
-            background: 'rgba(16, 185, 129, 0.08)',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            padding: '8px 20px',
-            borderRadius: '100px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)'
-          }}>
+          <div 
+            onDoubleClick={handleLogoDoubleClick}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              color: '#10b981',
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              padding: '8px 20px',
+              borderRadius: '100px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}>
             <Sparkles size={14} style={{ color: '#facc15' }} />
             Campus-Groovelab
           </div>
