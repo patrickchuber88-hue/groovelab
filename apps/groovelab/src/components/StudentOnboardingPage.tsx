@@ -263,7 +263,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   };
 
   const handleCopyLink = () => {
-    const link = `${window.location.origin}/onboarding/${token}`;
+    const link = `${window.location.origin}/onboarding/${token}${window.location.search}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -291,7 +291,9 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     );
   }
 
-  const isCampus = student.is_campus_active && !student.is_groovelab_active;
+  const urlParams = new URLSearchParams(window.location.search);
+  const platformParam = urlParams.get('platform');
+  const isCampus = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
   const activeColor = isCampus ? '#137333' : '#eab308';
   const displayAvatar = student.photo_url || '/avatar_ghost.jpg';
 
@@ -300,7 +302,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       
       {/* Header */}
       <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px', color: '#1e293b' }}>Willkommen bei GrooveLab</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px', color: '#1e293b' }}>Willkommen bei Campus-Groovelab</h1>
         <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Dein persönlicher Onboarding-Bereich</p>
       </div>
 
@@ -548,7 +550,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
               </div>
             </div>
 
-            <button onClick={() => window.location.replace('/login')} style={{ width: '100%', background: '#ffffff', color: '#18181b', border: '1px solid #d4d4d8', borderRadius: '14px', padding: '12px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
+            <button onClick={() => window.location.replace(`/login?platform=${isCampus ? 'campus' : 'groovelab'}`)} style={{ width: '100%', background: '#ffffff', color: '#18181b', border: '1px solid #d4d4d8', borderRadius: '14px', padding: '12px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
               Direkt zum Login <ArrowRight size={16} />
             </button>
           </div>

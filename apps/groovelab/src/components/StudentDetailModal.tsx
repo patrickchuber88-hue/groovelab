@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -65,6 +65,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [firstName, setFirstName] = useState<string>(student.first_name || '');
   const [lastName, setLastName] = useState<string>(student.last_name || '');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
   const [showQrOverlay, setShowQrOverlay] = useState<boolean>(false);
   const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -255,6 +258,30 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     };
     fetchCurrentUser();
   }, []);
+
+  const handleSaveName = async () => {
+    try {
+      if (!editFirstName.trim() || !editLastName.trim()) {
+        alert('Vorname und Nachname dürfen nicht leer sein.');
+        return;
+      }
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: editFirstName.trim(),
+          last_name: editLastName.trim()
+        })
+        .eq('id', student.id);
+      if (error) throw error;
+      setFirstName(editFirstName.trim());
+      setLastName(editLastName.trim());
+      student.first_name = editFirstName.trim();
+      student.last_name = editLastName.trim();
+      setIsEditingName(false);
+    } catch (err: any) {
+      alert('Fehler beim Speichern des Namens: ' + err.message);
+    }
+  };
 
   useEffect(() => {
     const fetchQrToken = async () => {
@@ -1340,29 +1367,122 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 <img src={displayAvatarSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>{firstName} {maskLastName(lastName)}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleRealNames()}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: showRealNames ? '#ea4335' : '#64748b',
-                      padding: '4px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '50%',
-                      transition: 'all 0.15s ease'
-                    }}
-                    title={showRealNames ? "Nachname ausblenden" : "Nachname einblenden (für 10s)"}
-                    className="hover-scale-mini"
-                  >
-                    {showRealNames ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </h2>
+                {isEditingName ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <input 
+                      type="text" 
+                      value={editFirstName} 
+                      onChange={e => setEditFirstName(e.target.value)} 
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        width: '120px',
+                        outline: 'none'
+                      }}
+                    />
+                    <input 
+                      type="text" 
+                      value={editLastName} 
+                      onChange={e => setEditLastName(e.target.value)} 
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        width: '120px',
+                        outline: 'none'
+                      }}
+                    />
+                    <button 
+                      onClick={handleSaveName}
+                      style={{
+                        background: '#34a853',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Speichern
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setEditFirstName(firstName);
+                        setEditLastName(lastName);
+                        setIsEditingName(false);
+                      }}
+                      style={{
+                        background: '#f1f5f9',
+                        color: '#64748b',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                ) : (
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{firstName} {maskLastName(lastName)}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleRealNames()}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: showRealNames ? '#ea4335' : '#64748b',
+                        padding: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={showRealNames ? "Nachname ausblenden" : "Nachname einblenden (für 10s)"}
+                      className="hover-scale-mini"
+                    >
+                      {showRealNames ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                    {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditFirstName(firstName);
+                          setEditLastName(lastName);
+                          setIsEditingName(true);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748b',
+                          padding: '4px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '50%',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title="Name bearbeiten"
+                        className="hover-scale-mini"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    )}
+                  </h2>
+                )}
                 <div style={{ display: 'flex', gap: '16px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
                     <Calendar size={14} /> Member seit {memberSince}
@@ -2087,7 +2207,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 <button
                   type="button"
                   onClick={() => {
-                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`;
                     navigator.clipboard.writeText(link);
                     setCopiedCampusLink(true);
                     setTimeout(() => setCopiedCampusLink(false), 2000);
@@ -2305,7 +2425,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Unterrichtsform</span>
-                  {activePlatform === 'secretary' ? (
+                  {activePlatform === 'secretary' || currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {durationRequestSent && (
                         <span style={{ 
@@ -2814,7 +2934,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <button
                       type="button"
                       onClick={() => {
-                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=groovelab`;
                         navigator.clipboard.writeText(link);
                         setCopiedGrooveLink(true);
                         setTimeout(() => setCopiedGrooveLink(false), 2000);
