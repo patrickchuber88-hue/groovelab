@@ -1142,6 +1142,19 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 
 // Auto-setup kiosk mode from URL parameters
 const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+
+// Handle platform override from URL (e.g. from LandingPage search)
+const targetPlatform = params.get('platform');
+if (targetPlatform && (targetPlatform === 'campus' || targetPlatform === 'groovelab' || targetPlatform === 'ensembles')) {
+  localStorage.setItem('groovelab_active_platform', targetPlatform);
+  params.delete('platform');
+  const newSearch = params.toString();
+  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+  if (typeof window !== 'undefined' && window.history) {
+    window.history.replaceState({}, '', newUrl);
+  }
+}
+
 const kioskTokenParam = params.get('kiosk_token');
 if (kioskTokenParam) {
   localStorage.setItem('groovelab_kiosk_token', kioskTokenParam);
@@ -3634,7 +3647,7 @@ function App() {
               coach:users!coach_id (first_name, last_name, photo_url)
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from('bands').select('*, songs(title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
+        supabase.from('bands').select('*, songs(id, title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
         supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
@@ -6710,7 +6723,7 @@ function App() {
 
       return (
         <LandingPage2 
-          onLogin={() => navigate('/login')} 
+          onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
@@ -8061,6 +8074,39 @@ function App() {
             </div>
           </button>
 
+          {/* Ausweis button */}
+          {(user?.qr_token || user?.teacher_qr_token) && (
+            <button 
+              type="button"
+              onClick={() => setShowQR(true)}
+              style={{ 
+                width: '100%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: '8px', 
+                padding: '12px 14px', 
+                borderRadius: '14px', 
+                border: `1.5px solid ${activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.18)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.18)' : 'rgba(234, 179, 8, 0.25)'}`, 
+                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.05)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(234, 179, 8, 0.05)', 
+                color: activePlatform === 'campus' ? '#137333' : activePlatform === 'ensembles' ? '#2563eb' : '#a16207', 
+                fontWeight: 800, 
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.1)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(234, 179, 8, 0.1)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.05)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(234, 179, 8, 0.05)';
+              }}
+            >
+              <QrCode size={16} /> Ausweis zeigen
+            </button>
+          )}
+
           {/* Abmelden button */}
           <button 
             type="button"
@@ -8071,7 +8117,7 @@ function App() {
               alignItems: 'center', 
               justifyContent: 'center',
               gap: '8px', 
-              padding: '10px 14px', 
+              padding: '12px 14px', 
               borderRadius: '14px', 
               border: 'none', 
               background: '#fef2f2', 
@@ -8475,15 +8521,16 @@ function App() {
                     const hasNumber = stationNumber.length > 0;
                     
                     const isHome = locationMode !== 'lab';
+                    const badgeColor = isTeacherStation ? '#137333' : stationColor;
                     const displayBg = isHome 
                       ? 'rgba(100, 116, 139, 0.06)' 
-                      : (isTeacherStation ? '#137333' : stationColor);
+                      : `${badgeColor}12`;
                     const displayBorder = isHome
                       ? '1px solid rgba(100, 116, 139, 0.12)'
-                      : `1px solid ${isTeacherStation ? '#137333' : stationColor}`;
+                      : `1px solid ${badgeColor}25`;
                     const displayColor = isHome
                       ? '#64748b'
-                      : getContrastColor(isTeacherStation ? '#137333' : stationColor);
+                      : badgeColor;
 
                     return (
                       <div style={{ 
@@ -8497,7 +8544,7 @@ function App() {
                         color: displayColor,
                         height: '36px',
                         boxSizing: 'border-box',
-                        boxShadow: isHome ? 'none' : '0 2px 8px rgba(0,0,0,0.06)',
+                        boxShadow: 'none',
                         transition: 'all 0.2s ease',
                         flexShrink: 0
                       }}>
@@ -8524,7 +8571,7 @@ function App() {
                               <span style={{ color: displayColor, fontWeight: 750 }}>iPad</span>
                               {hasNumber ? (
                                 <span style={{ 
-                                  background: displayColor === '#ffffff' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.12)', 
+                                  background: `${displayColor}20`, 
                                   color: displayColor, 
                                   borderRadius: '6px', 
                                   padding: '2px 6px', 
@@ -8559,21 +8606,23 @@ function App() {
                       return (yiq >= 170) ? '#0f172a' : '#ffffff';
                     };
 
-                    const themeColor = (activePlatform as string) === 'campus' ? '#34a853' : '#facc15';
-                    const displayColor = getContrastColor(themeColor);
+                    const themeColor = (activePlatform as string) === 'campus' ? '#34a853' : '#eab308';
+                    const displayBg = `${themeColor}12`;
+                    const displayBorder = `1px solid ${themeColor}25`;
+                    const displayColor = themeColor;
                     
                     return (
                       <div style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: '6px', 
-                        background: themeColor, 
-                        border: `1px solid ${themeColor}`, 
+                        background: displayBg, 
+                        border: displayBorder, 
                         padding: '6px 12px', 
                         borderRadius: '10px', 
                         height: '36px',
                         boxSizing: 'border-box',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                        boxShadow: 'none',
                         transition: 'all 0.2s ease',
                         color: displayColor,
                         flexShrink: 0
@@ -8587,7 +8636,7 @@ function App() {
                           gap: '4px'
                         }}>
                           <span style={{ 
-                            background: displayColor === '#ffffff' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.12)',
+                            background: `${displayColor}20`,
                             color: displayColor,
                             borderRadius: '6px',
                             padding: '2px 5px',
@@ -8606,26 +8655,7 @@ function App() {
               )}
             </div>
 
-            {/* Ausweis Button (Desktop only) */}
-            {windowWidth > 1024 && (
-              <button 
-                onClick={() => setShowQR(true)} 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '10px', 
-                  background: 'white', 
-                  padding: '10px 20px', 
-                  borderRadius: '16px', 
-                  border: `1.5px solid ${activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.25)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(250, 204, 21, 0.3)'}`, 
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.05)', 
-                  cursor: 'pointer' 
-                }}
-              >
-                <span style={{ color: activePlatform === 'campus' ? '#34a853' : activePlatform === 'ensembles' ? '#3b82f6' : '#eab308', fontWeight: 800, fontSize: '0.85rem' }}>Ausweis</span>
-                <QrCode size={18} color={activePlatform === 'campus' ? '#34a853' : activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'} />
-              </button>
-            )}
+            {/* Removed header Ausweis button (moved to sidebar) */}
 
             {/* User Info */}
             <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 1024 ? '8px' : '16px', paddingLeft: windowWidth <= 1024 ? '8px' : '16px', borderLeft: '1px solid #f1f5f9' }}>
@@ -8675,31 +8705,33 @@ function App() {
                   {windowWidth > 480 && <span>Verwaltung</span>}
                 </button>
               )}
-              {/* Elegant Logout Button next to avatar */}
-              <button 
-                onClick={() => handleLogout(true, true)}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  background: '#ffe4e6', 
-                  border: '1px solid #fecdd3', 
-                  padding: windowWidth <= 480 ? '8px' : '8px 14px', 
-                  borderRadius: '12px', 
-                  color: '#e11d48', 
-                  fontWeight: 800, 
-                  fontSize: '0.8rem', 
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 2px 10px rgba(225, 29, 72, 0.08)',
-                  flexShrink: 0
-                }}
-                className="hover-scale"
-                title="Abmelden"
-              >
-                <LogOut size={14} color="#e11d48" />
-                {windowWidth > 480 && <span>Abmelden</span>}
-              </button>
+              {/* Elegant Logout Button next to avatar (mobile-only to avoid duplicate on desktop) */}
+              {windowWidth <= 1024 && (
+                <button 
+                  onClick={() => handleLogout(true, true)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    background: '#ffe4e6', 
+                    border: '1px solid #fecdd3', 
+                    padding: windowWidth <= 480 ? '8px' : '8px 14px', 
+                    borderRadius: '12px', 
+                    color: '#e11d48', 
+                    fontWeight: 800, 
+                    fontSize: '0.8rem', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 2px 10px rgba(225, 29, 72, 0.08)',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                  title="Abmelden"
+                >
+                  <LogOut size={14} color="#e11d48" />
+                  {windowWidth > 480 && <span>Abmelden</span>}
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -14305,27 +14337,27 @@ function App() {
               });
               if (user) fetchDashboardData(user.id);
             }
-          }} className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '600px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Bandprofil bearbeiten</h2>
-              <button type="button" onClick={() => setShowEditBand(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={24} />
+          }} className="animation-slide-up" style={{ background: 'rgba(30, 30, 30, 0.95)', backdropFilter: 'blur(30px) saturate(150%)', WebkitBackdropFilter: 'blur(30px) saturate(150%)', border: '1px solid rgba(255,255,255,0.08)', padding: '40px', borderRadius: '32px', maxWidth: '640px', width: '100%', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), 0 40px 100px rgba(0,0,0,0.8)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '36px' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 900, color: 'white', margin: 0, letterSpacing: '-0.02em' }}>Bandprofil bearbeiten</h2>
+              <button type="button" onClick={() => setShowEditBand(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={20} />
               </button>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bandname</label>
-                <input required value={editingBand.name} onChange={e => setEditingBand({...editingBand, name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bandname</label>
+                <input required value={editingBand.name} onChange={e => setEditingBand({...editingBand, name: e.target.value})} style={{ color: 'white', padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '1rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }} />
               </div>
 
               {(user?.role === 'teacher' || user?.role === 'admin') && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bandcoach (Lehrer)</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bandcoach (Lehrer)</label>
                   <select 
                     value={editingBand.coach_id || ''} 
                     onChange={e => setEditingBand({...editingBand, coach_id: e.target.value || null})} 
-                    style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+                    style={{ color: 'white', padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.8)', fontWeight: 600, fontSize: '1rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }}
                   >
                     <option value="">-- Kein Coach --</option>
                     {teachers.map(t => (
@@ -14335,21 +14367,21 @@ function App() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musikrichtung / Genre</label>
-                <input value={editingBand.genre || ''} onChange={e => setEditingBand({...editingBand, genre: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} placeholder="z.B. Rock, Jazz, Pop..." />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikrichtung / Genre</label>
+                <input value={editingBand.genre || ''} onChange={e => setEditingBand({...editingBand, genre: e.target.value})} style={{ color: 'white', padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '1rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }} placeholder="z.B. Rock, Jazz, Pop..." />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Über uns</label>
-                <textarea rows={3} value={editingBand.bio || ''} onChange={e => setEditingBand({...editingBand, bio: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600, resize: 'none' }} placeholder="Erzählt eure Story..." />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Über uns</label>
+                <textarea rows={4} value={editingBand.bio || ''} onChange={e => setEditingBand({...editingBand, bio: e.target.value})} style={{ color: 'white', padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '1rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none', resize: 'none' }} placeholder="Erzählt eure Story..." />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Termine & Gigs</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Termine & Gigs</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                    {(editingBand.appointments || []).map((app: any, idx: number) => (
-                     <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                     <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <div style={{ flex: 1 }}>
                            <input 
                              placeholder="Titel" 
@@ -14359,9 +14391,9 @@ function App() {
                                newApps[idx].title = e.target.value;
                                setEditingBand({...editingBand, appointments: newApps});
                              }} 
-                             style={{ background: 'transparent', border: 'none', fontWeight: 700, width: '100%', outline: 'none' }} 
+                             style={{ color: 'white', background: 'transparent', border: 'none', fontWeight: 800, fontSize: '1.1rem', width: '100%', outline: 'none' }} 
                            />
-                           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                           <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                               <input 
                                 type="date" 
                                 value={app.date} 
@@ -14370,7 +14402,7 @@ function App() {
                                   newApps[idx].date = e.target.value;
                                   setEditingBand({...editingBand, appointments: newApps});
                                 }} 
-                                style={{ background: 'transparent', border: 'none', fontSize: '0.75rem', color: '#64748b', outline: 'none' }} 
+                                style={{ color: 'rgba(255,255,255,0.8)', background: 'transparent', border: 'none', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }} 
                               />
                               <input 
                                 placeholder="Ort" 
@@ -14380,29 +14412,32 @@ function App() {
                                   newApps[idx].location = e.target.value;
                                   setEditingBand({...editingBand, appointments: newApps});
                                 }} 
-                                style={{ background: 'transparent', border: 'none', fontSize: '0.75rem', color: '#64748b', outline: 'none', flex: 1 }} 
+                                style={{ color: 'rgba(255,255,255,0.8)', background: 'transparent', border: 'none', fontSize: '0.85rem', fontWeight: 600, outline: 'none', flex: 1 }} 
                               />
                            </div>
                         </div>
                         <button type="button" onClick={() => {
                           const newApps = editingBand.appointments.filter((_: any, i: number) => i !== idx);
                           setEditingBand({...editingBand, appointments: newApps});
-                        }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                        }} style={{ background: 'rgba(239,68,68,0.15)', padding: '12px', borderRadius: '12px', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}><Trash2 size={20} /></button>
                      </div>
                    ))}
                    <button type="button" onClick={() => {
                      const newApps = [...(editingBand.appointments || []), { title: '', date: new Date().toISOString().split('T')[0], location: '' }];
                      setEditingBand({...editingBand, appointments: newApps});
-                   }} style={{ padding: '12px', borderRadius: '12px', border: '2px dashed #e2e8f0', background: 'transparent', color: '#64748b', fontWeight: 700, cursor: 'pointer' }}>+ Termin hinzufügen</button>
+                   }} style={{ padding: '16px', borderRadius: '16px', border: '2px dashed rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.8)', fontWeight: 800, cursor: 'pointer', transition: 'background 0.2s' }}
+                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                     onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                   >+ Termin hinzufügen</button>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Musik (MP3 Links)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musik (MP3 Links)</label>
                 {(editingBand.soundcloud_links || []).map((track: any, idx: number) => {
                   const trackData = typeof track === 'string' ? { title: '', url: track } : track;
                   return (
-                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       <input 
                         placeholder="Titel (z.B. Song Name)" 
                         value={trackData.title}
@@ -14411,7 +14446,7 @@ function App() {
                           newList[idx] = { ...trackData, title: e.target.value };
                           setEditingBand({...editingBand, soundcloud_links: newList});
                         }}
-                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+                        style={{ color: 'white', flex: 1, padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '0.9rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }}
                       />
                       <input 
                         placeholder="MP3 Link (Cloud URL)" 
@@ -14421,27 +14456,30 @@ function App() {
                           newList[idx] = { ...trackData, url: e.target.value };
                           setEditingBand({...editingBand, soundcloud_links: newList});
                         }}
-                        style={{ flex: 2, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+                        style={{ color: 'white', flex: 2, padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '0.9rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }}
                       />
                       <button type="button" onClick={() => {
                         const newList = editingBand.soundcloud_links.filter((_: any, i: number) => i !== idx);
                         setEditingBand({...editingBand, soundcloud_links: newList});
-                      }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                      }} style={{ background: 'rgba(239,68,68,0.15)', padding: '14px', borderRadius: '14px', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}><Trash2 size={20} /></button>
                     </div>
                   );
                 })}
                 <button type="button" onClick={() => {
                   const newList = [...(editingBand.soundcloud_links || []), { title: '', url: '' }];
                   setEditingBand({...editingBand, soundcloud_links: newList});
-                }} style={{ padding: '10px', borderRadius: '10px', border: '1px dashed #cbd5e1', background: 'transparent', color: '#64748b', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>+ Song hinzufügen</button>
+                }} style={{ padding: '14px', borderRadius: '12px', border: '2px dashed rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.8)', fontWeight: 800, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.9rem' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                >+ Song hinzufügen</button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Videos (YouTube Links)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Videos (YouTube Links)</label>
                 {(editingBand.youtube_links || []).map((video: any, idx: number) => {
                   const videoData = typeof video === 'string' ? { title: '', url: video } : video;
                   return (
-                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       <input 
                         placeholder="Videotitel" 
                         value={videoData.title}
@@ -14450,7 +14488,7 @@ function App() {
                           newList[idx] = { ...videoData, title: e.target.value };
                           setEditingBand({...editingBand, youtube_links: newList});
                         }}
-                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+                        style={{ color: 'white', flex: 1, padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '0.9rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }}
                       />
                       <input 
                         placeholder="YouTube URL" 
@@ -14460,26 +14498,35 @@ function App() {
                           newList[idx] = { ...videoData, url: e.target.value };
                           setEditingBand({...editingBand, youtube_links: newList});
                         }}
-                        style={{ flex: 2, padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }}
+                        style={{ color: 'white', flex: 2, padding: '16px 20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', fontWeight: 600, fontSize: '0.9rem', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)', outline: 'none' }}
                       />
                       <button type="button" onClick={() => {
                         const newList = editingBand.youtube_links.filter((_: any, i: number) => i !== idx);
                         setEditingBand({...editingBand, youtube_links: newList});
-                      }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                      }} style={{ background: 'rgba(239,68,68,0.15)', padding: '14px', borderRadius: '14px', border: 'none', color: '#ff4d4f', cursor: 'pointer' }}><Trash2 size={20} /></button>
                     </div>
                   );
                 })}
                 <button type="button" onClick={() => {
                   const newList = [...(editingBand.youtube_links || []), { title: '', url: '' }];
                   setEditingBand({...editingBand, youtube_links: newList});
-                }} style={{ padding: '10px', borderRadius: '10px', border: '1px dashed #cbd5e1', background: 'transparent', color: '#64748b', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>+ Video hinzufügen</button>
+                }} style={{ padding: '14px', borderRadius: '12px', border: '2px dashed rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.8)', fontWeight: 800, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.9rem' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                >+ Video hinzufügen</button>
               </div>
 
 
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                <button type="submit" style={{ flex: 1, background: brandColor, color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer', fontSize: '1rem' }}>Speichern</button>
-                <button type="button" onClick={() => setShowEditBand(false)} style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}>Abbrechen</button>
+              <div style={{ display: 'flex', gap: '16px', marginTop: '20px' }}>
+                <button type="submit" style={{ flex: 1, background: brandColor, color: 'black', border: 'none', padding: '18px', borderRadius: '16px', fontWeight: 900, cursor: 'pointer', fontSize: '1.1rem', boxShadow: `0 10px 30px ${brandColor}40`, transition: 'transform 0.2s', letterSpacing: '0.02em' }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >Profil aktualisieren</button>
+                <button type="button" onClick={() => setShowEditBand(false)} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', padding: '18px', borderRadius: '16px', fontWeight: 800, cursor: 'pointer', fontSize: '1.1rem', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                >Abbrechen</button>
               </div>
             </div>
           </form>
@@ -14689,6 +14736,8 @@ function App() {
                      >
                        <img 
                         src={av.url} 
+                        loading="lazy"
+                        decoding="async"
                         style={{ 
                           width: '100%', 
                           height: '100%', 

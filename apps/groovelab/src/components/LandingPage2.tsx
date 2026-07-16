@@ -1,5 +1,6 @@
-import React from 'react';
-import { Sparkles, Lock, ArrowRight, School } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, Search, School, MapPin, Loader2, ArrowRight } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface LandingPage2Props {
   onLogin: () => void;
@@ -16,10 +17,75 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
   onShowAgb,
   onShowImpressum
 }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Close results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchQuery.trim().length < 2) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription')
+          .ilike('name', `%${searchQuery.trim()}%`)
+          .not('subdomain', 'is', null)
+          .limit(6);
+
+        if (!error && data) {
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSchoolSelect = (school: any) => {
+    if (typeof window !== 'undefined') {
+      let targetPlatform = 'campus'; // Default to campus
+      if (!school.has_campus_subscription && school.has_groovelab_subscription) {
+        targetPlatform = 'groovelab';
+      }
+
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocalhost) {
+        window.location.href = `http://${window.location.hostname}:${window.location.port}/?subdomain=${school.subdomain}&platform=${targetPlatform}`;
+      } else {
+        const baseDomain = window.location.hostname.replace('www.', ''); // e.g. campus-groovelab.de
+        window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?platform=${targetPlatform}`;
+      }
+    }
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#09090b',
+      background: '#050505', // Deep absolute dark
       fontFamily: '"Outfit", "Inter", system-ui, -apple-system, sans-serif',
       display: 'flex',
       flexDirection: 'column',
@@ -46,83 +112,168 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         }
         .ambient-glow-1 {
           position: absolute;
-          top: 15%;
-          left: 20%;
-          width: 500px;
-          height: 500px;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0) 70%);
-          filter: blur(60px);
+          top: 10%;
+          left: 15%;
+          width: 600px;
+          height: 600px;
+          background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0) 70%);
+          filter: blur(80px);
           pointer-events: none;
-          animation: float-glow-1 12s infinite ease-in-out;
+          animation: float-glow-1 15s infinite ease-in-out;
         }
         .ambient-glow-2 {
           position: absolute;
-          bottom: 15%;
-          right: 20%;
-          width: 550px;
-          height: 550px;
-          background: radial-gradient(circle, rgba(234, 179, 8, 0.08) 0%, rgba(234, 179, 8, 0) 70%);
-          filter: blur(70px);
+          bottom: 10%;
+          right: 15%;
+          width: 650px;
+          height: 650px;
+          background: radial-gradient(circle, rgba(234, 179, 8, 0.06) 0%, rgba(234, 179, 8, 0) 70%);
+          filter: blur(90px);
           pointer-events: none;
-          animation: float-glow-2 15s infinite ease-in-out;
+          animation: float-glow-2 18s infinite ease-in-out;
         }
-        .glass-card {
+        
+        /* Magic Search Styles */
+        .magic-search-container {
+          position: relative;
+          width: 100%;
+          max-width: 580px;
+          margin: 40px auto 0;
+          z-index: 20;
+        }
+        .magic-search-input {
+          width: 100%;
           background: rgba(20, 20, 25, 0.65);
-          backdrop-filter: blur(28px);
-          -webkit-backdrop-filter: blur(28px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 32px;
-          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-          transform: translateY(0);
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .glass-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(255, 255, 255, 0.12);
-          box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-        }
-        .btn-primary {
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: #ffffff;
-          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+          backdrop-filter: blur(32px);
+          -webkit-backdrop-filter: blur(32px);
           border: 1px solid rgba(255, 255, 255, 0.1);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .btn-primary:hover {
-          transform: scale(1.02);
-          box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4);
-          filter: brightness(1.05);
-        }
-        .btn-primary:active {
-          transform: scale(0.99);
-        }
-        .btn-secondary {
-          background: rgba(255, 255, 255, 0.03);
-          color: #e4e4e7;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .btn-secondary:hover {
-          background: rgba(255, 255, 255, 0.07);
+          border-radius: 24px;
+          padding: 24px 32px 24px 64px;
+          font-size: 1.25rem;
           color: #ffffff;
-          border-color: rgba(255, 255, 255, 0.15);
-          transform: scale(1.02);
+          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          outline: none;
+          font-family: inherit;
         }
-        .btn-secondary:active {
-          transform: scale(0.99);
+        .magic-search-input:focus {
+          border-color: rgba(16, 185, 129, 0.5);
+          box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+          background: rgba(24, 24, 30, 0.8);
         }
+        .magic-search-input::placeholder {
+          color: rgba(255, 255, 255, 0.3);
+        }
+        .magic-search-icon {
+          position: absolute;
+          left: 24px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: rgba(255, 255, 255, 0.4);
+          transition: color 0.3s;
+          pointer-events: none;
+        }
+        .magic-search-input:focus ~ .magic-search-icon {
+          color: #10b981;
+        }
+        
+        /* Dropdown Results */
+        .search-results-dropdown {
+          position: absolute;
+          top: calc(100% + 16px);
+          left: 0;
+          right: 0;
+          background: rgba(24, 24, 28, 0.85);
+          backdrop-filter: blur(40px);
+          -webkit-backdrop-filter: blur(40px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 24px;
+          padding: 12px;
+          box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+          opacity: 0;
+          visibility: hidden;
+          transform: translateY(-10px);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          max-height: 400px;
+          overflow-y: auto;
+        }
+        .search-results-dropdown.visible {
+          opacity: 1;
+          visibility: visible;
+          transform: translateY(0);
+        }
+        .search-result-item {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px 20px;
+          border-radius: 16px;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: left;
+          background: transparent;
+          border: 1px solid transparent;
+        }
+        .search-result-item:hover {
+          background: rgba(255, 255, 255, 0.04);
+          border-color: rgba(255, 255, 255, 0.06);
+          transform: translateX(4px);
+        }
+        .school-logo-placeholder {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          display: flex;
+          align-items: center;
+          justifyContent: center;
+          color: #a1a1aa;
+        }
+        .school-logo-image {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          object-fit: cover;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: white;
+        }
+        
         .text-gradient {
-          background: linear-gradient(135deg, #f4f4f5 10%, #a1a1aa 100%);
+          background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
-        .legal-link {
+
+        /* Footer Links */
+        .footer-link {
+          color: #71717a;
+          text-decoration: none;
+          font-size: 0.8rem;
+          font-weight: 600;
+          transition: all 0.2s;
           cursor: pointer;
-          transition: color 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
-        .legal-link:hover {
-          color: #ffffff;
-          text-decoration: underline;
+        .footer-link:hover {
+          color: #f4f4f5;
+        }
+        
+        /* Scrollbar for dropdown */
+        .search-results-dropdown::-webkit-scrollbar {
+          width: 6px;
+        }
+        .search-results-dropdown::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .search-results-dropdown::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+        .search-results-dropdown::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.2);
         }
       `}</style>
 
@@ -130,156 +281,133 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
       <div className="ambient-glow-1"></div>
       <div className="ambient-glow-2"></div>
 
-      {/* Main Container Card */}
-      <div className="glass-card" style={{
-        maxWidth: '520px',
-        width: '100%',
-        padding: '54px 40px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '36px',
-        position: 'relative',
-        zIndex: 10
-      }}>
-        {/* Brand/App Title */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '800px', padding: '0 20px' }}>
+        
+        {/* Header / Brand */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', marginBottom: '16px' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            fontSize: '0.74rem',
+            fontSize: '0.75rem',
             fontWeight: 800,
             color: '#10b981',
             background: 'rgba(16, 185, 129, 0.08)',
             border: '1px solid rgba(16, 185, 129, 0.2)',
-            padding: '6px 18px',
+            padding: '8px 20px',
             borderRadius: '100px',
             textTransform: 'uppercase',
-            letterSpacing: '0.08em',
+            letterSpacing: '0.1em',
             boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)'
           }}>
-            <Sparkles size={12} style={{ color: '#facc15' }} />
+            <Sparkles size={14} style={{ color: '#facc15' }} />
             Campus-Groovelab
           </div>
           
           <h1 className="text-gradient" style={{
-            fontSize: '2.3rem',
-            fontWeight: 900,
-            margin: '8px 0 0 0',
-            letterSpacing: '-0.04em',
-            lineHeight: 1.15
+            fontSize: 'clamp(2.5rem, 5vw, 4rem)',
+            fontWeight: 800,
+            margin: '0',
+            letterSpacing: '-0.03em',
+            lineHeight: 1.1
           }}>
-            Hier entsteht eine neue Software App.
+            Finde deine Musikschule
           </h1>
-        </div>
-
-        {/* Informative Text */}
-        <p style={{
-          fontSize: '0.98rem',
-          color: '#a1a1aa',
-          lineHeight: '1.65',
-          margin: 0,
-          fontWeight: 450
-        }}>
-          Wir befinden uns gerade in der Entwicklungsphase und arbeiten intensiv an neuen, spannenden Features für deine Musikschule.
-        </p>
-
-        {/* Status / Announcement Bar */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.02)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
-          borderRadius: '20px',
-          padding: '18px 24px',
-          width: '100%',
-          boxSizing: 'border-box',
-          fontSize: '0.84rem',
-          color: '#a1a1aa',
-          fontWeight: 500,
-          lineHeight: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px',
-          textAlign: 'left'
-        }}>
-          <div style={{
-            background: 'rgba(234, 179, 8, 0.1)',
-            border: '1px solid rgba(234, 179, 8, 0.15)',
-            borderRadius: '10px',
-            padding: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#facc15'
-          }}>
-            <Lock size={16} />
-          </div>
-          <div>
-            <span style={{ color: '#f4f4f5', fontWeight: 600 }}>Plattform geschützt.</span> Falls du bereits Zugangsdaten erhalten hast, kannst du dich direkt einloggen.
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '14px', width: '100%', flexDirection: 'column' }}>
-          <button
-            onClick={() => onLogin()}
-            className="btn-primary"
-            style={{
-              padding: '16px 24px',
-              borderRadius: '16px',
-              border: 'none',
-              fontWeight: 800,
-              fontSize: '0.96rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              width: '100%'
-            }}
-          >
-            Direkt zum Login
-            <ArrowRight size={16} />
-          </button>
           
-          <button
-            onClick={() => onRegister()}
-            className="btn-secondary"
-            style={{
-              padding: '16px 24px',
-              borderRadius: '16px',
-              fontWeight: 700,
-              fontSize: '0.96rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              width: '100%'
-            }}
-          >
-            <School size={16} style={{ opacity: 0.8 }} />
-            Als Schule registrieren
-          </button>
+          <p style={{
+            fontSize: '1.1rem',
+            color: '#a1a1aa',
+            maxWidth: '460px',
+            margin: '0 auto',
+            lineHeight: 1.6,
+            fontWeight: 400
+          }}>
+            Logge dich in das Profil deiner Schule ein und entdecke deinen Fortschritt, Aufgaben und Repertoire.
+          </p>
         </div>
 
-        {/* Footer Legal Links */}
-        <div style={{
-          display: 'flex',
-          gap: '16px',
-          fontSize: '0.74rem',
-          fontWeight: 700,
-          color: '#71717a',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          marginTop: '12px'
-        }}>
-          <span onClick={() => onShowPrivacy()} className="legal-link">Datenschutz</span>
-          <span style={{ opacity: 0.3 }}>•</span>
-          <span onClick={() => onShowAgb()} className="legal-link">AGB</span>
-          <span style={{ opacity: 0.3 }}>•</span>
-          <span onClick={() => onShowImpressum()} className="legal-link">Impressum</span>
+        {/* Magic Search */}
+        <div className="magic-search-container" ref={searchRef}>
+          <input
+            type="text"
+            className="magic-search-input"
+            placeholder="Name deiner Schule..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowResults(true);
+            }}
+            onFocus={() => setShowResults(true)}
+          />
+          <div className="magic-search-icon">
+            {isSearching ? <Loader2 size={24} className="animate-spin" /> : <Search size={24} />}
+          </div>
+
+          {/* Results Dropdown */}
+          <div className={`search-results-dropdown ${showResults && searchQuery.length >= 2 ? 'visible' : ''}`}>
+            {searchResults.length > 0 ? (
+              searchResults.map((school) => (
+                <div 
+                  key={school.id} 
+                  className="search-result-item"
+                  onClick={() => handleSchoolSelect(school)}
+                >
+                  {school.logo_url ? (
+                    <img src={school.logo_url} alt={school.name} className="school-logo-image" />
+                  ) : (
+                    <div className="school-logo-placeholder">
+                      <School size={24} style={{ opacity: 0.6 }} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#ffffff', marginBottom: '4px' }}>
+                      {school.name}
+                    </div>
+                    {school.city && (
+                      <div style={{ fontSize: '0.85rem', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <MapPin size={12} />
+                        {school.city}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ color: '#10b981', opacity: 0.8, display: 'flex', alignItems: 'center' }}>
+                    <ArrowRight size={20} />
+                  </div>
+                </div>
+              ))
+            ) : !isSearching && searchQuery.length >= 2 ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center', color: '#71717a' }}>
+                <School size={32} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
+                <div style={{ fontWeight: 500, marginBottom: '4px' }}>Keine Schule gefunden</div>
+                <div style={{ fontSize: '0.85rem' }}>Überprüfe die Schreibweise oder frage deinen Lehrer.</div>
+              </div>
+            ) : null}
+          </div>
         </div>
+
+      </div>
+
+      {/* Footer Links */}
+      <div style={{
+        position: 'absolute',
+        bottom: '32px',
+        left: '0',
+        right: '0',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '32px',
+        padding: '0 24px',
+        flexWrap: 'wrap'
+      }}>
+        <div className="footer-link" onClick={() => onRegister()}>
+          <School size={14} />
+          Als Schule registrieren
+        </div>
+        <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }}></div>
+        <div className="footer-link" onClick={() => onShowPrivacy()}>Datenschutz</div>
+        <div className="footer-link" onClick={() => onShowAgb()}>AGB</div>
+        <div className="footer-link" onClick={() => onShowImpressum()}>Impressum</div>
       </div>
     </div>
   );

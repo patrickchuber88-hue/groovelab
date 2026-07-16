@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
@@ -43,6 +43,8 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [needsManualActivation, setNeedsManualActivation] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -87,15 +89,20 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
           videoRef.current.setAttribute('playsinline', 'true');
           videoRef.current.play().catch(err => {
             console.warn('[Scanner] Play failed:', err);
+            setNeedsManualActivation(true);
           });
         }
       } catch (err: any) {
         console.error('[Scanner] getUserMedia error:', err);
-        onError(err);
+        if (err.name === 'NotAllowedError' || err.name === 'NotFoundError' || String(err).toLowerCase().includes('allow') || retryCount === 0) {
+          setNeedsManualActivation(true);
+        } else {
+          onError(err);
+        }
       }
     }
 
-    if (!paused) {
+    if (!paused && !needsManualActivation) {
       startCamera();
     } else {
       if (streamRef.current) {
@@ -115,7 +122,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         requestRef.current = null;
       }
     };
-  }, [facingMode, paused]);
+  }, [facingMode, paused, retryCount, needsManualActivation]);
 
   useEffect(() => {
     if (paused) {
@@ -168,12 +175,43 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   }, [paused, onScan]);
 
   return (
-    <video
-      ref={videoRef}
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-      playsInline
-      muted
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: 'black' }}>
+      <video
+        ref={videoRef}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        playsInline
+        muted
+      />
+      {needsManualActivation && (
+        <div style={{ 
+          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', 
+          alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', zIndex: 10 
+        }}>
+          <div style={{ background: 'white', padding: '12px', borderRadius: '50%', marginBottom: '16px' }}>
+            <Camera size={32} color="#1e293b" />
+          </div>
+          <p style={{ color: 'white', marginBottom: '20px', textAlign: 'center', padding: '0 20px', fontWeight: 600 }}>
+            Kamera-Zugriff erforderlich
+          </p>
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setNeedsManualActivation(false);
+              setRetryCount(c => c + 1);
+            }}
+            style={{ 
+              background: '#facc15', color: '#1e293b', border: 'none', 
+              padding: '12px 24px', borderRadius: '12px', fontWeight: 800, 
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+              boxShadow: '0 4px 12px rgba(250, 204, 21, 0.4)'
+            }}
+          >
+            Kamera aktivieren
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -403,7 +441,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
     return 'none';
   });
-  const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => !!kioskStationId);
+  const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return !!kioskStationId || params.get('groovelab') === 'true';
+  });
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
 
   // Parents Onboarding & Magic Link States

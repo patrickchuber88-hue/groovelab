@@ -215,6 +215,8 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       <img 
         src={displaySrc || '/avatar_ghost.jpg'} 
         onLoad={() => setIsLoaded(true)}
+        loading="lazy"
+        decoding="async"
         style={{ 
           width: '100%', 
           height: '100%', 
@@ -237,7 +239,7 @@ export const renderBandAvatar = (name: string, photoUrl?: string | null, size: s
   if (photoUrl) {
     return (
       <div style={{ width: size, height: size, borderRadius, overflow: 'hidden', flexShrink: 0 }}>
-        <img src={photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={name} />
+        <img src={photoUrl} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={name} />
       </div>
     );
   }
