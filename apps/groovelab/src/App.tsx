@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -8460,28 +8460,126 @@ function App() {
                   )}
 
                   {/* Location Pill */}
-                  <div style={{ 
-                    display: 'flex', alignItems: 'center', gap: '8px', 
-                    background: getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || ((user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? 'Lehrer iPad' : 'Labor iPad')) : undefined, locationMode === 'lab' ? session?.stations?.color : undefined), 
-                    padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                    boxShadow: `0 4px 12px ${getRoleColor(user?.role, locationMode === 'lab' ? (session?.stations?.name || ((user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? 'Lehrer iPad' : 'Labor iPad')) : undefined, locationMode === 'lab' ? session?.stations?.color : undefined)}30`
-                  }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
-                    <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      {(user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') 
-                        ? (locationMode === 'lab' ? 'Lehrer iPad' : 'Home') 
-                        : (locationMode === 'lab' ? `Labor (${session?.stations?.name || 'iPad'})` : 'Home')}
-                    </span>
-                  </div>
+                  {(() => {
+                    const stationName = locationMode === 'lab' 
+                      ? (session?.stations?.name || ((user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? 'Lehrer iPad' : 'Labor iPad'))
+                      : 'Home';
+                    
+                    const isTeacherStation = stationName.toLowerCase().includes('lehrer');
+                    const stationColor = locationMode === 'lab' ? (session?.stations?.color || '#10b981') : '#64748b';
+                    const stationNumber = stationName.replace(/[^0-9]/g, '');
+                    const hasNumber = stationNumber.length > 0;
+                    
+                    const isHome = locationMode !== 'lab';
+                    const displayBg = isHome 
+                      ? 'rgba(100, 116, 139, 0.06)' 
+                      : (isTeacherStation ? 'rgba(19, 115, 51, 0.08)' : 'rgba(255, 255, 255, 0.85)');
+                    const displayBorder = isHome
+                      ? '1px solid rgba(100, 116, 139, 0.12)'
+                      : (isTeacherStation ? '1px solid rgba(19, 115, 51, 0.18)' : '1px solid rgba(0, 0, 0, 0.06)');
+                    const displayColor = isHome
+                      ? '#64748b'
+                      : (isTeacherStation ? '#137333' : '#1e293b');
+
+                    return (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        background: displayBg, 
+                        border: displayBorder,
+                        padding: '6px 12px', 
+                        borderRadius: '10px', 
+                        color: displayColor,
+                        height: '36px',
+                        boxSizing: 'border-box',
+                        boxShadow: isHome ? 'none' : '0 2px 8px rgba(0,0,0,0.03)',
+                        transition: 'all 0.2s ease',
+                        flexShrink: 0
+                      }}>
+                        {isHome ? (
+                          <MapPin size={14} style={{ opacity: 0.8 }} />
+                        ) : (
+                          <Tablet size={14} style={{ color: isTeacherStation ? '#137333' : '#64748b' }} />
+                        )}
+                        
+                        <span style={{ 
+                          fontWeight: 750, 
+                          fontSize: '0.75rem', 
+                          letterSpacing: '-0.01em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          {isHome ? (
+                            'Home'
+                          ) : isTeacherStation ? (
+                            'Lehrer'
+                          ) : (
+                            <>
+                              <span style={{ color: '#64748b', fontWeight: 600 }}>iPad</span>
+                              {hasNumber ? (
+                                <span style={{ 
+                                  background: stationColor, 
+                                  color: 'white', 
+                                  borderRadius: '6px', 
+                                  padding: '2px 6px', 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 800,
+                                  lineHeight: 1,
+                                  minWidth: '16px',
+                                  textAlign: 'center',
+                                  boxShadow: `0 2px 6px ${stationColor}30`
+                                }}>
+                                  {stationNumber}
+                                </span>
+                              ) : (
+                                <span style={{ color: stationColor }}>{stationName}</span>
+                              )}
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Lab Count Pill */}
                   <div style={{ 
-                    display: 'flex', alignItems: 'center', gap: '8px', 
-                    background: (activePlatform as string) === 'campus' ? '#34a853' : '#eab308', padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                    boxShadow: (activePlatform as string) === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(234, 179, 8, 0.2)'
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    background: (activePlatform as string) === 'campus' ? 'rgba(52, 168, 83, 0.08)' : 'rgba(234, 179, 8, 0.08)', 
+                    border: (activePlatform as string) === 'campus' ? '1px solid rgba(52, 168, 83, 0.18)' : '1px solid rgba(234, 179, 8, 0.25)', 
+                    padding: '6px 12px', 
+                    borderRadius: '10px', 
+                    height: '36px',
+                    boxSizing: 'border-box',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                    transition: 'all 0.2s ease',
+                    color: (activePlatform as string) === 'campus' ? '#137333' : '#a16207',
+                    flexShrink: 0
                   }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'white' }}></div>
-                    <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{activeStudentsCount} im Lab</span>
+                    <Users size={14} style={{ opacity: 0.9 }} />
+                    <span style={{ 
+                      fontWeight: 750, 
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <span style={{ 
+                        background: (activePlatform as string) === 'campus' ? '#34a853' : '#eab308',
+                        color: (activePlatform as string) === 'campus' ? 'white' : '#0f172a',
+                        borderRadius: '6px',
+                        padding: '2px 5px',
+                        fontSize: '0.7rem',
+                        fontWeight: 800,
+                        lineHeight: 1
+                      }}>
+                        {activeStudentsCount}
+                      </span>
+                      {windowWidth > 576 ? 'im Lab' : 'Lab'}
+                    </span>
                   </div>
                 </>
               )}
@@ -8539,7 +8637,7 @@ function App() {
                     gap: '6px', 
                     background: '#fce8e6', 
                     border: '1px solid #fad2cf', 
-                    padding: windowWidth <= 768 ? '8px' : '8px 14px', 
+                    padding: windowWidth <= 480 ? '8px' : '8px 14px', 
                     borderRadius: '12px', 
                     color: '#ea4335', 
                     fontWeight: 800, 
@@ -8553,7 +8651,7 @@ function App() {
                   title="Zur Verwaltung wechseln"
                 >
                   <School size={14} color="#ea4335" />
-                  {windowWidth > 768 && <span>Verwaltung</span>}
+                  {windowWidth > 480 && <span>Verwaltung</span>}
                 </button>
               )}
               {/* Elegant Logout Button next to avatar */}
@@ -8563,23 +8661,23 @@ function App() {
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '6px', 
-                  background: '#fff1f2', 
-                  border: '1px solid #ffe4e6', 
-                  padding: windowWidth <= 768 ? '8px' : '8px 14px', 
+                  background: '#ffe4e6', 
+                  border: '1px solid #fecdd3', 
+                  padding: windowWidth <= 480 ? '8px' : '8px 14px', 
                   borderRadius: '12px', 
-                  color: '#f43f5e', 
+                  color: '#e11d48', 
                   fontWeight: 800, 
                   fontSize: '0.8rem', 
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.08)',
+                  boxShadow: '0 2px 10px rgba(225, 29, 72, 0.08)',
                   flexShrink: 0
                 }}
                 className="hover-scale"
                 title="Abmelden"
               >
-                <LogOut size={14} color="#f43f5e" />
-                {windowWidth > 768 && <span>Abmelden</span>}
+                <LogOut size={14} color="#e11d48" />
+                {windowWidth > 480 && <span>Abmelden</span>}
               </button>
             </div>
           </div>

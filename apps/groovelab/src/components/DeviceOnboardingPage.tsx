@@ -54,8 +54,9 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         // 3. Fetch Stations
         const { data: stationsData, error: stationsErr } = await supabase
           .from('stations')
-          .select('id, name, room_id')
-          .eq('school_id', schoolData.id)
+          .select('id, name, room_id, rooms!inner(school_id, is_groovelab_active)')
+          .eq('rooms.school_id', schoolData.id)
+          .eq('rooms.is_groovelab_active', true)
           .order('name');
         if (stationsErr) throw stationsErr;
         setStations(stationsData || []);
@@ -163,6 +164,8 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
           // Redirect to home and trigger auto-login
           window.location.replace('/?platform=groovelab');
         }, 1500);
+      } else {
+        throw new Error('Kopplungs-Token konnte nicht geladen werden.');
       }
     } catch (err: any) {
       console.error('[DeviceOnboarding] Save failed:', err);
@@ -199,7 +202,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
       
       {/* Header */}
       <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px' }}>GrooveLab Geräte-Onboarding</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px' }}>Campus-Groovelab Geräte-Onboarding</h1>
         <p style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 600 }}>Richte dieses Gerät als Kiosk-Scanner ein</p>
       </div>
 
@@ -261,7 +264,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
               {/* Station Selection */}
               {selectedRoomId && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>2. Geräte-Platzplatzierung auswählen</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>2. Geräteplatzierung auswählen</label>
                   {roomStations.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                       {roomStations.map(s => {
@@ -332,7 +335,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         {/* PWA / App Installation Guidance */}
         <div id="pwa-install-guide" style={{ background: 'rgba(30, 41, 59, 0.4)', border: '1.5px solid rgba(255,255,255,0.05)', borderRadius: '24px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0' }}>
-            <Smartphone size={18} color="#eab308" /> GrooveLab App installieren
+            <Smartphone size={18} color="#eab308" /> Campus-Groovelab App installieren
           </h3>
           <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0', lineHeight: 1.4 }}>
             Installiere die App auf diesem iPad für schnellen Zugriff und verlässlichen Vollbildmodus:
@@ -403,11 +406,11 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
           {/* Text Content */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', marginBottom: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>GrooveLab</span>
+              <span>Campus-Groovelab</span>
               <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>JETZT</span>
             </div>
             <div style={{ fontSize: '0.72rem', color: '#cbd5e1', lineHeight: 1.3, fontWeight: 500 }}>
-              Möchtest du die GrooveLab App auf diesem Gerät installieren?
+              Möchtest du die Campus-Groovelab App auf diesem Gerät installieren?
             </div>
           </div>
           
