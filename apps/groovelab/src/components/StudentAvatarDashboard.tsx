@@ -503,7 +503,7 @@ function MobileBriefingView({
           </div>
 
           <h2 style={{ fontSize: '24px', fontWeight: 900, margin: 0, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-            Willkommen zurück, <span style={{ color: '#34a853' }}>{studentUser?.first_name || 'Schüler'}</span>! 👋
+            Willkommen zurück!
           </h2>
 
           <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45, margin: 0, fontWeight: 550 }}>
@@ -538,20 +538,26 @@ function MobileBriefingView({
                   return `${d.toLocaleDateString('de-DE', {weekday: 'short', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
                 })();
 
+            const activePlat = (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab') || 'groovelab';
+            const isGroove = activePlat === 'groovelab';
+            const cardBg = isGroove ? '#fefce8' : '#e6f4ea';
+            const cardBorder = isGroove ? 'rgba(234, 179, 8, 0.1)' : 'rgba(52, 168, 83, 0.1)';
+            const cardColor = isGroove ? '#ca8a04' : '#34a853';
+
             return (
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between',
                 gap: '12px', 
-                background: '#e6f4ea', 
+                background: cardBg, 
                 padding: '8px 12px', 
                 borderRadius: '8px', 
-                border: '1px solid rgba(52, 168, 83, 0.1)',
+                border: `1px solid ${cardBorder}`,
                 marginTop: '4px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#34a853', fontSize: '0.74rem', fontWeight: 800 }}>
-                  <Calendar size={12} color="#34a853" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cardColor, fontSize: '0.74rem', fontWeight: 800 }}>
+                  <Calendar size={12} color={cardColor} />
                   <span>Nächster Unterricht: {lessonText}</span>
                 </div>
 
@@ -4109,6 +4115,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   }, [studentId]);
 
   useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(err => console.warn('Error closing AudioContext:', err));
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (activeTab === 'profile' && studentId) {
       const fetchStudentSchedules = async () => {
         try {
@@ -5047,39 +5062,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const cleanLastName = sanitizeTextInput(editingProfile.last_name);
       const cleanPhone = sanitizeTextInput(editingProfile.phone);
       const cleanInstrument = sanitizeTextInput(editingProfile.instrument);
-      const cleanEmail = sanitizeTextInput(editingProfile.email);
-      const cleanParentEmail = sanitizeTextInput(editingProfile.parent_email);
 
       const { error } = await supabase
-        .from('users')
-        .update({
-          first_name: cleanFirstName,
-          last_name: cleanLastName,
-          phone: cleanPhone,
-          instrument: cleanInstrument,
-          photo_url: editingProfile.photo_url
-        })
-        .eq('id', studentId);
+          .from('users')
+          .update({
+            first_name: cleanFirstName,
+            last_name: cleanLastName,
+            phone: cleanPhone,
+            instrument: cleanInstrument,
+            photo_url: editingProfile.photo_url
+          })
+          .eq('id', studentId);
       
       if (error) throw error;
 
-      // Update encrypted emails via RPC
-      const { error: emailError } = await supabase.rpc('update_student_emails', {
-        student_id_param: studentId,
-        input_student_email: cleanEmail || null,
-        input_parent_email: cleanParentEmail || null
-      });
-      if (emailError) throw emailError;
-      
       // Update local state
       const updatedProfile = {
         ...editingProfile,
         first_name: cleanFirstName,
         last_name: cleanLastName,
         phone: cleanPhone,
-        instrument: cleanInstrument,
-        email: cleanEmail,
-        parent_email: cleanParentEmail
+        instrument: cleanInstrument
       };
       setStudentUser((prev: any) => prev ? { ...prev, ...updatedProfile } : null);
       
@@ -5088,8 +5091,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         onProfileUpdate({
           first_name: cleanFirstName,
           last_name: cleanLastName,
-          email: cleanEmail,
-          parent_email: cleanParentEmail,
           phone: cleanPhone,
           instrument: cleanInstrument,
           photo_url: editingProfile.photo_url
@@ -5427,7 +5428,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           console.warn('Briefing API offline or failed, falling back:', err);
           return null;
         }),
-        supabase.rpc('get_student_emails', { student_id_param: studentId }),
+        Promise.resolve({ data: null, error: null } as any),
         supabase
           .from('student_missions')
           .select('*, mission_templates(*)')
@@ -5461,11 +5462,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       }
       user.resolved_instrument = resolvedInst;
 
-      // Assign student emails from rpc
-      if (!emailRes.error && emailRes.data && emailRes.data.length > 0) {
-        user.email = emailRes.data[0].email;
-        user.parent_email = emailRes.data[0].parent_email;
-      }
+
 
       setStudentUser(user);
       setSchoolFokusLevels(user.schools?.opening_hours?.fokus_levels || null);
@@ -9734,12 +9731,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     lineHeight: 1.1,
                     letterSpacing: '-0.02em'
                   }}>
-                    Willkommen zurück, <span style={{ 
+                    Willkommen <span style={{ 
                       background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       fontWeight: 950
-                    }}>{studentUser?.first_name || 'Schüler'}</span>! 👋
+                    }}>zurück!</span> 👋
                   </h3>
                   
                   <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>

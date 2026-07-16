@@ -178,16 +178,17 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
 
   const displaySrc = React.useMemo(() => {
     const r = (user?.role || '').toLowerCase();
-    const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
-    if ((r === 'admin' || r === 'secretary') && activePlat === 'campus') {
+    const roles = Array.isArray(user?.roles) ? user.roles.map((x: any) => String(x).toLowerCase()) : [];
+    if (r === 'admin' || r === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
       return '/campus_login_hero.png';
     }
+    const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
     if (activePlat === 'groovelab') {
       const isTeacherAvatar = src && (
         src.includes('teacher_') ||
         src.includes('avatar_teacher')
       );
-      if (r === 'teacher' || r === 'admin' || r === 'secretary') {
+      if (r === 'teacher') {
         return isTeacherAvatar ? src : '/avatar_ghost.jpg';
       }
       const isStudent = src && (

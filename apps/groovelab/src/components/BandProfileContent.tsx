@@ -511,7 +511,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
         .select(`
           *,
           songs (*),
-          suggested_by_user:users!suggested_by (first_name, photo_url),
+          suggested_by_user:users!suggested_by (id, first_name, photo_url),
           band_song_slots (*, users(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready)))
         `)
         .eq('band_id', selectedBandForProfile.id)

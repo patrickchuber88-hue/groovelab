@@ -81,7 +81,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
 
   let displayAvatarSrc = student.photo_url || '/avatar_ghost.jpg';
-  if ((student.role === 'admin' || student.role === 'secretary') && isPlatformCampus) {
+  const role = (student.role || '').toLowerCase();
+  const roles = Array.isArray(student.roles) ? student.roles.map((r: any) => String(r).toLowerCase()) : [];
+  if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
     displayAvatarSrc = '/campus_login_hero.png';
   } else if (isPlatformCampus) {
     displayAvatarSrc = getInstrumentAvatarUrl(student.instrument);
@@ -131,7 +133,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       student.photo_url.includes('teacher_') ||
       student.photo_url.includes('avatar_teacher')
     );
-    if (student.role === 'teacher' || student.role === 'admin' || student.role === 'secretary') {
+    if (student.role === 'teacher') {
       displayAvatarSrc = isTeacherAvatar ? student.photo_url : '/avatar_ghost.jpg';
     } else if (!student.photo_url || isInstrumentAvatar || student.photo_url === '/avatar_ghost.jpg') {
       displayAvatarSrc = '/avatar_ghost.jpg';
@@ -906,7 +908,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       // Fetch sessions
       const { data: sessData } = await supabase
         .from('sessions')
-        .select('*, stations(name, color)')
+        .select('*, stations(id, name, color)')
         .eq('user_id', student.id)
         .order('check_in_time', { ascending: false });
       setSessionsList(sessData || []);
@@ -987,14 +989,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       times.sort();
 
       const add15 = (t: string) => {
+        if (!t || !t.includes(':')) return '00:00';
         let [h, m] = t.split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return '00:00';
         m += 15;
         if (m >= 60) { h += 1; m = 0; }
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
       };
 
       const toMin = (t: string) => {
+        if (!t || !t.includes(':')) return 0;
         const [h, m] = t.split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return 0;
         return h * 60 + m;
       };
 
@@ -1836,7 +1842,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <div>
                       <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Lehrwerke</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {assignedLehrwerke.map((assigned) => {
+                        {(assignedLehrwerke || []).map((assigned) => {
                           const book = globalLehrwerke.find(b => b.id === assigned.lehrwerkId);
                           if (!book) return null;
 
@@ -1899,7 +1905,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             </div>
                           );
                         })}
-                        {assignedLehrwerke.length === 0 && (
+                        {(assignedLehrwerke || []).length === 0 && (
                           <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine aktiven Lehrwerke zugewiesen.</div>
                         )}
                       </div>

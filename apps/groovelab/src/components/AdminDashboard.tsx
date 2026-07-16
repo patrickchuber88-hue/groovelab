@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -14,6 +14,7 @@ import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
+import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -121,6 +122,23 @@ const resolveCampusAvatar = (u: any): string => {
     // Teachers
     return getInstrumentAvatarUrl(u.instrument);
   }
+};
+
+const resolveUserAvatar = (u: any, activePlatform?: string): string => {
+  if (!u) return '/avatar_ghost.jpg';
+  const role = (u.role || '').toLowerCase();
+  const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+  if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
+    return '/campus_login_hero.png';
+  }
+  if (activePlatform === 'campus') {
+    return resolveCampusAvatar(u);
+  }
+  const isTeacherAvatar = u.photo_url && (u.photo_url.includes('teacher_') || u.photo_url.includes('avatar_teacher'));
+  if (role === 'teacher') {
+    return isTeacherAvatar ? u.photo_url : '/avatar_ghost.jpg';
+  }
+  return u.photo_url || '/avatar_ghost.jpg';
 };
 
 const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
@@ -232,6 +250,7 @@ export function AdminDashboard({
   onSwitchPlatform
 }: AdminDashboardProps) {
   const [admin, setAdmin] = useState<any>(null);
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -2176,7 +2195,7 @@ export function AdminDashboard({
         if (weekChanged) {
           const { data: schedulesData } = await supabase
             .from('schedules')
-            .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+            .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
             .eq('school_id', adminData.school_id);
           setSchedules(schedulesData || []);
 
@@ -2198,6 +2217,7 @@ export function AdminDashboard({
               booked_by,
               status,
               profiles:users!booked_by (
+                id,
                 first_name,
                 last_name,
                 role
@@ -2329,7 +2349,7 @@ export function AdminDashboard({
       } else if (activeTab === 'bands') {
         const { data: bandsData } = await supabase
           .from('bands')
-          .select('*, songs(title, artist, instrumentation), band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
+          .select('*, songs(id, title, artist, instrumentation), band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
           .eq('school_id', adminData.school_id)
           .order('name');
         if (bandsData) {
@@ -4786,6 +4806,29 @@ export function AdminDashboard({
 
               {canManageStudents && (
                 <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => toggleRealNames()}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      borderRadius: '12px',
+                      padding: '8px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      background: showRealNames ? '#fee2e2' : '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      color: showRealNames ? '#ef4444' : '#64748b',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      height: '38px',
+                      boxSizing: 'border-box'
+                    }}
+                    title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+                  >
+                    {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
+                    <span>{showRealNames ? "Sperren" : "Anzeigen"}</span>
+                  </button>
                   {!showAddStudent && (
                     <button
                       onClick={() => {
@@ -5214,14 +5257,14 @@ export function AdminDashboard({
                       }}>
                         <span style={{ fontSize: '1rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
                         <img 
-                          src={activePlatform === 'campus' ? resolveCampusAvatar(s) : (s.photo_url || '/avatar_ghost.jpg')} 
+                          src={resolveUserAvatar(s, activePlatform)} 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
                           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</div>
+                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {maskLastName(s.last_name)}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {s.is_trial ? (
                           <div style={{ padding: '1px 5px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.6rem', fontWeight: 900 }}>
@@ -11757,7 +11800,7 @@ export function AdminDashboard({
                           <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <td style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <img 
-                                src={activePlatform === 'campus' ? resolveCampusAvatar(student) : (student.photo_url || '/avatar_ghost.jpg')} 
+                                src={resolveUserAvatar(student, activePlatform)} 
                                 style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
                                 alt="" 
                               />
@@ -12108,7 +12151,7 @@ export function AdminDashboard({
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <img 
-                            src={activePlatform === 'campus' ? resolveCampusAvatar(sub.users) : (sub.users?.photo_url || '/avatar_ghost.jpg')} 
+                            src={resolveUserAvatar(sub.users, activePlatform)} 
                             style={{ width: '48px', height: '48px', borderRadius: '14px', objectFit: 'cover', border: '1.5px solid #f1f5f9' }} 
                             alt="" 
                           />
@@ -16869,7 +16912,7 @@ function DeviceSetupScreen({
               }} />
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', lineHeight: 1.2 }}>
-                  {activeSession.profiles?.first_name} {activeSession.profiles?.last_name?.charAt(0)}.
+                  {activeSession.profiles?.first_name} {maskLastName(activeSession.profiles?.last_name)}
                 </div>
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
                   am Üben...

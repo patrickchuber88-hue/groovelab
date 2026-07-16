@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -839,6 +839,7 @@ export function TeacherDashboard({
   activePlatform = 'groovelab'
 }: TeacherDashboardProps) {
   const [teacher, setTeacher] = useState<any>(null);
+  const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Auto-dismiss toast message after 5 seconds
@@ -1742,7 +1743,7 @@ export function TeacherDashboard({
                 const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
                 if (!existingNotifsSet.has(notifKey)) {
                   const student = sched.student || allStudents.find(s => s.id === sched.student_id);
-                  const studentName = student ? `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim() : null;
+                  const studentName = student ? `${student.first_name} ${maskLastName(student.last_name)}`.trim() : null;
                   notificationsToInsert.push({
                     teacher_id: userId,
                     student_id: sched.student_id,
@@ -1779,7 +1780,7 @@ export function TeacherDashboard({
               const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
               if (!existingNotifsSet.has(notifKey)) {
                 const student = occ.student || allStudents.find(s => s.id === occ.student_id);
-                const studentName = student ? `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim() : null;
+                const studentName = student ? `${student.first_name} ${maskLastName(student.last_name)}`.trim() : null;
                 const matchingSched = (schedules || []).find(s => s.id === occ.schedule_id);
                 const durationVal = occ.duration || matchingSched?.duration || 30;
                 notificationsToInsert.push({
@@ -2551,6 +2552,7 @@ export function TeacherDashboard({
               rooms (id, name)
             ),
             student:users!schedule_occurrences_student_id_fkey (
+              id,
               first_name,
               last_name
             )
@@ -2576,11 +2578,11 @@ export function TeacherDashboard({
             date: occ.date,
             startTime: startTimeStr,
             endTime: endTimeStr,
-            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name ? occ.student.last_name.charAt(0) + '.' : ''}`.trim() : 'Unterricht',
+            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name)}`.trim() : 'Unterricht',
             teacherId: userId,
             status: occ.status,
             isSchedule: true,
-            studentName: occ.student ? `${occ.student.first_name} ${occ.student.last_name ? occ.student.last_name.charAt(0) + '.' : ''}`.trim() : null
+            studentName: occ.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name)}`.trim() : null
           };
         });
 
@@ -3270,7 +3272,7 @@ export function TeacherDashboard({
               original_date: null,
               student: student ? {
                 id: student.id,
-                name: `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim(),
+                name: `${student.first_name} ${maskLastName(student.last_name)}`.trim(),
                 isAppUser: student.is_app_user ?? false,
                 isAnalogStickerUser,
                 birthDate: student.birth_date,
@@ -3308,7 +3310,7 @@ export function TeacherDashboard({
                   original_date: occ.original_date,
                   student: student ? {
                     id: student.id,
-                    name: `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim(),
+                    name: `${student.first_name} ${maskLastName(student.last_name)}`.trim(),
                     isAppUser: student.is_app_user ?? false,
                     isAnalogStickerUser,
                     birthDate: student.birth_date,
@@ -3482,6 +3484,7 @@ export function TeacherDashboard({
                 start_time,
                 status,
                 student:users!schedule_occurrences_student_id_fkey (
+                  id,
                   first_name,
                   last_name
                 )
@@ -3510,7 +3513,7 @@ export function TeacherDashboard({
 
                 return {
                   id: occ.id,
-                  studentName: `${occ.student?.first_name || ''} ${occ.student?.last_name ? occ.student.last_name.charAt(0) + '.' : ''}`.trim(),
+                  studentName: `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name)}`.trim(),
                   originalWeekday: originalWeekdayStr,
                   weekday: weekdayStr,
                   weekdayShort,
@@ -11870,6 +11873,31 @@ export function TeacherDashboard({
                   style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} 
                 />
               </div>
+              <button
+                onClick={() => toggleRealNames()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  borderRadius: '24px',
+                  padding: '14px 20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  background: showRealNames ? '#fee2e2' : '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: showRealNames ? '#ef4444' : '#64748b',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+                  height: '50px',
+                  boxSizing: 'border-box'
+                }}
+                className="hover-scale"
+                title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+              >
+                {showRealNames ? <EyeOff size={16} /> : <Eye size={16} />}
+                <span>{showRealNames ? "Sperren" : "Anzeigen"}</span>
+              </button>
               {teachersManageStudents && (
                 <button
                   onClick={() => setShowInviteStudent(true)}
@@ -11988,7 +12016,7 @@ export function TeacherDashboard({
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {student.first_name} {student.last_name ? student.last_name.charAt(0) + '.' : ''}
+                              {student.first_name} {maskLastName(student.last_name)}
                             </div>
                           </div>
                         </div>
@@ -13247,7 +13275,7 @@ export function TeacherDashboard({
 
                   const studentName = n.student_name || (() => {
                     const student = allStudents.find(s => s.id === n.student_id);
-                    return student ? `${student.first_name} ${student.last_name ? student.last_name.charAt(0) + '.' : ''}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
+                    return student ? `${student.first_name} ${maskLastName(student.last_name)}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
                   })();
 
                   return (

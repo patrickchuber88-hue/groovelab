@@ -60,6 +60,14 @@ interface ScheduleBoardProps {
   userId: string;
 }
 
+const parseTime = (timeStr: string | null | undefined, fallback = '14:00'): [number, number] => {
+  const str = timeStr || fallback || '14:00';
+  if (!str || typeof str !== 'string' || !str.includes(':')) return [14, 0];
+  const parts = str.split(':').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return [14, 0];
+  return [parts[0], parts[1]];
+};
+
 const DAYS_OF_WEEK = [
   { value: 1, name: 'Montag' },
   { value: 2, name: 'Dienstag' },
@@ -255,7 +263,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const teacherBusyIntervals = useMemo(() => {
     const map: Record<number, { start: number; end: number; studentName: string; roomName: string; boardId: string }[]> = {};
     boards.forEach(ob => {
-      const [anchorH, anchorM] = (ob.startAnchor || '14:00').split(':').map(Number);
+      const [anchorH, anchorM] = parseTime(ob.startAnchor);
       const startMinutes = anchorH * 60 + anchorM;
       
       let currentStart = startMinutes;
@@ -287,7 +295,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     otherTeachersSchedules.forEach(os => {
       if (os.day_of_week !== undefined && os.room_id && os.time_slot) {
         const key = `${os.day_of_week}_${os.room_id}`;
-        const [osh, osm] = os.time_slot.split(':').map(Number);
+        const [osh, osm] = parseTime(os.time_slot);
         const start = osh * 60 + osm;
         const end = start + (os.duration || 45);
         if (!map[key]) {
@@ -796,7 +804,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch other teachers' schedules for room conflict checking
       const { data: otherSchedData } = await supabase
         .from('schedules')
-        .select('*, student:users!schedules_student_id_fkey(first_name, last_name), teacher:users!schedules_teacher_id_fkey(first_name, last_name)')
+        .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
         .eq('school_id', schoolId)
         .neq('teacher_id', selectedTeacherId);
       setOtherTeachersSchedules(otherSchedData || []);
@@ -1078,8 +1086,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         setOnboardingError(`Bitte wähle Start- und Endzeit für ${dayName} aus.`);
         return;
       }
-      const [sh, sm] = cfg.start.split(':').map(Number);
-      const [eh, em] = cfg.end.split(':').map(Number);
+      const [sh, sm] = parseTime(cfg.start);
+      const [eh, em] = parseTime(cfg.end);
       if (sh * 60 + sm >= eh * 60 + em) {
         const dayName = DAYS_OF_WEEK.find(d => d.value === Number(dayNum))?.name || 'Wochentag';
         setOnboardingError(`Die Endzeit an ${dayName} muss nach der Startzeit liegen.`);
@@ -1257,8 +1265,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             targetStudentIds.forEach(sId => {
               const studentPrefs = prefsData.filter(p => p.student_id === sId && Number(p.day_of_week) === day);
               studentPrefs.forEach(pref => {
-                const [sh, sm] = pref.start_time.split(':').map(Number);
-                const [eh, em] = pref.end_time.split(':').map(Number);
+                const [sh, sm] = parseTime(pref.start_time);
+                const [eh, em] = parseTime(pref.end_time);
                 const startIdx = Math.floor((sh * 60 + sm) / 15);
                 const endIdx = Math.ceil((eh * 60 + em) / 15);
                 
@@ -1483,14 +1491,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             // Find the last student's end time
             const lastStudent = board.students[board.students.length - 1];
             if (lastStudent.assignedTime) {
-              const [h, m] = lastStudent.assignedTime.split(':').map(Number);
+              const [h, m] = parseTime(lastStudent.assignedTime);
               currentMinutes = h * 60 + m + lastStudent.duration;
             } else {
-              const [h, m] = startAnchorTime.split(':').map(Number);
+              const [h, m] = parseTime(startAnchorTime);
               currentMinutes = h * 60 + m;
             }
           } else {
-            const [h, m] = startAnchorTime.split(':').map(Number);
+            const [h, m] = parseTime(startAnchorTime);
             currentMinutes = h * 60 + m;
           }
 
@@ -1503,8 +1511,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           
           let isBlocked = false;
           for (const pref of blockedPrefs) {
-            const [psh, psm] = pref.start_time.split(':').map(Number);
-            const [peh, pem] = pref.end_time.split(':').map(Number);
+            const [psh, psm] = parseTime(pref.start_time);
+            const [peh, pem] = parseTime(pref.end_time);
             const prefStart = psh * 60 + psm;
             const prefEnd = peh * 60 + pem;
 
@@ -1523,8 +1531,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const preferredPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
           let hasWunschOverlap = false;
           for (const pref of preferredPrefs) {
-            const [psh, psm] = pref.start_time.split(':').map(Number);
-            const [peh, pem] = pref.end_time.split(':').map(Number);
+            const [psh, psm] = parseTime(pref.start_time);
+            const [peh, pem] = parseTime(pref.end_time);
             const prefStart = psh * 60 + psm;
             const prefEnd = peh * 60 + pem;
 
@@ -1752,8 +1760,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           targetStudentIds.forEach(sId => {
             const studentPrefs = prefsData.filter(p => p.student_id === sId && Number(p.day_of_week) === day);
             studentPrefs.forEach(pref => {
-              const [sh, sm] = pref.start_time.split(':').map(Number);
-              const [eh, em] = pref.end_time.split(':').map(Number);
+              const [sh, sm] = parseTime(pref.start_time);
+              const [eh, em] = parseTime(pref.end_time);
               const startIdx = Math.floor((sh * 60 + sm) / 15);
               const endIdx = Math.ceil((eh * 60 + em) / 15);
               
@@ -2005,7 +2013,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const assignedStudent = tempBoard.students.find(s => s.id === sourceId);
 
         if (assignedStudent && assignedStudent.assignedTime) {
-          const [sh, sm] = assignedStudent.assignedTime.split(':').map(Number);
+          const [sh, sm] = parseTime(assignedStudent.assignedTime);
           const startMin = sh * 60 + sm;
           const endMin = startMin + student.duration;
 
@@ -2021,8 +2029,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               let isBlocked = false;
               for (const pref of prefs) {
                 if (Number(pref.day_of_week) === Number(targetBoard.dayOfWeek)) {
-                  const [psh, psm] = pref.start_time.split(':').map(Number);
-                  const [peh, pem] = pref.end_time.split(':').map(Number);
+                  const [psh, psm] = parseTime(pref.start_time);
+                  const [peh, pem] = parseTime(pref.end_time);
                   const prefStart = psh * 60 + psm;
                   const prefEnd = peh * 60 + pem;
 
@@ -2708,7 +2716,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (studentIds.length > 0) {
           const { data: existingSchedules, error: checkError } = await supabase
             .from('schedules')
-            .select('student_id, instrument, student:users!schedules_student_id_fkey(first_name, last_name)')
+            .select('student_id, instrument, student:users!schedules_student_id_fkey(id, first_name, last_name)')
             .eq('status', 'approved')
             .neq('teacher_id', selectedTeacherId)
             .in('student_id', studentIds);
@@ -3470,7 +3478,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               {boards.map((board, index) => {
                 const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
                 const PX_PER_MIN = 2.5;
-                const [anchorH, anchorM] = (board.startAnchor || '14:00').split(':').map(Number);
+                const [anchorH, anchorM] = parseTime(board.startAnchor);
                 const startMinutes = anchorH * 60 + anchorM;
                 const totalMinutes = board.students.reduce((acc, s) => acc + s.duration, 0);
                 const endMinutes = startMinutes + Math.max(totalMinutes, 60);
@@ -3625,8 +3633,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           
                           selectedStudentPrefs.forEach(pref => {
                             if (pref.day_of_week === board.dayOfWeek) {
-                              const [ph, pm] = pref.start_time.split(':').map(Number);
-                              const [peh, pem] = pref.end_time.split(':').map(Number);
+                              const [ph, pm] = parseTime(pref.start_time);
+                              const [peh, pem] = parseTime(pref.end_time);
                               const prefStart = ph * 60 + pm;
                               const prefEnd = peh * 60 + pem;
                               
@@ -3703,7 +3711,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         if (siblingInfo) {
                           // Scenario 1: Sibling is scheduled (we show parallel, before, after)
                           if (siblingInfo.scheduled_slot && siblingInfo.scheduled_slot.day_of_week === board.dayOfWeek) {
-                            const [sh, sm] = siblingInfo.scheduled_slot.start_time.split(':').map(Number);
+                            const [sh, sm] = parseTime(siblingInfo.scheduled_slot.start_time);
                             const sibStartMin = sh * 60 + sm;
                             const sibDuration = siblingInfo.duration || 45;
                             const currentStudDuration = students.find(s => s.id === selectedStudentId)?.duration || 45;
@@ -3778,15 +3786,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           if (!siblingInfo.scheduled_slot) {
                             selectedStudentPrefs.forEach(pref => {
                               if (pref.preference_type === 'wunsch' && pref.day_of_week === board.dayOfWeek) {
-                                const [ph, pm] = pref.start_time.split(':').map(Number);
-                                const [peh, pem] = pref.end_time.split(':').map(Number);
+                                const [ph, pm] = parseTime(pref.start_time);
+                                const [peh, pem] = parseTime(pref.end_time);
                                 const prefStart = ph * 60 + pm;
                                 const prefEnd = peh * 60 + pem;
 
                                 const hasOverlap = siblingInfo.selected_slots?.some((sp: any) => {
                                   if (sp.preference_type !== 'wunsch' || sp.day_of_week !== board.dayOfWeek) return false;
-                                  const [sph, spm] = sp.start_time.split(':').map(Number);
-                                  const [speh, spem] = sp.end_time.split(':').map(Number);
+                                  const [sph, spm] = parseTime(sp.start_time);
+                                  const [speh, spem] = parseTime(sp.end_time);
                                   const sStart = sph * 60 + spm;
                                   const sEnd = speh * 60 + spem;
                                   return (prefStart < sEnd && prefEnd > sStart);
@@ -3832,7 +3840,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                       {/* Cards: absolutely positioned by assignedTime */}
                       {board.students.map((bs, cardIndex) => {
-                        const [sh, sm] = (bs.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                        const [sh, sm] = parseTime(bs.assignedTime || board.startAnchor);
                         const cardTopPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN;
                         const cardHeightPx = bs.duration * PX_PER_MIN - 4;
 
@@ -3926,14 +3934,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         // Check if student is scheduled within a preferred ('wunsch') slot
                         let isInsideWunsch = false;
                         if (selectedStudentId === bs.id && selectedStudentPrefs.length > 0) {
-                          const [sh, sm] = (bs.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                          const [sh, sm] = parseTime(bs.assignedTime || board.startAnchor);
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
                           const wunschPrefs = selectedStudentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
                           for (const pref of wunschPrefs) {
-                            const [psh, psm] = pref.start_time.split(':').map(Number);
-                            const [peh, pem] = pref.end_time.split(':').map(Number);
+                            const [psh, psm] = parseTime(pref.start_time);
+                            const [peh, pem] = parseTime(pref.end_time);
                             const prefStart = psh * 60 + psm;
                             const prefEnd = peh * 60 + pem;
 
@@ -3949,7 +3957,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         let teacherConflictStudentName = '';
                         let teacherConflictRoomName = '';
                         if (bs.assignedTime) {
-                          const [sh, sm] = bs.assignedTime.split(':').map(Number);
+                          const [sh, sm] = parseTime(bs.assignedTime);
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
@@ -3968,7 +3976,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         let roomConflictTeacherName = '';
                         let roomConflictStudentName = '';
                         if (board.roomId && bs.assignedTime) {
-                          const [sh, sm] = bs.assignedTime.split(':').map(Number);
+                          const [sh, sm] = parseTime(bs.assignedTime);
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
@@ -4264,11 +4272,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         let topPx = 0;
                         if (dragOverIndex < board.students.length) {
                           const targetStudent = board.students[dragOverIndex];
-                          const [sh, sm] = (targetStudent.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                          const [sh, sm] = parseTime(targetStudent.assignedTime || board.startAnchor);
                           topPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN;
                         } else if (board.students.length > 0) {
                           const lastStudent = board.students[board.students.length - 1];
-                          const [sh, sm] = (lastStudent.assignedTime || board.startAnchor || '14:00').split(':').map(Number);
+                          const [sh, sm] = parseTime(lastStudent.assignedTime || board.startAnchor);
                           topPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN + lastStudent.duration * PX_PER_MIN;
                         }
                         
@@ -4465,7 +4473,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>
-                          {s.first_name} {s.last_name}
+                          {s.first_name} {maskLastName(s.last_name)}
                         </span>
                         {s.status === 'ausstehend' ? (
                           <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ausstehend</span>
