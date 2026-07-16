@@ -115,7 +115,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       src.includes('avatar_teacher')
     );
     if (!src || isMusicianOrInstrumentAvatar) {
-      displaySrc = '/avatar_ghost.jpg';
+      displaySrc = role === 'student' ? getInstrumentAvatarUrl(resolvedInstrument || user?.instrument) : '/avatar_ghost.jpg';
     }
   } else {
     // GrooveLab platform: musician/instrument avatars are allowed for students/teachers
