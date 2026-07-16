@@ -86,11 +86,11 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
     if (typeof window !== 'undefined') {
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {
-        window.location.href = `http://${window.location.hostname}:${window.location.port}/?platform=campus`;
+        window.location.href = `http://${window.location.hostname}:${window.location.port}/login?platform=campus`;
       } else {
         const parts = window.location.hostname.replace('www.', '').split('.');
         const baseDomain = parts.slice(-2).join('.');
-        window.location.href = `${window.location.protocol}//${baseDomain}/?platform=campus`;
+        window.location.href = `${window.location.protocol}//${baseDomain}/login?platform=campus`;
       }
     }
   };
