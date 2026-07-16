@@ -6771,7 +6771,7 @@ export function AdminDashboard({
         : 'Lehrer';
 
       const studentObj = students.find(s => s.id === bookingStudentId);
-      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
+      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name)}` : 'Unterricht';
       const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
       
       let finalPurpose = defaultPurpose;
@@ -6861,7 +6861,7 @@ export function AdminDashboard({
         : 'Lehrer';
 
       const studentObj = students.find(s => s.id === bookingStudentId);
-      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${studentObj.last_name}` : 'Unterricht';
+      const studentName = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name)}` : 'Unterricht';
       const defaultPurpose = bookingType === 'lesson' ? studentName : (bookingPurpose || 'Eigennutzung');
       
       let finalPurpose = defaultPurpose;
@@ -7221,7 +7221,7 @@ export function AdminDashboard({
            date: occ.date,
            startTime: startTimeStr,
            endTime: endTimeStr,
-           purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${occ.student.last_name}` : 'Unterricht',
+           purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name)}` : 'Unterricht',
            teacherId: userId,
            status: occ.status,
            isSchedule: true
@@ -11804,7 +11804,7 @@ export function AdminDashboard({
                                 style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
                                 alt="" 
                               />
-                              <span style={{ fontWeight: 700, color: '#1e293b' }}>{student.first_name} {student.last_name}</span>
+                              <span style={{ fontWeight: 700, color: '#1e293b' }}>{student.first_name} {maskLastName(student.last_name)}</span>
                             </td>
                             <td style={{ padding: '14px 16px' }}>
                               <select
@@ -12500,7 +12500,7 @@ export function AdminDashboard({
         foregroundColor: "rgb(255, 255, 255)",
         backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
         labelColor: "rgb(230, 244, 234)",
-        studentName: `${selectedQRUser.first_name} ${selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : ''}`,
+        studentName: `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name)}`,
         instrument: selectedQRUser.instrument || (selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
         qrToken: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token
       }, null, 2);
@@ -12540,7 +12540,7 @@ export function AdminDashboard({
         header: {
           defaultValue: {
             language: "de-DE",
-            value: `${selectedQRUser.first_name} ${selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : ''}`
+            value: `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name)}`
           }
         }
       }, null, 2);
@@ -12657,7 +12657,7 @@ export function AdminDashboard({
                      <div>
                        <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
                        <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                         {selectedQRUser.first_name} {selectedQRUser.last_name ? selectedQRUser.last_name.charAt(0) + '.' : ''}
+                         {selectedQRUser.first_name} {maskLastName(selectedQRUser.last_name)}
                        </div>
                      </div>
  
