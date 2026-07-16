@@ -1342,21 +1342,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 .replace(/^-+|-+$/g, '');
             };
 
-            // 1. Try exact match first
+            // 1. Try exact subdomain match first, then exact slugified name match
             let matchedSchool = allSchools.find(s => {
-              const slug = slugify(s.name);
               const cleanSub = subdomain.toLowerCase().trim();
-              return slug === cleanSub || slug.replace(/-/g, '') === cleanSub.replace(/-/g, '');
+              const exactSubMatch = s.subdomain && s.subdomain.toLowerCase().trim() === cleanSub;
+              const slug = slugify(s.name);
+              const slugMatch = slug === cleanSub || slug.replace(/-/g, '') === cleanSub.replace(/-/g, '');
+              return exactSubMatch || slugMatch;
             });
-
-            // 2. Fall back to prefix matching if no exact match was found
-            if (!matchedSchool) {
-              matchedSchool = allSchools.find(s => {
-                const slug = slugify(s.name);
-                const cleanSub = subdomain.toLowerCase().trim();
-                return slug.startsWith(cleanSub + '-') || cleanSub.startsWith(slug + '-');
-              });
-            }
             if (matchedSchool) {
               setSchoolName(matchedSchool.name);
               setSchoolData(matchedSchool);
