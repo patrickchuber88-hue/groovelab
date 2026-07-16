@@ -3476,14 +3476,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             textAlign: 'center',
             zIndex: 2
           }}>
-            <h2 style={{
-              fontSize: '3.2rem',
-              fontWeight: 900,
-              color: '#ffffff',
-              margin: 0,
-              letterSpacing: '-0.04em',
-              textShadow: '0 4px 12px rgba(0,0,0,0.2)'
-            }}>
+            <h2 
+              onDoubleClick={() => setIsGroovelabKiosk(false)}
+              style={{
+                fontSize: '3.2rem',
+                fontWeight: 900,
+                color: '#ffffff',
+                margin: 0,
+                letterSpacing: '-0.04em',
+                textShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}
+            >
               Campus-Groovelab
             </h2>
             <p style={{
