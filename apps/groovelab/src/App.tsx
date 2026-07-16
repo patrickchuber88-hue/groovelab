@@ -525,14 +525,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
   });
 
   useEffect(() => {
-    // 1. Priority: If there's a pending skill and current one isn't pending, switch to it
-    const pending = displaySkills.find((s: any) => s?.is_pending_approval);
-    if (pending && pending.id !== activeSlotId) {
-      setActiveSlotId(pending.id);
-      return;
-    }
-
-    // 2. If current activeSlotId is not in the new displaySkills (common on difficulty switch)
+    // If current activeSlotId is not in the new displaySkills (common on difficulty switch)
     if (!displaySkills.find((s: any) => s?.id === activeSlotId)) {
       // Find the previous skill to know which instrument/part we were on
       let prevInst = '';
@@ -8461,6 +8454,17 @@ function App() {
 
                   {/* Location Pill */}
                   {(() => {
+                    const getContrastColor = (hex: string) => {
+                      if (!hex || !hex.startsWith('#')) return '#ffffff';
+                      const cleanHex = hex.replace('#', '');
+                      if (cleanHex.length !== 6) return '#ffffff';
+                      const r = parseInt(cleanHex.substring(0, 2), 16);
+                      const g = parseInt(cleanHex.substring(2, 4), 16);
+                      const b = parseInt(cleanHex.substring(4, 6), 16);
+                      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                      return (yiq >= 170) ? '#0f172a' : '#ffffff';
+                    };
+
                     const stationName = locationMode === 'lab' 
                       ? (session?.stations?.name || ((user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'teacher') ? 'Lehrer iPad' : 'Labor iPad'))
                       : 'Home';
@@ -8473,13 +8477,13 @@ function App() {
                     const isHome = locationMode !== 'lab';
                     const displayBg = isHome 
                       ? 'rgba(100, 116, 139, 0.06)' 
-                      : (isTeacherStation ? 'rgba(19, 115, 51, 0.08)' : 'rgba(255, 255, 255, 0.85)');
+                      : (isTeacherStation ? '#137333' : stationColor);
                     const displayBorder = isHome
                       ? '1px solid rgba(100, 116, 139, 0.12)'
-                      : (isTeacherStation ? '1px solid rgba(19, 115, 51, 0.18)' : '1px solid rgba(0, 0, 0, 0.06)');
+                      : `1px solid ${isTeacherStation ? '#137333' : stationColor}`;
                     const displayColor = isHome
                       ? '#64748b'
-                      : (isTeacherStation ? '#137333' : '#1e293b');
+                      : getContrastColor(isTeacherStation ? '#137333' : stationColor);
 
                     return (
                       <div style={{ 
@@ -8493,14 +8497,14 @@ function App() {
                         color: displayColor,
                         height: '36px',
                         boxSizing: 'border-box',
-                        boxShadow: isHome ? 'none' : '0 2px 8px rgba(0,0,0,0.03)',
+                        boxShadow: isHome ? 'none' : '0 2px 8px rgba(0,0,0,0.06)',
                         transition: 'all 0.2s ease',
                         flexShrink: 0
                       }}>
                         {isHome ? (
                           <MapPin size={14} style={{ opacity: 0.8 }} />
                         ) : (
-                          <Tablet size={14} style={{ color: isTeacherStation ? '#137333' : '#64748b' }} />
+                          <Tablet size={14} style={{ color: displayColor }} />
                         )}
                         
                         <span style={{ 
@@ -8517,24 +8521,23 @@ function App() {
                             'Lehrer'
                           ) : (
                             <>
-                              <span style={{ color: '#64748b', fontWeight: 600 }}>iPad</span>
+                              <span style={{ color: displayColor, fontWeight: 750 }}>iPad</span>
                               {hasNumber ? (
                                 <span style={{ 
-                                  background: stationColor, 
-                                  color: 'white', 
+                                  background: displayColor === '#ffffff' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.12)', 
+                                  color: displayColor, 
                                   borderRadius: '6px', 
                                   padding: '2px 6px', 
                                   fontSize: '0.7rem', 
                                   fontWeight: 800,
                                   lineHeight: 1,
                                   minWidth: '16px',
-                                  textAlign: 'center',
-                                  boxShadow: `0 2px 6px ${stationColor}30`
+                                  textAlign: 'center'
                                 }}>
                                   {stationNumber}
                                 </span>
                               ) : (
-                                <span style={{ color: stationColor }}>{stationName}</span>
+                                <span style={{ color: displayColor }}>{stationName}</span>
                               )}
                             </>
                           )}
@@ -8544,43 +8547,61 @@ function App() {
                   })()}
 
                   {/* Lab Count Pill */}
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    background: (activePlatform as string) === 'campus' ? 'rgba(52, 168, 83, 0.08)' : 'rgba(234, 179, 8, 0.08)', 
-                    border: (activePlatform as string) === 'campus' ? '1px solid rgba(52, 168, 83, 0.18)' : '1px solid rgba(234, 179, 8, 0.25)', 
-                    padding: '6px 12px', 
-                    borderRadius: '10px', 
-                    height: '36px',
-                    boxSizing: 'border-box',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                    transition: 'all 0.2s ease',
-                    color: (activePlatform as string) === 'campus' ? '#137333' : '#a16207',
-                    flexShrink: 0
-                  }}>
-                    <Users size={14} style={{ opacity: 0.9 }} />
-                    <span style={{ 
-                      fontWeight: 750, 
-                      fontSize: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      <span style={{ 
-                        background: (activePlatform as string) === 'campus' ? '#34a853' : '#eab308',
-                        color: (activePlatform as string) === 'campus' ? 'white' : '#0f172a',
-                        borderRadius: '6px',
-                        padding: '2px 5px',
-                        fontSize: '0.7rem',
-                        fontWeight: 800,
-                        lineHeight: 1
+                  {(() => {
+                    const getContrastColor = (hex: string) => {
+                      if (!hex || !hex.startsWith('#')) return '#ffffff';
+                      const cleanHex = hex.replace('#', '');
+                      if (cleanHex.length !== 6) return '#ffffff';
+                      const r = parseInt(cleanHex.substring(0, 2), 16);
+                      const g = parseInt(cleanHex.substring(2, 4), 16);
+                      const b = parseInt(cleanHex.substring(4, 6), 16);
+                      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                      return (yiq >= 170) ? '#0f172a' : '#ffffff';
+                    };
+
+                    const themeColor = (activePlatform as string) === 'campus' ? '#34a853' : '#facc15';
+                    const displayColor = getContrastColor(themeColor);
+                    
+                    return (
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        background: themeColor, 
+                        border: `1px solid ${themeColor}`, 
+                        padding: '6px 12px', 
+                        borderRadius: '10px', 
+                        height: '36px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                        transition: 'all 0.2s ease',
+                        color: displayColor,
+                        flexShrink: 0
                       }}>
-                        {activeStudentsCount}
-                      </span>
-                      {windowWidth > 576 ? 'im Lab' : 'Lab'}
-                    </span>
-                  </div>
+                        <Users size={14} style={{ color: displayColor }} />
+                        <span style={{ 
+                          fontWeight: 750, 
+                          fontSize: '0.75rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span style={{ 
+                            background: displayColor === '#ffffff' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.12)',
+                            color: displayColor,
+                            borderRadius: '6px',
+                            padding: '2px 5px',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            lineHeight: 1
+                          }}>
+                            {activeStudentsCount}
+                          </span>
+                          {windowWidth > 576 ? 'im Lab' : 'Lab'}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>

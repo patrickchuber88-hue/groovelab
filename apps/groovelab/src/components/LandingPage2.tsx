@@ -1,4 +1,5 @@
 import React from 'react';
+import { Sparkles, Lock, ArrowRight, School } from 'lucide-react';
 
 interface LandingPage2Props {
   onLogin: () => void;
@@ -18,51 +19,156 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-      fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
+      background: '#09090b',
+      fontFamily: '"Outfit", "Inter", system-ui, -apple-system, sans-serif',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '24px',
-      color: '#0f172a',
+      color: '#f4f4f5',
       textAlign: 'center',
+      position: 'relative',
+      overflow: 'hidden',
       boxSizing: 'border-box'
     }}>
-      <div style={{
-        maxWidth: '560px',
+      {/* Dynamic background ambient glows */}
+      <style>{`
+        @keyframes float-glow-1 {
+          0% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(40px, -60px) scale(1.2); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes float-glow-2 {
+          0% { transform: translate(0px, 0px) scale(1.1); }
+          50% { transform: translate(-50px, 50px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1.1); }
+        }
+        .ambient-glow-1 {
+          position: absolute;
+          top: 15%;
+          left: 20%;
+          width: 500px;
+          height: 500px;
+          background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0) 70%);
+          filter: blur(60px);
+          pointer-events: none;
+          animation: float-glow-1 12s infinite ease-in-out;
+        }
+        .ambient-glow-2 {
+          position: absolute;
+          bottom: 15%;
+          right: 20%;
+          width: 550px;
+          height: 550px;
+          background: radial-gradient(circle, rgba(234, 179, 8, 0.08) 0%, rgba(234, 179, 8, 0) 70%);
+          filter: blur(70px);
+          pointer-events: none;
+          animation: float-glow-2 15s infinite ease-in-out;
+        }
+        .glass-card {
+          background: rgba(20, 20, 25, 0.65);
+          backdrop-filter: blur(28px);
+          -webkit-backdrop-filter: blur(28px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 32px;
+          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+          transform: translateY(0);
+          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .glass-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.12);
+          box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: #ffffff;
+          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-primary:hover {
+          transform: scale(1.02);
+          box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4);
+          filter: brightness(1.05);
+        }
+        .btn-primary:active {
+          transform: scale(0.99);
+        }
+        .btn-secondary {
+          background: rgba(255, 255, 255, 0.03);
+          color: #e4e4e7;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-secondary:hover {
+          background: rgba(255, 255, 255, 0.07);
+          color: #ffffff;
+          border-color: rgba(255, 255, 255, 0.15);
+          transform: scale(1.02);
+        }
+        .btn-secondary:active {
+          transform: scale(0.99);
+        }
+        .text-gradient {
+          background: linear-gradient(135deg, #f4f4f5 10%, #a1a1aa 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+        .legal-link {
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+        .legal-link:hover {
+          color: #ffffff;
+          text-decoration: underline;
+        }
+      `}</style>
+
+      {/* Decorative Blur Spheres */}
+      <div className="ambient-glow-1"></div>
+      <div className="ambient-glow-2"></div>
+
+      {/* Main Container Card */}
+      <div className="glass-card" style={{
+        maxWidth: '520px',
         width: '100%',
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: '32px',
-        padding: '48px 32px',
-        boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.04)',
+        padding: '54px 40px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '32px'
+        gap: '36px',
+        position: 'relative',
+        zIndex: 10
       }}>
         {/* Brand/App Title */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <span style={{
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
             fontSize: '0.74rem',
             fontWeight: 800,
-            color: '#137333',
-            background: '#e6f4ea',
-            padding: '6px 16px',
+            color: '#10b981',
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            padding: '6px 18px',
             borderRadius: '100px',
             textTransform: 'uppercase',
-            letterSpacing: '0.08em'
+            letterSpacing: '0.08em',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.05)'
           }}>
+            <Sparkles size={12} style={{ color: '#facc15' }} />
             Campus-Groovelab
-          </span>
-          <h1 style={{
-            fontSize: '2rem',
+          </div>
+          
+          <h1 className="text-gradient" style={{
+            fontSize: '2.3rem',
             fontWeight: 900,
-            margin: '12px 0 0 0',
-            letterSpacing: '-0.03em',
-            color: '#0f172a',
-            lineHeight: 1.2
+            margin: '8px 0 0 0',
+            letterSpacing: '-0.04em',
+            lineHeight: 1.15
           }}>
             Hier entsteht eine neue Software App.
           </h1>
@@ -70,76 +176,89 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
         {/* Informative Text */}
         <p style={{
-          fontSize: '0.95rem',
-          color: '#475569',
-          lineHeight: '1.6',
+          fontSize: '0.98rem',
+          color: '#a1a1aa',
+          lineHeight: '1.65',
           margin: 0,
-          fontWeight: 500
+          fontWeight: 450
         }}>
           Wir befinden uns gerade in der Entwicklungsphase und arbeiten intensiv an neuen, spannenden Features für deine Musikschule.
         </p>
 
-        {/* Notification / Call to action widget */}
+        {/* Status / Announcement Bar */}
         <div style={{
-          background: '#f8fafc',
-          border: '1px dashed #cbd5e1',
-          borderRadius: '16px',
-          padding: '20px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRadius: '20px',
+          padding: '18px 24px',
           width: '100%',
           boxSizing: 'border-box',
           fontSize: '0.84rem',
-          color: '#64748b',
-          fontWeight: 550,
-          lineHeight: 1.5
+          color: '#a1a1aa',
+          fontWeight: 500,
+          lineHeight: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          textAlign: 'left'
         }}>
-          🔧 Die Plattform wird bald verfügbar sein. Falls du bereits Zugangsdaten erhalten hast, kannst du dich direkt einloggen.
+          <div style={{
+            background: 'rgba(234, 179, 8, 0.1)',
+            border: '1px solid rgba(234, 179, 8, 0.15)',
+            borderRadius: '10px',
+            padding: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#facc15'
+          }}>
+            <Lock size={16} />
+          </div>
+          <div>
+            <span style={{ color: '#f4f4f5', fontWeight: 600 }}>Plattform geschützt.</span> Falls du bereits Zugangsdaten erhalten hast, kannst du dich direkt einloggen.
+          </div>
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '12px', width: '100%', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', gap: '14px', width: '100%', flexDirection: 'column' }}>
           <button
             onClick={() => onLogin()}
+            className="btn-primary"
             style={{
-              padding: '16px',
+              padding: '16px 24px',
               borderRadius: '16px',
-              background: '#137333',
-              color: '#ffffff',
               border: 'none',
               fontWeight: 800,
-              fontSize: '0.95rem',
+              fontSize: '0.96rem',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(19, 115, 51, 0.15)',
-              transition: 'transform 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
               width: '100%'
             }}
-            className="hover-scale"
           >
             Direkt zum Login
+            <ArrowRight size={16} />
           </button>
           
           <button
             onClick={() => onRegister()}
+            className="btn-secondary"
             style={{
-              padding: '16px',
+              padding: '16px 24px',
               borderRadius: '16px',
-              background: 'transparent',
-              color: '#475569',
-              border: '1px solid #cbd5e1',
               fontWeight: 700,
-              fontSize: '0.95rem',
+              fontSize: '0.96rem',
               cursor: 'pointer',
-              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
               width: '100%'
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.color = '#0f172a';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = '#475569';
-            }}
           >
+            <School size={16} style={{ opacity: 0.8 }} />
             Als Schule registrieren
           </button>
         </div>
@@ -148,18 +267,18 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         <div style={{
           display: 'flex',
           gap: '16px',
-          fontSize: '0.78rem',
+          fontSize: '0.74rem',
           fontWeight: 700,
-          color: '#94a3b8',
+          color: '#71717a',
           textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          marginTop: '8px'
+          letterSpacing: '0.06em',
+          marginTop: '12px'
         }}>
-          <span onClick={() => onShowPrivacy()} style={{ cursor: 'pointer', transition: 'color 0.2s' }} className="hover-underline">Datenschutz</span>
-          <span style={{ opacity: 0.5 }}>•</span>
-          <span onClick={() => onShowAgb()} style={{ cursor: 'pointer', transition: 'color 0.2s' }} className="hover-underline">AGB</span>
-          <span style={{ opacity: 0.5 }}>•</span>
-          <span onClick={() => onShowImpressum()} style={{ cursor: 'pointer', transition: 'color 0.2s' }} className="hover-underline">Impressum</span>
+          <span onClick={() => onShowPrivacy()} className="legal-link">Datenschutz</span>
+          <span style={{ opacity: 0.3 }}>•</span>
+          <span onClick={() => onShowAgb()} className="legal-link">AGB</span>
+          <span style={{ opacity: 0.3 }}>•</span>
+          <span onClick={() => onShowImpressum()} className="legal-link">Impressum</span>
         </div>
       </div>
     </div>
