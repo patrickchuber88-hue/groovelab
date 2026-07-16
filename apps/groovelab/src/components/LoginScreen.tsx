@@ -443,8 +443,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return !!kioskStationId || params.get('groovelab') === 'true';
+    return !!kioskStationId || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab';
   });
+  const [hasAutoCheckedPlatform, setHasAutoCheckedPlatform] = useState(false);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
 
   // Parents Onboarding & Magic Link States
@@ -1237,6 +1238,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       handlePinLogin(qrToken);
     }
   }, [schoolData]);
+
+  useEffect(() => {
+    if (schoolData && !hasAutoCheckedPlatform) {
+      const hasCampus = schoolData.has_campus_subscription || !schoolData.is_billing_booked;
+      if (!hasCampus) {
+        setIsGroovelabKiosk(true);
+      }
+      setHasAutoCheckedPlatform(true);
+    }
+  }, [schoolData, hasAutoCheckedPlatform]);
 
   const [availableInstruments, setAvailableInstruments] = useState<string[]>([]);
 
