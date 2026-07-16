@@ -8,7 +8,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { AdminDashboard } from './AdminDashboard';
@@ -18,6 +18,7 @@ import { TeacherDetailModal } from './TeacherDetailModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusTeacherDashboard } from './CampusTeacherDashboard';
 import QRCode from 'react-qr-code';
+import { getInstrumentAvatarUrl } from './StudioAvatar';
 import { QRCodeModal } from './QRCodeModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
@@ -1856,7 +1857,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   };
   
   // Apple-style settings panel states
-  const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy' | 'backup'>('general');
   const [initialSettings, setInitialSettings] = useState<any>(null);
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
   const [kioskAutoLogout, setKioskAutoLogout] = useState<number>(5);
@@ -11296,7 +11297,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           >
             <div style={{ position: 'relative' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <img src="/campus_login_hero.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} loading="lazy" />
+                <img 
+                  src={
+                    activeTab === 'secretary'
+                      ? '/campus_login_hero.png'
+                      : activeTab === 'campus'
+                      ? getInstrumentAvatarUrl(currentUserProfile?.instrument)
+                      : (!currentUserProfile?.photo_url || currentUserProfile?.photo_url === '/campus_login_hero.png'
+                          ? '/avatar_ghost.jpg'
+                          : currentUserProfile?.photo_url)
+                  } 
+                  alt="" 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} 
+                  loading="lazy" 
+                />
               </div>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -11885,31 +11899,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     <div style={{
                       background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
                       border: '1px solid #fde68a',
-                      borderRadius: '24px',
-                      padding: '20px 24px',
+                      borderRadius: '16px',
+                      padding: '12px 16px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '16px',
-                      boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.08)'
+                      boxShadow: '0 4px 12px -2px rgba(245, 158, 11, 0.08)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                           background: '#fef3c7',
-                          borderRadius: '16px',
-                          padding: '12px',
+                          borderRadius: '12px',
+                          padding: '8px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           border: '1px solid #fcd34d'
                         }}>
-                          <ShieldAlert size={24} style={{ color: '#d97706' }} />
+                          <ShieldAlert size={20} style={{ color: '#d97706' }} />
                         </div>
                         <div>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#92400e', marginBottom: '4px' }}>
+                          <strong style={{ display: 'block', fontSize: '0.84rem', color: '#92400e', marginBottom: '2px' }}>
                             Lokale Datensicherung empfohlen!
                           </strong>
-                          <span style={{ fontSize: '0.84rem', color: '#78350f', lineHeight: '1.4' }}>
+                          <span style={{ fontSize: '0.76rem', color: '#78350f', lineHeight: '1.3' }}>
                             {lastBackupDate 
                               ? `Dein letztes lokales Daten-Backup ist bereits ${daysSinceLastBackup} Tage alt. Bitte erstelle eine aktuelle Sicherungsdatei, um deine rechtlichen Mitwirkungspflichten zu erfüllen.`
                               : 'Es wurde noch kein lokales Daten-Backup heruntergeladen. Bitte erstelle eine Sicherungsdatei, um deine rechtlichen Mitwirkungspflichten zu erfüllen.'}
@@ -11919,15 +11933,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       <button
                         onClick={() => {
                           setSecretarySubTab('setup');
-                          setSettingsTab('security_privacy');
+                          setSettingsTab('backup');
                         }}
                         style={{
                           background: '#d97706',
                           color: '#ffffff',
                           border: 'none',
-                          borderRadius: '12px',
-                          padding: '10px 20px',
-                          fontSize: '0.84rem',
+                          borderRadius: '10px',
+                          padding: '8px 14px',
+                          fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
                           whiteSpace: 'nowrap',
@@ -15124,31 +15138,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     <div style={{
                       background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                       border: '1px solid #bbf7d0',
-                      borderRadius: '24px',
-                      padding: '20px 24px',
+                      borderRadius: '16px',
+                      padding: '12px 16px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '16px',
-                      boxShadow: '0 10px 25px -5px rgba(22, 163, 74, 0.08)'
+                      boxShadow: '0 4px 12px -2px rgba(22, 163, 74, 0.08)'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                           background: '#dcfce7',
-                          borderRadius: '16px',
-                          padding: '12px',
+                          borderRadius: '12px',
+                          padding: '8px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           border: '1px solid #86efac'
                         }}>
-                          <ShieldAlert size={24} style={{ color: '#137333' }} />
+                          <ShieldAlert size={20} style={{ color: '#137333' }} />
                         </div>
                         <div>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#14532d', marginBottom: '4px' }}>
+                          <strong style={{ display: 'block', fontSize: '0.84rem', color: '#14532d', marginBottom: '2px' }}>
                             Lokale Datensicherung empfohlen!
                           </strong>
-                          <span style={{ fontSize: '0.84rem', color: '#166534', lineHeight: '1.4' }}>
+                          <span style={{ fontSize: '0.76rem', color: '#166534', lineHeight: '1.3' }}>
                             {lastBackupDate 
                               ? `Dein letztes lokales Daten-Backup ist bereits ${daysSinceLastBackup} Tage alt. Bitte erstelle eine aktuelle Sicherungsdatei in den Einstellungen, um deine rechtlichen Mitwirkungspflichten zu erfüllen.`
                               : 'Es wurde noch kein lokales Daten-Backup heruntergeladen. Bitte erstelle eine Sicherungsdatei in den Einstellungen, um deine rechtlichen Mitwirkungspflichten zu erfüllen.'}
@@ -15158,15 +15172,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       <button
                         onClick={() => {
                           setSecretarySubTab('setup');
-                          setSettingsTab('security_privacy');
+                          setSettingsTab('backup');
                         }}
                         style={{
                           background: '#137333',
                           color: '#ffffff',
                           border: 'none',
-                          borderRadius: '12px',
-                          padding: '10px 20px',
-                          fontSize: '0.84rem',
+                          borderRadius: '10px',
+                          padding: '8px 14px',
+                          fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer',
                           whiteSpace: 'nowrap',
@@ -25842,7 +25856,8 @@ status: status,
                 {[
                   { id: 'general', label: 'Allgemein' },
                   { id: 'sync', label: 'Kalender & Synchronisation' },
-                  { id: 'security_privacy', label: 'Sicherheit & Datenschutz' }
+                  { id: 'security_privacy', label: 'Sicherheit & Datenschutz' },
+                  { id: 'backup', label: 'Lokale Datensicherung' }
                 ].map((item) => {
                   const isSelected = settingsTab === item.id;
                   const activeColor = isSelected ? '#ea4335' : '#64748b';
@@ -25852,6 +25867,7 @@ status: status,
                       case 'general': return <Settings size={14} color={activeColor} />;
                       case 'sync': return <Zap size={14} color={activeColor} />;
                       case 'security_privacy': return <Shield size={14} color={activeColor} />;
+                      case 'backup': return <Database size={14} color={activeColor} />;
                       default: return null;
                     }
                   };
@@ -26533,11 +26549,19 @@ status: status,
                         <option value="never">Nie löschen (manuell)</option>
                       </select>
                     </div>
+                  </div>
+                )}
 
-                    {/* JSON Data Export & Import */}
+                {settingsTab === 'backup' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Lokale Datensicherung</h3>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Backup &amp; Wiederherstellung der Schuldaten als strukturierte JSON-Datei.</p>
+                    </div>
+
                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div>
-                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Lokale Datensicherung (Backup &amp; Wiederherstellung)</strong>
+                        <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Sicherungsdatei erstellen / einspielen</strong>
                         <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: '1.4' }}>
                           Lade alle Stammdaten, Benutzer, Räume, Stundenpläne und Bands deiner Musikschule als strukturierte JSON-Sicherungsdatei herunter oder spiele ein bestehendes Backup wieder ein.
                         </span>

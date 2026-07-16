@@ -68,11 +68,12 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   const targetUser = user;
   const role = (targetUser?.role || '').toLowerCase();
   
-  if (role === 'admin' || role === 'secretary') {
+  if (activePlat === 'secretary') {
+    // In administration/secretariat module, always display the chalkboard
     displaySrc = '/campus_login_hero.png';
   } else if (activePlat === 'campus') {
-    // In Campus module, musician/instrument avatars are strictly prohibited.
-    // We only show custom non-avatar photos, otherwise default to /avatar_ghost.jpg
+    // In Campus module, display the instrument avatar for all roles (student, teacher, admin, secretary)
+    // We only show custom non-avatar photos if available, otherwise default to instrument avatar
     const isMusicianOrInstrumentAvatar = src && (
       src.includes('student_') ||
       src.includes('bandstyle_') ||
@@ -112,10 +113,11 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       src.includes('bariton_avatar') || 
       src.includes('oboe_avatar') ||
       src.includes('teacher_') ||
-      src.includes('avatar_teacher')
+      src.includes('avatar_teacher') ||
+      src === '/campus_login_hero.png'
     );
     if (!src || isMusicianOrInstrumentAvatar) {
-      displaySrc = role === 'student' ? getInstrumentAvatarUrl(resolvedInstrument || user?.instrument) : '/avatar_ghost.jpg';
+      displaySrc = getInstrumentAvatarUrl(resolvedInstrument || user?.instrument);
     }
   } else {
     // GrooveLab platform: musician/instrument avatars are allowed for students/teachers
@@ -171,7 +173,8 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
         displaySrc = '/avatar_ghost.jpg';
       }
     } else {
-      displaySrc = '/avatar_ghost.jpg';
+      // Admins/secretaries get ghost or custom avatar
+      displaySrc = !src || src === '/campus_login_hero.png' ? '/avatar_ghost.jpg' : src;
     }
   }
 
