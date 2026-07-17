@@ -1202,27 +1202,27 @@ export function BillingDashboard() {
                   <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid rgba(15, 23, 42, 0.04)' }}>
                     <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Lizenz-Abonnement</h4>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
-                        <span style={{ color: '#64748b' }}>Tariftyp:</span>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{inv.subscriptionType === 'solo' ? 'Solo-Lizenz' : 'Standard-Tarif'}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tariftyp</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>{inv.subscriptionType === 'solo' ? 'Solo-Lizenz' : 'Standard-Tarif'}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px', alignItems: 'center' }}>
-                        <span style={{ color: '#64748b' }}>Module:</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {inv.hasCampus && <span style={{ color: '#34a853', fontWeight: 750, fontSize: '0.62rem', background: '#e6f4ea', padding: '1px 5px', borderRadius: '4px' }}>Campus</span>}
-                          {inv.hasGroovelab && <span style={{ color: '#ca8a04', fontWeight: 750, fontSize: '0.62rem', background: '#fefce8', padding: '1px 5px', borderRadius: '4px' }}>GrooveLab</span>}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Freigeschaltete Module</span>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                          {inv.hasCampus && <span style={{ color: '#34a853', fontWeight: 750, fontSize: '0.65rem', background: '#e6f4ea', padding: '2px 6px', borderRadius: '4px' }}>Campus</span>}
+                          {inv.hasGroovelab && <span style={{ color: '#ca8a04', fontWeight: 750, fontSize: '0.65rem', background: '#fefce8', padding: '2px 6px', borderRadius: '4px' }}>GrooveLab</span>}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
-                        <span style={{ color: '#64748b' }}>Abrechnungsmodell:</span>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Abrechnungsmodell</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
                           {isSelbstzahler ? 'Direktabrechnung (Eltern)' : 'Sammelzahler (Musikschule)'}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                        <span style={{ color: '#64748b' }}>Kombi-Vorteil:</span>
-                        <span style={{ fontWeight: 700, color: inv.hasKombiDiscount ? '#34a853' : '#64748b' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Kombi-Vorteilsrabatt</span>
+                        <span style={{ fontWeight: 700, color: inv.hasKombiDiscount ? '#34a853' : '#64748b', fontSize: '0.82rem' }}>
                           {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Keiner'}
                         </span>
                       </div>
