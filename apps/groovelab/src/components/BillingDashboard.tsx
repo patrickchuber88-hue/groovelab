@@ -133,7 +133,7 @@ export function BillingDashboard() {
     setTick(t => t + 1);
   };
 
-  const getSchoolInvoices = (schoolId: string, currentInvoiceAmount: number) => {
+  const getSchoolInvoices = (schoolId: string, currentInvoiceAmount: number, schoolStatus?: string) => {
     const storedDate = localStorage.getItem(`contractStartDate_${schoolId}`) || localStorage.getItem('contractStartDate');
     const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
     
@@ -168,9 +168,10 @@ export function BillingDashboard() {
       const paidInvoicesList = getPaidInvoices(schoolId);
       const isMarkedPaid = paidInvoicesList.includes(invId);
 
-      const isTrialMonth = (y === startYear && m === startMonth);
-      const invoiceAmount = isTrialMonth ? 0.00 : (isCurrent ? currentInvoiceAmount : (currentInvoiceAmount > 0 ? currentInvoiceAmount : 39.90));
-      const status = isTrialMonth ? 'Probemonat' : (isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
+      const invoiceAmount = currentInvoiceAmount;
+      const status = (currentInvoiceAmount === 0.00)
+        ? (schoolStatus === 'bypass' ? 'Bypass' : schoolStatus === 'trial' ? 'Probemonat' : 'Kostenfrei')
+        : (isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
 
       list.push({
         id: invId,
@@ -688,8 +689,7 @@ export function BillingDashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      
-      {/* Dynamic styles injector */}
+        {/* Dynamic styles injector */}
       <style>{`
         .billing-card {
           background: rgba(255, 255, 255, 0.7);
@@ -708,12 +708,12 @@ export function BillingDashboard() {
         .billing-card:hover {
           transform: translateY(-2px);
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-          border-color: rgba(234, 67, 53, 0.15);
+          border-color: rgba(52, 168, 83, 0.15);
           background: rgba(255, 255, 255, 0.95);
         }
         .billing-card:hover .bc-icon-wrapper {
-          background: rgba(234, 67, 53, 0.06) !important;
-          color: #ea4335 !important;
+          background: rgba(52, 168, 83, 0.06) !important;
+          color: #34a853 !important;
         }
  
         .filter-btn {
@@ -736,15 +736,15 @@ export function BillingDashboard() {
           border-color: rgba(0, 0, 0, 0.1);
         }
         .filter-btn-active {
-          background: #ea4335 !important;
+          background: #34a853 !important;
           color: #ffffff !important;
-          border-color: #ea4335 !important;
-          box-shadow: 0 4px 10px rgba(234, 67, 53, 0.15);
+          border-color: #34a853 !important;
+          box-shadow: 0 4px 10px rgba(52, 168, 83, 0.15);
         }
         
         .school-list-item:hover {
           transform: translateY(-1px);
-          border-color: rgba(234, 67, 53, 0.15) !important;
+          border-color: rgba(52, 168, 83, 0.15) !important;
           background: rgba(255, 255, 255, 0.95) !important;
         }
 
@@ -776,9 +776,9 @@ export function BillingDashboard() {
       }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: '"Outfit", sans-serif' }}>
-            <CreditCard style={{ color: '#ea4335' }} size={28} /> Abrechnungen &amp; Abonnements
+            <CreditCard style={{ color: '#34a853' }} size={28} /> Abrechnungen &amp; Abonnements
           </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 550 }}>
             Globale Übersicht über alle Schul-Lizenzgebühren und privaten App-Upgrades von Campus-Groovelab.
           </p>
         </div>
@@ -802,7 +802,7 @@ export function BillingDashboard() {
             transition: 'all 0.2s',
             boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fce8e6'; e.currentTarget.style.color = '#ea4335'; e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.2)'; }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e6f4ea'; e.currentTarget.style.color = '#34a853'; e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.2)'; }}
           onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -864,8 +864,8 @@ export function BillingDashboard() {
             height: '44px',
             width: '44px',
             borderRadius: '12px',
-            background: 'rgba(234, 67, 53, 0.06)',
-            color: '#ea4335',
+            background: 'rgba(202, 138, 4, 0.06)',
+            color: '#ca8a04',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -876,7 +876,7 @@ export function BillingDashboard() {
           </div>
           <div>
             <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ausstehende Beträge</span>
-            <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#ea4335', marginTop: '2px', letterSpacing: '-0.02em' }}>
+            <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#ca8a04', marginTop: '2px', letterSpacing: '-0.02em' }}>
               {summary.totalUnpaid.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
           </div>
@@ -974,7 +974,7 @@ export function BillingDashboard() {
                   color: '#0f172a'
                 }}
                 onFocus={(e) => {
-                  e.target.style.borderColor = '#ea4335';
+                  e.target.style.borderColor = '#34a853';
                 }}
                 onBlur={(e) => {
                   e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)';
@@ -1007,19 +1007,19 @@ export function BillingDashboard() {
                 onClick={handleExportCSV}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(234, 67, 53, 0.2)',
+                  border: '1px solid rgba(52, 168, 83, 0.2)',
                   borderRadius: '10px',
                   padding: '8px 12px',
                   fontSize: '0.78rem',
                   fontWeight: 700,
-                  color: '#ea4335',
+                  color: '#34a853',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   transition: 'all 0.2s'
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fce8e6'; }}
+                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e6f4ea'; }}
                 onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 CSV Export
@@ -1036,8 +1036,8 @@ export function BillingDashboard() {
                     width: '24px',
                     height: '24px',
                     borderRadius: '50%',
-                    border: '2px solid rgba(234, 67, 53, 0.1)',
-                    borderTopColor: '#ea4335',
+                    border: '2px solid rgba(52, 168, 83, 0.1)',
+                    borderTopColor: '#34a853',
                     animation: 'spin 1s linear infinite'
                   }} />
                   <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -1062,11 +1062,11 @@ export function BillingDashboard() {
                       justifyContent: 'space-between',
                       padding: '14px 18px',
                       borderRadius: '16px',
-                      background: isSelected ? 'rgba(234, 67, 53, 0.04)' : '#ffffff',
-                      border: `1px solid ${isSelected ? 'rgba(234, 67, 53, 0.15)' : 'rgba(15, 23, 42, 0.05)'}`,
+                      background: isSelected ? 'rgba(52, 168, 83, 0.04)' : '#ffffff',
+                      border: `1px solid ${isSelected ? 'rgba(52, 168, 83, 0.15)' : 'rgba(15, 23, 42, 0.05)'}`,
                       cursor: 'pointer',
                       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isSelected ? '0 4px 12px rgba(234, 67, 53, 0.03)' : 'none'
+                      boxShadow: isSelected ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
                     }}
                     className="school-list-item"
                   >
@@ -1075,7 +1075,7 @@ export function BillingDashboard() {
                         width: '32px',
                         height: '32px',
                         borderRadius: '10px',
-                        background: isSelected ? '#ea4335' : '#f8fafc',
+                        background: isSelected ? '#34a853' : '#f8fafc',
                         color: isSelected ? '#ffffff' : '#475569',
                         border: '1px solid rgba(0, 0, 0, 0.04)',
                         display: 'flex',
@@ -1094,8 +1094,8 @@ export function BillingDashboard() {
                             fontWeight: 800,
                             padding: '1px 5px',
                             borderRadius: '4px',
-                            background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#f1f5f9' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
-                            color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#475569' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
+                            background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#fee2e2' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
+                            color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#dc2626' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
                             textTransform: 'uppercase',
                             letterSpacing: '0.03em'
                           }}>
@@ -1108,7 +1108,7 @@ export function BillingDashboard() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: isSelected ? '#ea4335' : '#0f172a' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: isSelected ? '#34a853' : '#0f172a' }}>
                         {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                       </span>
                       <span style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
@@ -1160,7 +1160,7 @@ export function BillingDashboard() {
                       width: '40px',
                       height: '40px',
                       borderRadius: '12px',
-                      background: `linear-gradient(135deg, #ea4335 0%, #b32418 100%)`,
+                      background: `linear-gradient(135deg, #34a853 0%, #2e7d32 100%)`,
                       color: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
@@ -1183,8 +1183,8 @@ export function BillingDashboard() {
                     fontWeight: 800,
                     padding: '4px 10px',
                     borderRadius: '8px',
-                    background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#f1f5f9' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
-                    color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#475569' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
+                    background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#fee2e2' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
+                    color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#dc2626' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em'
                   }}>
@@ -1255,7 +1255,7 @@ export function BillingDashboard() {
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.06)', marginTop: '8px' }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>Monatlicher Beitrag:</span>
-                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ea4335' }}>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#34a853' }}>
                         {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
                       </strong>
                     </div>
@@ -1291,7 +1291,7 @@ export function BillingDashboard() {
                                   <button 
                                     type="button"
                                     onClick={() => toggleStudentPayment(s.id, true)}
-                                    style={{ border: 'none', background: 'none', color: '#ea4335', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 5px', borderRadius: '4px' }}
+                                    style={{ border: 'none', background: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 5px', borderRadius: '4px' }}
                                     onMouseOver={(e: any) => e.currentTarget.style.background = '#fce8e6'}
                                     onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
                                   >
@@ -1321,9 +1321,9 @@ export function BillingDashboard() {
                                   <button 
                                     type="button"
                                     onClick={() => toggleStudentPayment(s.id, false)}
-                                    style={{ border: 'none', background: '#fce8e6', color: '#ea4335', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px' }}
-                                    onMouseOver={(e: any) => e.currentTarget.style.background = '#fcdcd9'}
-                                    onMouseOut={(e: any) => e.currentTarget.style.background = '#fce8e6'}
+                                    style={{ border: 'none', background: '#e6f4ea', color: '#34a853', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px' }}
+                                    onMouseOver={(e: any) => e.currentTarget.style.background = '#d1fae5'}
+                                    onMouseOut={(e: any) => e.currentTarget.style.background = '#e6f4ea'}
                                   >
                                     Aktivieren
                                   </button>
@@ -1373,8 +1373,8 @@ export function BillingDashboard() {
                       onClick={() => createManualInvoice(inv.schoolId)}
                       style={{
                         backgroundColor: 'transparent',
-                        color: '#ea4335',
-                        border: '1px solid rgba(234, 67, 53, 0.2)',
+                        color: '#34a853',
+                        border: '1px solid rgba(52, 168, 83, 0.2)',
                         padding: '4px 10px',
                         borderRadius: '6px',
                         fontWeight: 700,
@@ -1382,7 +1382,7 @@ export function BillingDashboard() {
                         cursor: 'pointer',
                         transition: 'all 0.15s'
                       }}
-                      onMouseOver={(e: any) => { e.currentTarget.style.background = '#fce8e6'; }}
+                      onMouseOver={(e: any) => { e.currentTarget.style.background = '#e6f4ea'; }}
                       onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       + Manuelle Rechnung
@@ -1391,7 +1391,7 @@ export function BillingDashboard() {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
                     {(() => {
-                      const generated = getSchoolInvoices(inv.schoolId, inv.total);
+                      const generated = getSchoolInvoices(inv.schoolId, inv.total, inv.status);
                       const dbInvs = dbInvoices.filter(i => i.school_id === inv.schoolId);
                       const allCombined = [
                         ...dbInvs.map(i => ({
