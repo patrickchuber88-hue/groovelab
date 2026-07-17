@@ -3328,6 +3328,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   id: newUserId,
                   school_id: inviteSchoolId,
                   role: finalRole,
+                  roles: [finalRole],
+                  is_active: true,
                   first_name: firstName.trim(),
                   last_name: lastName.trim(),
                   qr_token: newQrToken,
