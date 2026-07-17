@@ -313,7 +313,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {campusCost > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren Campus</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Server-Hosting-Flatrate Campus</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                               Bereitstellung, Betrieb &amp; Hosting (Campus){freeLabel}
                             </span>
@@ -334,7 +334,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {groovelabCost > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Server &amp; Service Gebühren GrooveLab</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Server-Hosting-Flatrate GrooveLab</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                               Bereitstellung, Betrieb &amp; Hosting (GrooveLab){freeLabel}
                             </span>
@@ -355,10 +355,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {invoice.totalTeachersCount > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Team</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Infrastruktur- &amp; Server-Hosting (Lehrkräfte)</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
                               {invoice.totalTeachersCount} Lehrkräfte (0,49 € / Mo. pro User)
-                              {invoice.totalAdminsCount !== undefined && invoice.totalAdminsCount > 0 && ` | ${invoice.totalAdminsCount} Verwalter (kostenfrei)`}
                               {freeLabel}
                             </span>
                           </td>
@@ -378,8 +377,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {invoice.passiveStudentsCount > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler</strong>
-                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Infrastrukturpauschale für {invoice.passiveStudentsCount} Schüler (0,09 € / Mo. pro User){freeLabel}</span>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Datenbank- &amp; Speicher-Hosting (passive Profile)</strong>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Speicher- &amp; Datenbank-Hosting für {invoice.passiveStudentsCount} passive Schüler-Accounts (0,09 € / Mo. pro User){freeLabel}</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
                             {invoice.isCurrentMonth ? 1 : 12} {invoice.isCurrentMonth ? 'Monat' : 'Monate'}
@@ -397,8 +396,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {invoice.activeStudentFee > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>DB &amp; Service Schüler-Aktivierungen</strong>
-                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Schüler-Aktivierungsgebühr (Sammelabrechnung Musikschule){freeLabel}</span>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Infrastruktur-Bereitstellung (Schüleraktivierungen)</strong>
+                            <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>Freischaltung und Infrastrukturpauschale für Schüler-Accounts{freeLabel}</span>
                           </td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>1 Monat</td>
                           <td style={{ padding: '8px', textAlign: 'right', color: '#64748b' }}>
