@@ -1843,9 +1843,30 @@ export function ScheduleCalendarView({
       return;
     }
 
-    const confirmPaste = await showConfirm(
-      `Möchtest du alle ${copiedEvents.length} kopierten Termine in diese Woche einfügen? Dies überschreibt alle bestehenden Terminanpassungen dieser Woche.`
+    const weekStartStr = toLocalYYYYMMDD(weekStart);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekEndStr = toLocalYYYYMMDD(weekEnd);
+
+    // Conflict Detection: Check destination week for existing manual changes
+    const { data: existingOccurrences } = await supabase
+      .from('schedule_occurrences')
+      .select('id, date, start_time, status, rescheduled, notes')
+      .eq('teacher_id', userId)
+      .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
+
+    const hasManualChanges = existingOccurrences?.some(
+      (occ) => occ.rescheduled || occ.notes || occ.status !== 'scheduled'
     );
+
+    let confirmMsg = `Möchtest du alle ${copiedEvents.length} kopierten Termine in diese Woche einfügen?`;
+    if (hasManualChanges) {
+      confirmMsg = `⚠️ Achtung: In der Zielwoche gibt es bereits manuelle Anpassungen (verschobene Termine, Notizen oder Fehlzeiten).\n\nWenn du fortfährst, werden diese durch die kopierten Termine überschrieben. Möchtest du wirklich einfügen?`;
+    } else if (existingOccurrences && existingOccurrences.length > 0) {
+      confirmMsg += `\n\n(Bestehende Standardtermine dieser Woche werden überschrieben)`;
+    }
+
+    const confirmPaste = await showConfirm(confirmMsg);
     if (!confirmPaste) return;
 
     setLoading(true);
@@ -3302,8 +3323,9 @@ export function ScheduleCalendarView({
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Group A: Ansicht & Filter */}
+            {/* Unified Segmented Control for View & Actions */}
             <div className="apple-btn-group">
+              {/* Group A: Ansicht & Filter */}
               <button
                 type="button"
                 onClick={() => setShowWeekend(prev => !prev)}
@@ -3328,28 +3350,10 @@ export function ScheduleCalendarView({
                 <Users size={13} />
                 <span>Gruppen</span>
               </button>
-            </div>
 
-            {/* Merge Selected Action (Floating outside groups since it's a primary CTA) */}
-            {isGroupModeActive && selectedForGroup.length >= 2 && (
-              <button
-                type="button"
-                onClick={handleMergeSelectedOccurrences}
-                className="apple-btn active"
-                style={{
-                  background: brandColor,
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  boxShadow: `0 2px 8px ${brandColor}33`,
-                  borderRadius: '8px'
-                }}
-              >
-                <span>Zusammenführen ({selectedForGroup.length})</span>
-              </button>
-            )}
+              <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
 
-            {/* Group B: Wochen-Aktionen */}
-            <div className="apple-btn-group">
+              {/* Group B: Wochen-Aktionen */}
               <button
                 onClick={handleCopyWeek}
                 className="apple-btn"
@@ -3369,6 +3373,8 @@ export function ScheduleCalendarView({
                 <span>Einfügen</span>
               </button>
 
+              <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
+
               <button
                 onClick={handleResetWeek}
                 className="apple-btn"
@@ -3379,6 +3385,24 @@ export function ScheduleCalendarView({
                 <span>Zurücksetzen</span>
               </button>
             </div>
+
+            {/* Merge Selected Action (Floating outside groups since it's a primary CTA) */}
+            {isGroupModeActive && selectedForGroup.length >= 2 && (
+              <button
+                type="button"
+                onClick={handleMergeSelectedOccurrences}
+                className="apple-btn active"
+                style={{
+                  background: brandColor,
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  boxShadow: `0 2px 8px ${brandColor}33`,
+                  borderRadius: '8px'
+                }}
+              >
+                <span>Zusammenführen ({selectedForGroup.length})</span>
+              </button>
+            )}
 
             {/* Save Pending Changes Action (Floating primary CTA) */}
             {Object.keys(pendingChanges).length > 0 && (

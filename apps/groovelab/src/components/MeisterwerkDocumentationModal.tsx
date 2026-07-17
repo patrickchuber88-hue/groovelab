@@ -553,7 +553,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           
           const { error: uploadErr } = await supabase.storage
             .from('campus-assets')
-            .upload(filePath, blob);
+            .upload(filePath, blob, { cacheControl: 'private, max-age=3600' });
             
           if (uploadErr) throw uploadErr;
           
@@ -10809,7 +10809,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       
       const { error } = await supabase.storage
         .from('campus-assets')
-        .upload(filePath, mixBlob, { contentType });
+        .upload(filePath, mixBlob, { contentType, cacheControl: 'private, max-age=3600' });
         
       if (error) throw error;
       
