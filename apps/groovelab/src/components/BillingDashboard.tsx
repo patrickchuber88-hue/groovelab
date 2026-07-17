@@ -56,6 +56,8 @@ interface Invoice {
   totalTeachersCount: number;
   totalEmployeesCount: number;
   passiveStudentsCount: number;
+  teachersHostingFee: number;
+  passiveStudentsHostingFee: number;
 }
 
 interface PlatformSummary {
@@ -542,7 +544,9 @@ export function BillingDashboard() {
           activeStudentFee: parseFloat(activeStudentFee.toFixed(2)),
           totalTeachersCount: teachersCount,
           totalEmployeesCount: employeesCount,
-          passiveStudentsCount
+          passiveStudentsCount,
+          teachersHostingFee: parseFloat(staffFee.toFixed(2)),
+          passiveStudentsHostingFee: parseFloat(passiveStudentsFee.toFixed(2))
         };
       });
 
@@ -934,7 +938,7 @@ export function BillingDashboard() {
       {/* Main Split-Pane Container */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1.1fr 1.3fr',
+        gridTemplateColumns: '1fr 1.8fr',
         gap: '24px',
         alignItems: 'start'
       }}>
@@ -1241,12 +1245,16 @@ export function BillingDashboard() {
                           </div>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#64748b' }}>Lehrer-Servicegebühr ({inv.totalTeachersCount} aktiv):</span>
-                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.userFee.toFixed(2).replace('.', ',')} €</span>
+                          <span style={{ color: '#64748b' }}>Infrastruktur- & Server-Hosting (Lehrkräfte) ({inv.totalTeachersCount} aktiv):</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                          <span style={{ color: '#64748b' }}>Datenbank- & Speicher-Hosting (passive Profile) ({inv.passiveStudentsCount} passiv):</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
                         {inv.activeStudentFee > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                            <span style={{ color: '#64748b' }}>Schüleraktivierungen:</span>
+                            <span style={{ color: '#64748b' }}>Infrastruktur-Bereitstellung (Schüleraktivierungen):</span>
                             <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
