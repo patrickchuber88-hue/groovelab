@@ -1258,6 +1258,24 @@ export function BillingDashboard() {
                             <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
+                        {inv.status === 'bypass' && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
+                            <span>Bypass-Gebührenfreistellung:</span>
+                            <span>-{inv.subtotal.toFixed(2).replace('.', ',')} €</span>
+                          </div>
+                        )}
+                        {inv.status === 'trial' && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#ca8a04', fontWeight: 600 }}>
+                            <span>Probezeit-Rabatt (100%):</span>
+                            <span>-{inv.subtotal.toFixed(2).replace('.', ',')} €</span>
+                          </div>
+                        )}
+                        {inv.status === 'suspended' && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
+                            <span>Sperrungs-Berechnungsstopp:</span>
+                            <span>-{inv.subtotal.toFixed(2).replace('.', ',')} €</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     
