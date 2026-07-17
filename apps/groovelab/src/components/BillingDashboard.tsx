@@ -104,6 +104,8 @@ export function BillingDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedSchoolId, setExpandedSchoolId] = useState<string | null>(null);
+  const [expandedSchoolUsers, setExpandedSchoolUsers] = useState<any[]>([]);
+  const [loadingExpandedUsers, setLoadingExpandedUsers] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<any>(null);
   const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
   const [operatorContact, setOperatorContact] = useState('Patrick Huber');
@@ -194,6 +196,31 @@ export function BillingDashboard() {
   useEffect(() => {
     fetchBillingData();
   }, []);
+
+  // Load user details lazily when a school is expanded (Performance & Privacy Optimization)
+  useEffect(() => {
+    if (!expandedSchoolId) {
+      setExpandedSchoolUsers([]);
+      return;
+    }
+    const fetchExpandedUsers = async () => {
+      setLoadingExpandedUsers(true);
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, first_name, last_name, exempt_from_direct_billing')
+          .eq('school_id', expandedSchoolId);
+        if (!error && data) {
+          setExpandedSchoolUsers(data);
+        }
+      } catch (err) {
+        console.error('Error fetching expanded school users:', err);
+      } finally {
+        setLoadingExpandedUsers(false);
+      }
+    };
+    fetchExpandedUsers();
+  }, [expandedSchoolId]);
 
   const updateInvoiceStatus = async (invoiceId: string, newStatus: string) => {
     try {
@@ -339,13 +366,13 @@ export function BillingDashboard() {
         metricsMap[m.school_id] = m.active_campus_users || 0;
       });
 
-      // 4. Fetch users to compute actual student & teacher counts
+      // 4. Fetch users to compute actual student & teacher counts (Optimized payload without large text columns)
       const { data: users, error: usersErr } = await supabase
         .from('users')
-        .select('id, school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, first_name, last_name, exempt_from_direct_billing');
+        .select('school_id, role, roles, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing');
 
       if (usersErr) throw usersErr;
-      setAllUsers(users || []);
+      setAllUsers([]);
 
       // 4b. Fetch pending students
       const { data: pendingStudentsDb, error: pendingErr } = await supabase
@@ -612,7 +639,7 @@ export function BillingDashboard() {
       'Bypass Aktiv',
       'Server-Grundpreis (EUR)',
       'Kombi-Rabatt (EUR)',
-      'Servicegebuehr Profile (EUR)',
+      'Lehrer-Servicegebuehr (EUR)',
       'Aktivierungsgebuehr Schueler (EUR)',
       'Monats-Soll gesamt (EUR)'
     ];
@@ -645,15 +672,22 @@ export function BillingDashboard() {
     link.click();
     document.body.removeChild(link);
   };
-
   const filteredInvoices = invoices.filter(inv => {
     const matchesSearch = inv.schoolName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  useEffect(() => {
+    if (filteredInvoices.length > 0 && !expandedSchoolId) {
+      setExpandedSchoolId(filteredInvoices[0].schoolId);
+    }
+  }, [filteredInvoices, expandedSchoolId]);
+
+  const selectedInv = invoices.find(i => i.schoolId === expandedSchoolId);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       
       {/* Dynamic styles injector */}
       <style>{`
@@ -661,37 +695,37 @@ export function BillingDashboard() {
           background: rgba(255, 255, 255, 0.7);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border-radius: 24px;
-          padding: 24px;
+          border-radius: 20px;
+          padding: 20px;
           border: 1px solid rgba(255, 255, 255, 0.4);
-          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.03);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           align-items: center;
-          gap: 20px;
+          gap: 16px;
           cursor: default;
         }
         .billing-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
-          border-color: rgba(234, 67, 53, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+          border-color: rgba(234, 67, 53, 0.15);
           background: rgba(255, 255, 255, 0.95);
         }
         .billing-card:hover .bc-icon-wrapper {
-          background: rgba(234, 67, 53, 0.08) !important;
+          background: rgba(234, 67, 53, 0.06) !important;
           color: #ea4335 !important;
         }
  
         .filter-btn {
-          padding: 8px 16px;
+          padding: 8px 14px;
           border-radius: 10px;
           font-weight: 600;
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           border: 1px solid rgba(0, 0, 0, 0.05);
           background: rgba(255, 255, 255, 0.6);
           color: #64748b;
           cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.15s ease;
           display: inline-flex;
           align-items: center;
           justifyContent: center;
@@ -705,113 +739,28 @@ export function BillingDashboard() {
           background: #ea4335 !important;
           color: #ffffff !important;
           border-color: #ea4335 !important;
-          box-shadow: 0 4px 12px rgba(234, 67, 53, 0.2);
+          box-shadow: 0 4px 10px rgba(234, 67, 53, 0.15);
         }
- 
-        .billing-table {
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 0 10px;
-          text-align: left;
+        
+        .school-list-item:hover {
+          transform: translateY(-1px);
+          border-color: rgba(234, 67, 53, 0.15) !important;
+          background: rgba(255, 255, 255, 0.95) !important;
         }
-        .billing-table th {
-          padding: 12px 16px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          color: #64748b;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .billing-row {
-          background: transparent;
-          transition: all 0.2s ease;
-        }
-        .billing-row td {
-          padding: 16px;
-          font-size: 0.88rem;
-          font-weight: 500;
-          color: #1e293b;
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border-top: 1px solid rgba(0, 0, 0, 0.03);
-          border-bottom: 1px solid rgba(0, 0, 0, 0.03);
-          transition: all 0.2s ease;
-        }
-        .billing-row td:first-child {
-          border-left: 1px solid rgba(0, 0, 0, 0.03);
-          border-top-left-radius: 16px;
-          border-bottom-left-radius: 16px;
-        }
-        .billing-row td:last-child {
-          border-right: 1px solid rgba(0, 0, 0, 0.03);
-          border-top-right-radius: 16px;
-          border-bottom-right-radius: 16px;
-        }
-        .billing-row:hover td {
-          background: rgba(255, 255, 255, 0.95);
-          border-color: rgba(234, 67, 53, 0.1);
-        }
-        .billing-row-expanded td {
-          border-bottom: none !important;
-          background: rgba(255, 255, 255, 0.9) !important;
-        }
-        .billing-row-expanded td:first-child {
-          border-bottom-left-radius: 0 !important;
-        }
-        .billing-row-expanded td:last-child {
-          border-bottom-right-radius: 0 !important;
-        }
- 
-        .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 5px 10px;
-          border-radius: 8px;
-          font-size: 0.75rem;
-          font-weight: 700;
-        }
-        .status-badge-active {
-          color: #34a853;
-          background: #e6f4ea;
-        }
-        .status-badge-trial {
-          color: #b06000;
-          background: #fff8e1;
-        }
-        .status-badge-bypass {
-          color: #475569;
-          background: #f1f5f9;
-        }
-        .status-badge-suspended {
-          color: #7f1d1d;
-          background: #fee2e2;
-        }
- 
-        .action-icon-btn {
-          border: none;
-          background: none;
-          cursor: pointer;
-          color: #64748b;
+
+        .receipt-card {
+          background: #ffffff;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.06);
+          padding: 14px 16px;
           display: flex;
           align-items: center;
-          justifyContent: center;
-          padding: 8px;
-          border-radius: 10px;
-          transition: all 0.15s;
+          justifyContent: space-between;
+          transition: all 0.2s;
         }
-        .action-icon-btn:hover {
-          color: #ea4335;
-          background: rgba(234, 67, 53, 0.08);
-        }   }
-
-        .invoice-card {
-          background: #ffffff;
-          border-radius: 16px;
-          border: 1px solid rgba(0, 0, 0, 0.04);
-          padding: 20px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+        .receipt-card:hover {
+          border-color: rgba(15, 23, 42, 0.15);
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.02);
         }
       `}</style>
 
@@ -821,15 +770,15 @@ export function BillingDashboard() {
         alignItems: 'center',
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-        paddingBottom: '24px',
+        paddingBottom: '20px',
         gap: '20px',
         flexWrap: 'wrap'
       }}>
         <div>
-          <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <CreditCard style={{ color: '#ea4335' }} size={32} /> Abrechnungen &amp; Abonnements
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: '"Outfit", sans-serif' }}>
+            <CreditCard style={{ color: '#ea4335' }} size={28} /> Abrechnungen &amp; Abonnements
           </h2>
-          <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 500 }}>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>
             Globale Übersicht über alle Schul-Lizenzgebühren und privaten App-Upgrades von Campus-Groovelab.
           </p>
         </div>
@@ -844,19 +793,19 @@ export function BillingDashboard() {
             backgroundColor: 'rgba(255, 255, 255, 0.8)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
-            borderRadius: '12px',
-            padding: '10px 20px',
+            borderRadius: '10px',
+            padding: '8px 16px',
             fontWeight: 600,
-            fontSize: '0.85rem',
+            fontSize: '0.8rem',
             color: '#334155',
             cursor: 'pointer',
             transition: 'all 0.2s',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.01)'
           }}
           onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fce8e6'; e.currentTarget.style.color = '#ea4335'; e.currentTarget.style.borderColor = 'rgba(234, 67, 53, 0.2)'; }}
           onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'; }}
         >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           Aktualisieren
         </button>
       </div>
@@ -869,12 +818,12 @@ export function BillingDashboard() {
           color: '#ea4335',
           backgroundColor: '#fce8e6',
           border: '1px solid rgba(234, 67, 53, 0.2)',
-          padding: '16px',
-          borderRadius: '16px',
-          fontSize: '0.88rem',
+          padding: '14px',
+          borderRadius: '12px',
+          fontSize: '0.85rem',
           fontWeight: 600
         }}>
-          <ShieldAlert size={20} style={{ flexShrink: 0 }} />
+          <ShieldAlert size={18} style={{ flexShrink: 0 }} />
           <span>{error}</span>
         </div>
       )}
@@ -882,29 +831,28 @@ export function BillingDashboard() {
       {/* Financial Summary Cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '20px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px'
       }}>
-        
         {/* Total B2B Revenue */}
         <div className="billing-card">
           <div className="bc-icon-wrapper" style={{
-            height: '52px',
-            width: '52px',
-            borderRadius: '14px',
-            background: 'rgba(0, 0, 0, 0.04)',
+            height: '44px',
+            width: '44px',
+            borderRadius: '12px',
+            background: 'rgba(0, 0, 0, 0.03)',
             color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            transition: 'all 0.2s'
           }}>
-            <School size={22} />
+            <School size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schul-Umsatz (Lizenzen)</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Monatlicher Lizenzumsatz</span>
+            <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', letterSpacing: '-0.02em' }}>
               {summary.totalB2BRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
           </div>
@@ -913,22 +861,22 @@ export function BillingDashboard() {
         {/* Total B2B Unpaid / Outstanding */}
         <div className="billing-card">
           <div className="bc-icon-wrapper" style={{
-            height: '52px',
-            width: '52px',
-            borderRadius: '14px',
-            background: 'rgba(234, 67, 53, 0.08)',
+            height: '44px',
+            width: '44px',
+            borderRadius: '12px',
+            background: 'rgba(234, 67, 53, 0.06)',
             color: '#ea4335',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            transition: 'all 0.2s'
           }}>
-            <CreditCard size={22} />
+            <CreditCard size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Offene Posten (B2B)</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 800, color: '#ea4335', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ausstehende Beträge</span>
+            <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#ea4335', marginTop: '2px', letterSpacing: '-0.02em' }}>
               {summary.totalUnpaid.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
           </div>
@@ -937,22 +885,22 @@ export function BillingDashboard() {
         {/* Total B2C Revenue */}
         <div className="billing-card">
           <div className="bc-icon-wrapper" style={{
-            height: '52px',
-            width: '52px',
-            borderRadius: '14px',
-            background: 'rgba(0, 0, 0, 0.04)',
+            height: '44px',
+            width: '44px',
+            borderRadius: '12px',
+            background: 'rgba(0, 0, 0, 0.03)',
             color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            transition: 'all 0.2s'
           }}>
-            <TrendingUp size={22} />
+            <TrendingUp size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Direkt-Umsatz (App-Käufe)</span>
-            <span style={{ display: 'block', fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', letterSpacing: '-0.02em' }}>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Upgrade-Umsatz (Eltern)</span>
+            <span style={{ display: 'block', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', letterSpacing: '-0.02em' }}>
               {summary.totalB2CRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
             </span>
           </div>
@@ -961,718 +909,636 @@ export function BillingDashboard() {
         {/* Total registered students */}
         <div className="billing-card">
           <div className="bc-icon-wrapper" style={{
-            height: '52px',
-            width: '52px',
-            borderRadius: '14px',
-            background: 'rgba(0, 0, 0, 0.04)',
+            height: '44px',
+            width: '44px',
+            borderRadius: '12px',
+            background: 'rgba(0, 0, 0, 0.03)',
             color: '#475569',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            transition: 'all 0.2s'
           }}>
-            <Users size={22} />
+            <Users size={18} />
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktive Nutzer</span>
-            <span style={{ display: 'flex', fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', letterSpacing: '-0.02em', alignItems: 'baseline', gap: '4px' }}>
-              {summary.totalStudents} <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Schüler</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Schülerlizenzen</span>
+            <span style={{ display: 'flex', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', letterSpacing: '-0.02em', alignItems: 'baseline', gap: '4px' }}>
+              {summary.totalStudents} <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>aktiv</span>
             </span>
           </div>
         </div>
-
-        {/* Bypassed Schools */}
-        <div className="billing-card">
-          <div className="bc-icon-wrapper" style={{
-            height: '52px',
-            width: '52px',
-            borderRadius: '14px',
-            background: 'rgba(0, 0, 0, 0.04)',
-            color: '#475569',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
-            <Ban size={22} />
-          </div>
-          <div>
-            <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abo-Bypass aktiv</span>
-            <span style={{ display: 'flex', fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', letterSpacing: '-0.02em', alignItems: 'baseline', gap: '4px' }}>
-              {summary.bypassedSchools} <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Schulen</span>
-            </span>
-          </div>
-        </div>
-
       </div>
 
-      {/* Filters & Search Toolbar */}
+      {/* Main Split-Pane Container */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.6)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '16px',
-        padding: '16px',
-        border: '1px solid rgba(0, 0, 0, 0.04)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '20px',
-        flexWrap: 'wrap',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.01)'
+        display: 'grid',
+        gridTemplateColumns: '1.1fr 1.3fr',
+        gap: '24px',
+        alignItems: 'start'
       }}>
         
-        {/* Search */}
-        <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
-          <Search style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={16} />
-          <input
-            type="text"
-            placeholder="Musikschule suchen..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              padding: '10px 16px 10px 46px',
-              borderRadius: '12px',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-              fontSize: '0.88rem',
-              fontWeight: 500,
-              outline: 'none',
-              transition: 'all 0.2s',
-              background: '#ffffff',
-              color: '#0f172a'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#ea4335';
-              e.target.style.boxShadow = '0 0 0 3px rgba(234, 67, 53, 0.1)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-              e.target.style.boxShadow = 'none';
-            }}
-          />
-        </div>
+        {/* LEFT PANE: Search, Status Filter & School List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.6)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '14px',
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.01)'
+          }}>
+            {/* Search */}
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={14} />
+              <input
+                type="text"
+                placeholder="Musikschule suchen..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '8px 12px 8px 36px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
+                  outline: 'none',
+                  transition: 'all 0.2s',
+                  background: '#ffffff',
+                  color: '#0f172a'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#ea4335';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+                }}
+              />
+            </div>
 
-        {/* Filter buttons */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {[
-            { id: 'all', label: 'Alle' },
-            { id: 'active', label: 'Aktiv' },
-            { id: 'bypass', label: 'Bypass' },
-            { id: 'trial', label: 'Probe' },
-            { id: 'suspended', label: 'Gesperrt' }
-          ].map(btn => (
-            <button
-              key={btn.id}
-              onClick={() => setStatusFilter(btn.id)}
-              className={`filter-btn ${statusFilter === btn.id ? 'filter-btn-active' : ''}`}
-            >
-              {btn.label}
-            </button>
-          ))}
-          <button
-            onClick={handleExportCSV}
-            style={{
-              background: '#ea4335',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '10px 18px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: '#ffffff',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(234, 67, 53, 0.15)',
-              transition: 'all 0.2s',
-              marginLeft: '12px'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#b32418'; }}
-            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#ea4335'; }}
-          >
-            Exportieren (CSV) 📥
-          </button>
-        </div>
+            {/* Filter buttons */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'all', label: 'Alle' },
+                  { id: 'active', label: 'Aktiv' },
+                  { id: 'bypass', label: 'Bypass' },
+                  { id: 'trial', label: 'Probe' },
+                  { id: 'suspended', label: 'Gesperrt' }
+                ].map(btn => (
+                  <button
+                    key={btn.id}
+                    type="button"
+                    onClick={() => setStatusFilter(btn.id)}
+                    className={`filter-btn ${statusFilter === btn.id ? 'filter-btn-active' : ''}`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(234, 67, 53, 0.2)',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#ea4335',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fce8e6'; }}
+                onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                CSV Export
+              </button>
+            </div>
+          </div>
 
-      </div>
-
-      {/* Main Billing Table Container */}
-      <div style={{ overflowX: 'auto', width: '100%' }}>
-        <table className="billing-table">
-          <thead>
-            <tr>
-              <th style={{ width: '40%' }}>Musikschule</th>
-              <th style={{ width: '30%', textAlign: 'center' }}>Nutzer &amp; Lizenzen</th>
-              <th style={{ width: '30%', textAlign: 'right', color: '#1e293b' }}>Monats-Soll (Schule)</th>
-            </tr>
-          </thead>
-          <tbody>
+          {/* School list cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '680px', overflowY: 'auto', paddingRight: '4px' }}>
             {loading ? (
-              <tr>
-                <td colSpan={3} style={{ textAlign: 'center', padding: '60px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      border: '3px solid rgba(234, 67, 53, 0.1)',
-                      borderTopColor: '#ea4335',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      Abrechnungen werden geladen...
-                    </p>
-                  </div>
-                </td>
-              </tr>
+              <div style={{ textAlign: 'center', padding: '40px', background: '#ffffff', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(234, 67, 53, 0.1)',
+                    borderTopColor: '#ea4335',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Schulen werden geladen...
+                  </p>
+                </div>
+              </div>
             ) : filteredInvoices.length === 0 ? (
-              <tr>
-                <td colSpan={3} style={{ textAlign: 'center', padding: '60px', fontWeight: 600, color: '#94a3b8' }}>
-                  Keine Einträge für diese Filterkombination gefunden.
-                </td>
-              </tr>
+              <div style={{ textAlign: 'center', padding: '32px', fontWeight: 600, color: '#94a3b8', background: '#ffffff', borderRadius: '16px', border: '1px dashed rgba(0,0,0,0.05)' }}>
+                Keine Musikschulen gefunden.
+              </div>
             ) : (
               filteredInvoices.map((inv) => {
-                const isExpanded = expandedSchoolId === inv.schoolId;
-                const schoolInvoices = dbInvoices.filter(i => i.school_id === inv.schoolId);
-                
+                const isSelected = expandedSchoolId === inv.schoolId;
                 return (
-                  <React.Fragment key={inv.schoolId}>
-                    <tr 
-                      className={`billing-row ${isExpanded ? 'billing-row-expanded' : ''}`}
-                      onClick={() => setExpandedSchoolId(isExpanded ? null : inv.schoolId)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {/* School Name & Status */}
-                      <td style={{ fontWeight: 550, color: '#0f172a' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ 
-                            color: isExpanded ? '#ea4335' : '#64748b', 
-                            transform: isExpanded ? 'rotate(180deg)' : 'none', 
-                            transition: 'transform 0.2s',
-                            display: 'inline-flex',
-                            alignItems: 'center'
-                          }}>
-                            <ChevronDown size={16} />
-                          </span>
+                  <div
+                    key={inv.schoolId}
+                    onClick={() => setExpandedSchoolId(inv.schoolId)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 18px',
+                      borderRadius: '16px',
+                      background: isSelected ? 'rgba(234, 67, 53, 0.04)' : '#ffffff',
+                      border: `1px solid ${isSelected ? 'rgba(234, 67, 53, 0.15)' : 'rgba(15, 23, 42, 0.05)'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: isSelected ? '0 4px 12px rgba(234, 67, 53, 0.03)' : 'none'
+                    }}
+                    className="school-list-item"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '10px',
+                        background: isSelected ? '#ea4335' : '#f8fafc',
+                        color: isSelected ? '#ffffff' : '#475569',
+                        border: '1px solid rgba(0, 0, 0, 0.04)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '0.85rem'
+                      }}>
+                        {inv.schoolName?.[0] || 'S'}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontWeight: 750, fontSize: '0.86rem', color: '#0f172a' }}>{inv.schoolName}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            background: '#f8fafc',
-                            border: '1px solid rgba(0, 0, 0, 0.05)',
-                            color: '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: '0.8rem'
+                            fontSize: '0.6rem',
+                            fontWeight: 800,
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                            background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#f1f5f9' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
+                            color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#475569' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.03em'
                           }}>
-                            {inv.schoolName?.[0] || 'S'}
+                            {inv.status === 'trial' ? 'Probe' : inv.status === 'bypass' ? 'Bypass' : inv.status === 'suspended' ? 'Gesperrt' : 'Aktiv'}
                           </span>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{inv.schoolName}</span>
-                            <div>
-                              {inv.status === 'bypass' ? (
-                                 <span className="status-badge status-badge-bypass" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Bypass</span>
-                              ) : inv.status === 'trial' ? (
-                                 <span className="status-badge status-badge-trial" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Probezeit</span>
-                              ) : inv.status === 'suspended' ? (
-                                 <span className="status-badge status-badge-suspended" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Gesperrt</span>
-                              ) : (
-                                 <span className="status-badge status-badge-active" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>Aktiv</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      
-                      {/* Users & active licenses merged */}
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ color: '#0f172a', fontWeight: 700, fontSize: '0.85rem' }}>
-                            {inv.totalStudents} Schüler / {inv.totalTeachers} Lehrer
-                          </span>
-                          <span style={{ 
-                            display: 'inline-flex', 
-                            alignItems: 'center', 
-                            gap: '4px', 
-                            fontSize: '0.72rem', 
-                            fontWeight: 700, 
-                            color: '#ea4335', 
-                            backgroundColor: '#fce8e6', 
-                            padding: '2px 8px', 
-                            borderRadius: '6px'
-                          }}>
-                            <BookOpen size={10} /> {inv.premiumStudents} aktive Lizenzen
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                            {inv.totalStudents} Schüler | {inv.totalTeachers} Lehrer
                           </span>
                         </div>
-                      </td>
- 
-                      {/* Total Billed & Breakdown merged */}
-                      <td style={{ textAlign: 'right', fontSize: '0.85rem' }}>
-                        <div style={{ color: '#ea4335', fontWeight: 800, fontSize: '1rem' }}>
-                          {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                        </div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 400, marginTop: '2px', lineHeight: 1.3 }}>
-                          {inv.subscriptionBypass ? (
-                            <span style={{ fontWeight: 700, color: '#dc2626' }}>Bypass Aktiv</span>
-                          ) : (
-                            <>
-                              {inv.hasCampus && 'Campus'} {inv.hasCampus && inv.hasGroovelab && '+'} {inv.hasGroovelab && 'GrooveLab'} ({(inv.baseFee - inv.kombiDiscountAmount).toFixed(2).replace('.', ',')} €)
-                              <br />
-                              + Profile ({(inv.userFee + inv.activeStudentFee).toFixed(2).replace('.', ',')} €)
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Expandable Invoice History Details */}
-                    {isExpanded && (() => {
-                      const isSelbstzahler = ['both', 'debit', 'cash', 'option1'].includes(inv.studentBillingOption);
-                      const schoolStudents = allUsers.filter(u => u.school_id === inv.schoolId && u.role === 'student');
-                      
-                      const activePaidStudents = schoolStudents.filter(s => (s.is_campus_active || s.is_groovelab_active) && s.student_billing_cash_paid === true && !s.is_trial);
-                      const pendingStudents = schoolStudents.filter(s => s.is_trial === true || ((s.is_campus_active || s.is_groovelab_active) && !s.student_billing_cash_paid));
-                      const freeStudents = schoolStudents.filter(s => !s.is_trial && !s.is_campus_active && !s.is_groovelab_active);
-                      
-                      const getInitials = (first: string, last: string) => {
-                        return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase();
-                      };
-
-                      return (
-                        <tr>
-                          <td colSpan={3} style={{ 
-                            padding: '0 24px 24px 24px', 
-                            background: '#ffffff',
-                            borderBottomLeftRadius: '16px',
-                            borderBottomRightRadius: '16px',
-                            borderLeft: '1px solid rgba(0, 0, 0, 0.03)',
-                            borderRight: '1px solid rgba(0, 0, 0, 0.03)',
-                            borderBottom: '1px solid rgba(0, 0, 0, 0.03)'
-                          }}>
-                            <div 
-                              onClick={(e: any) => e.stopPropagation()}
-                              style={{ 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                gap: '24px',
-                                paddingTop: '20px',
-                                borderTop: '1px solid rgba(0, 0, 0, 0.04)'
-                              }}
-                            >
-                              
-                              {/* Row 1: Subscription & Billing Grid */}
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                                gap: '32px',
-                                padding: '8px 0'
-                              }}>
-                                {/* Left: Subscription details */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Abonnement Details</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                      <span style={{ color: '#86868b' }}>Vertragstyp:</span>
-                                      <span style={{ color: '#1d1d1f', fontWeight: 600 }}>{inv.subscriptionType === 'solo' ? 'Solo' : 'Standard'}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                      <span style={{ color: '#86868b' }}>Module:</span>
-                                      <div style={{ display: 'flex', gap: '6px' }}>
-                                        {inv.hasCampus && <span style={{ color: '#34a853', fontWeight: 600, fontSize: '0.75rem', background: '#e6f4ea', padding: '2px 8px', borderRadius: '4px' }}>Campus</span>}
-                                        {inv.hasGroovelab && <span style={{ color: '#b45309', fontWeight: 600, fontSize: '0.75rem', background: '#fef3c7', padding: '2px 8px', borderRadius: '4px' }}>GrooveLab</span>}
-                                      </div>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                      <span style={{ color: '#86868b' }}>Kombi-Rabatt (Schule):</span>
-                                      <strong style={{ color: inv.hasKombiDiscount ? '#34a853' : '#86868b', fontWeight: 600 }}>
-                                        {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Nein'}
-                                      </strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                      <span style={{ color: '#86868b' }}>Kostenträger:</span>
-                                      <strong style={{ color: isSelbstzahler ? '#ea4335' : '#1d1d1f', fontWeight: 600 }}>
-                                        {isSelbstzahler ? 'Schüler / Eltern (Direktabrechnung)' : 'Musikschule (Sammelzahler)'}
-                                      </strong>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', alignItems: 'center', paddingBottom: '8px' }}>
-                                      <span style={{ color: '#86868b' }}>Private App-Upgrades:</span>
-                                      <span style={{ color: '#1d1d1f', fontWeight: 600 }}>
-                                        {inv.b2cRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 400, marginLeft: '6px' }}>
-                                          ({inv.premiumStudents} x 9,99 €)
-                                        </span>
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-  
-                                {/* Right: Billing numbers */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monatsgebühren Übersicht</span>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 0' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                        <span style={{ color: '#86868b' }}>Grundgebühr Module:</span>
-                                        <span style={{ color: '#1d1d1f', fontWeight: 600 }}>{inv.baseFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', color: '#86868b', textAlign: 'right', marginTop: '-2px' }}>
-                                        ({inv.hasCampus && 'Campus: 7,99 €'}{inv.hasCampus && inv.hasGroovelab && ' + '}{inv.hasGroovelab && 'GrooveLab: 4,99 €'})
-                                      </div>
-                                    </div>
-                                    {inv.hasKombiDiscount && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#34a853', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                        <span style={{ fontWeight: 600 }}>Kombi-Rabatt:</span>
-                                        <span style={{ fontWeight: 600 }}>-{inv.kombiDiscountAmount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
-                                      </div>
-                                    )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                      <span style={{ color: '#86868b' }}>Servicegebühr Profile:</span>
-                                      <span style={{ color: '#1d1d1f', fontWeight: 600 }}>
-                                        {inv.userFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 400, marginLeft: '6px' }}>
-                                          ({inv.totalTeachersCount} active profiles)
-                                        </span>
-                                      </span>
-                                    </div>
-                                    {inv.activeStudentFee > 0 && (
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#ea4335', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '8px' }}>
-                                        <span style={{ fontWeight: 600 }}>Schüler-Aktivierung:</span>
-                                        <span style={{ fontWeight: 600 }}>
-                                          {inv.activeStudentFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                        </span>
-                                      </div>
-                                    )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', paddingTop: '8px' }}>
-                                      <span style={{ color: '#1d1d1f', fontWeight: 700 }}>Monats-Soll Schule:</span>
-                                      <strong style={{ color: '#ea4335', fontWeight: 700, fontSize: '1.15rem' }}>{inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
- 
-                              {/* Row 2: Schüler Direct Billing Lists (Selbstzahler only) */}
-                              {isSelbstzahler && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(0, 0, 0, 0.04)', paddingTop: '16px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüler-Freischaltungsstatus</span>
-                                  <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                                    gap: '24px',
-                                  }}>
-                                    {/* Column 1: Aktiv freigeschaltet */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-                                        <span style={{ fontSize: '0.8rem', color: '#1d1d1f', fontWeight: 600 }}>Aktiv freigeschaltet</span>
-                                        <span style={{ background: '#f5f5f7', color: '#86868b', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
-                                          {activePaidStudents.length}
-                                        </span>
-                                      </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                                        {activePaidStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#86868b', fontStyle: 'italic', padding: '6px 0' }}>Keine aktiven Schüler</span>
-                                        ) : (
-                                          activePaidStudents.map(s => (
-                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f5f5f7', border: '1px solid rgba(0, 0, 0, 0.03)', color: '#86868b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
-                                                  {getInitials(s.first_name, s.last_name)}
-                                                </div>
-                                                <span style={{ color: '#1d1d1f', fontWeight: 500 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
-                                              </div>
-                                              <button 
-                                                onClick={() => toggleStudentPayment(s.id, true)}
-                                                style={{ border: 'none', background: 'none', color: '#ea4335', fontWeight: 600, cursor: 'pointer', fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fce8e6'}
-                                                onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
-                                              >
-                                                Sperren
-                                              </button>
-                                            </div>
-                                          ))
-                                        )}
-                                      </div>
-                                    </div>
- 
-                                    {/* Column 2: Probezeit / Zahlung ausstehend */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-                                        <span style={{ fontSize: '0.8rem', color: '#1d1d1f', fontWeight: 600 }}>Ausstehend / Probezeit</span>
-                                        <span style={{ background: '#fff8e1', color: '#b06000', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
-                                          {pendingStudents.length}
-                                        </span>
-                                      </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                                        {pendingStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#86868b', fontStyle: 'italic', padding: '6px 0' }}>Keine ausstehenden Schüler</span>
-                                        ) : (
-                                          pendingStudents.map(s => (
-                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#fff8e1', border: '1px solid rgba(176, 96, 0, 0.08)', color: '#b06000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
-                                                  {getInitials(s.first_name, s.last_name)}
-                                                </div>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                  <span style={{ color: '#1d1d1f', fontWeight: 500 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
-                                                  <span style={{ fontSize: '0.65rem', color: '#86868b' }}>
-                                                    {s.is_trial ? 'Probezeit' : 'Zahlung offen'}
-                                                  </span>
-                                                </div>
-                                              </div>
-                                              <button 
-                                                onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ border: 'none', background: '#fce8e6', color: '#ea4335', fontWeight: 600, cursor: 'pointer', fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#fcdcd9'}
-                                                onMouseOut={(e: any) => e.currentTarget.style.background = '#fce8e6'}
-                                              >
-                                                Freischalten
-                                              </button>
-                                            </div>
-                                          ))
-                                        )}
-                                      </div>
-                                    </div>
- 
-                                    {/* Column 3: Kostenloser User */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
-                                        <span style={{ fontSize: '0.8rem', color: '#1d1d1f', fontWeight: 600 }}>Basic User (Kostenlos)</span>
-                                        <span style={{ background: '#f5f5f7', color: '#86868b', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
-                                          {freeStudents.length}
-                                        </span>
-                                      </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                                        {freeStudents.length === 0 ? (
-                                          <span style={{ fontSize: '0.75rem', color: '#86868b', fontStyle: 'italic', padding: '6px 0' }}>Keine kostenlosen Schüler</span>
-                                        ) : (
-                                          freeStudents.map(s => (
-                                            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f5f5f7', color: '#86868b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.65rem' }}>
-                                                  {getInitials(s.first_name, s.last_name)}
-                                                </div>
-                                                <span style={{ color: '#1d1d1f', fontWeight: 500 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
-                                              </div>
-                                              <button 
-                                                onClick={() => toggleStudentPayment(s.id, false)}
-                                                style={{ border: 'none', background: 'none', color: '#86868b', fontWeight: 600, cursor: 'pointer', fontSize: '0.72rem', padding: '2px 6px', borderRadius: '4px' }}
-                                                onMouseOver={(e: any) => e.currentTarget.style.background = '#f5f5f7'}
-                                                onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
-                                              >
-                                                Aktivieren
-                                              </button>
-                                            </div>
-                                          ))
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
- 
-                              {/* Row 3: Invoices History */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(0, 0, 0, 0.04)', paddingTop: '16px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', flexWrap: 'wrap', gap: '12px' }}>
-                                  <span style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Abrechnungs- und Rechnungsverlauf
-                                  </span>
-                                  <button
-                                    onClick={() => createManualInvoice(inv.schoolId)}
-                                    style={{
-                                      backgroundColor: 'transparent',
-                                      color: '#ea4335',
-                                      border: '1px solid rgba(234, 67, 53, 0.2)',
-                                      padding: '4px 10px',
-                                      borderRadius: '6px',
-                                      fontWeight: 600,
-                                      fontSize: '0.78rem',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s'
-                                    }}
-                                    onMouseOver={(e: any) => { e.currentTarget.style.background = '#fce8e6'; }}
-                                    onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
-                                  >
-                                    + Manuelle Rechnung erstellen
-                                  </button>
-                                </div>
- 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                  {(() => {
-                                    const generated = getSchoolInvoices(inv.schoolId, inv.total);
-                                    const dbInvs = dbInvoices.filter(i => i.school_id === inv.schoolId);
-                                    const allCombined = [
-                                      ...dbInvs.map(i => ({
-                                        id: i.id,
-                                        billing_date: formatDateDisplay(i.billing_date),
-                                        amount: i.amount,
-                                        status: i.status,
-                                        type: i.type,
-                                        isDb: true,
-                                        isCurrentMonth: false,
-                                        isTrialMonth: false
-                                      })),
-                                      ...generated.map(g => ({
-                                        id: g.id,
-                                        billing_date: g.date,
-                                        amount: g.amount,
-                                        status: g.status === 'Bezahlt' ? 'paid' : 'open',
-                                        type: 'INF',
-                                        isDb: false,
-                                        isCurrentMonth: g.isCurrentMonth,
-                                        isTrialMonth: g.status === 'Probemonat'
-                                      }))
-                                    ];
-
-                                    if (allCombined.length === 0) {
-                                      return (
-                                        <div style={{ textAlign: 'center', color: '#86868b', fontSize: '0.8rem', padding: '16px 0', border: '1px dashed rgba(0, 0, 0, 0.04)', borderRadius: '8px' }}>
-                                          Keine Rechnungen vorhanden.
-                                        </div>
-                                      );
-                                    }
-
-                                    return allCombined.map(invoice => {
-                                      return (
-                                        <div 
-                                          key={invoice.id} 
-                                          style={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            justifyContent: 'space-between', 
-                                            padding: '10px 0', 
-                                            backgroundColor: 'transparent', 
-                                            borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
-                                            flexWrap: 'wrap',
-                                            gap: '12px',
-                                            opacity: invoice.status === 'cancelled' ? 0.5 : 1
-                                          }}
-                                        >
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-                                            <span style={{ fontWeight: 600, color: '#1d1d1f', fontSize: '0.82rem' }}>
-                                              {invoice.amount < 0 
-                                                ? invoice.id.replace('INV-', 'GS-') 
-                                                : invoice.id.replace('INV-', 'RE-')}
-                                            </span>
-                                            <span style={{ fontSize: '0.8rem', color: '#86868b', fontWeight: 500 }}>{invoice.billing_date}</span>
-                                            <span style={{ fontWeight: 600, color: '#1d1d1f', fontSize: '0.82rem' }}>
-                                              {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                                            </span>
-                                          </div>
-
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setViewingInvoice({
-                                                  invoiceId: invoice.id,
-                                                  schoolId: inv.schoolId,
-                                                  schoolName: inv.schoolName,
-                                                  schoolStreet: inv.schoolStreet,
-                                                  schoolZipCode: inv.schoolZipCode,
-                                                  schoolCity: inv.schoolCity,
-                                                  date: invoice.billing_date,
-                                                  amount: invoice.amount,
-                                                  status: invoice.status,
-                                                  type: invoice.type,
-                                                  isCurrentMonth: invoice.isCurrentMonth,
-                                                  hasCampus: inv.hasCampus,
-                                                  hasGroovelab: inv.hasGroovelab,
-                                                  baseFee: inv.baseFee,
-                                                  kombiDiscountAmount: inv.kombiDiscountAmount,
-                                                  userFee: inv.userFee,
-                                                  activeStudentFee: inv.activeStudentFee,
-                                                  totalTeachersCount: inv.totalTeachersCount,
-                                                  totalEmployeesCount: inv.totalEmployeesCount,
-                                                  passiveStudentsCount: inv.passiveStudentsCount,
-                                                  activeStudents: inv.activeStudents,
-                                                  subscriptionBypass: inv.subscriptionBypass,
-                                                  subtotal: inv.subtotal,
-                                                  studentBillingOption: inv.studentBillingOption,
-                                                  isTrialMonth: invoice.isTrialMonth
-                                                });
-                                              }}
-                                              style={{
-                                                background: 'transparent',
-                                                border: '1px solid rgba(0, 0, 0, 0.08)',
-                                                borderRadius: '6px',
-                                                padding: '4px 10px',
-                                                fontSize: '0.78rem',
-                                                fontWeight: 600,
-                                                color: '#1d1d1f',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px'
-                                              }}
-                                              onMouseOver={(e: any) => { e.currentTarget.style.background = '#f5f5f7'; }}
-                                              onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
-                                            >
-                                              Ansehen
-                                            </button>
-                                            {invoice.isDb ? (
-                                              <select
-                                                value={invoice.status}
-                                                onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
-                                                style={{
-                                                  padding: '4px 10px',
-                                                  borderRadius: '6px',
-                                                  border: '1px solid rgba(0, 0, 0, 0.08)',
-                                                  fontSize: '0.78rem',
-                                                  fontWeight: 500,
-                                                  background: '#ffffff',
-                                                  cursor: 'pointer',
-                                                  outline: 'none',
-                                                  color: '#1e293b'
-                                                }}
-                                              >
-                                                <option value="open">Offen</option>
-                                                <option value="paid">Bezahlt</option>
-                                                <option value="overdue">Überfällig</option>
-                                                <option value="cancelled">Storniert</option>
-                                              </select>
-                                            ) : (
-                                              <select
-                                                value={invoice.status}
-                                                onChange={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
-                                                style={{
-                                                  padding: '4px 10px',
-                                                  borderRadius: '6px',
-                                                  border: '1px solid rgba(0, 0, 0, 0.08)',
-                                                  fontSize: '0.78rem',
-                                                  fontWeight: 500,
-                                                  background: '#ffffff',
-                                                  cursor: 'pointer',
-                                                  outline: 'none',
-                                                  color: '#1e293b'
-                                                }}
-                                              >
-                                                <option value="open">Offen</option>
-                                                <option value="paid">Bezahlt</option>
-                                              </select>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })()}
-                  </React.Fragment>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: isSelected ? '#ea4335' : '#0f172a' }}>
+                        {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                      <span style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        Monatsbeitrag
+                      </span>
+                    </div>
+                  </div>
                 );
               })
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        {/* RIGHT PANE: Selected School Detailed Dashboard */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          padding: '24px 28px',
+          border: '1px solid rgba(15, 23, 42, 0.05)',
+          boxShadow: '0 8px 30px rgba(15, 23, 42, 0.015)',
+          minHeight: '520px'
+        }}>
+          {!selectedInv ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '480px', color: '#94a3b8', textAlign: 'center' }}>
+              <School size={48} style={{ marginBottom: '16px', strokeWidth: 1.2, color: '#cbd5e1' }} />
+              <p style={{ fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>Keine Musikschule ausgewählt</p>
+              <p style={{ fontSize: '0.8rem', margin: '4px 0 0 0' }}>Bitte wählen Sie links eine Schule aus, um deren Abrechnungs- und Abonnementdetails zu verwalten.</p>
+            </div>
+          ) : (() => {
+            const inv = selectedInv;
+            const isSelbstzahler = ['both', 'debit', 'cash', 'option1'].includes(inv.studentBillingOption);
+            const schoolStudents = expandedSchoolUsers.filter(u => u.role === 'student');
+            
+            const activePaidStudents = schoolStudents.filter(s => (s.is_campus_active || s.is_groovelab_active) && s.student_billing_cash_paid === true && !s.is_trial);
+            const pendingStudents = schoolStudents.filter(s => s.is_trial === true || ((s.is_campus_active || s.is_groovelab_active) && !s.student_billing_cash_paid));
+            const freeStudents = schoolStudents.filter(s => !s.is_trial && !s.is_campus_active && !s.is_groovelab_active);
+            
+            const getInitials = (first: string, last: string) => {
+              return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase();
+            };
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* Header Section: School details & primary status info */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '16px' }}>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      background: `linear-gradient(135deg, #ea4335 0%, #b32418 100%)`,
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 900,
+                      fontSize: '1rem'
+                    }}>
+                      {inv.schoolName?.[0] || 'S'}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, fontFamily: '"Outfit", sans-serif' }}>{inv.schoolName}</h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
+                        {inv.schoolZipCode} {inv.schoolCity} {inv.schoolStreet ? `• ${inv.schoolStreet}` : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    padding: '4px 10px',
+                    borderRadius: '8px',
+                    background: inv.status === 'trial' ? '#fff8e1' : inv.status === 'bypass' ? '#f1f5f9' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
+                    color: inv.status === 'trial' ? '#b06000' : inv.status === 'bypass' ? '#475569' : inv.status === 'suspended' ? '#7f1d1d' : '#34a853',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em'
+                  }}>
+                    Abonnement: {inv.status === 'trial' ? 'Probezeit' : inv.status === 'bypass' ? 'Gebühren-Bypass' : inv.status === 'suspended' ? 'Gesperrt' : 'Aktiv'}
+                  </span>
+                </div>
+
+                {/* Subscriptions Card & Monthly rate side-by-side */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                  {/* Subscription card */}
+                  <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid rgba(15, 23, 42, 0.04)' }}>
+                    <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 12px 0' }}>Lizenz-Abonnement</h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
+                        <span style={{ color: '#64748b' }}>Tariftyp:</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{inv.subscriptionType === 'solo' ? 'Solo-Lizenz' : 'Standard-Tarif'}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px', alignItems: 'center' }}>
+                        <span style={{ color: '#64748b' }}>Module:</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {inv.hasCampus && <span style={{ color: '#34a853', fontWeight: 750, fontSize: '0.62rem', background: '#e6f4ea', padding: '1px 5px', borderRadius: '4px' }}>Campus</span>}
+                          {inv.hasGroovelab && <span style={{ color: '#ca8a04', fontWeight: 750, fontSize: '0.62rem', background: '#fefce8', padding: '1px 5px', borderRadius: '4px' }}>GrooveLab</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid rgba(0,0,0,0.04)', paddingBottom: '6px' }}>
+                        <span style={{ color: '#64748b' }}>Abrechnungsmodell:</span>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                          {isSelbstzahler ? 'Direktabrechnung (Eltern)' : 'Sammelzahler (Musikschule)'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                        <span style={{ color: '#64748b' }}>Kombi-Vorteil:</span>
+                        <span style={{ fontWeight: 700, color: inv.hasKombiDiscount ? '#34a853' : '#64748b' }}>
+                          {inv.hasKombiDiscount ? 'Aktiv (-2,99 €)' : 'Keiner'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pricing Breakdown Card */}
+                  <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>Gebührenaufstellung</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                          <span style={{ color: '#64748b' }}>Modul-Grundpreis:</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.baseFee.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                        {inv.hasKombiDiscount && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#34a853' }}>
+                            <span style={{ fontWeight: 600 }}>Kombi-Vorteilsrabatt:</span>
+                            <span style={{ fontWeight: 600 }}>-{(2.99).toFixed(2).replace('.', ',')} €</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                          <span style={{ color: '#64748b' }}>Lehrer-Servicegebühr ({inv.totalTeachersCount} aktiv):</span>
+                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.userFee.toFixed(2).replace('.', ',')} €</span>
+                        </div>
+                        {inv.activeStudentFee > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                            <span style={{ color: '#64748b' }}>Schüleraktivierungen:</span>
+                            <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.06)', marginTop: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>Monatlicher Beitrag:</span>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ea4335' }}>
+                        {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Direct payment students list if self-paying enabled */}
+                {isSelbstzahler && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '18px' }}>
+                    <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Schüler-Freischaltungsstatus</h4>
+                    {loadingExpandedUsers ? (
+                      <div style={{ padding: '20px 0', textAlign: 'center', color: '#86868b', fontSize: '0.8rem' }}>
+                        Lade Schülerdaten...
+                      </div>
+                    ) : (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: '16px',
+                      }}>
+                        {/* Active Students */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 700 }}>Aktiv freigeschaltet ({activePaidStudents.length})</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '140px', overflowY: 'auto' }}>
+                            {activePaidStudents.length === 0 ? (
+                              <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', padding: '4px 0' }}>Keine aktiven Schüler</span>
+                            ) : (
+                              activePaidStudents.map(s => (
+                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                                  <span style={{ color: '#334155', fontWeight: 550 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
+                                  <button 
+                                    type="button"
+                                    onClick={() => toggleStudentPayment(s.id, true)}
+                                    style={{ border: 'none', background: 'none', color: '#ea4335', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 5px', borderRadius: '4px' }}
+                                    onMouseOver={(e: any) => e.currentTarget.style.background = '#fce8e6'}
+                                    onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
+                                  >
+                                    Sperren
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Pending Students */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 700 }}>Ausstehend ({pendingStudents.length})</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '140px', overflowY: 'auto' }}>
+                            {pendingStudents.length === 0 ? (
+                              <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', padding: '4px 0' }}>Keine ausstehenden Schüler</span>
+                            ) : (
+                              pendingStudents.map(s => (
+                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ color: '#334155', fontWeight: 550 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
+                                    <span style={{ fontSize: '0.6rem', color: '#86868b' }}>{s.is_trial ? 'Probezeit' : 'Zahlung offen'}</span>
+                                  </div>
+                                  <button 
+                                    type="button"
+                                    onClick={() => toggleStudentPayment(s.id, false)}
+                                    style={{ border: 'none', background: '#fce8e6', color: '#ea4335', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px' }}
+                                    onMouseOver={(e: any) => e.currentTarget.style.background = '#fcdcd9'}
+                                    onMouseOut={(e: any) => e.currentTarget.style.background = '#fce8e6'}
+                                  >
+                                    Aktivieren
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Basic Students */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(0, 0, 0, 0.04)' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#0f172a', fontWeight: 700 }}>Basic Lizenzen (Kostenlos) ({freeStudents.length})</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '140px', overflowY: 'auto' }}>
+                            {freeStudents.length === 0 ? (
+                              <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', padding: '4px 0' }}>Keine basic Schüler</span>
+                            ) : (
+                              freeStudents.map(s => (
+                                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                                  <span style={{ color: '#334155', fontWeight: 550 }}>{s.first_name} {s.last_name ? s.last_name[0] + '.' : ''}</span>
+                                  <button 
+                                    type="button"
+                                    onClick={() => toggleStudentPayment(s.id, false)}
+                                    style={{ border: 'none', background: 'none', color: '#64748b', fontWeight: 700, cursor: 'pointer', fontSize: '0.68rem', padding: '2px 5px', borderRadius: '4px' }}
+                                    onMouseOver={(e: any) => e.currentTarget.style.background = '#f1f5f9'}
+                                    onMouseOut={(e: any) => e.currentTarget.style.background = 'none'}
+                                  >
+                                    Freischalten
+                                  </button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Invoices History section as beautiful receipt items */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Abrechnungsverlauf</h4>
+                    <button
+                      type="button"
+                      onClick={() => createManualInvoice(inv.schoolId)}
+                      style={{
+                        backgroundColor: 'transparent',
+                        color: '#ea4335',
+                        border: '1px solid rgba(234, 67, 53, 0.2)',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '0.74rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseOver={(e: any) => { e.currentTarget.style.background = '#fce8e6'; }}
+                      onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      + Manuelle Rechnung
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {(() => {
+                      const generated = getSchoolInvoices(inv.schoolId, inv.total);
+                      const dbInvs = dbInvoices.filter(i => i.school_id === inv.schoolId);
+                      const allCombined = [
+                        ...dbInvs.map(i => ({
+                          id: i.id,
+                          billing_date: formatDateDisplay(i.billing_date),
+                          amount: i.amount,
+                          status: i.status,
+                          type: i.type,
+                          isDb: true,
+                          isCurrentMonth: false,
+                          isTrialMonth: false
+                        })),
+                        ...generated.map(g => ({
+                          id: g.id,
+                          billing_date: g.date,
+                          amount: g.amount,
+                          status: g.status === 'Bezahlt' ? 'paid' : 'open',
+                          type: 'INF',
+                          isDb: false,
+                          isCurrentMonth: g.isCurrentMonth,
+                          isTrialMonth: g.status === 'Probemonat'
+                        }))
+                      ];
+
+                      if (allCombined.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', color: '#86868b', fontSize: '0.78rem', padding: '16px 0', border: '1px dashed rgba(0, 0, 0, 0.05)', borderRadius: '10px' }}>
+                            Keine Rechnungen vorhanden.
+                          </div>
+                        );
+                      }
+
+                      return allCombined.map(invoice => {
+                        return (
+                          <div key={invoice.id} className="receipt-card" style={{ opacity: invoice.status === 'cancelled' ? 0.6 : 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.8rem' }}>
+                                  {invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-')}
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>{invoice.billing_date}</span>
+                              </div>
+                              <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem' }}>
+                                {Number(invoice.amount || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingInvoice({
+                                    invoiceId: invoice.id,
+                                    schoolId: inv.schoolId,
+                                    schoolName: inv.schoolName,
+                                    schoolStreet: inv.schoolStreet,
+                                    schoolZipCode: inv.schoolZipCode,
+                                    schoolCity: inv.schoolCity,
+                                    date: invoice.billing_date,
+                                    amount: invoice.amount,
+                                    status: invoice.status,
+                                    type: invoice.type,
+                                    isCurrentMonth: invoice.isCurrentMonth,
+                                    hasCampus: inv.hasCampus,
+                                    hasGroovelab: inv.hasGroovelab,
+                                    baseFee: inv.baseFee,
+                                    kombiDiscountAmount: inv.kombiDiscountAmount,
+                                    userFee: inv.userFee,
+                                    activeStudentFee: inv.activeStudentFee,
+                                    totalTeachersCount: inv.totalTeachersCount,
+                                    totalEmployeesCount: inv.totalEmployeesCount,
+                                    passiveStudentsCount: inv.passiveStudentsCount,
+                                    activeStudents: inv.activeStudents,
+                                    subscriptionBypass: inv.subscriptionBypass,
+                                    subtotal: inv.subtotal,
+                                    studentBillingOption: inv.studentBillingOption,
+                                    isTrialMonth: invoice.isTrialMonth
+                                  });
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 600,
+                                  color: '#1e293b',
+                                  cursor: 'pointer'
+                                }}
+                                onMouseOver={(e: any) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                                onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
+                              >
+                                Beleg ansehen
+                              </button>
+                              {invoice.isDb ? (
+                                <select
+                                  value={invoice.status}
+                                  onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
+                                  style={{
+                                    padding: '4px 6px',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    background: '#ffffff',
+                                    cursor: 'pointer',
+                                    color: '#334155',
+                                    outline: 'none'
+                                  }}
+                                >
+                                  <option value="open">Offen</option>
+                                  <option value="paid">Bezahlt</option>
+                                  <option value="overdue">Überfällig</option>
+                                  <option value="cancelled">Storniert</option>
+                                </select>
+                              ) : (
+                                <select
+                                  value={invoice.status}
+                                  onChange={() => toggleInvoicePaid(inv.schoolId, invoice.id)}
+                                  style={{
+                                    padding: '4px 6px',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 600,
+                                    background: '#ffffff',
+                                    cursor: 'pointer',
+                                    color: '#334155',
+                                    outline: 'none'
+                                  }}
+                                >
+                                  <option value="open">Offen</option>
+                                  <option value="paid">Bezahlt</option>
+                                </select>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       </div>
       
       {viewingInvoice && (
