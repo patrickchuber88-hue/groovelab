@@ -1245,16 +1245,16 @@ export function BillingDashboard() {
                           </div>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#64748b' }}>Infrastruktur- & Server-Hosting (Lehrkräfte) ({inv.totalTeachersCount} aktiv):</span>
+                          <span style={{ color: '#64748b' }}>Infrastruktur- & Server-Hosting ({inv.totalTeachersCount} Lehrkräfte aktiv x 0,49 €):</span>
                           <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#64748b' }}>Datenbank- & Speicher-Hosting (passive Profile) ({inv.passiveStudentsCount} passiv):</span>
+                          <span style={{ color: '#64748b' }}>Datenbank- & Speicher-Hosting ({inv.passiveStudentsCount} Schüler passiv x 0,09 €):</span>
                           <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
                         {inv.activeStudentFee > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                            <span style={{ color: '#64748b' }}>Infrastruktur-Bereitstellung (Schüleraktivierungen):</span>
+                            <span style={{ color: '#64748b' }}>Infrastruktur-Bereitstellung ({Math.round(inv.activeStudentFee / 0.49)} Schüler aktiv x 0,49 €):</span>
                             <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
