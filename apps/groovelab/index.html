@@ -10,11 +10,73 @@
                           window.location.pathname.indexOf('/device-onboarding') !== -1 || 
                           localStorage.getItem('groovelab_active_platform') === 'groovelab';
         
-        var manifestHref = isGrooveLab ? '/manifest-groovelab.json' : '/manifest.json';
         var themeColor = isGrooveLab ? '#eab308' : '#34a853';
-        var title = isGrooveLab ? 'GrooveLab' : 'Campus';
+        var title = 'Campus-Groovelab';
         var appleTouchIcon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/apple-touch-icon.png';
         var favicon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/pwa-icon.png';
+        
+        // Dynamische Manifest-Generierung, um Kiosk-Kopplungsparameter im iOS WebClip/PWA zu erhalten
+        var manifestObj;
+        if (isGrooveLab) {
+          var token = params.get('kiosk_token') || localStorage.getItem('groovelab_kiosk_token') || '';
+          var stationId = params.get('station_id') || localStorage.getItem('groovelab_station_id') || '';
+          var roomId = params.get('kiosk_room_id') || localStorage.getItem('groovelab_kiosk_room_id') || '';
+          
+          var startUrl = '/?platform=groovelab';
+          if (token && stationId) {
+            startUrl += '&kiosk_token=' + encodeURIComponent(token) + '&station_id=' + encodeURIComponent(stationId);
+            if (roomId) {
+              startUrl += '&kiosk_room_id=' + encodeURIComponent(roomId);
+            }
+          }
+          
+          manifestObj = {
+            "short_name": "Campus-Groovelab",
+            "name": "Campus-Groovelab",
+            "icons": [
+              {
+                "src": "/pwa-icon-groovelab.png",
+                "type": "image/png",
+                "sizes": "192x192"
+              },
+              {
+                "src": "/pwa-icon-groovelab.png",
+                "type": "image/png",
+                "sizes": "512x512"
+              }
+            ],
+            "start_url": startUrl,
+            "background_color": "#0c0f12",
+            "theme_color": "#eab308",
+            "display": "standalone",
+            "orientation": "any"
+          };
+        } else {
+          manifestObj = {
+            "short_name": "Campus-Groovelab",
+            "name": "Campus-Groovelab",
+            "icons": [
+              {
+                "src": "/pwa-icon.png",
+                "type": "image/png",
+                "sizes": "192x192"
+              },
+              {
+                "src": "/pwa-icon.png",
+                "type": "image/png",
+                "sizes": "512x512"
+              }
+            ],
+            "start_url": "/?platform=campus",
+            "background_color": "#062413",
+            "theme_color": "#34a853",
+            "display": "standalone",
+            "orientation": "any"
+          };
+        }
+        
+        var manifestStr = JSON.stringify(manifestObj);
+        var manifestHref = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(manifestStr)));
         
         document.write('<link rel="manifest" href="' + manifestHref + '" />');
         document.write('<meta name="theme-color" content="' + themeColor + '" />');
