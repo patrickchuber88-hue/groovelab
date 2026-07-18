@@ -2292,6 +2292,7 @@ function App() {
   }, []);
 
   const [loading, setLoading] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);
   const [user, setUserRaw] = useState<any>(() => {
     if (typeof window === 'undefined') return null;
@@ -3370,7 +3371,7 @@ function App() {
       // 1. Dashboard Data Fetch (Interval)
       const dashboardInterval = setInterval(() => {
         fetchDashboardData(loggedInUserId);
-      }, 15000);
+      }, 45000);
 
       // 2. Continuous Heartbeat Monitor (Students only)
       const heartbeatInterval = setInterval(async () => {
@@ -3436,18 +3437,73 @@ function App() {
       if (isInitial) setLoading(true);
       console.log(`[Dashboard] Fetching data for user: ${userId}`);
       
-      // Stage 1 light: Fetch user record and current session in parallel
+      // Stage 1 light: Fetch user record and current session in parallel with automatic retries
       const [userRes, sessionRes] = await Promise.all([
-        supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle(),
-        supabase.from('sessions').select('*, stations(name, color)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle()
+        safeSupabaseQuery(async () => await supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle()),
+        safeSupabaseQuery(async () => await supabase.from('sessions').select('*, stations(name, color)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle())
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 1 Light:', err);
         return [ {error: err}, {error: err} ] as any;
       });
 
-      if (userRes?.error) console.error('[Dashboard] User Fetch Error:', userRes.error);
+      if (userRes?.error) {
+        console.error('[Dashboard] User Fetch Error or Network Issue:', userRes.error);
+      }
 
-      const userData = userRes?.data;
+      let userData = userRes?.data;
+      let usedOfflineCache = false;
+
+      // --- OFFLINE CACHE FALLBACK LOGIC ---
+      if (!userData && userRes?.error) {
+        console.warn('[Dashboard] Attempting to load user from offline cache due to fetch error...');
+        const cachedStr = localStorage.getItem('groovelab_offline_user_cache');
+        if (cachedStr) {
+          try {
+            const parsedCache = JSON.parse(cachedStr);
+            // Check TTL (e.g., 48 hours = 48 * 60 * 60 * 1000 = 172800000 ms)
+            const cacheAge = Date.now() - parsedCache.timestamp;
+            if (cacheAge < 172800000) {
+              console.log('[Dashboard] Valid offline cache found! Age (hours):', (cacheAge / 3600000).toFixed(1));
+              userData = parsedCache.data;
+              usedOfflineCache = true;
+              setIsOfflineMode(true);
+            } else {
+              console.warn('[Dashboard] Offline cache expired (TTL > 48h). Purging.');
+              localStorage.removeItem('groovelab_offline_user_cache');
+            }
+          } catch (e) {
+            console.error('[Dashboard] Error parsing offline cache:', e);
+            localStorage.removeItem('groovelab_offline_user_cache');
+          }
+        }
+      } else if (userData) {
+        // --- UPDATE OFFLINE CACHE (DATA MINIMIZATION) ---
+        try {
+          const minimalUserData = {
+            id: userData.id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            role: userData.role,
+            roles: userData.roles,
+            school_id: userData.school_id,
+            is_campus_active: userData.is_campus_active,
+            is_groovelab_active: userData.is_groovelab_active,
+            avatar_url: userData.avatar_url,
+            photo_url: userData.photo_url,
+            schools: Array.isArray(userData.schools) 
+              ? userData.schools.map((s: any) => ({ id: s.id, has_campus_subscription: s.has_campus_subscription, has_groovelab_subscription: s.has_groovelab_subscription }))
+              : userData.schools ? { id: userData.schools.id, has_campus_subscription: userData.schools.has_campus_subscription, has_groovelab_subscription: userData.schools.has_groovelab_subscription } : null
+          };
+          localStorage.setItem('groovelab_offline_user_cache', JSON.stringify({
+            timestamp: Date.now(),
+            data: minimalUserData
+          }));
+          setIsOfflineMode(false); // We got fresh data
+        } catch (e) {
+          console.error('[Dashboard] Failed to write offline cache:', e);
+        }
+      }
+
       if (userData) {
         const r = (userData.role || '').toLowerCase();
         const rolesArr = userData.roles || [];
@@ -3457,9 +3513,17 @@ function App() {
           userData.avatar_url = '/campus_login_hero.png';
         }
       }
+
       if (!userData) {
         console.warn('[Dashboard] No user data found for ID:', userId);
         setLoading(false);
+        // We only trigger diagnostic exit hatch if this is an actual DB fetch error and we have NO offline cache
+        if (userRes?.error && isInitial) {
+           if (typeof window !== 'undefined') {
+              (window as any).fetchDashboardDataError = userRes.error;
+              (window as any).fetchDashboardDataStack = new Error().stack;
+           }
+        }
         return;
       }
 
@@ -8492,6 +8556,20 @@ function App() {
               </button>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: windowWidth <= 768 ? '4px' : '8px' }}>
+                {isOfflineMode && (
+                  <div style={{ 
+                    display: 'flex', alignItems: 'center', gap: '8px', 
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
+                    padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
+                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)',
+                    color: 'white'
+                  }}>
+                    <AlertCircle size={14} color="white" />
+                    <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Offline Modus
+                    </span>
+                  </div>
+                )}
               {activePlatform === 'campus' ? (
                 <>
                   {/* Trial Pill */}
