@@ -67,12 +67,18 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
       setIsSearching(true);
       try {
-        const { data, error } = await supabase
+        const queryPromise = supabase
           .from('schools')
           .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription')
           .ilike('name', `%${searchQuery.trim()}%`)
           .not('subdomain', 'is', null)
           .limit(6);
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Query timeout')), 2500)
+        );
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
         if (!error && data) {
           setSearchResults(data);
