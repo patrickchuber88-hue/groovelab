@@ -447,6 +447,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
   const [hasAutoCheckedPlatform, setHasAutoCheckedPlatform] = useState(false);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
+  const [coupledStationName, setCoupledStationName] = useState<string | null>(null);
 
   // Parents Onboarding & Magic Link States
   const [parentFirstName, setParentFirstName] = useState(() => {
@@ -1729,6 +1730,29 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
     }
     prefetch();
+  }, [effectiveStationId]);
+
+  // Fetch name of the coupled station from Supabase
+  useEffect(() => {
+    if (!effectiveStationId) {
+      setCoupledStationName(null);
+      return;
+    }
+    async function fetchStationName() {
+      try {
+        const { data, error } = await supabase
+          .from('stations')
+          .select('name')
+          .eq('id', effectiveStationId)
+          .maybeSingle();
+        if (!error && data) {
+          setCoupledStationName(data.name);
+        }
+      } catch (err) {
+        console.error("Error fetching coupled station name:", err);
+      }
+    }
+    fetchStationName();
   }, [effectiveStationId]);
 
   // Fetch rooms and stations for the Kiosk activator when schoolData is resolved (or query all active if not set yet)
@@ -3923,6 +3947,66 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
           </div>
         )}
+        
+        {/* Coupled Kiosk Station indicator inside the card */}
+        {isGroovelabKiosk && effectiveStationId && (
+          <div style={{
+            width: '100%',
+            marginTop: '20px',
+            background: 'rgba(254, 252, 232, 0.7)',
+            border: '1px solid rgba(234, 179, 8, 0.3)',
+            borderRadius: '16px',
+            padding: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              color: '#78350f',
+              fontSize: '13px',
+              fontWeight: 800
+            }}>
+              <Tablet size={15} style={{ color: '#ca8a04' }} />
+              <span>Gekoppelt mit: <strong>{coupledStationName || 'Station'}</strong></span>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Möchtest du die Kopplung mit „${coupledStationName || 'dieser Station'}“ wirklich aufheben, um das Gerät neu zu koppeln?`)) {
+                  localStorage.removeItem('groovelab_station_id');
+                  localStorage.removeItem('groovelab_kiosk_token');
+                  localStorage.removeItem('groovelab_kiosk_room_id');
+                  window.location.reload();
+                }
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#ca8a04',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                padding: '4px 8px',
+                transition: 'color 0.2s',
+                outline: 'none',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.color = '#78350f'; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = '#ca8a04'; }}
+            >
+              Kopplung aufheben / Station wechseln
+            </button>
+          </div>
+        )}
 
         {/* iOS-Style GrooveLab check-in button - Hidden in Kiosk Mode */}
         {!isGroovelabKiosk && (
@@ -4034,8 +4118,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
 
-        {/* Kiosk Activator Nested Inside Scanner Card */}
-        {isGroovelabKiosk && (
+        {/* Kiosk Activator Nested Inside Scanner Card - Hide if already coupled */}
+        {isGroovelabKiosk && !effectiveStationId && (
           <div style={{
             width: '100%',
             display: 'flex',

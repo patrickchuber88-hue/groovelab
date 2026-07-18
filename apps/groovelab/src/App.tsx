@@ -2096,6 +2096,31 @@ function App() {
   // Effect to resolve the kiosk token on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // Check query params to capture and persist the coupling state on this device
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('kiosk_token');
+    const urlStationId = params.get('station_id');
+    const urlRoomId = params.get('kiosk_room_id');
+
+    if (urlToken && urlStationId) {
+      console.log('[KioskAutoSave] Found coupling parameters in URL, saving to localStorage:', { urlToken, urlStationId, urlRoomId });
+      localStorage.setItem('groovelab_kiosk_token', urlToken);
+      localStorage.setItem('groovelab_station_id', urlStationId);
+      if (urlRoomId) {
+        localStorage.setItem('groovelab_kiosk_room_id', urlRoomId);
+      }
+      localStorage.setItem('groovelab_active_platform', 'groovelab');
+      setStationIdFromStorage(urlStationId);
+
+      // Clean up the URL parameters if running in standalone (PWA) mode
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+      if (isStandalone) {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    }
+    
     const token = localStorage.getItem('groovelab_kiosk_token');
     if (!token) {
       setLoadingKiosk(false);
@@ -6083,7 +6108,13 @@ function App() {
       localStorage.removeItem('groovelab_location_mode');
       localStorage.removeItem('groovelab_active_tab');
 
-      window.location.replace(getRedirectUrl(`kiosk_room_id=${roomId}`));
+      // If the device has a coupled station (not general uncoupled kiosk), do not pass kiosk_room_id
+      // to avoid triggering auto-bootstrap on load which would overwrite the coupled station.
+      if (!isGeneralKiosk) {
+        window.location.replace(getRedirectUrl());
+      } else {
+        window.location.replace(getRedirectUrl(`kiosk_room_id=${roomId}`));
+      }
       return;
     }
 

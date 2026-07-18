@@ -161,8 +161,9 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         
         setSetupSuccess(true);
         setTimeout(() => {
-          // Redirect to home and trigger auto-login
-          window.location.replace('/?platform=groovelab');
+          // Redirect to home and trigger auto-login with parameters to survive iOS PWA installation isolation
+          const pairingUrl = `/?platform=groovelab&kiosk_token=${encodeURIComponent(kioskRecord.secret_token)}&station_id=${encodeURIComponent(selectedStation.id)}&kiosk_room_id=${encodeURIComponent(selectedStation.room_id)}`;
+          window.location.replace(pairingUrl);
         }, 1500);
       } else {
         throw new Error('Kopplungs-Token konnte nicht geladen werden.');
