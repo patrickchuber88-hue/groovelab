@@ -86,9 +86,15 @@ const formatDateDisplay = (dateString: string) => {
   }
 };
 
-export function BillingDashboard() {
+export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?: string }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [dbInvoices, setDbInvoices] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (preselectedSchoolId) {
+      setExpandedSchoolId(preselectedSchoolId);
+    }
+  }, [preselectedSchoolId]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [summary, setSummary] = useState<PlatformSummary>({
     totalSchools: 0,
@@ -117,6 +123,13 @@ export function BillingDashboard() {
   const [operatorIban, setOperatorIban] = useState('DE89 3704 0044 0532 9482 11');
   const [operatorBic, setOperatorBic] = useState('WELADED1XYZ');
   const [tick, setTick] = useState(0);
+  const [expandedYears, setExpandedYears] = useState<Record<number, boolean>>({
+    [new Date().getFullYear()]: true
+  });
+
+  const toggleYearExpanded = (year: number) => {
+    setExpandedYears(prev => ({ ...prev, [year]: !prev[year] }));
+  };
 
   const getPaidInvoices = (schoolId: string): string[] => {
     if (typeof window === 'undefined') return [];
@@ -1424,7 +1437,7 @@ export function BillingDashboard() {
                     </button>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto', paddingRight: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', paddingRight: '4px' }}>
                     {(() => {
                       const generated = getSchoolInvoices(inv.schoolId, inv.total, inv.status);
                       const dbInvs = dbInvoices.filter(i => i.school_id === inv.schoolId);
@@ -1432,6 +1445,7 @@ export function BillingDashboard() {
                         ...dbInvs.map(i => ({
                           id: i.id,
                           billing_date: formatDateDisplay(i.billing_date),
+                          year: i.billing_date ? new Date(i.billing_date).getFullYear() : new Date().getFullYear(),
                           amount: i.amount,
                           status: i.status,
                           type: i.type,
@@ -1442,6 +1456,7 @@ export function BillingDashboard() {
                         ...generated.map(g => ({
                           id: g.id,
                           billing_date: g.date,
+                          year: g.year ? parseInt(g.year) : new Date().getFullYear(),
                           amount: g.amount,
                           status: g.status === 'Bezahlt' ? 'paid' : 'open',
                           type: 'INF',
@@ -1459,7 +1474,24 @@ export function BillingDashboard() {
                         );
                       }
 
-                      return allCombined.map(invoice => {
+                      const unpaidInvoices = allCombined.filter(i => i.status === 'open' || i.status === 'overdue');
+                      const archivedInvoices = allCombined.filter(i => i.status !== 'open' && i.status !== 'overdue');
+
+                      // Group archived invoices by year
+                      const archivedByYear: Record<number, any[]> = {};
+                      archivedInvoices.forEach(i => {
+                        const yr = i.year || new Date().getFullYear();
+                        if (!archivedByYear[yr]) {
+                          archivedByYear[yr] = [];
+                        }
+                        archivedByYear[yr].push(i);
+                      });
+
+                      const sortedYears = Object.keys(archivedByYear)
+                        .map(Number)
+                        .sort((a, b) => b - a);
+
+                      const renderInvoiceCard = (invoice: any) => {
                         return (
                           <div key={invoice.id} className="receipt-card" style={{ opacity: invoice.status === 'cancelled' ? 0.6 : 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
@@ -1566,7 +1598,85 @@ export function BillingDashboard() {
                             </div>
                           </div>
                         );
-                      });
+                      };
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {/* Floating Unpaid Sektion */}
+                          {unpaidInvoices.length > 0 && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                              background: 'rgba(239, 68, 68, 0.02)',
+                              padding: '12px 14px',
+                              borderRadius: '14px',
+                              border: '1px dashed rgba(239, 68, 68, 0.15)',
+                              marginBottom: '6px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#dc2626', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                <ShieldAlert size={14} />
+                                <span>Ausstehende Rechnungen ({unpaidInvoices.length})</span>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {unpaidInvoices.map(invoice => renderInvoiceCard(invoice))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Archived Years Accordion Sektion */}
+                          {sortedYears.length > 0 ? (
+                            sortedYears.map(yr => {
+                              const isExpanded = expandedYears[yr] ?? false;
+                              const yearInvoices = archivedByYear[yr] || [];
+                              
+                              const summaryText = yearInvoices.length === 1 ? '1 Rechnung' : `${yearInvoices.length} Rechnungen`;
+
+                              return (
+                                <div key={yr} style={{ display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid rgba(15, 23, 42, 0.05)', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden' }}>
+                                  {/* Accordion Header */}
+                                  <div 
+                                    onClick={() => toggleYearExpanded(yr)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '10px 14px',
+                                      cursor: 'pointer',
+                                      userSelect: 'none',
+                                      background: '#ffffff',
+                                      transition: 'background 0.15s'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                                    onMouseOut={(e) => { e.currentTarget.style.background = '#ffffff'; }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#0f172a' }}>Archiv {yr}</span>
+                                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>({summaryText})</span>
+                                    </div>
+                                    <div style={{ color: '#64748b', display: 'flex', alignItems: 'center' }}>
+                                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                    </div>
+                                  </div>
+
+                                  {/* Accordion Content */}
+                                  {isExpanded && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', background: '#f8fafc', borderTop: '1px solid rgba(15, 23, 42, 0.03)' }}>
+                                      {yearInvoices.map(invoice => renderInvoiceCard(invoice))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            unpaidInvoices.length === 0 && (
+                              <div style={{ textAlign: 'center', color: '#86868b', fontSize: '0.78rem', padding: '16px 0', border: '1px dashed rgba(0, 0, 0, 0.05)', borderRadius: '10px' }}>
+                                Keine Rechnungen vorhanden.
+                              </div>
+                            )
+                          )}
+                        </div>
+                      );
                     })()}
                   </div>
                 </div>

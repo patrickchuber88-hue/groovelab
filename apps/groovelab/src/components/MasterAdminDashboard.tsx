@@ -36,6 +36,7 @@ interface School {
   is_trial?: boolean;
   trial_ends_at?: string | null;
   contract_ends_at?: string | null;
+  contract_start_date?: string | null;
   max_teachers?: number;
   max_students?: number;
   max_songs?: number;
@@ -50,6 +51,7 @@ interface School {
   secretary_onboarding_token?: string | null;
   email?: string | null;
   phone_number?: string | null;
+  student_billing_option?: string | null;
 }
 
 function getSubdomainOrigin(schoolName: string): string {
@@ -176,6 +178,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     totalSessions: 0
   });
   const [schoolStats, setSchoolStats] = useState<Record<string, any>>({});
+  const [dbInvoices, setDbInvoices] = useState<any[]>([]);
+  const [preselectedSchoolId, setPreselectedSchoolId] = useState<string | null>(null);
+  const [businessAnalyticsExpanded, setBusinessAnalyticsExpanded] = useState(false);
   
   // Selected School Modal State
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
@@ -563,6 +568,1615 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     return dateString;
   };
 
+  const calculateSchoolTotal = (school: any) => {
+    const statsRow = schoolStats[school.id] || { teachers: 0, students: 0, teachersCampus: 0, studentsCampus: 0 };
+    
+    const rateCampus = parseFloat(String(priceCampus || 7.99));
+    const rateGroovelab = parseFloat(String(priceGroovelab || 4.99));
+    
+    let baseFee = 0;
+    if (school.has_campus_subscription) baseFee += rateCampus;
+    if (school.has_groovelab_subscription) baseFee += rateGroovelab;
+    
+    const hasKombi = school.has_campus_subscription && school.has_groovelab_subscription;
+    const kombiDiscountAmount = hasKombi ? 2.99 : 0.00;
+    
+    const staffFee = (statsRow.teachers || 0) * 0.49;
+    
+    const isPartial = school.student_billing_option === 'student_partial';
+    const isFullDirect = school.student_billing_option === 'student_full';
+    const passiveStudentsCount = isPartial ? (statsRow.students || 0) : (isFullDirect ? 0 : Math.max(0, (statsRow.students || 0) - (statsRow.studentsCampus || 0)));
+    const passiveStudentsFee = passiveStudentsCount * 0.09;
+    
+    const userFee = staffFee + passiveStudentsFee;
+    
+    const isSchoolPayer = school.student_billing_option === 'option2' || school.student_billing_option === 'option3_2' || school.student_billing_option === 'option3_3';
+    const activeStudentFee = (isSchoolPayer && school.student_billing_option === 'option2') ? (statsRow.studentsCampus || 0) * 0.49 : 0.00;
+    
+    const subtotal = Math.max(0, (baseFee - kombiDiscountAmount) + userFee + activeStudentFee);
+    
+    const isBypass = school.subscription_bypass || false;
+    const isTrial = school.is_trial || false;
+    const isSuspended = school.status === 'suspended';
+    
+    const total = (isBypass || isTrial || isSuspended) ? 0.00 : subtotal;
+    return parseFloat(total.toFixed(2));
+  };
+
+  const getUnpaidInvoices = () => {
+    const list: any[] = [];
+    const deMonths = [
+      '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+    ];
+    
+    const systemDate = new Date();
+    const currentYear = systemDate.getFullYear();
+    const currentMonth = systemDate.getMonth() + 1;
+
+    schools.forEach(school => {
+      // 1. Get database invoices for this school
+      const schoolDbInvs = dbInvoices.filter(i => i.school_id === school.id && (i.status === 'open' || i.status === 'overdue'));
+      schoolDbInvs.forEach(i => {
+        list.push({
+          id: i.id,
+          schoolId: school.id,
+          schoolName: school.name,
+          billing_date: i.billing_date ? i.billing_date.split('T')[0].split('-').reverse().join('.') : '',
+          amount: i.amount,
+          status: i.status,
+          isDb: true
+        });
+      });
+
+      // 2. Get procedurally generated invoices
+      const storedDate = localStorage.getItem(`contractStartDate_${school.id}`) || school.contract_start_date;
+      const contractDateObj = storedDate ? new Date(storedDate) : new Date('2026-07-01T12:00:00Z');
+      
+      const startYear = contractDateObj.getFullYear();
+      const startMonth = contractDateObj.getMonth() + 1;
+      
+      let y = startYear;
+      let m = startMonth;
+
+      const schoolTotal = calculateSchoolTotal(school);
+      if (schoolTotal > 0) {
+        while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+          const monthStr = m < 10 ? `0${m}` : `${m}`;
+          const invId = `RE-${y}-${monthStr}`;
+          
+          const lastDay = new Date(y, m, 0).getDate();
+          const monthName = deMonths[m];
+          const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
+          
+          const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
+          const isCreated = systemDate.getTime() >= creationTime.getTime();
+          
+          // Check if paid in localStorage
+          const paidInvoicesList = JSON.parse(localStorage.getItem(`paid_invoices_${school.id}`) || '[]');
+          const isMarkedPaid = paidInvoicesList.includes(invId);
+
+          if (isCreated && !isMarkedPaid) {
+            // Also ensure it is not already overridden by a database invoice with same ID
+            const isOverridden = dbInvoices.some(dbi => dbi.id === invId && dbi.school_id === school.id);
+            if (!isOverridden) {
+              list.push({
+                id: invId,
+                schoolId: school.id,
+                schoolName: school.name,
+                billing_date: invoiceDateStr,
+                amount: schoolTotal,
+                status: 'open',
+                isDb: false
+              });
+            }
+          }
+          
+          m++;
+          if (m > 12) {
+            m = 1;
+            y++;
+          }
+        }
+      }
+    });
+
+    return list;
+  };
+
+  const toggleInvoicePaidFromBriefing = async (invoice: any) => {
+    if (invoice.isDb) {
+      try {
+        const { error } = await supabase
+          .from('invoices')
+          .update({ status: 'paid' })
+          .eq('id', invoice.id);
+        if (error) throw error;
+        // Refresh dbInvoices
+        const { data: dbInvs } = await supabase.from('invoices').select('*');
+        if (dbInvs) setDbInvoices(dbInvs);
+        alert('Rechnung erfolgreich verbucht!');
+      } catch (err: any) {
+        alert('Fehler beim Verbuchen: ' + err.message);
+      }
+    } else {
+      // Generated invoice: update localStorage
+      const paidInvoicesList = JSON.parse(localStorage.getItem(`paid_invoices_${invoice.schoolId}`) || '[]');
+      if (!paidInvoicesList.includes(invoice.id)) {
+        paidInvoicesList.push(invoice.id);
+        localStorage.setItem(`paid_invoices_${invoice.schoolId}`, JSON.stringify(paidInvoicesList));
+        // Force refresh state
+        fetchSchoolsAndStats();
+        alert('Rechnung erfolgreich verbucht!');
+      }
+    }
+  };
+
+  const renderBriefingTab = () => {
+    const unpaidInvs = getUnpaidInvoices();
+    
+    let mrrTotal = 0;
+    let baseSubTotal = 0;
+    let staffSubTotal = 0;
+    let studentActiveSubTotal = 0;
+    let studentPassiveSubTotal = 0;
+
+    let campusOnlyCount = 0;
+    let groovelabOnlyCount = 0;
+    let kombiCount = 0;
+
+    schools.forEach((school) => {
+      const isBypass = school.subscription_bypass || false;
+      const isTrial = school.is_trial || false;
+      const isSuspended = school.status === 'suspended';
+      const statsRow = schoolStats[school.id] || { teachers: 0, students: 0, teachersCampus: 0, studentsCampus: 0 };
+      
+      const rateCampus = parseFloat(String(priceCampus || 7.99));
+      const rateGroovelab = parseFloat(String(priceGroovelab || 4.99));
+      
+      let baseFee = 0;
+      if (school.has_campus_subscription) baseFee += rateCampus;
+      if (school.has_groovelab_subscription) baseFee += rateGroovelab;
+      
+      const hasKombi = school.has_campus_subscription && school.has_groovelab_subscription;
+      const kombiDiscountAmount = hasKombi ? 2.99 : 0.00;
+      const schoolBaseFee = Math.max(0, baseFee - kombiDiscountAmount);
+
+      const staffFee = (statsRow.teachers || 0) * 0.49;
+      
+      const isPartial = school.student_billing_option === 'student_partial';
+      const isFullDirect = school.student_billing_option === 'student_full';
+      const passiveStudentsCount = isPartial ? (statsRow.students || 0) : (isFullDirect ? 0 : Math.max(0, (statsRow.students || 0) - (statsRow.studentsCampus || 0)));
+      const passiveStudentsFee = passiveStudentsCount * 0.09;
+      
+      const isSchoolPayer = school.student_billing_option === 'option2' || school.student_billing_option === 'option3_2' || school.student_billing_option === 'option3_3';
+      const activeStudentFee = (isSchoolPayer && school.student_billing_option === 'option2') ? (statsRow.studentsCampus || 0) * 0.49 : 0.00;
+
+      if (!isBypass && !isTrial && !isSuspended) {
+        mrrTotal += (schoolBaseFee + staffFee + passiveStudentsFee + activeStudentFee);
+        baseSubTotal += schoolBaseFee;
+        staffSubTotal += staffFee;
+        studentActiveSubTotal += activeStudentFee;
+        studentPassiveSubTotal += passiveStudentsFee;
+      }
+
+      if (school.has_campus_subscription && school.has_groovelab_subscription) {
+        kombiCount++;
+      } else if (school.has_campus_subscription) {
+        campusOnlyCount++;
+      } else if (school.has_groovelab_subscription) {
+        groovelabOnlyCount++;
+      }
+    });
+
+    const activePaidCount = schools.filter(s => !s.is_trial && s.status === 'active').length;
+    const activeTrialCount = schools.filter(s => s.is_trial && s.status === 'active').length;
+    
+    const latestMetric = serverMetrics[0] || null;
+    const cpuVal = latestMetric ? latestMetric.cpu_load : 0;
+    const ramUsed = latestMetric ? latestMetric.mem_used_mb : 0;
+    const ramTotal = latestMetric ? latestMetric.mem_total_mb : 8000;
+    const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
+    const dbConns = latestMetric ? latestMetric.active_connections : 0;
+    
+    const diskUsed = latestMetric?.disk_used_gb ?? 18.0;
+    const diskTotal = latestMetric?.disk_total_gb ?? 40.0;
+    const diskPct = diskTotal > 0 ? (diskUsed / diskTotal) * 100 : 0;
+    
+    const volUsed = latestMetric?.volume_used_gb ?? 2.1;
+    const volTotal = latestMetric?.volume_total_gb ?? 14.0;
+    const volPct = volTotal > 0 ? (volUsed / volTotal) * 100 : 0;
+
+    const serverAlerts: any[] = [];
+    if (cpuVal >= 4.0) {
+      serverAlerts.push({ metric: 'cpu', level: 'Kritisch', message: `Server-CPU ist kritisch überlastet (${cpuVal.toFixed(2)} Cores)` });
+    } else if (cpuVal >= 2.0) {
+      serverAlerts.push({ metric: 'cpu', level: 'Warnung', message: `Server-CPU hat erhöhte Last (${cpuVal.toFixed(2)} Cores)` });
+    }
+
+    if (ramPct >= 90) {
+      serverAlerts.push({ metric: 'ram', level: 'Kritisch', message: `Arbeitsspeicher fast voll (${ramPct.toFixed(0)}%)` });
+    } else if (ramPct >= 75) {
+      serverAlerts.push({ metric: 'ram', level: 'Warnung', message: `Arbeitsspeicher-Auslastung erhöht (${ramPct.toFixed(0)}%)` });
+    }
+
+    if (dbConns >= 80) {
+      serverAlerts.push({ metric: 'db', level: 'Kritisch', message: `Datenbank-Pool fast ausgelastet (${dbConns}/100 Connections)` });
+    } else if (dbConns >= 50) {
+      serverAlerts.push({ metric: 'db', level: 'Warnung', message: `Erhöhte DB-Pool-Auslastung (${dbConns}/100 Connections)` });
+    }
+
+    if (diskPct >= 90) {
+      serverAlerts.push({ metric: 'ssd', level: 'Kritisch', message: `SSD Festplattenspeicher fast voll (${diskPct.toFixed(0)}%)` });
+    } else if (diskPct >= 75) {
+      serverAlerts.push({ metric: 'ssd', level: 'Warnung', message: `SSD-Festplatten-Speicherplatz knapp (${diskPct.toFixed(0)}%)` });
+    }
+
+    const totalPendingCount = pendingUsers.length + unpaidInvs.length + serverAlerts.length;
+    
+    const latestSchools = [...schools]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 4);
+
+    let healthStatus: 'optimal' | 'warning' | 'critical' = 'optimal';
+    if (cpuVal >= 4.0 || ramPct >= 90 || dbConns >= 80 || diskPct >= 90 || volPct >= 90) {
+      healthStatus = 'critical';
+    } else if (cpuVal >= 2.0 || ramPct >= 75 || dbConns >= 50 || diskPct >= 75 || volPct >= 75) {
+      healthStatus = 'warning';
+    }
+
+    const formattedTime = latestMetric 
+      ? new Date(latestMetric.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+      : '--:--:--';
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
+        {/* Header Panel - Greeting */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+              Guten Morgen, Patrick.
+            </h2>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+              Hier ist dein System-Briefing für heute.
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                fetchPendingUsers();
+                fetchSchoolsAndStats();
+                fetchServerMetrics();
+              }}
+              disabled={loadingPending}
+              style={{
+                padding: '12px 18px',
+                borderRadius: '14px',
+                background: '#ffffff',
+                border: '1px solid rgba(15, 23, 42, 0.08)',
+                color: '#475569',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = '#ea4335';
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.borderColor = '#ea4335';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = '#ffffff';
+                e.currentTarget.style.color = '#475569';
+                e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
+              }}
+            >
+              <RefreshCw size={14} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Cards Dashboard (System Overview) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gap: '16px'
+        }}>
+          {/* Total Schools */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: '1px solid rgba(15, 23, 42, 0.05)',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            transition: 'transform 0.2s',
+            cursor: 'default'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Layers size={18} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalSchools}</strong>
+              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schulen</span>
+            </div>
+          </div>
+
+          {/* Total Teachers */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: '1px solid rgba(15, 23, 42, 0.05)',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            transition: 'transform 0.2s',
+            cursor: 'default'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={18} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalTeachers}</strong>
+              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkräfte</span>
+            </div>
+          </div>
+
+          {/* Total Students */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: '1px solid rgba(15, 23, 42, 0.05)',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            transition: 'transform 0.2s',
+            cursor: 'default'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={18} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalStudents}</strong>
+              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler</span>
+            </div>
+          </div>
+
+          {/* Total Active Users */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: '1px solid rgba(15, 23, 42, 0.05)',
+            boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            transition: 'transform 0.2s',
+            cursor: 'default'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={18} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalTeachers + stats.totalStudents}</strong>
+              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Nutzer</span>
+            </div>
+          </div>
+
+          {/* Pending Activations (Red Highlight) */}
+          <div style={{
+            background: totalPendingCount > 0 ? 'rgba(234, 67, 53, 0.05)' : 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(16px)',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            border: totalPendingCount > 0 ? '1px solid rgba(234, 67, 53, 0.2)' : '1px solid rgba(15, 23, 42, 0.05)',
+            boxShadow: totalPendingCount > 0 ? '0 4px 12px rgba(234, 67, 53, 0.05)' : '0 4px 12px rgba(15, 23, 42, 0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            transition: 'transform 0.2s',
+            cursor: 'default'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: totalPendingCount > 0 ? 'rgba(234, 67, 53, 0.15)' : 'rgba(100, 116, 139, 0.1)', color: totalPendingCount > 0 ? '#ea4335' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={18} />
+            </div>
+            <div>
+              <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: totalPendingCount > 0 ? '#ea4335' : '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{totalPendingCount}</strong>
+              <span style={{ fontSize: '0.7rem', color: totalPendingCount > 0 ? '#ea4335' : '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ausstehend</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Column Responsive Briefing Layout */}
+        <div style={{ display: 'flex', flexDirection: isMobileOrTablet ? 'column' : 'row', gap: '24px', alignItems: 'stretch' }}>
+          
+          {/* Left Column: Aktionsbedarf (65% width) */}
+          <div style={{ flex: '1 1 65%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Aktionsbedarf</h3>
+              {totalPendingCount > 0 && (
+                <span style={{ background: '#ea4335', color: 'white', padding: '3px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 800 }}>
+                  {totalPendingCount} offen
+                </span>
+              )}
+            </div>
+
+            {/* Server Alerts Section */}
+            {serverAlerts.length > 0 && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.02)', border: '1px dashed rgba(239, 68, 68, 0.15)', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <AlertTriangle size={15} /> System- &amp; Server-Alarme
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {serverAlerts.map((alert, aIdx) => (
+                    <div key={aIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid rgba(15, 23, 42, 0.04)', padding: '12px 16px', borderRadius: '14px', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 650, color: '#334155' }}>{alert.message}</span>
+                      <span style={{ fontSize: '0.74rem', background: '#fee2e2', color: '#991b1b', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>{alert.level}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Unpaid Invoices Section */}
+            {unpaidInvs.length > 0 && (
+              <div style={{
+                background: 'rgba(234, 67, 53, 0.02)',
+                border: '1px dashed rgba(234, 67, 53, 0.15)',
+                borderRadius: '20px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ea4335', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <CreditCard size={15} /> Ausstehende Rechnungen ({unpaidInvs.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {unpaidInvs.map(inv => (
+                    <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid rgba(15, 23, 42, 0.04)', padding: '12px 16px', borderRadius: '14px', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>{inv.schoolName}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                            {inv.id} • {inv.billing_date}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                          {inv.amount.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleInvoicePaidFromBriefing(inv)}
+                          style={{
+                            background: 'transparent',
+                            color: '#34a853',
+                            border: '1px solid rgba(52, 168, 83, 0.2)',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={(e: any) => e.currentTarget.style.background = '#e6f4ea'}
+                          onMouseOut={(e: any) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          Direkt verbuchen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreselectedSchoolId(inv.schoolId);
+                            setActivePortalTab('billing');
+                          }}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid rgba(15, 23, 42, 0.06)',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={(e: any) => e.currentTarget.style.background = '#e2e8f0'}
+                          onMouseOut={(e: any) => e.currentTarget.style.background = '#f1f5f9'}
+                        >
+                          Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pending Activations (Aktivierungs-Center) */}
+            {pendingUsers.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Ausstehende Freischaltungen ({pendingUsers.length})
+                </div>
+                <div style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch' }}>
+                  
+                  {/* Left Pane: List of pending users */}
+                  <div style={{
+                    flex: '0 0 45%',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(16px)',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    {/* Batch Action Bar if selected */}
+                    {selectedUserIds.length > 0 && (
+                      <div style={{ padding: '12px 20px', background: 'rgba(234, 67, 53, 0.05)', borderBottom: '1px solid rgba(234, 67, 53, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ea4335' }}>
+                          {selectedUserIds.length} ausgewählt
+                        </span>
+                        <button
+                          onClick={() => handleBatchActivateUsers(selectedUserIds)}
+                          disabled={loadingPending}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            background: '#ea4335',
+                            border: 'none',
+                            color: '#ffffff',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 12px rgba(234, 67, 53, 0.3)',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 67, 53, 0.4)'; }}
+                          onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(234, 67, 53, 0.3)'; }}
+                        >
+                          Ausgewählte freischalten
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Search Bar inside pane */}
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)', position: 'relative' }}>
+                      <Search size={16} style={{ position: 'absolute', left: '32px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                      <input
+                        type="text"
+                        value={pendingSearchQuery}
+                        onChange={(e) => setPendingSearchQuery(e.target.value)}
+                        placeholder="Suche Name, Schule, Ausweis-Nr..."
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '10px 14px 10px 36px',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(15, 23, 42, 0.08)',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          fontSize: '0.85rem',
+                          fontWeight: 700,
+                          outline: 'none',
+                          transition: 'all 0.2s'
+                        }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = '#ea4335'; e.currentTarget.style.background = '#ffffff'; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)'; e.currentTarget.style.background = '#f8fafc'; }}
+                      />
+                    </div>
+
+                    {/* Bulk Select Utility bar */}
+                    <div style={{
+                      padding: '10px 20px',
+                      background: '#f8fafc',
+                      borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.8rem',
+                      color: '#64748b',
+                      fontWeight: 600
+                    }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.length === pendingUsers.length && pendingUsers.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedUserIds(pendingUsers.map(u => u.id));
+                            } else {
+                              setSelectedUserIds([]);
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        Alle auswählen ({pendingUsers.length})
+                      </label>
+                    </div>
+
+                    {/* Scrollable list */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+                      {pendingUsers
+                        .filter(u => {
+                          const term = pendingSearchQuery.toLowerCase().trim();
+                          if (!term) return true;
+                          const school = schools.find(s => s.id === u.school_id);
+                          const schoolName = school ? school.name.toLowerCase() : '';
+                          return (
+                            `${u.first_name} ${u.last_name}`.toLowerCase().includes(term) ||
+                            (u.nickname && u.nickname.toLowerCase().includes(term)) ||
+                            (u.ausweis_nummer && u.ausweis_nummer.toLowerCase().includes(term)) ||
+                            schoolName.includes(term)
+                          );
+                        })
+                        .map((u) => {
+                          const isSelected = selectedUser?.id === u.id;
+                          const school = schools.find(s => s.id === u.school_id);
+                          const isChecked = selectedUserIds.includes(u.id);
+
+                          return (
+                            <div
+                              key={u.id}
+                              onClick={() => setSelectedUser(u)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '12px 14px',
+                                borderRadius: '16px',
+                                cursor: 'pointer',
+                                background: isSelected ? 'rgba(234, 67, 53, 0.05)' : 'transparent',
+                                border: isSelected ? '1px solid rgba(234, 67, 53, 0.1)' : '1px solid transparent',
+                                transition: 'all 0.2s',
+                                marginBottom: '6px'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedUserIds(prev => [...prev, u.id]);
+                                  } else {
+                                    setSelectedUserIds(prev => prev.filter(id => id !== u.id));
+                                  }
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                background: school?.primary_color ? `${school.primary_color}10` : 'rgba(0,0,0,0.03)',
+                                color: school?.primary_color || '#0f172a',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: '0.85rem'
+                              }}>
+                                {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
+                              </div>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{u.first_name} {u.last_name}</strong>
+                                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>{school?.name || 'Keine Schule'}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Right Pane: Selected user details */}
+                  <div style={{
+                    flex: 1,
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(16px)',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(15, 23, 42, 0.06)',
+                    boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
+                    padding: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {selectedUser ? (
+                      (() => {
+                        const u = selectedUser;
+                        const school = schools.find(s => s.id === u.school_id);
+                        const refCode = `CG-${u.ausweis_nummer || 'OHNE'}`;
+                        const isActivating = activatingUserId === u.id;
+                        
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%', width: '100%' }} className="animate-fade-in">
+                            {/* Profile Header */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)' }}>
+                              <div style={{
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                background: school?.primary_color ? `${school.primary_color}1a` : 'rgba(15, 23, 42, 0.05)',
+                                color: school?.primary_color || '#0f172a',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.4rem',
+                                fontWeight: 900
+                              }}>
+                                {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
+                              </div>
+                              <div>
+                                <h3 style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
+                                  {u.first_name} {u.last_name}
+                                </h3>
+                                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Rolle: Schüler (Campus-Groovelab)</span>
+                              </div>
+                            </div>
+
+                            {/* Details List */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div>
+                                <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikschule</span>
+                                <strong style={{ fontSize: '0.95rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                  {school?.name || 'Unbekannte Schule'}
+                                </strong>
+                              </div>
+                              <div>
+                                <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zahlungsmethode</span>
+                                <strong style={{ fontSize: '0.95rem', color: '#334155', display: 'block', marginTop: '4px' }}>
+                                  {u.student_billing_payment_method === 'bank_transfer' ? 'Überweisung (Vorkasse)' : u.student_billing_payment_method}
+                                </strong>
+                              </div>
+                            </div>
+
+                            {/* Reference Code Match Card (Apple-Style Highlight) */}
+                            <div style={{
+                              background: '#f8fafc',
+                              borderRadius: '16px',
+                              padding: '20px 24px',
+                              border: '1px solid rgba(15, 23, 42, 0.05)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px'
+                            }}>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verwendungszweck für Kontomuster</span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                                <code style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                                  {refCode}
+                                </code>
+                                
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(refCode);
+                                    setCopiedCodeId(u.id);
+                                    setTimeout(() => setCopiedCodeId(null), 2000);
+                                  }}
+                                  style={{
+                                    background: copiedCodeId === u.id ? '#ea4335' : '#ffffff',
+                                    color: copiedCodeId === u.id ? '#ffffff' : '#475569',
+                                    border: copiedCodeId === u.id ? '1px solid #ea4335' : '1px solid rgba(15, 23, 42, 0.08)',
+                                    borderRadius: '12px',
+                                    padding: '10px 16px',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)'
+                                  }}
+                                >
+                                  {copiedCodeId === u.id ? (
+                                    <>Kopiert ✓</>
+                                  ) : (
+                                    <>
+                                      <Copy size={14} /> Kopieren
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Fee calculation details */}
+                            <div style={{
+                              background: 'rgba(234, 67, 53, 0.03)',
+                              border: '1px solid rgba(234, 67, 53, 0.1)',
+                              borderRadius: '16px',
+                              padding: '20px 24px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <div>
+                                <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b' }}>Zu zahlender Gesamtbetrag:</strong>
+                                <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 650 }}>Monatliche Lizenzgebühr (inkl. MwSt.)</span>
+                              </div>
+                              <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#991b1b' }}>
+                                {priceStudent} €
+                              </span>
+                            </div>
+
+                            {/* Large Action Buttons */}
+                            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              <button
+                                onClick={() => handleActivateUser(u.id)}
+                                disabled={isActivating}
+                                style={{
+                                  width: '100%',
+                                  padding: '18px',
+                                  borderRadius: '16px',
+                                  background: '#ea4335',
+                                  border: 'none',
+                                  color: '#ffffff',
+                                  fontSize: '1rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '10px',
+                                  boxShadow: '0 8px 24px rgba(234, 67, 53, 0.3)',
+                                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                                }}
+                                onMouseOver={(e) => {
+                                  if (!isActivating) {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(234, 67, 53, 0.4)';
+                                  }
+                                }}
+                                onMouseOut={(e) => {
+                                  if (!isActivating) {
+                                    e.currentTarget.style.transform = 'none';
+                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(234, 67, 53, 0.3)';
+                                  }
+                                }}
+                              >
+                                {isActivating ? (
+                                  <><div className="animate-spin" style={{ width: '18px', height: '18px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%' }} /> Aktiviere...</>
+                                ) : (
+                                  <><Check size={20} /> Zahlung erhalten &amp; Account freischalten</>
+                                )}
+                              </button>
+                              
+                              <button
+                                onClick={() => setSelectedUser(null)}
+                                style={{
+                                  width: '100%',
+                                  padding: '16px',
+                                  borderRadius: '16px',
+                                  background: '#f1f5f9',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  fontSize: '0.95rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
+                                onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                              >
+                                Abbrechen
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div style={{ color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(15, 23, 42, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Users size={32} style={{ color: '#94a3b8' }} />
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <strong style={{ fontSize: '1.2rem', color: '#0f172a', display: 'block', marginBottom: '8px', fontWeight: 800 }}>Kein Schüler ausgewählt</strong>
+                          <span style={{ fontSize: '0.95rem', lineHeight: '1.5', display: 'block', maxWidth: '300px', margin: '0 auto' }}>Wähle einen Schüler aus der Liste aus, um Zahlungsdetails einzusehen und den Account freizuschalten.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Alles erledigt block when nothing is pending */}
+            {totalPendingCount === 0 && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.6)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '16px',
+                border: '1px dashed rgba(15, 23, 42, 0.12)',
+                padding: '36px 24px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={20} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>Alles erledigt!</h4>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Es liegen aktuell keine offenen Aktivierungen oder Zahlungsrückstände vor. Genieß den Tag.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Neueste Registrierungen (35% width) */}
+          <div style={{ flex: '0 0 35%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Neueste Registrierungen</h3>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(16px)',
+              borderRadius: '24px',
+              border: '1px solid rgba(15, 23, 42, 0.06)',
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
+              {latestSchools.length === 0 ? (
+                <div style={{ color: '#64748b', fontSize: '0.8rem', textAlign: 'center', padding: '16px 0' }}>Keine Schulen registriert.</div>
+              ) : (
+                latestSchools.map((sch, idx) => {
+                  const daysAgo = sch.created_at ? Math.floor((new Date().getTime() - new Date(sch.created_at).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                  const timeStr = daysAgo === 0 ? 'Heute' : daysAgo === 1 ? 'Gestern' : `Vor ${daysAgo} Tagen`;
+                  return (
+                    <div key={sch.id} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', position: 'relative' }}>
+                      {/* Timeline dot & line */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '4px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ea4335', border: '2px solid #ffffff', boxShadow: '0 0 0 2px rgba(234, 67, 53, 0.15)', zIndex: 2 }} />
+                        {idx < latestSchools.length - 1 && (
+                          <div style={{ width: '2px', height: '54px', background: 'rgba(15, 23, 42, 0.05)', marginTop: '4px', marginBottom: '-16px' }} />
+                        )}
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>{sch.name}</span>
+                          <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>{timeStr}</span>
+                        </div>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>{sch.city || 'Keine Ortsangabe'}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSchoolId(sch.id);
+                            setEditName(sch.name);
+                            setEditColor(sch.primary_color || '#3b82f6');
+                            setEditLogo(sch.logo_url || '');
+                            setEditStatus(sch.status || 'active');
+                            setEditIsTrial(sch.is_trial || false);
+                            setEditTrialEndsAt(sch.trial_ends_at || '');
+                            setEditContractEndsAt(sch.contract_ends_at || '');
+                            setEditMaxTeachers(sch.max_teachers ?? 2);
+                            setEditMaxStudents(sch.max_students ?? 6);
+                            setEditMaxSongs(sch.max_songs ?? 5);
+                            setEditLimitsEnabled(sch.limits_enabled || false);
+                            setEditZipCode(sch.zip_code || '');
+                            setEditCity(sch.city || '');
+                            setEditEmail(sch.email || '');
+                            setEditPhoneNumber(sch.phone_number || '');
+                            setEditHasCampus(sch.has_campus_subscription || false);
+                            setEditHasGroovelab(sch.has_groovelab_subscription || false);
+                            setEditSubscriptionBypass(sch.subscription_bypass || false);
+                            setSelectedSchool(sch);
+                            setActivePortalTab('schools');
+                          }}
+                          style={{
+                            alignSelf: 'flex-start',
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ea4335',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '4px 0 2px 0',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            transition: 'color 0.15s'
+                          }}
+                          onMouseOver={(e: any) => e.currentTarget.style.color = '#dc2626'}
+                          onMouseOut={(e: any) => e.currentTarget.style.color = '#ea4335'}
+                        >
+                          Details anzeigen →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Server-Systemstatus & Auslastung */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid rgba(15, 23, 42, 0.06)',
+          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+          padding: '32px',
+          marginTop: '12px'
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(52, 168, 83, 0.1)',
+                color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#34a853',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Activity size={20} className={healthStatus === 'critical' ? 'animate-pulse' : ''} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                  Server-Systemstatus &amp; Live-Messung
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                  Hetzner VPS Telemetrie-Agent • Letztes Signal: {formattedTime}
+                </p>
+              </div>
+            </div>
+
+            {/* Status Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '9999px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(52, 168, 83, 0.08)',
+                color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#34a853',
+                border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(52, 168, 83, 0.15)'}`
+              }}>
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#34a853',
+                  display: 'inline-block'
+                }} />
+                {healthStatus === 'critical' && 'KRITISCH (Upgrade empfohlen)'}
+                {healthStatus === 'warning' && 'WARNUNG (Auslastung erhöht)'}
+                {healthStatus === 'optimal' && 'OPTIMAL (Gesund)'}
+              </div>
+            </div>
+          </div>
+
+          {/* Critical Alert Callout */}
+          {healthStatus === 'critical' && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.03)',
+              border: '1px solid rgba(239, 68, 68, 0.15)',
+              borderRadius: '16px',
+              padding: '18px 24px',
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'flex-start'
+            }}>
+              <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b', fontWeight: 800, marginBottom: '4px' }}>
+                  Achtung: Der Server erreicht seine Leistungsgrenzen!
+                </strong>
+                <span style={{ fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.5 }}>
+                  Aufgrund hoher Auslastung (CPU Load ≥ 4.0, RAM ≥ 90% oder offene DB-Verbindungen ≥ 80) läuft das System am Limit.
+                  Ein Umstieg auf einen leistungsstärkeren Hetzner Cloud Server (z. B. Upgrade auf CX32 oder CX42 mit mehr CPU-Kernen und RAM) wird dringend empfohlen, um Server-Ausfälle oder Verzögerungen für die Schulen zu vermeiden.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Gauges Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px'
+          }}>
+            {/* CPU Metric Card */}
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              border: '1px solid rgba(15, 23, 42, 0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Cpu size={14} /> CPU Auslastung
+                </span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#34a853' }}>
+                  {cpuVal.toFixed(2)} / 2.0 Cores
+                </span>
+              </div>
+              {/* Custom progress bar */}
+              <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min((cpuVal / 2.0) * 100, 100)}%`,
+                  background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#34a853',
+                  borderRadius: '4px',
+                  transition: 'width 0.5s ease-in-out'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                <span>Auslastung: {Math.round((cpuVal / 2.0) * 100)}%</span>
+                <span>{cpuVal >= 4.0 ? 'Kritisch' : cpuVal >= 2.0 ? 'Warnung' : 'Stabil'}</span>
+              </div>
+            </div>
+
+            {/* RAM Metric Card */}
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              border: '1px solid rgba(15, 23, 42, 0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Sliders size={14} /> Arbeitsspeicher (RAM)
+                </span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#34a853' }}>
+                  {(ramUsed / 1024).toFixed(2)} / {(ramTotal / 1024).toFixed(0)} GB
+                </span>
+              </div>
+              {/* Custom progress bar */}
+              <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(ramPct, 100)}%`,
+                  background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#34a853',
+                  borderRadius: '4px',
+                  transition: 'width 0.5s ease-in-out'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                <span>Belegt: {Math.round(ramPct)}%</span>
+                <span>{ramPct >= 90 ? 'Kritisch' : ramPct >= 75 ? 'Warnung' : 'Stabil'}</span>
+              </div>
+            </div>
+
+            {/* DB Connections Metric Card */}
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              border: '1px solid rgba(15, 23, 42, 0.04)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <Database size={14} /> DB Pool Connections
+                </span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#34a853' }}>
+                  {dbConns} / 100
+                </span>
+              </div>
+              {/* Custom progress bar */}
+              <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(dbConns, 100)}%`,
+                  background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#34a853',
+                  borderRadius: '4px',
+                  transition: 'width 0.5s ease-in-out'
+                }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                <span>Auslastung: {dbConns}%</span>
+                <span>{dbConns >= 80 ? 'Kritisch' : dbConns >= 50 ? 'Warnung' : 'Stabil'}</span>
+              </div>
+            </div>
+
+            {/* Combined Storage Metric Card (SSD & Cloud Volume) */}
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              border: '1px solid rgba(15, 23, 42, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                <HardDrive size={14} /> Speicher &amp; Cloud-Volumes
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* SSD Item */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    <span>SSD Festplatte</span>
+                    <span style={{ fontWeight: 800, color: diskPct >= 90 ? '#ef4444' : diskPct >= 75 ? '#d97706' : '#34a853' }}>
+                      {diskUsed.toFixed(1)} / {diskTotal.toFixed(0)} GB
+                    </span>
+                  </div>
+                  <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(diskPct, 100)}%`,
+                      background: diskPct >= 90 ? '#ef4444' : diskPct >= 75 ? '#f59e0b' : '#34a853',
+                      borderRadius: '3px',
+                      transition: 'width 0.5s ease-in-out'
+                    }} />
+                  </div>
+                </div>
+
+                {/* Cloud Item */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                    <span>Cloud Storage</span>
+                    <span style={{ fontWeight: 800, color: volPct >= 90 ? '#ef4444' : volPct >= 75 ? '#d97706' : '#34a853' }}>
+                      {volUsed.toFixed(1)} / {volTotal.toFixed(0)} GB
+                    </span>
+                  </div>
+                  <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(volPct, 100)}%`,
+                      background: volPct >= 90 ? '#ef4444' : volPct >= 75 ? '#f59e0b' : '#34a853',
+                      borderRadius: '3px',
+                      transition: 'width 0.5s ease-in-out'
+                    }} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 600, marginTop: '8px' }}>
+                <span>SSD: {Math.round(diskPct)}% belegt</span>
+                <span>Cloud: {Math.round(volPct)}% belegt</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Timeline Trend Chart */}
+          {serverMetrics.length > 1 && (
+            <div style={{
+              borderTop: '1px solid rgba(15, 23, 42, 0.06)',
+              paddingTop: '24px'
+            }}>
+              <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Auslastungshistorie (Letzte 30 Messungen)
+              </h4>
+              
+              {/* Interactive SVG Chart */}
+              <div style={{ width: '100%', height: '140px', position: 'relative' }}>
+                {(() => {
+                  const data = [...serverMetrics].reverse();
+                  const width = 800; // virtual width for SVG viewbox
+                  const height = 120; // virtual height for SVG viewbox
+                  
+                  // Normalization helper
+                  const getPoints = (valExtractor: (m: ServerMetric) => number, maxVal: number) => {
+                    return data.map((m, index) => {
+                      const x = (index / (data.length - 1)) * width;
+                      const y = height - (Math.min(valExtractor(m), maxVal) / maxVal) * (height - 10) - 5;
+                      return { x, y };
+                    });
+                  };
+
+                  const cpuPoints = getPoints((m) => m.cpu_load, 4.0);
+                  const ramPoints = getPoints((m) => (m.mem_used_mb / (m.mem_total_mb || 8000)) * 100, 100);
+                  const dbPoints = getPoints((m) => m.active_connections, 100);
+
+                  const pointsToString = (pts: { x: number, y: number }[]) => {
+                    return pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                  };
+
+                  return (
+                    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                      {/* Definitions for grid line pattern or gradients */}
+                      <defs>
+                        <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#34a853" stopOpacity="0.25"/>
+                          <stop offset="100%" stopColor="#34a853" stopOpacity="0.00"/>
+                        </linearGradient>
+                        <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25"/>
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00"/>
+                        </linearGradient>
+                        <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#a855f7" stopOpacity="0.25"/>
+                          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.00"/>
+                        </linearGradient>
+                      </defs>
+
+                      {/* Y-axis gridlines */}
+                      <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                      <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+                      <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
+
+                      {/* Area below curves (fill) */}
+                      {cpuPoints.length > 1 && (
+                        <polygon
+                          points={`${cpuPoints[0].x},${height} ${pointsToString(cpuPoints)} ${cpuPoints[cpuPoints.length-1].x},${height}`}
+                          fill="url(#cpuGrad)"
+                        />
+                      )}
+                      {ramPoints.length > 1 && (
+                        <polygon
+                          points={`${ramPoints[0].x},${height} ${pointsToString(ramPoints)} ${ramPoints[ramPoints.length-1].x},${height}`}
+                          fill="url(#ramGrad)"
+                        />
+                      )}
+                      {dbPoints.length > 1 && (
+                        <polygon
+                          points={`${dbPoints[0].x},${height} ${pointsToString(dbPoints)} ${dbPoints[dbPoints.length-1].x},${height}`}
+                          fill="url(#dbGrad)"
+                        />
+                      )}
+
+                      {/* Line curves */}
+                      <polyline fill="none" stroke="#34a853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
+                      <polyline fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(ramPoints)} />
+                      <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(dbPoints)} />
+
+                      {/* Interactive dots on latest point */}
+                      {cpuPoints.length > 0 && (
+                        <>
+                          <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#34a853" stroke="#ffffff" strokeWidth="2" />
+                          <circle cx={ramPoints[ramPoints.length - 1].x} cy={ramPoints[ramPoints.length - 1].y} r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2" />
+                          <circle cx={dbPoints[dbPoints.length - 1].x} cy={dbPoints[dbPoints.length - 1].y} r="5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" />
+                        </>
+                      )}
+                    </svg>
+                  );
+                })()}
+              </div>
+
+              {/* Chart Legend */}
+              <div style={{
+                display: 'flex',
+                gap: '24px',
+                justifyContent: 'center',
+                marginTop: '8px',
+                flexWrap: 'wrap'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  <span style={{ width: '12px', height: '3px', background: '#34a853', borderRadius: '2px' }} />
+                  CPU-Auslastung (Skaliert auf 4.0 Cores)
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  <span style={{ width: '12px', height: '3px', background: '#6366f1', borderRadius: '2px' }} />
+                  RAM-Belegung %
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                  <span style={{ width: '12px', height: '3px', background: '#a855f7', borderRadius: '2px' }} />
+                  Aktive DB-Verbindungen %
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Business KPIs & Umsatz-Analyse (Collapsible) */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid rgba(15, 23, 42, 0.06)',
+          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+          padding: '32px',
+          marginTop: '12px'
+        }}>
+          {/* Toggle Header */}
+          <div 
+            onClick={() => setBusinessAnalyticsExpanded(prev => !prev)}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: 'rgba(52, 168, 83, 0.1)',
+                color: '#34a853',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Tag size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                  Business KPIs &amp; Umsatz-Analyse
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                  Umsatzverteilung, Modul-Adoption und aktive Abonnements
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                color: '#34a853',
+                background: 'rgba(52, 168, 83, 0.08)',
+                padding: '6px 14px',
+                borderRadius: '9999px'
+              }}>
+                MRR: {mrrTotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+              </span>
+              <div style={{ color: '#64748b', display: 'flex', alignItems: 'center' }}>
+                {businessAnalyticsExpanded ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible Content */}
+          {businessAnalyticsExpanded && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobileOrTablet ? '1fr' : '1fr 1fr',
+              gap: '32px',
+              borderTop: '1px solid rgba(15, 23, 42, 0.06)',
+              paddingTop: '24px'
+            }} className="animate-fade-in">
+              
+              {/* Left Block: MRR Breakdown */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Monatlicher Bruttoumsatz (MRR Breakdown)
+                </h4>
+
+                <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '20px', border: '1px solid rgba(15, 23, 42, 0.03)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                      <span>Server-Hosting-Flatrate (Module)</span>
+                      <span style={{ fontWeight: 800 }}>{baseSubTotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                      <span>Teammitglieder-Betreuungsgebühr</span>
+                      <span style={{ fontWeight: 800 }}>{staffSubTotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                      <span>Schüleraktivierungs-Lizenzen (Sammelzahler)</span>
+                      <span style={{ fontWeight: 800 }}>{studentActiveSubTotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                      <span>Schülerdatenbank-Speichergebühr (Passiv)</span>
+                      <span style={{ fontWeight: 800 }}>{studentPassiveSubTotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid rgba(15, 23, 42, 0.05)', paddingTop: '10px', fontSize: '0.72rem', color: '#64748b', fontWeight: 650, fontStyle: 'italic' }}>
+                    * Die Campus-Groovelab Softwarelizenz ist zu 100% kostenlos. Berechnet werden ausschließlich Server-Hostinggebühren, Team-Betreuungen und Schülerlizenzen.
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Block: Module Share */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Modul-Adoption &amp; Testphasen
+                </h4>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                      <span>Abonnements nach Modulen</span>
+                      <span style={{ fontWeight: 800 }}>{campusOnlyCount} Campus / {groovelabOnlyCount} GrooveLab / {kombiCount} Kombi</span>
+                    </div>
+                    {(() => {
+                      const totalSubscribed = campusOnlyCount + groovelabOnlyCount + kombiCount;
+                      const campusPct = totalSubscribed > 0 ? (campusOnlyCount / totalSubscribed) * 100 : 0;
+                      const groovelabPct = totalSubscribed > 0 ? (groovelabOnlyCount / totalSubscribed) * 100 : 0;
+                      const kombiPct = totalSubscribed > 0 ? (kombiCount / totalSubscribed) * 100 : 0;
+                      return (
+                        <div style={{ height: '14px', background: '#e2e8f0', borderRadius: '7px', overflow: 'hidden', display: 'flex' }}>
+                          {campusOnlyCount > 0 && <div style={{ width: `${campusPct}%`, background: '#34a853', height: '100%' }} title="Campus-Modul" />}
+                          {groovelabOnlyCount > 0 && <div style={{ width: `${groovelabPct}%`, background: '#facc15', height: '100%' }} title="GrooveLab-Modul" />}
+                          {kombiCount > 0 && <div style={{ width: `${kombiPct}%`, background: '#3b82f6', height: '100%' }} title="Kombi-Vorteil" />}
+                        </div>
+                      );
+                    })()}
+                    <div style={{ display: 'flex', gap: '14px', marginTop: '6px', fontSize: '0.7rem', fontWeight: 650, color: '#64748b' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853' }} /> Campus Only
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#facc15' }} /> GrooveLab Only
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} /> Kombi-Vorteil
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid rgba(15, 23, 42, 0.03)' }}>
+                      <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>AKTIVE ZAHLER</span>
+                      <strong style={{ fontSize: '1.2rem', color: '#0f172a', fontWeight: 900 }}>{activePaidCount} Schulen</strong>
+                    </div>
+                    <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid rgba(15, 23, 42, 0.03)' }}>
+                      <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>TESTPHASEN</span>
+                      <strong style={{ fontSize: '1.2rem', color: '#f59e0b', fontWeight: 900 }}>{activeTrialCount} Schulen</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const handleSaveSchoolDetails = async () => {
     if (!selectedSchool || !editName.trim()) return;
     try {
@@ -642,14 +2256,18 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         { data: staffUsers },
         { data: songs },
         { data: bands },
-        { count: sessionCount }
+        { count: sessionCount },
+        { data: invoiceData }
       ] = await Promise.all([
         supabase.from('school_user_statistics').select('*'),
         supabase.from('users').select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated').or('role.eq.secretary,role.eq.admin,role.eq.teacher'),
         supabase.from('songs').select('school_id'),
         supabase.from('bands').select('school_id, name'),
-        supabase.from('sessions').select('*', { count: 'exact', head: true })
+        supabase.from('sessions').select('*', { count: 'exact', head: true }),
+        supabase.from('invoices').select('*')
       ]);
+
+      if (invoiceData) setDbInvoices(invoiceData);
 
       const totalTeachersSum = statsData?.reduce((acc, curr) => acc + (curr.teachers || 0), 0) || 0;
       const totalStudentsSum = statsData?.reduce((acc, curr) => acc + (curr.students || 0), 0) || 0;
@@ -1115,1087 +2733,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           boxSizing: 'border-box'
         }}>
           {activePortalTab === 'briefing' ? (
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
-              {/* Header Panel - Greeting */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Guten Morgen, Patrick.
-                  </h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-                    Hier ist dein System-Briefing für heute.
-                  </p>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  <button
-                    onClick={fetchPendingUsers}
-                    disabled={loadingPending}
-                    style={{
-                      padding: '12px 18px',
-                      borderRadius: '14px',
-                      background: '#ffffff',
-                      border: '1px solid rgba(15, 23, 42, 0.08)',
-                      color: '#475569',
-                      fontSize: '0.9rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#ea4335';
-                      e.currentTarget.style.color = '#ffffff';
-                      e.currentTarget.style.borderColor = '#ea4335';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = '#ffffff';
-                      e.currentTarget.style.color = '#475569';
-                      e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)';
-                    }}
-                  >
-                    <RefreshCw size={14} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
-                  </button>
-                </div>
-              </div>
-
-              {/* Stats Cards Dashboard (System Overview) */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                gap: '16px'
-              }}>
-                {/* Total Schools */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '16px',
-                  padding: '14px 18px',
-                  border: '1px solid rgba(15, 23, 42, 0.05)',
-                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  transition: 'transform 0.2s',
-                  cursor: 'default'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Layers size={18} />
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalSchools}</strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schulen</span>
-                  </div>
-                </div>
-
-                {/* Total Teachers */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '16px',
-                  padding: '14px 18px',
-                  border: '1px solid rgba(15, 23, 42, 0.05)',
-                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  transition: 'transform 0.2s',
-                  cursor: 'default'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Award size={18} />
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalTeachers}</strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkräfte</span>
-                  </div>
-                </div>
-
-                {/* Total Students */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '16px',
-                  padding: '14px 18px',
-                  border: '1px solid rgba(15, 23, 42, 0.05)',
-                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  transition: 'transform 0.2s',
-                  cursor: 'default'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Users size={18} />
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalStudents}</strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler</span>
-                  </div>
-                </div>
-
-                {/* Total Active Users */}
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '16px',
-                  padding: '14px 18px',
-                  border: '1px solid rgba(15, 23, 42, 0.05)',
-                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.01)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  transition: 'transform 0.2s',
-                  cursor: 'default'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Users size={18} />
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{stats.totalTeachers + stats.totalStudents}</strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktive Nutzer</span>
-                  </div>
-                </div>
-
-                {/* Pending Activations (Red Highlight) */}
-                <div style={{
-                  background: pendingUsers.length > 0 ? 'rgba(234, 67, 53, 0.05)' : 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(16px)',
-                  borderRadius: '16px',
-                  padding: '14px 18px',
-                  border: pendingUsers.length > 0 ? '1px solid rgba(234, 67, 53, 0.2)' : '1px solid rgba(15, 23, 42, 0.05)',
-                  boxShadow: pendingUsers.length > 0 ? '0 4px 12px rgba(234, 67, 53, 0.05)' : '0 4px 12px rgba(15, 23, 42, 0.01)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  transition: 'transform 0.2s',
-                  cursor: 'default'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: pendingUsers.length > 0 ? 'rgba(234, 67, 53, 0.15)' : 'rgba(100, 116, 139, 0.1)', color: pendingUsers.length > 0 ? '#ea4335' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Clock size={18} />
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: pendingUsers.length > 0 ? '#ea4335' : '#0f172a', fontFamily: '"Outfit", sans-serif', display: 'block', lineHeight: 1.2 }}>{pendingUsers.length}</strong>
-                    <span style={{ fontSize: '0.7rem', color: pendingUsers.length > 0 ? '#ea4335' : '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ausstehend</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Required: Aktivierungs-Center */}
-              <div style={{ marginTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Aktionsbedarf</h3>
-                  {pendingUsers.length > 0 && (
-                    <span style={{ background: '#ea4335', color: 'white', padding: '3px 8px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 800 }}>
-                      {pendingUsers.length} offen
-                    </span>
-                  )}
-                </div>
-
-                {pendingUsers.length === 0 ? (
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.6)',
-                    backdropFilter: 'blur(16px)',
-                    borderRadius: '16px',
-                    border: '1px dashed rgba(15, 23, 42, 0.12)',
-                    padding: '24px',
-                    textAlign: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(52, 168, 83, 0.1)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Check size={20} />
-                    </div>
-                    <div>
-                      <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>Alles erledigt!</h4>
-                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Es liegen aktuell keine offenen Aktivierungen vor. Genieß den Tag.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '24px', minHeight: '520px', alignItems: 'stretch' }}>
-                    
-                    {/* Left Pane: List of pending users */}
-                    <div style={{
-                      flex: '0 0 45%',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      backdropFilter: 'blur(16px)',
-                      borderRadius: '24px',
-                      border: '1px solid rgba(15, 23, 42, 0.06)',
-                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden'
-                    }}>
-                      {/* Batch Action Bar if selected */}
-                      {selectedUserIds.length > 0 && (
-                        <div style={{ padding: '12px 20px', background: 'rgba(234, 67, 53, 0.05)', borderBottom: '1px solid rgba(234, 67, 53, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ea4335' }}>
-                            {selectedUserIds.length} ausgewählt
-                          </span>
-                          <button
-                            onClick={() => handleBatchActivateUsers(selectedUserIds)}
-                            disabled={loadingPending}
-                            style={{
-                              padding: '8px 14px',
-                              borderRadius: '10px',
-                              background: '#ea4335',
-                              border: 'none',
-                              color: '#ffffff',
-                              fontSize: '0.8rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              boxShadow: '0 4px 12px rgba(234, 67, 53, 0.3)',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(234, 67, 53, 0.4)'; }}
-                            onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(234, 67, 53, 0.3)'; }}
-                          >
-                            Ausgewählte freischalten
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Search Bar inside pane */}
-                      <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)', position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: '32px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                        <input
-                          type="text"
-                          value={pendingSearchQuery}
-                          onChange={(e) => setPendingSearchQuery(e.target.value)}
-                          placeholder="Suche Name, Schule, Ausweis-Nr..."
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '10px 14px 10px 36px',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(15, 23, 42, 0.08)',
-                            background: '#f8fafc',
-                            color: '#0f172a',
-                            fontSize: '0.85rem',
-                            fontWeight: 700,
-                            outline: 'none',
-                            transition: 'all 0.2s'
-                          }}
-                          onFocus={(e) => { e.currentTarget.style.borderColor = '#ea4335'; e.currentTarget.style.background = '#ffffff'; }}
-                          onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(15, 23, 42, 0.08)'; e.currentTarget.style.background = '#f8fafc'; }}
-                        />
-                      </div>
-
-                      {/* Bulk Select Utility bar */}
-                      <div style={{
-                        padding: '10px 20px',
-                        background: '#f8fafc',
-                        borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.8rem',
-                        color: '#64748b',
-                        fontWeight: 600
-                      }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={pendingUsers.length > 0 && selectedUserIds.length === pendingUsers.length}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedUserIds(pendingUsers.map(u => u.id));
-                              } else {
-                                setSelectedUserIds([]);
-                              }
-                            }}
-                            style={{ width: '16px', height: '16px', borderRadius: '4px', cursor: 'pointer', accentColor: '#ea4335' }}
-                          />
-                          <span>Alle {pendingUsers.length} auswählen</span>
-                        </label>
-                      </div>
-
-                      {/* Scrollable list */}
-                      <div style={{ flex: 1, overflowY: 'auto', maxHeight: '450px', padding: '12px' }}>
-                        {loadingPending ? (
-                          <div style={{ padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '28px', height: '28px', border: '3px solid rgba(234, 67, 53, 0.1)', borderTopColor: '#ea4335', borderRadius: '50%' }} className="animate-spin" />
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Lade Schüler...</span>
-                          </div>
-                        ) : (
-                          (() => {
-                            const filtered = pendingUsers.filter(u => {
-                              const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
-                              const schoolName = (schools.find(s => s.id === u.school_id)?.name || '').toLowerCase();
-                              const refCode = `CG-${u.ausweis_nummer || ''}`.toLowerCase();
-                              const query = pendingSearchQuery.toLowerCase();
-                              return name.includes(query) || schoolName.includes(query) || refCode.includes(query);
-                            });
-
-                            if (filtered.length === 0) {
-                              return (
-                                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Keine Treffer</div>
-                                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>Die Suche ergab keine Ergebnisse.</div>
-                                </div>
-                              );
-                            }
-
-                            return filtered.map(u => {
-                              const school = schools.find(s => s.id === u.school_id);
-                              const isSelected = selectedUserIds.includes(u.id);
-                              const isFocused = selectedUser?.id === u.id;
-                              
-                              // Format creation date
-                              const ageStr = u.created_at ? (() => {
-                                const diff = Date.now() - new Date(u.created_at).getTime();
-                                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-                                if (days === 0) return 'Heute';
-                                if (days === 1) return 'Gestern';
-                                return `Vor ${days} Tagen`;
-                              })() : '';
-
-                              return (
-                                <div
-                                  key={u.id}
-                                  onClick={() => setSelectedUser(u)}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '14px',
-                                    padding: '14px',
-                                    borderRadius: '16px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                    background: isFocused ? 'rgba(234, 67, 53, 0.06)' : 'transparent',
-                                    border: isFocused ? '1px solid rgba(234, 67, 53, 0.15)' : '1px solid transparent',
-                                    marginBottom: '8px'
-                                  }}
-                                  className="activation-list-item"
-                                  onMouseOver={(e) => { if (!isFocused) e.currentTarget.style.background = '#f8fafc'; }}
-                                  onMouseOut={(e) => { if (!isFocused) e.currentTarget.style.background = 'transparent'; }}
-                                >
-                                  {/* Selection Checkbox */}
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedUserIds(prev => [...prev, u.id]);
-                                      } else {
-                                        setSelectedUserIds(prev => prev.filter(id => id !== u.id));
-                                      }
-                                    }}
-                                    style={{ width: '18px', height: '18px', borderRadius: '4px', cursor: 'pointer', flexShrink: 0, accentColor: '#ea4335' }}
-                                  />
-
-                                  {/* Student Initials Avatar */}
-                                  <div style={{
-                                    width: '42px',
-                                    height: '42px',
-                                    borderRadius: '50%',
-                                    background: school?.primary_color ? `${school.primary_color}15` : 'rgba(15, 23, 42, 0.05)',
-                                    color: school?.primary_color || '#0f172a',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '0.9rem',
-                                    fontWeight: 800,
-                                    flexShrink: 0
-                                  }}>
-                                    {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
-                                  </div>
-
-                                  {/* User Info details */}
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                                      <strong style={{ fontSize: '0.95rem', color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
-                                        {u.first_name} {u.last_name}
-                                      </strong>
-                                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>{ageStr}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                                      <span style={{
-                                        fontSize: '0.72rem',
-                                        fontWeight: 750,
-                                        color: school?.primary_color || '#64748b',
-                                        background: school?.primary_color ? `${school.primary_color}0d` : '#f1f5f9',
-                                        padding: '4px 8px',
-                                        borderRadius: '8px',
-                                        textOverflow: 'ellipsis',
-                                        overflow: 'hidden',
-                                        whiteSpace: 'nowrap',
-                                        maxWidth: '140px'
-                                      }}>
-                                        {school?.name || 'Unbekannte Schule'}
-                                      </span>
-                                      <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 800, color: '#334155', background: '#e2e8f0', padding: '4px 8px', borderRadius: '8px' }}>
-                                        CG-{u.ausweis_nummer || 'OHNE'}
-                                      </span>
-                                      {!u.is_campus_active ? (
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ea4335', background: 'rgba(234, 67, 53, 0.1)', padding: '4px 8px', borderRadius: '8px' }}>
-                                          Neu
-                                        </span>
-                                      ) : (
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#d97706', background: '#fef3c7', padding: '4px 8px', borderRadius: '8px' }}>
-                                          Zahlung offen
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            });
-                          })()
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Pane: Detailed View and Actions */}
-                    <div style={{
-                      flex: '0 0 55%',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      backdropFilter: 'blur(16px)',
-                      borderRadius: '24px',
-                      border: '1px solid rgba(15, 23, 42, 0.06)',
-                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.03)',
-                      padding: '32px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: selectedUser ? 'flex-start' : 'center',
-                      alignItems: selectedUser ? 'stretch' : 'center',
-                      textAlign: selectedUser ? 'left' : 'center'
-                    }}>
-                      {selectedUser ? (
-                        (() => {
-                          const u = selectedUser;
-                          const school = schools.find(s => s.id === u.school_id);
-                          const refCode = `CG-${u.ausweis_nummer || 'OHNE'}`;
-                          const isActivating = activatingUserId === u.id;
-                          
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }} className="animate-fade-in">
-                              {/* Profile Header */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(15, 23, 42, 0.05)' }}>
-                                <div style={{
-                                  width: '64px',
-                                  height: '64px',
-                                  borderRadius: '50%',
-                                  background: school?.primary_color ? `${school.primary_color}1a` : 'rgba(15, 23, 42, 0.05)',
-                                  color: school?.primary_color || '#0f172a',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '1.4rem',
-                                  fontWeight: 900
-                                }}>
-                                  {(u.first_name?.[0] || '') + (u.last_name?.[0] || '')}
-                                </div>
-                                <div>
-                                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
-                                    {u.first_name} {u.last_name}
-                                  </h3>
-                                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Rolle: Schüler (Campus-Groovelab)</span>
-                                </div>
-                              </div>
-
-                              {/* Details List */}
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                                <div>
-                                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikschule</span>
-                                  <strong style={{ fontSize: '0.95rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                                    {school?.name || 'Unbekannte Schule'}
-                                  </strong>
-                                </div>
-                                <div>
-                                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Zahlungsmethode</span>
-                                  <strong style={{ fontSize: '0.95rem', color: '#334155', display: 'block', marginTop: '4px' }}>
-                                    {u.student_billing_payment_method === 'bank_transfer' ? 'Überweisung (Vorkasse)' : u.student_billing_payment_method}
-                                  </strong>
-                                </div>
-                              </div>
-
-                              {/* Reference Code Match Card (Apple-Style Highlight) */}
-                              <div style={{
-                                background: '#f8fafc',
-                                borderRadius: '16px',
-                                padding: '20px 24px',
-                                border: '1px solid rgba(15, 23, 42, 0.05)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '10px'
-                              }}>
-                                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verwendungszweck für Kontomuster</span>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-                                  <code style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.05em', fontFamily: 'monospace' }}>
-                                    {refCode}
-                                  </code>
-                                  
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(refCode);
-                                      setCopiedCodeId(u.id);
-                                      setTimeout(() => setCopiedCodeId(null), 2000);
-                                    }}
-                                    style={{
-                                      background: copiedCodeId === u.id ? '#ea4335' : '#ffffff',
-                                      color: copiedCodeId === u.id ? '#ffffff' : '#475569',
-                                      border: copiedCodeId === u.id ? '1px solid #ea4335' : '1px solid rgba(15, 23, 42, 0.08)',
-                                      borderRadius: '12px',
-                                      padding: '10px 16px',
-                                      fontSize: '0.85rem',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                      transition: 'all 0.2s',
-                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)'
-                                    }}
-                                  >
-                                    {copiedCodeId === u.id ? (
-                                      <>Kopiert ✓</>
-                                    ) : (
-                                      <>
-                                        <Copy size={14} /> Kopieren
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Fee calculation details */}
-                              <div style={{
-                                background: 'rgba(234, 67, 53, 0.03)',
-                                border: '1px solid rgba(234, 67, 53, 0.1)',
-                                borderRadius: '16px',
-                                padding: '20px 24px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}>
-                                <div>
-                                  <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b' }}>Zu zahlender Gesamtbetrag:</strong>
-                                  <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 650 }}>Monatliche Lizenzgebühr (inkl. MwSt.)</span>
-                                </div>
-                                <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#991b1b' }}>
-                                  {priceStudent} €
-                                </span>
-                              </div>
-
-                              {/* Large Action Buttons */}
-                              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <button
-                                  onClick={() => handleActivateUser(u.id)}
-                                  disabled={isActivating}
-                                  style={{
-                                    width: '100%',
-                                    padding: '18px',
-                                    borderRadius: '16px',
-                                    background: '#ea4335',
-                                    border: 'none',
-                                    color: '#ffffff',
-                                    fontSize: '1rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '10px',
-                                    boxShadow: '0 8px 24px rgba(234, 67, 53, 0.3)',
-                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                                  }}
-                                  onMouseOver={(e) => {
-                                    if (!isActivating) {
-                                      e.currentTarget.style.transform = 'translateY(-2px)';
-                                      e.currentTarget.style.boxShadow = '0 12px 32px rgba(234, 67, 53, 0.4)';
-                                    }
-                                  }}
-                                  onMouseOut={(e) => {
-                                    if (!isActivating) {
-                                      e.currentTarget.style.transform = 'none';
-                                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(234, 67, 53, 0.3)';
-                                    }
-                                  }}
-                                >
-                                  {isActivating ? (
-                                    <><div className="animate-spin" style={{ width: '18px', height: '18px', border: '3px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%' }} /> Aktiviere...</>
-                                  ) : (
-                                    <><Check size={20} /> Zahlung erhalten & Account freischalten</>
-                                  )}
-                                </button>
-                                
-                                <button
-                                  onClick={() => setSelectedUser(null)}
-                                  style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    borderRadius: '16px',
-                                    background: '#f1f5f9',
-                                    border: 'none',
-                                    color: '#64748b',
-                                    fontSize: '0.95rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                  }}
-                                  onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#475569'; }}
-                                  onMouseOut={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
-                                >
-                                  Abbrechen
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div style={{ color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(15, 23, 42, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Users size={32} style={{ color: '#94a3b8' }} />
-                          </div>
-                          <div style={{ textAlign: 'center' }}>
-                            <strong style={{ fontSize: '1.2rem', color: '#0f172a', display: 'block', marginBottom: '8px', fontWeight: 800 }}>Kein Schüler ausgewählt</strong>
-                            <span style={{ fontSize: '0.95rem', lineHeight: '1.5', display: 'block', maxWidth: '300px', margin: '0 auto' }}>Wähle einen Schüler aus der Liste aus, um Zahlungsdetails einzusehen und den Account freizuschalten.</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              
-
-              {/* Server-Systemstatus & Auslastung */}
-              {(() => {
-                const latestMetric = serverMetrics[0] || null;
-                const cpuVal = latestMetric ? latestMetric.cpu_load : 0;
-                const ramUsed = latestMetric ? latestMetric.mem_used_mb : 0;
-                const ramTotal = latestMetric ? latestMetric.mem_total_mb : 8000;
-                const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 0;
-                const dbConns = latestMetric ? latestMetric.active_connections : 0;
-                
-                const diskUsed = latestMetric?.disk_used_gb ?? 18.0;
-                const diskTotal = latestMetric?.disk_total_gb ?? 40.0;
-                const diskPct = diskTotal > 0 ? (diskUsed / diskTotal) * 100 : 0;
-                
-                const volUsed = latestMetric?.volume_used_gb ?? 2.1;
-                const volTotal = latestMetric?.volume_total_gb ?? 14.0;
-                const volPct = volTotal > 0 ? (volUsed / volTotal) * 100 : 0;
-                
-                let healthStatus: 'optimal' | 'warning' | 'critical' = 'optimal';
-                if (cpuVal >= 4.0 || ramPct >= 90 || dbConns >= 80 || diskPct >= 90 || volPct >= 90) {
-                  healthStatus = 'critical';
-                } else if (cpuVal >= 2.0 || ramPct >= 75 || dbConns >= 50 || diskPct >= 75 || volPct >= 75) {
-                  healthStatus = 'warning';
-                }
-
-                // Format timestamp
-                const formattedTime = latestMetric 
-                  ? new Date(latestMetric.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
-                  : '--:--:--';
-
-                return (
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '32px',
-                    border: '1px solid rgba(15, 23, 42, 0.06)',
-                    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '24px'
-                  }}>
-                    {/* Header */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '16px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '12px',
-                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.1)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(52, 168, 83, 0.1)',
-                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#34a853',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <Activity size={20} className={healthStatus === 'critical' ? 'animate-pulse' : ''} />
-                        </div>
-                        <div>
-                          <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                            Server-Systemstatus &amp; Live-Messung
-                          </h3>
-                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                            Hetzner VPS Telemetrie-Agent • Letztes Signal: {formattedTime}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 16px',
-                          borderRadius: '9999px',
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          background: healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.08)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(52, 168, 83, 0.08)',
-                          color: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#d97706' : '#34a853',
-                          border: `1px solid ${healthStatus === 'critical' ? 'rgba(239, 68, 68, 0.15)' : healthStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(52, 168, 83, 0.15)'}`
-                        }}>
-                          <span style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: healthStatus === 'critical' ? '#ef4444' : healthStatus === 'warning' ? '#f59e0b' : '#34a853',
-                            display: 'inline-block'
-                          }} />
-                          {healthStatus === 'critical' && 'KRITISCH (Upgrade empfohlen)'}
-                          {healthStatus === 'warning' && 'WARNUNG (Auslastung erhöht)'}
-                          {healthStatus === 'optimal' && 'OPTIMAL (Gesund)'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Critical Alert Callout */}
-                    {healthStatus === 'critical' && (
-                      <div style={{
-                        background: 'rgba(239, 68, 68, 0.03)',
-                        border: '1px solid rgba(239, 68, 68, 0.15)',
-                        borderRadius: '16px',
-                        padding: '18px 24px',
-                        display: 'flex',
-                        gap: '16px',
-                        alignItems: 'flex-start'
-                      }}>
-                        <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.9rem', color: '#991b1b', fontWeight: 800, marginBottom: '4px' }}>
-                            Achtung: Der Server erreicht seine Leistungsgrenzen!
-                          </strong>
-                          <span style={{ fontSize: '0.82rem', color: '#7f1d1d', fontWeight: 550, lineHeight: 1.5 }}>
-                            Aufgrund hoher Auslastung (CPU Load ≥ 4.0, RAM ≥ 90% oder offene DB-Verbindungen ≥ 80) läuft das System am Limit.
-                            Ein Umstieg auf einen leistungsstärkeren Hetzner Cloud Server (z. B. Upgrade auf CX32 oder CX42 mit mehr CPU-Kernen und RAM) wird dringend empfohlen, um Server-Ausfälle oder Verzögerungen für die Schulen zu vermeiden.
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Gauges Grid */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '16px'
-                    }}>
-                      {/* CPU Metric Card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '16px 20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <Cpu size={14} /> CPU Auslastung
-                          </span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#d97706' : '#34a853' }}>
-                            {cpuVal.toFixed(2)} / 2.0 Cores
-                          </span>
-                        </div>
-                        {/* Custom progress bar */}
-                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${Math.min((cpuVal / 2.0) * 100, 100)}%`,
-                            background: cpuVal >= 4.0 ? '#ef4444' : cpuVal >= 2.0 ? '#f59e0b' : '#34a853',
-                            borderRadius: '4px',
-                            transition: 'width 0.5s ease-in-out'
-                          }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>Auslastung: {Math.round((cpuVal / 2.0) * 100)}%</span>
-                          <span>{cpuVal >= 4.0 ? 'Kritisch' : cpuVal >= 2.0 ? 'Warnung' : 'Stabil'}</span>
-                        </div>
-                      </div>
-
-                      {/* RAM Metric Card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '16px 20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <Sliders size={14} /> Arbeitsspeicher (RAM)
-                          </span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#d97706' : '#34a853' }}>
-                            {(ramUsed / 1024).toFixed(2)} / {(ramTotal / 1024).toFixed(0)} GB
-                          </span>
-                        </div>
-                        {/* Custom progress bar */}
-                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${Math.min(ramPct, 100)}%`,
-                            background: ramPct >= 90 ? '#ef4444' : ramPct >= 75 ? '#f59e0b' : '#34a853',
-                            borderRadius: '4px',
-                            transition: 'width 0.5s ease-in-out'
-                          }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>Belegt: {Math.round(ramPct)}%</span>
-                          <span>{ramPct >= 90 ? 'Kritisch' : ramPct >= 75 ? 'Warnung' : 'Stabil'}</span>
-                        </div>
-                      </div>
-
-                      {/* DB Connections Metric Card */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '16px 20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <Database size={14} /> DB Pool Connections
-                          </span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#d97706' : '#34a853' }}>
-                            {dbConns} / 100
-                          </span>
-                        </div>
-                        {/* Custom progress bar */}
-                        <div style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${Math.min(dbConns, 100)}%`,
-                            background: dbConns >= 80 ? '#ef4444' : dbConns >= 50 ? '#f59e0b' : '#34a853',
-                            borderRadius: '4px',
-                            transition: 'width 0.5s ease-in-out'
-                          }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
-                          <span>Auslastung: {dbConns}%</span>
-                          <span>{dbConns >= 80 ? 'Kritisch' : dbConns >= 50 ? 'Warnung' : 'Stabil'}</span>
-                        </div>
-                      </div>
-
-                      {/* Combined Storage Metric Card (SSD & Cloud Volume) */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '16px',
-                        padding: '16px 20px',
-                        border: '1px solid rgba(15, 23, 42, 0.04)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                          <HardDrive size={14} /> Speicher &amp; Cloud-Volumes
-                        </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {/* SSD Item */}
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                              <span>SSD Festplatte</span>
-                              <span style={{ fontWeight: 800, color: diskPct >= 90 ? '#ef4444' : diskPct >= 75 ? '#d97706' : '#34a853' }}>
-                                {diskUsed.toFixed(1)} / {diskTotal.toFixed(0)} GB
-                              </span>
-                            </div>
-                            <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{
-                                height: '100%',
-                                width: `${Math.min(diskPct, 100)}%`,
-                                background: diskPct >= 90 ? '#ef4444' : diskPct >= 75 ? '#f59e0b' : '#34a853',
-                                borderRadius: '3px',
-                                transition: 'width 0.5s ease-in-out'
-                              }} />
-                            </div>
-                          </div>
-
-                          {/* Cloud Item */}
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                              <span>Cloud Storage</span>
-                              <span style={{ fontWeight: 800, color: volPct >= 90 ? '#ef4444' : volPct >= 75 ? '#d97706' : '#34a853' }}>
-                                {volUsed.toFixed(1)} / {volTotal.toFixed(0)} GB
-                              </span>
-                            </div>
-                            <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{
-                                height: '100%',
-                                width: `${Math.min(volPct, 100)}%`,
-                                background: volPct >= 90 ? '#ef4444' : volPct >= 75 ? '#f59e0b' : '#34a853',
-                                borderRadius: '3px',
-                                transition: 'width 0.5s ease-in-out'
-                              }} />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#64748b', fontWeight: 600, marginTop: '8px' }}>
-                          <span>SSD: {Math.round(diskPct)}% belegt</span>
-                          <span>Cloud: {Math.round(volPct)}% belegt</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timeline Trend Chart */}
-                    {serverMetrics.length > 1 && (
-                      <div style={{
-                        borderTop: '1px solid rgba(15, 23, 42, 0.06)',
-                        paddingTop: '24px'
-                      }}>
-                        <h4 style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 800, margin: '0 0 16px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Auslastungshistorie (Letzte 30 Messungen)
-                        </h4>
-                        
-                        {/* Interactive SVG Chart */}
-                        <div style={{ width: '100%', height: '140px', position: 'relative' }}>
-                          {(() => {
-                            const data = [...serverMetrics].reverse();
-                            const width = 800; // virtual width for SVG viewbox
-                            const height = 120; // virtual height for SVG viewbox
-                            
-                            // Normalization helper
-                            const getPoints = (valExtractor: (m: ServerMetric) => number, maxVal: number) => {
-                              return data.map((m, index) => {
-                                const x = (index / (data.length - 1)) * width;
-                                const y = height - (Math.min(valExtractor(m), maxVal) / maxVal) * (height - 10) - 5;
-                                return { x, y };
-                              });
-                            };
-
-                            const cpuPoints = getPoints((m) => m.cpu_load, 4.0);
-                            const ramPoints = getPoints((m) => (m.mem_used_mb / (m.mem_total_mb || 8000)) * 100, 100);
-                            const dbPoints = getPoints((m) => m.active_connections, 100);
-
-                            const pointsToString = (pts: { x: number, y: number }[]) => {
-                              return pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                            };
-
-                            return (
-                              <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                                {/* Definitions for grid line pattern or gradients */}
-                                <defs>
-                                  <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#34a853" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#34a853" stopOpacity="0.00"/>
-                                  </linearGradient>
-                                  <linearGradient id="ramGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00"/>
-                                  </linearGradient>
-                                  <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#a855f7" stopOpacity="0.25"/>
-                                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.00"/>
-                                  </linearGradient>
-                                </defs>
-
-                                {/* Y-axis gridlines */}
-                                <line x1="0" y1={height * 0.25} x2={width} y2={height * 0.25} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                                <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-                                <line x1="0" y1={height * 0.75} x2={width} y2={height * 0.75} stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3,3" />
-
-                                {/* Area below curves (fill) */}
-                                {cpuPoints.length > 1 && (
-                                  <polygon
-                                    points={`${cpuPoints[0].x},${height} ${pointsToString(cpuPoints)} ${cpuPoints[cpuPoints.length-1].x},${height}`}
-                                    fill="url(#cpuGrad)"
-                                  />
-                                )}
-                                {ramPoints.length > 1 && (
-                                  <polygon
-                                    points={`${ramPoints[0].x},${height} ${pointsToString(ramPoints)} ${ramPoints[ramPoints.length-1].x},${height}`}
-                                    fill="url(#ramGrad)"
-                                  />
-                                )}
-                                {dbPoints.length > 1 && (
-                                  <polygon
-                                    points={`${dbPoints[0].x},${height} ${pointsToString(dbPoints)} ${dbPoints[dbPoints.length-1].x},${height}`}
-                                    fill="url(#dbGrad)"
-                                  />
-                                )}
-
-                                {/* Line curves */}
-                                <polyline fill="none" stroke="#34a853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(cpuPoints)} />
-                                <polyline fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(ramPoints)} />
-                                <polyline fill="none" stroke="#a855f7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsToString(dbPoints)} />
-
-                                {/* Interactive dots on latest point */}
-                                {cpuPoints.length > 0 && (
-                                  <>
-                                    <circle cx={cpuPoints[cpuPoints.length - 1].x} cy={cpuPoints[cpuPoints.length - 1].y} r="5" fill="#34a853" stroke="#ffffff" strokeWidth="2" />
-                                    <circle cx={ramPoints[ramPoints.length - 1].x} cy={ramPoints[ramPoints.length - 1].y} r="5" fill="#6366f1" stroke="#ffffff" strokeWidth="2" />
-                                    <circle cx={dbPoints[dbPoints.length - 1].x} cy={dbPoints[dbPoints.length - 1].y} r="5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" />
-                                  </>
-                                )}
-                              </svg>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Chart Legend */}
-                        <div style={{
-                          display: 'flex',
-                          gap: '24px',
-                          justifyContent: 'center',
-                          marginTop: '8px',
-                          flexWrap: 'wrap'
-                        }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#34a853', borderRadius: '2px' }} />
-                            CPU-Auslastung (Skaliert auf 4.0 Cores)
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#6366f1', borderRadius: '2px' }} />
-                            RAM-Belegung %
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
-                            <span style={{ width: '12px', height: '3px', background: '#a855f7', borderRadius: '2px' }} />
-                            Aktive DB-Verbindungen %
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              
-            </div>
-            </div>
-
+            renderBriefingTab()
           ) : activePortalTab === 'billing' ? (
             <div className="animate-fade-in">
-              <BillingDashboard />
+              <BillingDashboard preselectedSchoolId={preselectedSchoolId || undefined} />
             </div>
           ) : activePortalTab === 'pricing' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
@@ -3365,90 +3906,34 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     </button>
                   </div>
 
-                  {/* Search Input */}
-                  <div style={{ position: 'relative', marginBottom: '24px' }}>
-                    <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="text"
-                      placeholder="Suche nach Schulname, PLZ oder Ort..."
-                      value={schoolSearchQuery}
-                      onChange={(e) => setSchoolSearchQuery(e.target.value)}
-                      style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: '12px 16px 12px 44px',
-                        borderRadius: '12px',
-                        border: '1px solid rgba(15, 23, 42, 0.08)',
-                        background: '#f8fafc',
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
-                        color: '#0f172a',
-                        outline: 'none',
-                        transition: 'all 0.25s ease'
-                      }}
-                      className="search-input-field"
-                    />
-                  </div>
-
-                  {/* Filters & View Toggles Row (Apple Standard Segmented Controls) */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                    {/* Status filter segment group */}
-                    <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.04)' }}>
-                      {[
-                        { id: 'all', label: 'Alle' },
-                        { id: 'campus', label: 'Campus' },
-                        { id: 'groovelab', label: 'GrooveLab' },
-                        { id: 'bypass', label: 'Bypass' },
-                        { id: 'paused', label: 'Pausiert' }
-                      ].map(seg => {
-                        const IconComponent = 
-                          seg.id === 'campus' ? GraduationCap :
-                          seg.id === 'groovelab' ? Music :
-                          seg.id === 'bypass' ? Sliders :
-                          seg.id === 'paused' ? Clock : null;
-
-                        return (
-                          <button
-                            key={seg.id}
-                            type="button"
-                            onClick={() => {
-                              setFilterSegment(seg.id as any);
-                              setCurrentPage(1);
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '9px',
-                              border: 'none',
-                              background: filterSegment === seg.id ? '#ffffff' : 'transparent',
-                              color: filterSegment === seg.id ? '#0f172a' : '#64748b',
-                              fontSize: '0.78rem',
-                              fontWeight: 750,
-                              cursor: 'pointer',
-                              boxShadow: filterSegment === seg.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                              transition: 'all 0.15s ease',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            {IconComponent && (
-                              <IconComponent 
-                                size={12} 
-                                style={{ 
-                                  color: filterSegment === seg.id 
-                                    ? (seg.id === 'campus' ? '#34a853' : seg.id === 'groovelab' ? '#ca8a04' : seg.id === 'bypass' ? '#dc2626' : '#64748b') 
-                                    : '#64748b' 
-                                }} 
-                              />
-                            )}
-                            <span>{seg.label}</span>
-                          </button>
-                        );
-                      })}
+                  {/* Search Input & View Toggles Row */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <input
+                        type="text"
+                        placeholder="Suche nach Schulname, PLZ oder Ort..."
+                        value={schoolSearchQuery}
+                        onChange={(e) => setSchoolSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '12px 16px 12px 44px',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(15, 23, 42, 0.08)',
+                          background: '#f8fafc',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          outline: 'none',
+                          transition: 'all 0.25s ease'
+                        }}
+                        className="search-input-field"
+                      />
                     </div>
 
                     {/* Grid/List Layout Mode buttons */}
-                    <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.04)' }}>
+                    <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.04)', flexShrink: 0 }}>
                       <button
                         type="button"
                         onClick={() => setViewLayout('grid')}
@@ -3489,6 +3974,66 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         <List size={13} />
                         <span style={{ fontSize: '0.78rem', fontWeight: 750 }}>Liste</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Filters Row */}
+                  <div style={{ display: 'flex', marginBottom: '24px' }}>
+                    {/* Status filter segment group */}
+                    <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', border: '1px solid rgba(15,23,42,0.04)', width: '100%', justifyContent: 'space-around' }}>
+                      {[
+                        { id: 'all', label: 'Alle' },
+                        { id: 'campus', label: 'Campus' },
+                        { id: 'groovelab', label: 'GrooveLab' },
+                        { id: 'bypass', label: 'Bypass' },
+                        { id: 'paused', label: 'Pausiert' }
+                      ].map(seg => {
+                        const IconComponent = 
+                          seg.id === 'campus' ? GraduationCap :
+                          seg.id === 'groovelab' ? Music :
+                          seg.id === 'bypass' ? Sliders :
+                          seg.id === 'paused' ? Clock : null;
+
+                        return (
+                          <button
+                            key={seg.id}
+                            type="button"
+                            onClick={() => {
+                              setFilterSegment(seg.id as any);
+                              setCurrentPage(1);
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '9px',
+                              border: 'none',
+                              background: filterSegment === seg.id ? '#ffffff' : 'transparent',
+                              color: filterSegment === seg.id ? '#0f172a' : '#64748b',
+                              fontSize: '0.78rem',
+                              fontWeight: 750,
+                              cursor: 'pointer',
+                              boxShadow: filterSegment === seg.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                              transition: 'all 0.15s ease',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              flex: 1
+                            }}
+                          >
+                            {IconComponent && (
+                              <IconComponent 
+                                size={12} 
+                                style={{ 
+                                  color: filterSegment === seg.id 
+                                    ? (seg.id === 'campus' ? '#34a853' : seg.id === 'groovelab' ? '#ca8a04' : seg.id === 'bypass' ? '#dc2626' : '#64748b') 
+                                    : '#64748b' 
+                                }} 
+                              />
+                            )}
+                            <span>{seg.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -3793,208 +4338,213 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                       })}
                     </div>
                   ) : (
-                    /* List Layout Table Render */
-                    <div style={{ overflowX: 'hidden', background: '#ffffff', borderRadius: '16px', border: '1px solid rgba(15, 23, 42, 0.05)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                        <thead>
-                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid rgba(15, 23, 42, 0.06)' }}>
-                            <th style={{ padding: '10px 12px', fontWeight: 800, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>Schule / Standort</th>
-                            <th style={{ padding: '10px 12px', fontWeight: 800, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>Lizenzen</th>
-                            <th style={{ padding: '10px 12px', fontWeight: 800, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>Nutzer</th>
-                            <th style={{ padding: '10px 12px', fontWeight: 800, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>Status</th>
-                            <th style={{ padding: '10px 12px', fontWeight: 800, color: '#475569', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Aktionen</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {paginatedSchools.map((school) => {
-                            const teachers = schoolStats[school.id]?.teachers || 0;
-                            const students = schoolStats[school.id]?.students || 0;
-                            const bands = schoolStats[school.id]?.bands || 0;
-                            
-                            return (
-                              <tr 
-                                key={school.id}
-                                onClick={() => {
-                                  setSelectedSchool(school);
-                                  setShowMobileDetail(true);
-                                  setEditName(school.name);
-                                  setEditColor(school.primary_color || '#3b82f6');
-                                  setEditLogo(school.logo_url || '');
-                                  setEditStatus(school.status || 'active');
-                                  setEditIsTrial(school.is_trial ?? true);
-                                  setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
-                                  setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
-                                  setEditMaxTeachers(school.max_teachers ?? 2);
-                                  setEditMaxStudents(school.max_students ?? 6);
-                                  setEditMaxSongs(school.max_songs ?? 5);
-                                  setEditLimitsEnabled(school.limits_enabled ?? false);
-                                  setEditTrialOption('custom');
-                                  setEditZipCode(school.zip_code || '');
-                                  setEditCity(school.city || '');
-                                  setEditEmail(school.email || '');
-                                  setEditPhoneNumber(school.phone_number || '');
-                                  setEditHasGroovelab(school.has_groovelab_subscription ?? false);
-                                  setEditHasCampus(school.has_campus_subscription ?? false);
-                                  setEditSubscriptionBypass(school.subscription_bypass ?? false);
-                                }}
-                                style={{ 
-                                  borderBottom: '1px solid rgba(15, 23, 42, 0.04)', 
-                                  cursor: 'pointer',
-                                  transition: 'background 0.15s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                              >
-                                {/* Name / Logo & Standort subtitle */}
-                                <td style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                  <div style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '8px',
-                                    background: `linear-gradient(135deg, ${school.primary_color || '#3b82f6'} 0%, ${school.primary_color ? school.primary_color + 'cc' : '#1d4ed8'} 100%)`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontWeight: 900,
-                                    color: '#ffffff',
-                                    fontSize: '0.8rem',
-                                    flexShrink: 0,
-                                    overflow: 'hidden'
-                                  }}>
-                                    {school.logo_url ? (
-                                      <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#ffffff' }} alt="" />
-                                    ) : (
-                                      school.name.substring(0, 2).toUpperCase()
-                                    )}
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.82rem', lineHeight: '1.2' }}>{school.name}</span>
-                                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                                      {school.zip_code || school.city ? `${school.zip_code || ''} ${school.city || ''}` : 'Kein Standort'}
-                                    </span>
-                                  </div>
-                                </td>
+                    /* List Layout Card Render matching screenshot */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {paginatedSchools.map((school) => {
+                        const teachers = schoolStats[school.id]?.teachers || 0;
+                        const students = schoolStats[school.id]?.students || 0;
+                        
+                        return (
+                          <div 
+                            key={school.id}
+                            onClick={() => {
+                              setSelectedSchool(school);
+                              setShowMobileDetail(true);
+                              setEditName(school.name);
+                              setEditColor(school.primary_color || '#3b82f6');
+                              setEditLogo(school.logo_url || '');
+                              setEditStatus(school.status || 'active');
+                              setEditIsTrial(school.is_trial ?? true);
+                              setEditTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : '');
+                              setEditContractEndsAt(school.contract_ends_at ? new Date(school.contract_ends_at).toISOString().split('T')[0] : '');
+                              setEditMaxTeachers(school.max_teachers ?? 2);
+                              setEditMaxStudents(school.max_students ?? 6);
+                              setEditMaxSongs(school.max_songs ?? 5);
+                              setEditLimitsEnabled(school.limits_enabled ?? false);
+                              setEditTrialOption('custom');
+                              setEditZipCode(school.zip_code || '');
+                              setEditCity(school.city || '');
+                              setEditEmail(school.email || '');
+                              setEditPhoneNumber(school.phone_number || '');
+                              setEditHasGroovelab(school.has_groovelab_subscription ?? false);
+                              setEditHasCampus(school.has_campus_subscription ?? false);
+                              setEditSubscriptionBypass(school.subscription_bypass ?? false);
+                            }}
+                            style={{
+                              background: '#ffffff',
+                              borderRadius: '24px',
+                              border: '1px solid rgba(15, 23, 42, 0.05)',
+                              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.015)',
+                              padding: '16px 24px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              gap: '16px'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 6px 20px rgba(15, 23, 42, 0.03)'}
+                            onMouseOut={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.015)'}
+                            className="school-list-card-item"
+                          >
+                            {/* Left Section */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: 0 }}>
+                              {/* Circle Logo */}
+                              <div style={{
+                                width: '54px',
+                                height: '54px',
+                                borderRadius: '50%',
+                                background: school.primary_color ? `${school.primary_color}10` : '#f1f5f9',
+                                border: `1px solid ${school.primary_color ? `${school.primary_color}20` : 'rgba(15, 23, 42, 0.05)'}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                color: school.primary_color || '#475569',
+                                fontSize: '1rem',
+                                flexShrink: 0,
+                                overflow: 'hidden'
+                              }}>
+                                {school.logo_url ? (
+                                  <img src={school.logo_url} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#ffffff' }} alt="" />
+                                ) : (
+                                  school.name.substring(0, 2).toUpperCase()
+                                )}
+                              </div>
 
-                                {/* Lizenzen Badges */}
-                                <td style={{ padding: '10px 12px' }}>
-                                  <div style={{ display: 'flex', gap: '4px' }}>
-                                    {school.has_campus_subscription && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', padding: '2px 6px', borderRadius: '4px' }}>Campus</span>
-                                    )}
-                                    {school.has_groovelab_subscription && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#ca8a04', background: '#fef9c3', padding: '2px 6px', borderRadius: '4px' }}>GrooveLab</span>
-                                    )}
-                                    {school.subscription_bypass && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#dc2626', background: 'rgba(239, 68, 68, 0.08)', padding: '2px 6px', borderRadius: '4px', border: '1px dashed rgba(239, 68, 68, 0.2)' }}>Bypass</span>
-                                    )}
-                                  </div>
-                                </td>
-
-                                {/* Nutzer Zähler */}
-                                <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#334155' }}>
-                                  <span title="Lehrer">{teachers} L</span>
-                                  <span style={{ margin: '0 4px', color: '#cbd5e1' }}>|</span>
-                                  <span title="Schüler">{students} S</span>
-                                </td>
-
-                                {/* Status */}
-                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                              {/* Info Column */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem', letterSpacing: '-0.01em' }}>
+                                    {school.name}
+                                  </span>
                                   <span style={{
-                                    fontSize: '0.65rem',
-                                    fontWeight: 800,
+                                    fontSize: '0.62rem',
+                                    fontWeight: 900,
                                     padding: '3px 8px',
-                                    borderRadius: '100px',
-                                    background: school.is_paused ? 'rgba(100,116,139,0.1)' : 'rgba(52, 168, 83, 0.12)',
-                                    color: school.is_paused ? '#64748b' : '#34a853'
+                                    borderRadius: '6px',
+                                    background: school.is_paused ? 'rgba(100,116,139,0.08)' : '#e6f4ea',
+                                    color: school.is_paused ? '#64748b' : '#34a853',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em'
                                   }}>
                                     {school.is_paused ? 'Pausiert' : 'Aktiv'}
                                   </span>
-                                </td>
 
-                                {/* Aktionen */}
-                                <td style={{ padding: '10px 12px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleSchoolPause(school.id, school.is_paused)}
-                                      style={{
-                                        border: 'none',
-                                        background: 'transparent',
-                                        color: school.is_paused ? '#34a853' : '#64748b',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background 0.15s'
-                                      }}
-                                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-                                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                                      title={school.is_paused ? 'Aktivieren' : 'Pausieren'}
-                                    >
-                                      <Activity size={14} />
-                                    </button>
+                                  {/* Subscriptions stacked next to the name/status to avoid column collision */}
+                                  {school.has_campus_subscription && (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', background: '#e6f4ea', padding: '4px 10px', borderRadius: '6px' }}>
+                                      Campus
+                                    </span>
+                                  )}
+                                  {school.has_groovelab_subscription && (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', background: '#fef9c3', padding: '4px 10px', borderRadius: '6px' }}>
+                                      GrooveLab
+                                    </span>
+                                  )}
+                                  {school.subscription_bypass && (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', border: '1px dashed rgba(220,38,38,0.2)', padding: '3px 8px', borderRadius: '6px' }}>
+                                      Bypass
+                                    </span>
+                                  )}
+                                </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => copyInviteLink(school.id, school.name, school.secretary_onboarding_token)}
-                                      style={{
-                                        border: 'none',
-                                        background: 'transparent',
-                                        color: copiedId === school.id ? '#34a853' : '#4f46e5',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background 0.15s'
-                                      }}
-                                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-                                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                                      title="Einladungs-Link kopieren"
-                                    >
-                                      {copiedId === school.id ? <Check size={14} /> : <Link size={14} />}
-                                    </button>
+                                <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span>{school.zip_code || school.city ? `${school.zip_code || ''} ${school.city || ''}` : 'Kein Standort'}</span>
+                                  <span style={{ color: '#cbd5e1' }}>•</span>
+                                  <span>{students} Schüler</span>
+                                  <span style={{ color: '#cbd5e1' }}>|</span>
+                                  <span>{teachers} Lehrer</span>
+                                </div>
+                              </div>
+                            </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        if (!window.confirm(`Möchtest du die Schule "${school.name}" wirklich deaktivieren?`)) return;
-                                        try {
-                                          const { error } = await supabase.from('schools').update({ is_active: false }).eq('id', school.id);
-                                          if (error) throw error;
-                                          fetchSchoolsAndStats();
-                                        } catch (err: any) {
-                                          alert("Fehler beim Deaktivieren: " + err.message);
-                                        }
-                                      }}
-                                      style={{
-                                        border: 'none',
-                                        background: 'transparent',
-                                        color: '#dc2626',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background 0.15s'
-                                      }}
-                                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                                      title="Deaktivieren"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                            {/* Right Section */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                              {/* Vertical Separator */}
+                              <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 4px' }} />
+
+                              {/* Action Buttons */}
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSchoolPause(school.id, school.is_paused)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#475569',
+                                    cursor: 'pointer',
+                                    padding: '8px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background 0.15s'
+                                  }}
+                                  onMouseOver={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                                  title={school.is_paused ? 'Aktivieren' : 'Pausieren'}
+                                >
+                                  <Activity size={18} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => copyInviteLink(school.id, school.name, school.secretary_onboarding_token)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#4f46e5',
+                                    cursor: 'pointer',
+                                    padding: '8px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background 0.15s'
+                                  }}
+                                  onMouseOver={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                                  title="Einladungs-Link kopieren"
+                                >
+                                  {copiedId === school.id ? <Check size={18} color="#34a853" /> : <Link size={18} />}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!window.confirm(`Möchtest du die Schule "${school.name}" wirklich deaktivieren?`)) return;
+                                    try {
+                                      const { error } = await supabase.from('schools').update({ is_active: false }).eq('id', school.id);
+                                      if (error) throw error;
+                                      fetchSchoolsAndStats();
+                                    } catch (err: any) {
+                                      alert("Fehler beim Deaktivieren: " + err.message);
+                                    }
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#dc2626',
+                                    cursor: 'pointer',
+                                    padding: '8px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background 0.15s'
+                                  }}
+                                  onMouseOver={(e) => e.currentTarget.style.background = '#fef2f2'}
+                                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                                  title="Schule deaktivieren"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 

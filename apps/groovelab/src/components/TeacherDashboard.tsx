@@ -265,7 +265,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     const targetUser = user;
     
     const r = (targetUser?.role || '').toLowerCase();
-    if ((r === 'admin' || r === 'secretary') && activePlat === 'campus') {
+    if (r === 'admin' || r === 'secretary') {
       return '/campus_login_hero.png';
     }
     
@@ -914,7 +914,7 @@ export function TeacherDashboard({
         ];
       case 'live':
         return [
-          { title: "Das Live Lab 🎸", description: "Hier hast du die volle Kontrolle über den Live-Unterricht und die Raumbelegung.", selector: "tour-teacher-livelab" },
+          { title: "Das Live Lab 🎸", description: "Hier siehst du den visuellen Raum und die Belegung der Stationen durch die Schüler.", selector: "tour-teacher-livelab" },
           { title: "Räume verwalten 🚪", description: "Wähle hier einen Raum aus, um die interaktive Sitzverteilung und die angemeldeten Schüler zu sehen.", selector: "tour-teacher-livelab-rooms" }
         ];
       case 'bands':
@@ -1003,6 +1003,12 @@ export function TeacherDashboard({
     }
     setZoomFactor(1.0);
   }, [selectedRoomId, userId]);
+
+  useEffect(() => {
+    if (selectedRoomId) {
+      localStorage.setItem('groovelab_teacher_selected_room_id', selectedRoomId);
+    }
+  }, [selectedRoomId]);
 
   useEffect(() => {
     if (!userId) return;
