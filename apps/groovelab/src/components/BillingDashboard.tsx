@@ -1233,46 +1233,55 @@ export function BillingDashboard() {
                   <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <h4 style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>Gebührenaufstellung</h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#64748b' }}>Modul-Grundpreis:</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem' }}>
+                          <span style={{ color: '#0f172a', fontWeight: 600 }}>Modul-Grundpreis</span>
                           <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.baseFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
                         {inv.hasKombiDiscount && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#34a853' }}>
-                            <span style={{ fontWeight: 600 }}>Kombi-Vorteilsrabatt:</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#34a853' }}>
+                            <span style={{ fontWeight: 600 }}>Kombi-Vorteilsrabatt</span>
                             <span style={{ fontWeight: 600 }}>-{(2.99).toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#64748b' }}>Infrastruktur- & Server-Hosting ({inv.totalTeachersCount} Lehrkräfte aktiv x 0,49 €):</span>
-                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} €</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur- & Server-Hosting</span>
+                            <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.totalTeachersCount} Lehrkräfte aktiv × 0,49 €</span>
+                          </div>
+                          <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.teachersHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                          <span style={{ color: '#64748b' }}>Datenbank- & Speicher-Hosting ({inv.passiveStudentsCount} Schüler passiv x 0,09 €):</span>
-                          <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} €</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                            <span style={{ color: '#0f172a', fontWeight: 600 }}>Datenbank- & Speicher-Hosting</span>
+                            <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.passiveStudentsCount} Schüler passiv × 0,09 €</span>
+                          </div>
+                          <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.passiveStudentsHostingFee.toFixed(2).replace('.', ',')} €</span>
                         </div>
                         {inv.activeStudentFee > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                            <span style={{ color: '#64748b' }}>Infrastruktur-Bereitstellung ({Math.round(inv.activeStudentFee / 0.49)} Schüler aktiv x 0,49 €):</span>
-                            <span style={{ fontWeight: 650, color: '#0f172a' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                              <span style={{ color: '#0f172a', fontWeight: 600 }}>Infrastruktur-Bereitstellung</span>
+                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{Math.round(inv.activeStudentFee / 0.49)} Schüler aktiv × 0,49 €</span>
+                            </div>
+                            <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{inv.activeStudentFee.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
                         {inv.status === 'bypass' && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
-                            <span>Bypass-Gebührenfreistellung:</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
+                            <span>Bypass-Gebührenfreistellung</span>
                             <span>-{inv.subtotal.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
                         {inv.status === 'trial' && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#ca8a04', fontWeight: 600 }}>
-                            <span>Probezeit-Rabatt (100%):</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#ca8a04', fontWeight: 600 }}>
+                            <span>Probezeit-Rabatt (100%)</span>
                             <span>-{inv.subtotal.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
                         {inv.status === 'suspended' && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
-                            <span>Sperrungs-Berechnungsstopp:</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#dc2626', fontWeight: 600 }}>
+                            <span>Sperrungs-Berechnungsstopp</span>
                             <span>-{inv.subtotal.toFixed(2).replace('.', ',')} €</span>
                           </div>
                         )}
