@@ -270,15 +270,16 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
           padding: 16px 20px;
           border-radius: 16px;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           text-align: left;
           background: transparent;
           border: 1px solid transparent;
         }
         .search-result-item:hover {
-          background: rgba(255, 255, 255, 0.04);
-          border-color: rgba(255, 255, 255, 0.06);
-          transform: translateX(4px);
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.15);
+          transform: scale(1.015) translateY(-1px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 16px rgba(255, 255, 255, 0.05);
         }
         .school-logo-placeholder {
           width: 48px;
@@ -425,8 +426,40 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
                     </div>
                   )}
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#ffffff', marginBottom: '4px' }}>
-                      {school.name}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#ffffff' }}>
+                        {school.name}
+                      </span>
+                      {school.has_campus_subscription && (
+                        <span style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          color: '#34a853',
+                          background: 'rgba(52, 168, 83, 0.1)',
+                          border: '1px solid rgba(52, 168, 83, 0.2)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Campus
+                        </span>
+                      )}
+                      {school.has_groovelab_subscription && (
+                        <span style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          color: '#eab308',
+                          background: 'rgba(234, 179, 8, 0.1)',
+                          border: '1px solid rgba(234, 179, 8, 0.2)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          GrooveLab
+                        </span>
+                      )}
                     </div>
                     {school.city && (
                       <div style={{ fontSize: '0.85rem', color: '#71717a', display: 'flex', alignItems: 'center', gap: '4px' }}>
