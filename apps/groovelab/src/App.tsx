@@ -2205,19 +2205,21 @@ function App() {
   // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
   // automatically resolve a station ID for that room and go directly to the QR-scanner.
   // When kiosk_setup=1 is present (= came from "Beenden" button), show DeviceSetupScreen instead.
+  // CRITICAL: Skip auto-bootstrap if pairing params (kiosk_token, station_id) are present.
   const kioskRoomIdParam = searchParams.get('kiosk_room_id');
   const kioskSetupParam = searchParams.get('kiosk_setup');
+  const isPairingRedirect = searchParams.has('kiosk_token') && searchParams.has('station_id');
 
   const [kioskBootstrapping, setKioskBootstrapping] = useState<boolean>(() => {
-    // Only auto-bootstrap if kiosk_room_id is present AND kiosk_setup is NOT set
-    return !!kioskRoomIdParam && kioskSetupParam !== '1';
+    // Only auto-bootstrap if kiosk_room_id is present AND kiosk_setup is NOT set AND we are NOT in a pairing redirect
+    return !!kioskRoomIdParam && kioskSetupParam !== '1' && !isPairingRedirect;
   });
 
   useEffect(() => {
     const kioskRoomId = searchParams.get('kiosk_room_id');
     const isSetupMode = searchParams.get('kiosk_setup') === '1';
-    // Skip auto-bootstrap when setup mode is requested
-    if (!kioskRoomId || isSetupMode) return;
+    // Skip auto-bootstrap when setup mode is requested or we are in a pairing redirect
+    if (!kioskRoomId || isSetupMode || isPairingRedirect) return;
 
     const bootstrap = async () => {
       try {

@@ -11,7 +11,7 @@
                           localStorage.getItem('groovelab_active_platform') === 'groovelab';
         
         var themeColor = isGrooveLab ? '#eab308' : '#34a853';
-        var title = 'Campus-Groovelab';
+        var title = isGrooveLab ? 'GrooveLab' : 'Campus-Groovelab';
         var appleTouchIcon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/apple-touch-icon.png';
         var favicon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/pwa-icon.png';
         
@@ -31,8 +31,8 @@
           }
           
           manifestObj = {
-            "short_name": "Campus-Groovelab",
-            "name": "Campus-Groovelab",
+            "short_name": "GrooveLab",
+            "name": "GrooveLab",
             "icons": [
               {
                 "src": "/pwa-icon-groovelab.png",
