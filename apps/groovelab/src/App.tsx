@@ -389,6 +389,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallbac
 
 function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isBandReady, onDelete, userBands = [], userId, isExpanded, onToggle, onOpenPdfViewer }: any) {
   const { width } = useWindowSize();
+  const isMobile = width < 768;
   const [activeDifficulty, setActiveDifficulty] = useState('starter'); // 'starter' | 'original'
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isChallengeHovered, setIsChallengeHovered] = useState(false);
@@ -578,21 +579,21 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
   }, [activeSkill.id, activeSkill.progress, isDragging]);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginBottom: '16px', position: 'relative' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '32px', marginBottom: '16px', position: 'relative' }}>
       <div 
         onClick={onToggle}
 
         className={`glass-panel animation-slide-up ${isBandReady ? 'band-ready' : ''} ${activeSkill.progress >= 90 && !activeSkill.is_stage_ready ? 'challenge-glow' : ''}`} 
         style={{ 
-          padding: isExpanded ? '32px' : '20px 24px', 
+          padding: isExpanded ? (isMobile ? '20px' : '32px') : (isMobile ? '14px 16px' : '20px 24px'), 
           position: 'relative', 
           overflow: 'visible', 
-          borderRadius: '28px', 
+          borderRadius: isMobile ? '20px' : '28px', 
           display: 'flex', 
           flexDirection: 'column',
           flex: 1,
           background: 'white', 
-          borderLeft: `8px solid ${isBandReady ? '#f59e0b' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || '#cbd5e1')}`,
+          borderLeft: `${isMobile ? '5px' : '8px'} solid ${isBandReady ? '#f59e0b' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || '#cbd5e1')}`,
           boxShadow: activeSkill.progress >= 90 && !activeSkill.is_stage_ready ? `0 0 30px ${brandColor}22` : '0 10px 30px rgba(0,0,0,0.02)',
           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
           cursor: 'pointer'
@@ -602,7 +603,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
           <div style={{ 
             position: 'absolute', 
             top: '-10px', 
-            right: '60px', 
+            right: isMobile ? '16px' : '60px', 
             background: 'linear-gradient(135deg, #f59e0b, #d97706)', 
             color: 'white', 
             fontSize: '0.65rem', 
@@ -622,15 +623,15 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '32px', width: '100%', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: '320px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '16px' : '32px', width: '100%', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: isMobile ? '100%' : '320px', flexShrink: 0 }}>
             <div 
               onClick={(e) => { 
                 e.stopPropagation(); 
                 if (songGroup.tomplay_url || songGroup.media_link) window.open(songGroup.tomplay_url || songGroup.media_link, '_blank'); 
               }}
               style={{ 
-                width: '52px', height: '52px', borderRadius: '16px', 
+                width: isMobile ? '44px' : '52px', height: isMobile ? '44px' : '52px', borderRadius: isMobile ? '12px' : '16px', 
                 background: (songGroup.tomplay_url || songGroup.media_link) ? 'linear-gradient(135deg, #f8fafc, #f1f5f9)' : '#f8fafc', 
                 color: (songGroup.tomplay_url || songGroup.media_link) ? brandColor : '#cbd5e1', 
                 display: 'flex', alignItems: 'center', justifyContent: 'center', 
@@ -642,20 +643,20 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
               }}
               className={(songGroup.tomplay_url || songGroup.media_link) ? "hover-scale" : ""}
             >
-              <Music size={24} />
+              <Music size={isMobile ? 20 : 24} />
             </div>
             
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '2px' }}>
+            <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '2px' }}>
                 {songGroup.artist}
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
+              <div style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 900, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.1 }}>
                 {songGroup.title}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
               {displaySkills.map((s: any) => (
                 <div 
                   key={s.id} 
@@ -724,10 +725,23 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
               )}
             </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexShrink: 0, paddingLeft: '20px', borderLeft: width > 1000 ? '1px solid #f1f5f9' : 'none', marginLeft: 'auto' }}>
-            <div style={{ textAlign: 'right', minWidth: '100px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: isMobile ? '16px' : '32px', 
+            flexShrink: 0, 
+            paddingLeft: isMobile ? 0 : '20px', 
+            borderLeft: (!isMobile && width > 1000) ? '1px solid #f1f5f9' : 'none', 
+            marginLeft: isMobile ? 0 : 'auto',
+            width: isMobile ? '100%' : 'auto',
+            justifyContent: isMobile ? 'space-between' : 'flex-start',
+            borderTop: isMobile ? '1px solid #f1f5f9' : 'none',
+            paddingTop: isMobile ? '12px' : 0,
+            marginTop: isMobile ? '4px' : 0
+          }}>
+            <div style={{ textAlign: isMobile ? 'left' : 'right', minWidth: isMobile ? 'auto' : '100px' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Gesamt</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 950, color: localProgress >= 100 ? '#34a853' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
+              <div style={{ fontSize: isMobile ? '1.5rem' : '1.75rem', fontWeight: 950, color: localProgress >= 100 ? '#34a853' : (APP_INSTRUMENT_COLORS[activeSkill.instrument] || brandColor), lineHeight: 1 }}>
                 {localProgress}%
               </div>
             </div>
@@ -735,7 +749,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
             <button 
               onClick={(e) => { e.stopPropagation(); onToggle(); }} 
               style={{ 
-                width: '44px', height: '44px', borderRadius: '14px', 
+                width: isMobile ? '36px' : '44px', height: isMobile ? '36px' : '44px', borderRadius: isMobile ? '10px' : '14px', 
                 background: isExpanded ? '#1e293b' : '#f8fafc', 
                 border: 'none', 
                 color: isExpanded ? 'white' : '#64748b', 
@@ -746,7 +760,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
                 flexShrink: 0
               }}
             >
-              <ChevronDown size={24} />
+              <ChevronDown size={isMobile ? 20 : 24} />
             </button>
           </div>
         </div>
@@ -760,9 +774,9 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
           paddingTop: isExpanded ? '32px' : '0', 
           borderTop: isExpanded ? '2px solid #f8fafc' : 'none' 
         }}>
-          <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: isMobile ? '20px' : '48px', alignItems: 'flex-start', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
             
-            <div style={{ flex: 2, minWidth: '300px' }}>
+            <div style={{ flex: isMobile ? '1 1 100%' : 2, minWidth: '300px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b' }}>Schwierigkeitsgrad:</div>
@@ -929,7 +943,7 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
               )}
             </div>
 
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '200px', paddingTop: '40px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minWidth: '200px', paddingTop: isMobile ? '12px' : '40px' }}>
               {!activeSkill.is_pending_approval && !activeSkill.is_stage_ready && localProgress >= 90 && (
                 <button 
                   
@@ -3149,6 +3163,7 @@ function App() {
       }
   }, [user, activePlatform, activeStudentTab]);
   const { width, height } = useWindowSize();
+  const isMobile = width < 768;
 
   const [liveSessionMins, setLiveSessionMins] = useState(0);
 
@@ -11223,10 +11238,25 @@ function App() {
                 </div>
 
                 {/* Alphabet Bar */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', background: 'white', padding: '10px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                <div 
+                  className="hide-scrollbar"
+                  style={{ 
+                    display: 'flex', 
+                    gap: '6px', 
+                    background: 'white', 
+                    padding: '10px', 
+                    borderRadius: '16px', 
+                    border: '1px solid #f1f5f9', 
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                    overflowX: 'auto',
+                    scrollbarWidth: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                    minWidth: 0
+                  }}
+                >
                   <button
                     onClick={() => setPracticeAlphaFilter(null)}
-                    style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !practiceAlphaFilter ? brandColor : '#f8fafc', color: !practiceAlphaFilter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px' }}
+                    style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !practiceAlphaFilter ? brandColor : '#f8fafc', color: !practiceAlphaFilter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px', flexShrink: 0 }}
                   >
                     ALLE
                   </button>
@@ -11239,7 +11269,8 @@ function App() {
                         background: practiceAlphaFilter === letter ? brandColor : 'transparent', 
                         color: practiceAlphaFilter === letter ? 'white' : '#94a3b8', 
                         fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        flexShrink: 0
                       }}
                     >
                       {letter}
@@ -11290,14 +11321,14 @@ function App() {
         {/* Repertoire Tab (Hall of Fame) */}
         {activeStudentTab === 'repertoire' && (
           <ErrorBoundary>
-            <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
-              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                <div style={{ marginBottom: '32px' }}>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-                    <div style={{ color: '#34a853' }}><Award size={32} /></div>
+            <section className="exercises-section animation-slide-up" style={{ padding: isMobile ? '12px' : '24px' }}>
+              <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+                <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
+                  <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                    <div style={{ color: '#34a853' }}><Award size={isMobile ? 22 : 32} /></div>
                     Dein Repertoire
                   </h2>
-                  <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Hier sind deine Meisterleistungen. Du hast diese Songs zu 100% gemeistert!</p>
+                  {!isMobile && <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Hier sind deine Meisterleistungen. Du hast diese Songs zu 100% gemeistert!</p>}
                 </div>
 
                 <div className="exercises-grid">
@@ -11309,18 +11340,18 @@ function App() {
                   </div>
                 ) : (
                   groupedRepertoireSongs.map((group: any) => (
-                    <div key={group.song_id} className="glass-panel" style={{ padding: '14px 18px', background: 'white', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
+                    <div key={group.song_id} className="glass-panel" style={{ padding: isMobile ? '10px 14px' : '14px 18px', background: 'white', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', lineHeight: 1 }}>{group.artist}</div>
-                          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2 }}>{group.title}</div>
+                        <div style={{ minWidth: 0, flex: 1, paddingRight: '10px' }}>
+                          <div style={{ fontSize: isMobile ? '0.6rem' : '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', lineHeight: 1 }}>{group.artist}</div>
+                          <div style={{ fontSize: isMobile ? '0.95rem' : '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.title}</div>
                         </div>
-                        <div style={{ background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-                          <Award size={12} /> 100%
+                        <div style={{ background: '#e6f4ea', color: '#34a853', padding: isMobile ? '3px 8px' : '4px 10px', borderRadius: '10px', fontSize: isMobile ? '0.7rem' : '0.75rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                          <Award size={isMobile ? 10 : 12} /> 100%
                         </div>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
                         {group.skills.map((s: any) => (
                           <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '2px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b' }}>
                             {APP_INSTRUMENT_ICONS[s.instrument as keyof typeof APP_INSTRUMENT_ICONS]} {s.instrument}
@@ -11328,8 +11359,8 @@ function App() {
                         ))}
                       </div>
 
-                      <div style={{ background: '#34a853', height: '4px', borderRadius: '2px', width: '100%', marginBottom: '6px' }}></div>
-                      <div style={{ color: '#34a853', fontSize: '0.72rem', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div style={{ background: '#34a853', height: '3px', borderRadius: '2px', width: '100%', marginBottom: isMobile ? '4px' : '6px' }}></div>
+                      <div style={{ color: '#34a853', fontSize: isMobile ? '0.65rem' : '0.72rem', fontWeight: 900, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         Du bist bereit für eine Band
                       </div>
                       
@@ -11361,14 +11392,14 @@ function App() {
         {/* Band Matching Tab (The Wall) */}
         {activeStudentTab === 'matching' && (
           <ErrorBoundary>
-            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: '24px', padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '20px' }}>
+            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: isMobile ? '12px' : '24px', padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: isMobile ? '16px' : '32px', flexWrap: 'wrap', gap: isMobile ? '12px' : '20px' }}>
                   <div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-                      <div style={{ color: '#f59e0b' }}><Users size={32} /></div>
+                    <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                      <div style={{ color: '#f59e0b' }}><Users size={isMobile ? 22 : 32} /></div>
                       Band Matching
                     </h2>
-                    <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Finde deine Mitmusiker für deine 100% Songs!</p>
+                    {!isMobile && <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Finde deine Mitmusiker für deine 100% Songs!</p>}
                   </div>
 
                   {/* Level Switch */}
@@ -11382,10 +11413,10 @@ function App() {
                         key={btn.id}
                         onClick={() => setMatchingLevelFilter(btn.id as any)}
                         style={{ 
-                          padding: '10px 20px', borderRadius: '12px', border: 'none', 
+                          padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', border: 'none', 
                           background: matchingLevelFilter === btn.id ? 'white' : 'transparent', 
                           color: matchingLevelFilter === btn.id ? '#1e293b' : '#64748b', 
-                          fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem',
+                          fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.78rem' : '0.85rem',
                           boxShadow: matchingLevelFilter === btn.id ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
                           transition: 'all 0.2s'
                         }}
@@ -11443,48 +11474,79 @@ function App() {
                         style={{ 
                           background: 'white', 
                           borderRadius: isExpanded ? '24px 24px 0 0' : '24px', 
-                          padding: '24px 32px', 
+                          padding: isMobile ? '14px 16px' : '24px 32px', 
                           border: '1px solid #f1f5f9',
                           borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9',
                           boxShadow: isExpanded ? '0 10px 30px rgba(0,0,0,0.03)' : '0 4px 15px rgba(0,0,0,0.01)', 
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           cursor: 'pointer', transition: 'all 0.2s', zIndex: 1
                         }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                          <div style={{ 
-                            padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 900,
-                            background: song.level === 'starter' ? '#fffbeb' : '#eff6ff',
-                            color: song.level === 'starter' ? '#b45309' : '#2563eb',
-                            border: `1px solid ${song.level === 'starter' ? '#fef3c7' : '#dbeafe'}`,
-                            textTransform: 'uppercase'
-                          }}>
-                            {song.level === 'starter' ? '🚀 Starter' : '⚡ Pro'}
+                        {isMobile ? (
+                          /* Mobile: vertical layout */
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ 
+                                padding: '4px 10px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 900,
+                                background: song.level === 'starter' ? '#fffbeb' : '#eff6ff',
+                                color: song.level === 'starter' ? '#b45309' : '#2563eb',
+                                border: `1px solid ${song.level === 'starter' ? '#fef3c7' : '#dbeafe'}`,
+                                textTransform: 'uppercase', flexShrink: 0
+                              }}>
+                                {song.level === 'starter' ? '🚀 Starter' : '⚡ Pro'}
+                              </div>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{song.artist}</div>
+                                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                {openSlots} offene Slots
+                              </div>
+                              <div style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', background: isExpanded ? '#f8fafc' : 'transparent' }}>
+                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{song.artist}</div>
-                            <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, margin: 0 }}>{song.title}</h3>
+                        ) : (
+                          /* Desktop: horizontal layout */
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                              <div style={{ 
+                                padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 900,
+                                background: song.level === 'starter' ? '#fffbeb' : '#eff6ff',
+                                color: song.level === 'starter' ? '#b45309' : '#2563eb',
+                                border: `1px solid ${song.level === 'starter' ? '#fef3c7' : '#dbeafe'}`,
+                                textTransform: 'uppercase'
+                              }}>
+                                {song.level === 'starter' ? '🚀 Starter' : '⚡ Pro'}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{song.artist}</div>
+                                <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, margin: 0 }}>{song.title}</h3>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', padding: '8px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                {openSlots} offene Slots
+                              </div>
+                              <div style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: isExpanded ? '#f8fafc' : 'transparent' }}>
+                                {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', padding: '8px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                            {openSlots} offene Slots
-                          </div>
-                          <div style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: isExpanded ? '#f8fafc' : 'transparent' }}>
-                            {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                          </div>
-                        </div>
+                        )}
                       </div>
 
                       {isExpanded && (
                         <div style={{ 
-                          padding: '32px', 
+                          padding: isMobile ? '16px' : '32px', 
                           background: '#f8fafc', 
                           borderRadius: '0 0 24px 24px', 
                           border: '1px solid #f1f5f9', 
                           borderTop: 'none',
                           boxShadow: 'inset 0 10px 10px -10px rgba(0,0,0,0.05)'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
                             {(() => {
                               const activeBandForSong = (userBands || []).find((b: any) => {
                                 const hasActiveSong = (b.band_songs || []).some((bs: any) => 
@@ -11821,50 +11883,52 @@ function App() {
         {/* Bands Tab (Only for Students) */}
         {activeStudentTab === 'bands' && user.role === 'student' && (
           <ErrorBoundary>
-            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: '24px', padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-              <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-                  <div style={{ color: '#3b82f6' }}><Box size={32} /></div>
+            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: isMobile ? '12px' : '24px', padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+              <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
+                <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                  <div style={{ color: '#3b82f6' }}><Box size={isMobile ? 22 : 32} /></div>
                   Bands
                 </h2>
               </div>
 
               {/* Band-Finder Sidebar */}
-              <div style={{ display: 'grid', gridTemplateColumns: width < 1200 ? '1fr' : '1fr 380px', gap: '32px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (width < 1200 ? '1fr' : '1fr 380px'), gap: isMobile ? '24px' : '32px' }}>
                   {/* Left Column: Band Management */}
                   <div style={{ minWidth: 0 }}>
                     {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '6px', borderRadius: '20px', width: 'fit-content', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '6px', borderRadius: '20px', width: 'fit-content', marginBottom: isMobile ? '16px' : '24px' }}>
                       <button 
                         onClick={() => setActiveBandSubTab('meine')}
-                        style={{ padding: '12px 24px', borderRadius: '16px', border: 'none', background: activeBandSubTab === 'meine' ? 'white' : 'transparent', color: activeBandSubTab === 'meine' ? '#1e293b' : '#64748b', fontWeight: 800, cursor: 'pointer', boxShadow: activeBandSubTab === 'meine' ? '0 4px 10px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
+                        style={{ padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '16px', border: 'none', background: activeBandSubTab === 'meine' ? 'white' : 'transparent', color: activeBandSubTab === 'meine' ? '#1e293b' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '1rem', boxShadow: activeBandSubTab === 'meine' ? '0 4px 10px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
                       >
                         Meine Bands
                       </button>
                       <button 
                         onClick={() => setActiveBandSubTab('alle')}
-                        style={{ padding: '12px 24px', borderRadius: '16px', border: 'none', background: activeBandSubTab === 'alle' ? 'white' : 'transparent', color: activeBandSubTab === 'alle' ? '#1e293b' : '#64748b', fontWeight: 800, cursor: 'pointer', boxShadow: activeBandSubTab === 'alle' ? '0 4px 10px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
+                        style={{ padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '16px', border: 'none', background: activeBandSubTab === 'alle' ? 'white' : 'transparent', color: activeBandSubTab === 'alle' ? '#1e293b' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '1rem', boxShadow: activeBandSubTab === 'alle' ? '0 4px 10px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
                       >
                         Alle Bands
                       </button>
                     </div>
 
                     {activeBandSubTab === 'alle' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
-                        <div style={{ position: 'relative', maxWidth: '600px' }}>
-                          <Search size={20} color="#94a3b8" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '10px' : '20px', marginBottom: isMobile ? '16px' : '32px' }}>
+                        <div style={{ position: 'relative' }}>
+                          <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                           <input 
                             type="text"
                             placeholder="Nach Bands suchen..."
                             value={bandSearchText}
                             onChange={(e) => setBandSearchText(e.target.value)}
-                            style={{ width: '100%', padding: '16px 20px 16px 54px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '1rem', fontWeight: 600, background: 'white' }}
+                            style={{ width: '100%', padding: isMobile ? '12px 16px 12px 44px' : '16px 20px 16px 54px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 600, background: 'white', boxSizing: 'border-box' }}
                           />
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        <div 
+                          className="hide-scrollbar"
+                          style={{ display: 'flex', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: '6px', overflowX: isMobile ? 'auto' : 'visible', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                           <button
                             onClick={() => setBandSearchLetter(null)}
-                            style={{ padding: '8px 16px', borderRadius: '12px', border: 'none', background: !bandSearchLetter ? brandColor : '#f1f5f9', color: !bandSearchLetter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}
+                            style={{ padding: isMobile ? '6px 12px' : '8px 16px', borderRadius: '12px', border: 'none', background: !bandSearchLetter ? brandColor : '#f1f5f9', color: !bandSearchLetter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}
                           >
                             Alle
                           </button>
@@ -11872,7 +11936,7 @@ function App() {
                             <button
                               key={letter}
                               onClick={() => setBandSearchLetter(letter)}
-                              style={{ padding: '8px 12px', borderRadius: '12px', border: 'none', background: bandSearchLetter === letter ? brandColor : '#f1f5f9', color: bandSearchLetter === letter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}
+                              style={{ padding: isMobile ? '6px 10px' : '8px 12px', borderRadius: '12px', border: 'none', background: bandSearchLetter === letter ? brandColor : '#f1f5f9', color: bandSearchLetter === letter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}
                             >
                               {letter}
                             </button>
@@ -11927,19 +11991,19 @@ function App() {
                               }}
                               className="glass-panel hover-card" 
                               style={{ 
-                                background: 'white', padding: '24px', borderRadius: '32px', border: '1px solid #f1f5f9',
+                                background: 'white', padding: isMobile ? '14px 16px' : '24px', borderRadius: isMobile ? '20px' : '32px', border: '1px solid #f1f5f9',
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                               }}
                             >
-                              <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                                {renderBandAvatar(band.name, band.photo_url, '80px', '24px')}
-                                <div>
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>{band.name}</h3>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-                                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: brandColor }}>{band.genre || 'Bandprojekt'}</span>
+                              <div style={{ display: 'flex', gap: isMobile ? '14px' : '24px', alignItems: 'center', minWidth: 0, flex: 1 }}>
+                                {renderBandAvatar(band.name, band.photo_url, isMobile ? '52px' : '80px', isMobile ? '16px' : '24px')}
+                                <div style={{ minWidth: 0 }}>
+                                    <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{band.name}</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 800, color: brandColor }}>{band.genre || 'Bandprojekt'}</span>
                                       <span style={{ color: '#cbd5e1' }}>•</span>
-                                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8' }}>{uniqueMembersList.length} Mitglieder</span>
+                                      <span style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 700, color: '#94a3b8' }}>{uniqueMembersList.length} Mitglieder</span>
                                     </div>
                                   </div>
                                 </div>
@@ -12188,40 +12252,40 @@ function App() {
         )}
         {activeStudentTab === 'library' && (
           <ErrorBoundary>
-            <section className="exercises-section animation-slide-up" style={{ padding: '24px' }}>
-              <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                <div style={{ marginBottom: '32px' }}>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-                    <Library size={32} color={brandColor} />
+            <section className="exercises-section animation-slide-up" style={{ padding: isMobile ? '12px' : '24px' }}>
+              <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+                <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
+                  <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                    <Library size={isMobile ? 22 : 32} color={brandColor} />
                     Songbibliothek
                   </h2>
-                  <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Entdecke neue Songs und füge sie deinem Üben-Board hinzu.</p>
+                  {!isMobile && <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Entdecke neue Songs und füge sie deinem Üben-Board hinzu.</p>}
                 </div>
 
               {/* Search and Alpha Filter Navigation */}
-              <div style={{ marginBottom: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ marginBottom: isMobile ? '16px' : '32px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px' }}>
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '20px', alignItems: isMobile ? 'stretch' : 'center' }}>
                   {/* Text Search */}
-                  <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
-                    <Search size={20} color="#94a3b8" style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <div style={{ position: 'relative', flex: 1, minWidth: isMobile ? 'unset' : '300px' }}>
+                    <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                     <input 
                       type="text"
                       placeholder={`Suche nach ${librarySearchType === 'title' ? 'Songtitel' : 'Interpret'}...`}
                       value={librarySearchQuery}
                       onChange={(e) => setLibrarySearchQuery(e.target.value)}
-                      style={{ width: '100%', padding: '16px 20px 16px 54px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '1rem', fontWeight: 600, background: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}
+                      style={{ width: '100%', padding: isMobile ? '13px 16px 13px 44px' : '16px 20px 16px 54px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 600, background: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', boxSizing: 'border-box' }}
                     />
                   </div>
 
                   {/* Toggle Search Type */}
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '14px', padding: '4px' }}>
+                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '14px', padding: '4px', alignSelf: isMobile ? 'flex-start' : 'center' }}>
                     <button 
                       onClick={() => setLibrarySearchType('title')}
                       style={{ 
-                        padding: '10px 20px', borderRadius: '10px', border: 'none', 
+                        padding: isMobile ? '8px 16px' : '10px 20px', borderRadius: '10px', border: 'none', 
                         background: librarySearchType === 'title' ? 'white' : 'transparent', 
                         color: librarySearchType === 'title' ? brandColor : '#64748b', 
-                        fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem',
+                        fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.85rem',
                         boxShadow: librarySearchType === 'title' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
                         transition: 'all 0.2s'
                       }}
@@ -12231,10 +12295,10 @@ function App() {
                     <button 
                       onClick={() => setLibrarySearchType('artist')}
                       style={{ 
-                        padding: '10px 20px', borderRadius: '10px', border: 'none', 
+                        padding: isMobile ? '8px 16px' : '10px 20px', borderRadius: '10px', border: 'none', 
                         background: librarySearchType === 'artist' ? 'white' : 'transparent', 
                         color: librarySearchType === 'artist' ? brandColor : '#64748b', 
-                        fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem',
+                        fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.85rem',
                         boxShadow: librarySearchType === 'artist' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
                         transition: 'all 0.2s'
                       }}
@@ -12245,10 +12309,25 @@ function App() {
                 </div>
 
                 {/* Alphabet Bar */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', background: 'white', padding: '10px', borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                <div 
+                  className="hide-scrollbar"
+                  style={{ 
+                    display: 'flex', 
+                    gap: '6px', 
+                    background: 'white', 
+                    padding: '10px', 
+                    borderRadius: '16px', 
+                    border: '1px solid #f1f5f9', 
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+                    overflowX: 'auto',
+                    scrollbarWidth: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                    minWidth: 0
+                  }}
+                >
                   <button
                     onClick={() => setLibraryAlphaFilter(null)}
-                    style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !libraryAlphaFilter ? brandColor : '#f8fafc', color: !libraryAlphaFilter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px' }}
+                    style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !libraryAlphaFilter ? brandColor : '#f8fafc', color: !libraryAlphaFilter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px', flexShrink: 0 }}
                   >
                     ALLE
                   </button>
@@ -12261,10 +12340,9 @@ function App() {
                         background: libraryAlphaFilter === letter ? brandColor : 'transparent', 
                         color: libraryAlphaFilter === letter ? 'white' : '#94a3b8', 
                         fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        flexShrink: 0
                       }}
-                      
-                      
                     >
                       {letter}
                     </button>
@@ -12311,25 +12389,26 @@ function App() {
                         key={song.id} 
                         className="glass-panel" 
                         style={{ 
-                          padding: '24px', 
+                          padding: isMobile ? '16px' : '24px', 
                           background: 'white', 
                           border: '1px solid #f1f5f9',
-                          borderLeft: `8px solid ${levelColor}`, 
+                          borderLeft: `${isMobile ? '5px' : '8px'} solid ${levelColor}`, 
                           borderRadius: '24px',
                           display: 'flex', 
+                          flexDirection: isMobile ? 'column' : 'row',
                           justifyContent: 'space-between', 
-                          alignItems: 'center', 
-                          gap: '24px',
+                          alignItems: isMobile ? 'stretch' : 'center', 
+                          gap: isMobile ? '16px' : '24px',
                           boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
                           transition: 'all 0.25s ease',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '20px', flex: 1, width: '100%' }}>
                           {/* Music Icon Rounded Box */}
                           <div style={{ 
-                            width: '64px', 
-                            height: '64px', 
-                            borderRadius: '18px', 
+                            width: isMobile ? '48px' : '64px', 
+                            height: isMobile ? '48px' : '64px', 
+                            borderRadius: isMobile ? '12px' : '18px', 
                             background: iconBg, 
                             border: `1px solid ${iconBorder}`, 
                             display: 'flex', 
@@ -12337,11 +12416,11 @@ function App() {
                             justifyContent: 'center',
                             flexShrink: 0
                           }}>
-                            <Music size={28} color={iconColor} />
+                            <Music size={isMobile ? 22 : 28} color={iconColor} />
                           </div>
 
                           {/* Text Info */}
-                          <div style={{ flex: 1 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ 
                               fontSize: '0.75rem', 
                               fontWeight: 900, 
@@ -12353,11 +12432,14 @@ function App() {
                               {song.artist}
                             </div>
                             <div style={{ 
-                              fontSize: '1.4rem', 
+                              fontSize: isMobile ? '1.15rem' : '1.4rem', 
                               fontWeight: 950, 
                               color: '#0f172a', 
                               marginTop: '4px',
-                              lineHeight: 1.2
+                              lineHeight: 1.2,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
                               {song.title}
                             </div>
@@ -12396,7 +12478,7 @@ function App() {
                         </div>
 
                         {/* Actions */}
-                        <div style={{ flexShrink: 0 }}>
+                        <div style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto' }}>
                           {userSongs.some(us => us.song_id === song.id) ? (
                             <div style={{ 
                               background: '#e6f4ea', 
@@ -12405,10 +12487,12 @@ function App() {
                               borderRadius: '16px', 
                               display: 'flex', 
                               alignItems: 'center', 
+                              justifyContent: isMobile ? 'center' : 'flex-start',
                               gap: '8px', 
                               color: '#34a853', 
                               fontWeight: 900, 
-                              fontSize: '0.85rem' 
+                              fontSize: '0.85rem',
+                              width: isMobile ? '100%' : 'auto'
                             }}>
                               <Check size={18} strokeWidth={3} /> Hinzugefügt
                             </div>
@@ -12423,6 +12507,7 @@ function App() {
                                 cursor: 'pointer', 
                                 display: 'flex', 
                                 alignItems: 'center', 
+                                justifyContent: isMobile ? 'center' : 'flex-start',
                                 gap: '8px', 
                                 boxShadow: '0 4px 10px rgba(0,0,0,0.02)',
                                 transition: 'all 0.2s ease' 

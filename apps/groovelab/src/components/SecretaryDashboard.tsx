@@ -1287,10 +1287,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [containerWidth, setContainerWidth] = useState(1000);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [windowHeight, setWindowHeight] = useState(window.innerHeight);
 
   useEffect(() => {
     const handleResize = () => {
+      setWindowWidth(window.innerWidth);
       setWindowHeight(window.innerHeight);
     };
     window.addEventListener('resize', handleResize);
@@ -19149,13 +19151,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
             {/* Subtab: Live Lab Blueprint Board (1:1 replicated from TeacherDashboard) */}
             {groovelabSubTab === 'live' && (() => {
+              const isMobileView = windowWidth < 768 || containerWidth < 768 || windowHeight < 500;
               const groovelabRooms = rooms.filter(r => r.is_groovelab_active || r.isGroovelabActive);
               const activeRoom = groovelabRooms.find(r => r.id === selectedRoomId) || groovelabRooms[0];
               const roomStations = stations.filter(s => s.room_id === (activeRoom?.id || selectedRoomId));
-              const hasCustomLayout = activeRoom && 
-                activeRoom.room_width && 
-                activeRoom.room_height && 
-                roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
 
               const activeCoachesForLayout = activeSessions
                 .filter(s => s.users?.role === 'teacher' || s.users?.role === 'admin')
@@ -19164,6 +19163,249 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                   users: s.users,
                   session: s
                 }));
+
+              if (isMobileView) {
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', minWidth: 0 }}>
+                    {/* Mobile Room Switcher Row */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                          <Music size={20} style={{ color: '#eab308' }} /> Campus-Groovelab Board
+                        </h2>
+                      </div>
+                      {groovelabRooms.length > 1 && (
+                        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                          {groovelabRooms.map((room, idx) => {
+                            const isSelected = room.id === (activeRoom?.id || selectedRoomId);
+                            return (
+                              <button
+                                key={room.id}
+                                onClick={() => {
+                                  setSelectedRoomId(room.id);
+                                  localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                                }}
+                                style={{
+                                  border: 'none',
+                                  background: isSelected ? '#eab308' : '#f1f5f9',
+                                  color: isSelected ? '#0f172a' : '#64748b',
+                                  padding: '8px 14px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  transition: 'all 0.2s',
+                                  boxShadow: isSelected ? '0 4px 10px rgba(234,179,8,0.2)' : 'none'
+                                }}
+                              >
+                                {(() => {
+                                  const cleanName = cleanRoomName(room.name);
+                                  return `${idx + 1} - ${cleanName}`;
+                                })()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                      {/* Coaches section */}
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        border: '1.5px dashed rgba(52, 168, 83, 0.25)',
+                        borderRadius: '24px',
+                        padding: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }}></span>
+                          Coaches vor Ort
+                        </div>
+                        {activeCoachesForLayout.filter(Boolean).length === 0 ? (
+                          <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600, fontStyle: 'italic', paddingLeft: '4px' }}>
+                            Keine Coaches vor Ort eingeloggt
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                            {activeCoachesForLayout.filter(Boolean).map((c, idx) => {
+                              const coachName = c.users ? `${c.users.first_name} ${showRealNames ? c.users.last_name : maskLastName(c.users.last_name)}` : 'Coach';
+                              return (
+                                <div
+                                  key={c.id || idx}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    background: 'white',
+                                    padding: '6px 12px 6px 8px',
+                                    borderRadius: '16px',
+                                    border: '1px solid #e2e8f0',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                                  }}
+                                  onClick={() => c.users && setSelectedCoachProfile(c.users)}
+                                >
+                                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+                                    <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.75rem', lineHeight: 1.1 }}>{coachName}</span>
+                                    <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>{c.session?.stations?.name || 'Lehrer iPad'}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Stations section */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {roomStations.filter(s => {
+                          const sName = s.name || '';
+                          return !(sName.toLowerCase().includes('lehrer') || sName.toLowerCase().includes('teacher'));
+                        }).map(station => {
+                          const sess = activeSessions.find(se => se.station_id === station.id);
+                          const isActive = !!sess;
+                          const sName = station.name || '';
+                          const instColor = getStationColor(sName, station.color);
+                          const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
+                          const hasHelp = helpRequests.some(r => r.station_id === station.id);
+                          const studentName = sess?.users ? `${sess.users.first_name} ${showRealNames ? sess.users.last_name : maskLastName(sess.users.last_name)}` : '';
+
+                          return (
+                            <div
+                              key={station.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                background: 'white',
+                                borderRadius: '20px',
+                                border: isActive ? `2px solid ${instColor}` : `1px solid ${instColor}40`,
+                                padding: '12px 16px',
+                                position: 'relative',
+                                gap: '12px',
+                                boxShadow: isActive ? `0 6px 16px ${instColor}08` : 'none',
+                                cursor: isActive ? 'pointer' : 'default',
+                                minWidth: 0
+                              }}
+                              onClick={() => {
+                                if (isActive && sess.users) {
+                                  setSelectedStudentForDetail(sess.users);
+                                }
+                              }}
+                            >
+                              {/* Color Left Accent Line */}
+                              <div style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: '6px',
+                                borderTopLeftRadius: '20px',
+                                borderBottomLeftRadius: '20px',
+                                background: instColor
+                              }} />
+
+                              {/* Station Instrument Icon & Name info */}
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, paddingLeft: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  <Music size={12} style={{ color: instColor }} />
+                                  <span>{station.instrument || 'Tablet'}</span>
+                                  <span style={{ color: '#cbd5e1' }}>•</span>
+                                  <span>{sName}</span>
+                                </div>
+                                
+                                {isActive ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', minWidth: 0 }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${instColor}`, flexShrink: 0 }}>
+                                      <AvatarImage src={sess.users?.photo_url} user={sess.users} activePlatform={activePlatform} />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                      <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {studentName}
+                                      </span>
+                                      <span style={{ fontSize: '0.7rem', color: instColor, fontWeight: 700 }}>
+                                        Aktiv seit {activeMins}m
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#cbd5e1' }} />
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#cbd5e1', letterSpacing: '0.05em' }}>
+                                      BEREIT
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Help Request badge */}
+                              {hasHelp && (
+                                <div style={{
+                                  background: '#ef4444',
+                                  color: 'white',
+                                  padding: '4px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 900,
+                                  animation: 'pulse-red 1s infinite',
+                                  boxShadow: '0 2px 6px rgba(239, 68, 68, 0.2)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  marginRight: '4px'
+                                }}>
+                                  <AlertCircle size={10} fill="white" /> HILFE
+                                </div>
+                              )}
+
+                              {/* Checkout Button */}
+                              {isActive && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLogoutStudent(sess.id);
+                                  }}
+                                  style={{
+                                    background: '#fef2f2',
+                                    border: '1px solid #fee2e2',
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    color: '#ef4444',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold',
+                                    padding: 0,
+                                    flexShrink: 0
+                                  }}
+                                  title="Auschecken"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              const hasCustomLayout = activeRoom && 
+                activeRoom.room_width && 
+                activeRoom.room_height && 
+                roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
+
+              // activeCoachesForLayout already declared above
 
               const renderLiveHeader = () => (
                 <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
