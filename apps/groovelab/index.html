@@ -4,11 +4,19 @@
     <meta charset="UTF-8" />
     <script>
       (function() {
+        function safeGetItem(key) {
+          try {
+            return localStorage.getItem(key);
+          } catch (e) {
+            return null;
+          }
+        }
+
         var params = new URLSearchParams(window.location.search);
         var isGrooveLab = params.get('platform') === 'groovelab' || 
                           window.location.pathname.indexOf('/onboarding') !== -1 || 
                           window.location.pathname.indexOf('/device-onboarding') !== -1 || 
-                          localStorage.getItem('groovelab_active_platform') === 'groovelab';
+                          safeGetItem('groovelab_active_platform') === 'groovelab';
         
         var themeColor = isGrooveLab ? '#eab308' : '#34a853';
         var title = isGrooveLab ? 'GrooveLab' : 'Campus-Groovelab';
@@ -18,9 +26,9 @@
         // Dynamische Manifest-Generierung, um Kiosk-Kopplungsparameter im iOS WebClip/PWA zu erhalten
         var manifestObj;
         if (isGrooveLab) {
-          var token = params.get('kiosk_token') || localStorage.getItem('groovelab_kiosk_token') || '';
-          var stationId = params.get('station_id') || localStorage.getItem('groovelab_station_id') || '';
-          var roomId = params.get('kiosk_room_id') || localStorage.getItem('groovelab_kiosk_room_id') || '';
+          var token = params.get('kiosk_token') || safeGetItem('groovelab_kiosk_token') || '';
+          var stationId = params.get('station_id') || safeGetItem('groovelab_station_id') || '';
+          var roomId = params.get('kiosk_room_id') || safeGetItem('groovelab_kiosk_room_id') || '';
           
           var startUrl = '/?platform=groovelab';
           if (token && stationId) {
@@ -75,8 +83,15 @@
           };
         }
         
-        var manifestStr = JSON.stringify(manifestObj);
-        var manifestHref = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(manifestStr)));
+        var manifestHref = isGrooveLab ? '/manifest-groovelab.json' : '/manifest.json';
+        try {
+          var manifestStr = JSON.stringify(manifestObj);
+          if (typeof btoa === 'function') {
+            manifestHref = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(manifestStr)));
+          }
+        } catch (e) {
+          console.error('[Manifest] Failed to encode dynamic manifest:', e);
+        }
         
         document.write('<link rel="manifest" href="' + manifestHref + '" />');
         document.write('<meta name="theme-color" content="' + themeColor + '" />');
