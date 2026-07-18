@@ -289,7 +289,7 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
           border: 1px solid rgba(255, 255, 255, 0.08);
           display: flex;
           align-items: center;
-          justifyContent: center;
+          justify-content: center;
           color: #a1a1aa;
         }
         .school-logo-image {
