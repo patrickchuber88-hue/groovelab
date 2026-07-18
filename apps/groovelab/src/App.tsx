@@ -1172,26 +1172,47 @@ if (targetPlatform && (targetPlatform === 'campus' || targetPlatform === 'groove
 const kioskTokenParam = params.get('kiosk_token');
 if (kioskTokenParam) {
   localStorage.setItem('groovelab_kiosk_token', kioskTokenParam);
-  localStorage.removeItem('groovelab_station_id');
-  localStorage.removeItem('groovelab_kiosk_room_id');
+  
+  // Persist station_id if provided in the redirect URL
+  const urlStationId = params.get('station_id') || params.get('kiosk_station_id');
+  if (urlStationId) {
+    localStorage.setItem('groovelab_station_id', urlStationId);
+  } else {
+    localStorage.removeItem('groovelab_station_id');
+  }
+
+  // Persist kiosk_room_id if provided
+  const urlRoomId = params.get('kiosk_room_id');
+  if (urlRoomId) {
+    localStorage.setItem('groovelab_kiosk_room_id', urlRoomId);
+  } else {
+    localStorage.removeItem('groovelab_kiosk_room_id');
+  }
+
   sessionStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_location_mode');
-  // Strip parameter and redirect to clean up URL
+  
+  // Strip parameters and redirect to clean up URL
   params.delete('kiosk_token');
+  params.delete('station_id');
+  params.delete('kiosk_station_id');
+  params.delete('kiosk_room_id');
   const newSearch = params.toString();
   const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
   window.location.replace(newUrl);
 }
 
-const kioskStationId = params.get('kiosk_station_id');
+const kioskStationId = params.get('kiosk_station_id') || params.get('station_id');
 if (kioskStationId) {
   localStorage.setItem('groovelab_station_id', kioskStationId);
   sessionStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_location_mode');
-  // Strip parameter and redirect to clean up URL
+  
+  // Strip parameters and redirect to clean up URL
   params.delete('kiosk_station_id');
+  params.delete('station_id');
   const newSearch = params.toString();
   const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
   window.location.replace(newUrl);

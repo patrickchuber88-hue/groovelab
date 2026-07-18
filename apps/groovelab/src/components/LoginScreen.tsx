@@ -180,6 +180,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         ref={videoRef}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         playsInline
+        autoPlay
         muted
       />
       {needsManualActivation && (
@@ -3749,7 +3750,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               pointerEvents: 'none',
               zIndex: 9
             }} />
-             {isCameraActive && !cameraHasError ? (
+             {isCameraActive && !cameraHasError && effectiveStationId ? (
                <>
                  <CustomQRScanner
                    onScan={(val) => {
@@ -3776,10 +3777,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                    zIndex: 10
                  }}>
                    {/* 4 Corner brackets for scanner target */}
-                   <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #e6f4ea', borderLeft: '3px solid #e6f4ea', borderTopLeftRadius: '8px' }} />
-                   <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #e6f4ea', borderRight: '3px solid #e6f4ea', borderTopRightRadius: '8px' }} />
-                   <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #e6f4ea', borderLeft: '3px solid #e6f4ea', borderBottomLeftRadius: '8px' }} />
-                   <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #e6f4ea', borderRight: '3px solid #e6f4ea', borderBottomRightRadius: '8px' }} />
+                   <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #eab308', borderLeft: '3px solid #eab308', borderTopLeftRadius: '8px' }} />
+                   <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #eab308', borderRight: '3px solid #eab308', borderTopRightRadius: '8px' }} />
+                   <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #eab308', borderLeft: '3px solid #eab308', borderBottomLeftRadius: '8px' }} />
+                   <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #eab308', borderRight: '3px solid #eab308', borderBottomRightRadius: '8px' }} />
                    
                    {/* Animated Laser line */}
                    <div style={{
@@ -3787,7 +3788,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                      left: 0,
                      width: '100%',
                      height: '80px',
-                     background: 'linear-gradient(180deg, rgba(52, 168, 83, 0) 0%, rgba(52, 168, 83, 0.08) 50%, rgba(52, 168, 83, 0) 100%)',
+                     background: 'linear-gradient(180deg, rgba(234, 179, 8, 0) 0%, rgba(234, 179, 8, 0.08) 50%, rgba(234, 179, 8, 0) 100%)',
                      filter: 'blur(6px)',
                      animation: 'scanLaser 4s ease-in-out infinite',
                      pointerEvents: 'none'
@@ -3844,43 +3845,57 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                  gap: '16px',
                  color: 'white',
                  padding: '24px',
-                 textAlign: 'center'
+                 textAlign: 'center',
+                 boxSizing: 'border-box'
                }}>
-                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e6f4ea' }}>
-                   {cameraHasError ? <span style={{ fontSize: '20px' }}>📷🚫</span> : <Tablet size={24} />}
+                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+                   {!effectiveStationId ? <Tablet size={24} color="#eab308" /> : (cameraHasError ? <span style={{ fontSize: '20px' }}>📷🚫</span> : <Tablet size={24} />)}
                  </div>
-                 {cameraHasError ? (
-                   <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
-                     Kamerazugriff blockiert oder nicht verfügbar
-                   </div>
+                 {!effectiveStationId ? (
+                   <>
+                     <div style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff' }}>
+                       Kiosk-Gerät nicht gekoppelt
+                     </div>
+                     <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.4', maxWidth: '240px' }}>
+                       Wähle unten eine freie Station aus, um dieses iPad als Kiosk-Gerät zu aktivieren.
+                     </div>
+                   </>
+                 ) : cameraHasError ? (
+                   <>
+                     <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
+                       Kamerazugriff blockiert oder nicht verfügbar
+                     </div>
+                     <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
+                       Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung.
+                     </div>
+                   </>
                  ) : (
-                   <button
-                     type="button"
-                     onClick={() => {
-                       setCameraHasError(false);
-                       setIsCameraActive(true);
-                     }}
-                     style={{
-                       padding: '10px 20px',
-                       borderRadius: '12px',
-                       border: 'none',
-                       background: '#e6f4ea',
-                       color: '#062413',
-                       fontWeight: 800,
-                       fontSize: '13px',
-                       cursor: 'pointer',
-                       boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
-                     }}
-                   >
-                     Kamera aktivieren
-                   </button>
+                   <>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setCameraHasError(false);
+                         setIsCameraActive(true);
+                       }}
+                       style={{
+                         padding: '10px 20px',
+                         borderRadius: '12px',
+                         border: 'none',
+                         background: '#eab308',
+                         color: '#062413',
+                         fontWeight: 800,
+                         fontSize: '13px',
+                         cursor: 'pointer',
+                         boxShadow: '0 4px 12px rgba(234, 179, 8, 0.2)'
+                       }}
+                     >
+                       Kamera aktivieren
+                     </button>
+                     <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
+                       Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#eab308', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span>
+                     </div>
+                   </>
                  )}
-                 <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
-                   {cameraHasError 
-                     ? "Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung." 
-                     : <>Wähle bei der Abfrage <strong>„Erlauben“</strong>. <span onClick={() => setShowPermissionHelp(true)} style={{ color: '#e6f4ea', textDecoration: 'underline', cursor: 'pointer', fontWeight: 800 }}>Hilfe</span></>
-                   }
-                 </div>
                </div>
              )}
 
