@@ -6806,6 +6806,9 @@ function App() {
   }
 
   if (loading || !user) {
+    const debugError = typeof window !== 'undefined' ? (window as any).fetchDashboardDataError : null;
+    const debugStack = typeof window !== 'undefined' ? (window as any).fetchDashboardDataStack : null;
+
     return (
       <div style={{ 
         position: 'fixed', 
@@ -6815,18 +6818,95 @@ function App() {
         alignItems: 'center', 
         justifyContent: 'center', 
         flexDirection: 'column', 
-        gap: '16px' 
+        gap: '16px',
+        padding: '20px',
+        boxSizing: 'border-box'
       }}>
-        <div className="animate-spin" style={{ 
-          width: '40px', 
-          height: '40px', 
-          border: '3px solid rgba(255, 255, 255, 0.05)', 
-          borderTopColor: '#facc15', 
-          borderRadius: '50%' 
-        }}></div>
-        <div style={{ fontSize: '14px', fontWeight: 600, color: '#a1a1aa', letterSpacing: '0.05em' }}>
-          Sitzung wird wiederhergestellt...
+        {loading && (
+          <div className="animate-spin" style={{ 
+            width: '40px', 
+            height: '40px', 
+            border: '3px solid rgba(255, 255, 255, 0.05)', 
+            borderTopColor: '#facc15', 
+            borderRadius: '50%',
+            marginBottom: '8px'
+          }}></div>
+        )}
+        <div style={{ fontSize: '14px', fontWeight: 600, color: '#a1a1aa', letterSpacing: '0.05em', textAlign: 'center' }}>
+          {loading ? 'Sitzung wird wiederhergestellt...' : 'Sitzungs-Daten konnten nicht geladen werden.'}
         </div>
+
+        {debugError && (
+          <div style={{ 
+            marginTop: '20px', 
+            color: '#ef4444', 
+            fontSize: '12px', 
+            textAlign: 'center', 
+            maxWidth: '100%', 
+            wordBreak: 'break-all',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            padding: '12px',
+            borderRadius: '8px'
+          }}>
+            <strong>Fehlerdetails:</strong> {debugError}
+            {debugStack && (
+              <pre style={{ 
+                marginTop: '10px', 
+                fontSize: '10px', 
+                color: '#f87171', 
+                textAlign: 'left', 
+                whiteSpace: 'pre-wrap',
+                maxHeight: '150px',
+                overflowY: 'auto'
+              }}>{debugStack}</pre>
+            )}
+          </div>
+        )}
+
+        {/* Exit Hatch: allow manual reset if stuck or database is unreachable */}
+        {(!loading || debugError) && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await supabase.auth.signOut();
+              } catch (e) {}
+              sessionStorage.removeItem('groovelab_user_id');
+              sessionStorage.removeItem('groovelab_location_mode');
+              localStorage.removeItem('groovelab_user_id');
+              localStorage.removeItem('groovelab_location_mode');
+              localStorage.removeItem('groovelab_cached_user');
+              setLoggedInUserId(null);
+              setUser(null);
+              setLoading(false);
+              window.location.reload();
+            }}
+            style={{
+              marginTop: '24px',
+              background: 'transparent',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#a1a1aa',
+              fontSize: '12px',
+              fontWeight: 600,
+              padding: '8px 16px',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              outline: 'none'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.color = '#ffffff';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.color = '#a1a1aa';
+            }}
+          >
+            Sitzung zurücksetzen & neu anmelden
+          </button>
+        )}
       </div>
     );
   }
