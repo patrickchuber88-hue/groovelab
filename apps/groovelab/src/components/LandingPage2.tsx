@@ -34,6 +34,28 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fallback schools for offline/connection failure scenarios
+  const FALLBACK_SCHOOLS = [
+    {
+      id: 'musaek-bad-saeckingen-static-id',
+      name: 'Musikschule Bad Säckingen',
+      subdomain: 'musaek-bad-saeckingen',
+      city: 'Bad Säckingen',
+      has_campus_subscription: true,
+      has_groovelab_subscription: true,
+      logo_url: null
+    },
+    {
+      id: 'groovelab-demo-static-id',
+      name: 'GrooveLab Demo',
+      subdomain: 'demo',
+      city: 'Stuttgart',
+      has_campus_subscription: true,
+      has_groovelab_subscription: true,
+      logo_url: null
+    }
+  ];
+
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -54,9 +76,29 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
         if (!error && data) {
           setSearchResults(data);
+          // Cache successful school list
+          try {
+            localStorage.setItem('groovelab_cached_schools', JSON.stringify(data));
+          } catch (e) {}
+        } else {
+          throw error || new Error('No data');
         }
       } catch (err) {
-        console.error('Search error:', err);
+        console.error('Search error, using fallback:', err);
+        // Load from local storage cache if available
+        let fallbackList = FALLBACK_SCHOOLS;
+        try {
+          const cached = localStorage.getItem('groovelab_cached_schools');
+          if (cached) {
+            fallbackList = JSON.parse(cached);
+          }
+        } catch (e) {}
+        
+        const filtered = fallbackList.filter((s: any) => 
+          (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+          (s.city || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setSearchResults(filtered);
       } finally {
         setIsSearching(false);
       }

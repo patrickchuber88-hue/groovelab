@@ -1420,6 +1420,35 @@ const DashboardLoader = () => (
   </div>
 );
 
+async function safeSupabaseQuery<T>(
+  queryFn: () => Promise<{ data: T | null; error: any }>,
+  retries = 3,
+  delay = 500
+): Promise<{ data: T | null; error: any }> {
+  let attempt = 0;
+  while (attempt < retries) {
+    try {
+      const res = await queryFn();
+      if (!res.error) return res;
+      
+      const status = res.error?.status || res.error?.code;
+      const isNetworkError = !status || status >= 500 || status === 'PGRST100' || String(res.error?.message || '').toLowerCase().includes('fetch');
+      if (!isNetworkError || attempt === retries - 1) {
+        return res;
+      }
+    } catch (err: any) {
+      if (attempt === retries - 1) {
+        return { data: null, error: err };
+      }
+    }
+    attempt++;
+    console.warn(`[SupabaseRetry] Query failed, retrying attempt ${attempt}/${retries} in ${delay}ms...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    delay *= 2;
+  }
+  return { data: null, error: new Error('All query attempts failed.') };
+}
+
 function App() {
 
   // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
