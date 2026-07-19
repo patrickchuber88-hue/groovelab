@@ -2012,15 +2012,66 @@ export function AdminDashboard({
 
   const fetchData = async (force = false) => {
     let currentAdmin = admin;
-    const { data: adminData } = await supabase
-      .from('users')
-      .select('*, schools(*)')
-      .eq('id', userId)
-      .single();
-    if (adminData) {
-      setAdmin(adminData);
-      currentAdmin = adminData;
+    let adminData = null;
+    let fetchError = null;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*, schools(*)')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) {
+        fetchError = error;
+      } else {
+        adminData = data;
+      }
+    } catch (e: any) {
+      fetchError = e;
     }
+
+    // Fallback 1: Try shallow select if relation join failed or RLS blocked join
+    if (!adminData) {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        if (data) {
+          adminData = data;
+          console.warn('[AdminDashboard] Loaded user via fallback query without schools join.');
+        }
+      } catch (e) {
+        console.error('[AdminDashboard] Fallback query failed:', e);
+      }
+    }
+
+    // Fallback 2: Retrieve from cached localStorage user if API failed
+    if (!adminData) {
+      console.error('[AdminDashboard] Failed to fetch admin/teacher user profile:', fetchError);
+      const cached = localStorage.getItem('groovelab_cached_user');
+      if (cached) {
+        try {
+          adminData = JSON.parse(cached);
+          console.warn('[AdminDashboard] Recovered user profile from local storage cache.');
+        } catch (e) {}
+      }
+    }
+
+    // Fallback 3: Hard fallback minimal object to prevent layout hangs
+    if (!adminData) {
+      adminData = {
+        id: userId,
+        first_name: 'Lehrer',
+        last_name: 'GrooveLab',
+        role: 'teacher',
+        school_id: null
+      };
+      console.warn('[AdminDashboard] Created hard fallback minimal user profile.');
+    }
+
+    setAdmin(adminData);
+    currentAdmin = adminData;
 
     if (currentAdmin?.school_id) {
       // Fetch kiosks for the school only if not loaded yet

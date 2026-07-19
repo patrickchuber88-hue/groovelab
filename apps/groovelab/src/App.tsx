@@ -6397,7 +6397,8 @@ function App() {
         .is('check_out_time', null);
     }
 
-    const mode = isHome ? 'home' : 'lab';
+    const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
+    const mode = (isStaff && activePlatform === 'groovelab') ? 'lab' : (isHome ? 'home' : 'lab');
     
     // If we are switching profiles, mark the OLD one as offline first
     if (loggedInUserId && loggedInUserId !== userId) {
@@ -6412,7 +6413,6 @@ function App() {
 
     // Default start tab: Always open the briefing board for all users in Campus, and for staff/teachers in GrooveLab.
     // GrooveLab students start on the 'live' tab.
-    const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
     
     // Check if the user selected 'groovelab' on the login screen
     let selectedPlat = localStorage.getItem('groovelab_active_platform') || 'campus';
@@ -8542,11 +8542,15 @@ function App() {
               </div>
             )}
 
-            {/* GrooveLab Tab */}
             {school && (school.has_groovelab_subscription || !school.is_billing_booked) && user?.is_groovelab_active && (
               <div 
                 onClick={() => {
                   setActivePlatform('groovelab');
+                  const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+                  if (isStaff) {
+                    setLocationMode('lab');
+                    sessionStorage.setItem('groovelab_location_mode', 'lab');
+                  }
                 }}
                 style={{
                   display: 'flex',
