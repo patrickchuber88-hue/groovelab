@@ -5300,6 +5300,43 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>{dateStr}</span>
+                    {(role === 'admin' || role === 'secretary') && (
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('Diese Mitteilung wirklich löschen?')) {
+                            try {
+                              const { error } = await supabase
+                                .from('campus_announcements')
+                                .delete()
+                                .eq('id', ann.id);
+                              if (!error) {
+                                fetchAnnouncements();
+                              } else {
+                                alert('Fehler beim Löschen: ' + error.message);
+                              }
+                            } catch (err: any) {
+                              alert('Fehler: ' + err.message);
+                            }
+                          }
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 0.5,
+                          transition: 'opacity 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+                        title="Löschen"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                   <strong style={{ fontSize: '0.94rem', color: '#1a253c', fontWeight: 800 }}>{ann.title}</strong>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>{ann.message}</p>

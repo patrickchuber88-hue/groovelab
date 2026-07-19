@@ -7,7 +7,7 @@ import {
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
-  LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical,
+  LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
@@ -1234,6 +1234,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [newDutyAttachmentUrl, setNewDutyAttachmentUrl] = useState('');
   const [isUploadingDutyAttachment, setIsUploadingDutyAttachment] = useState(false);
   const [selectedDutyForStats, setSelectedDutyForStats] = useState<any>(null);
+  const [statsSearchQuery, setStatsSearchQuery] = useState('');
+  const [statsStatusFilter, setStatsStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
+  const [statsModalTab, setStatsModalTab] = useState<'status' | 'qa'>('status');
   const [dutyResponsesList, setDutyResponsesList] = useState<any[]>([]);
   const [newDutyQuestionInput, setNewDutyQuestionInput] = useState('');
   const [editingDutyId, setEditingDutyId] = useState<string | null>(null);
@@ -3990,6 +3993,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
     }
   };
 
+  const handleMoveQuestion = (idx: number, direction: 'up' | 'down') => {
+    const nextQuestions = [...newDutyQuestions];
+    if (direction === 'up' && idx > 0) {
+      const temp = nextQuestions[idx - 1];
+      nextQuestions[idx - 1] = nextQuestions[idx];
+      nextQuestions[idx] = temp;
+    } else if (direction === 'down' && idx < nextQuestions.length - 1) {
+      const temp = nextQuestions[idx + 1];
+      nextQuestions[idx + 1] = nextQuestions[idx];
+      nextQuestions[idx] = temp;
+    }
+    setNewDutyQuestions(nextQuestions);
+  };
+
   const handleCreateDuty = async () => {
     if (!newDutyTitle.trim()) {
       alert('Bitte einen Titel eingeben.');
@@ -4068,6 +4085,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const fetchDutyStats = async (duty: any) => {
     try {
       setSelectedDutyForStats(duty);
+      setStatsSearchQuery('');
+      setStatsStatusFilter('all');
+      setStatsModalTab('status');
       const { data, error } = await supabase
         .from('campus_feedback_responses')
         .select('*')
@@ -4077,6 +4097,149 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
     } catch (err: any) {
       console.error('Error fetching duty stats:', err);
     }
+  };
+
+  const getDutysTargetedTeachers = (duty: any) => {
+    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+      if (!acc.some(existing => existing.id === t.id)) {
+        acc.push(t);
+      }
+      return acc;
+    }, []);
+
+    if (duty.target_type === 'all') return allUniqueTeachers;
+    if (duty.target_type === 'individual') {
+      const found = allUniqueTeachers.find(t => t.id === duty.target_teacher_id);
+      return found ? [found] : [];
+    }
+    if (duty.target_type === 'group') {
+      return allUniqueTeachers.filter(t => {
+        const inst = (t.instrument || '').toLowerCase();
+        const targetGrp = (duty.target_group || '').toLowerCase();
+        if (targetGrp === 'guitar') return inst.includes('gitarre') || inst.includes('guitar') || inst.includes('bass');
+        if (targetGrp === 'piano') return inst.includes('klavier') || inst.includes('piano') || inst.includes('keyboard') || inst.includes('keys');
+        if (targetGrp === 'vocals') return inst.includes('gesang') || inst.includes('vocal') || inst.includes('sing');
+        if (targetGrp === 'drums') return inst.includes('schlagzeug') || inst.includes('drum');
+        return inst.includes(targetGrp);
+      });
+    }
+    return [];
+  };
+
+  const handleSendReminder = async (duty: any) => {
+    if (!duty) return;
+    const targeted = getDutysTargetedTeachers(duty);
+    const pendingTeachers = targeted.filter((t: any) => !dutyResponsesList.some((res: any) => res.teacher_id === t.id));
+    
+    if (pendingTeachers.length === 0) {
+      alert('Alle Lehrkräfte haben diese Aufgabe bereits erledigt!');
+      return;
+    }
+    
+    const confirmSend = confirm(`Möchtest du eine Erinnerung an ${pendingTeachers.length} ausstehende Lehrkräfte senden?`);
+    if (!confirmSend) return;
+    
+    let successCount = 0;
+    for (const teacher of pendingTeachers) {
+      try {
+        const title = 'Erinnerung: Dienstliche Aufgabe ausstehend 🚨';
+        const message = `Bitte erledige die Aufgabe: "${duty.title}"`;
+        const metadata = { type: 'duty_reminder', request_id: duty.id };
+
+        const { data: notification, error: notifErr } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: teacher.id,
+            title,
+            message,
+            metadata
+          })
+          .select('id')
+          .single();
+
+        if (!notifErr && notification) {
+          await supabase.functions.invoke('send-push', {
+            body: {
+              userId: teacher.id,
+              title,
+              body: message,
+              url: '/',
+              notificationId: notification.id
+            }
+          });
+        }
+        successCount++;
+      } catch (err) {
+        console.error('Failed to send reminder to', teacher.id, err);
+      }
+    }
+    
+    alert(`Erinnerungen erfolgreich an ${successCount} Lehrkräfte gesendet!`);
+  };
+
+  const handleExportCSV = (duty: any) => {
+    if (!duty) return;
+    const targeted = getDutysTargetedTeachers(duty);
+    
+    let csvContent = '\uFEFF'; // Add BOM for excel support
+    
+    if (duty.questions && duty.questions.length > 0) {
+      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', ...duty.questions];
+      csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
+      
+      targeted.forEach((t: any) => {
+        const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+        const hasCompleted = !!response;
+        
+        let answersObj: Record<string, string> = {};
+        if (hasCompleted && response.response_text) {
+          try {
+            if (response.response_text.startsWith('{')) {
+              answersObj = JSON.parse(response.response_text);
+            }
+          } catch (e) {}
+        }
+        
+        const row = [
+          `${t.firstName || t.first_name} ${t.lastName || t.last_name}`,
+          hasCompleted ? 'Erledigt' : 'Offen',
+          hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
+          ...duty.questions.map((q: string) => {
+            if (!hasCompleted) return '-';
+            const ans = answersObj[q] !== undefined ? answersObj[q] : (response.response_text || '');
+            return ans;
+          })
+        ];
+        
+        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+    } else {
+      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', 'Antwort'];
+      csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
+      
+      targeted.forEach((t: any) => {
+        const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+        const hasCompleted = !!response;
+        
+        const row = [
+          `${t.firstName || t.first_name} ${t.lastName || t.last_name}`,
+          hasCompleted ? 'Erledigt' : 'Offen',
+          hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
+          hasCompleted ? response.response_text : '-'
+        ];
+        
+        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+    }
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `auswertung_${duty.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleResolveTicket = async (ticketId: string) => {
@@ -6899,29 +7062,32 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               {editingDutyId ? 'Aufgabe bearbeiten' : 'Aufgabe anlegen'}
             </h4>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Titel der Aufgabe *</label>
-              <input
-                type="text"
-                value={newDutyTitle}
-                onChange={(e) => setNewDutyTitle(e.target.value)}
-                placeholder="z. B. Stundenzettel Juni einreichen"
-                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-              />
-            </div>
+            {/* SECTION 1: ALLGEMEINE INFOS */}
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1. Allgemeine Infos</div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Titel der Aufgabe *</label>
+                <input
+                  type="text"
+                  value={newDutyTitle}
+                  onChange={(e) => setNewDutyTitle(e.target.value)}
+                  placeholder="z. B. Stundenzettel Juni einreichen"
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
+                />
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Anweisung / Beschreibung</label>
-              <textarea
-                value={newDutyDescription}
-                onChange={(e) => setNewDutyDescription(e.target.value)}
-                placeholder="Detaillierte Beschreibung der Aufgabe..."
-                rows={3}
-                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-              />
-            </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Anweisung / Beschreibung</label>
+                <textarea
+                  value={newDutyDescription}
+                  onChange={(e) => setNewDutyDescription(e.target.value)}
+                  placeholder="Detaillierte Beschreibung der Aufgabe..."
+                  rows={3}
+                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Aufgabentyp</label>
                 <select
@@ -6933,45 +7099,125 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                   style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
                 >
                   <option value="todo">To-Do (einfaches Abhaken)</option>
-                  <option value="questionnaire">Fragebogen / Feedback</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Priorität</label>
-                <select
-                  value={newDutyPriority}
-                  onChange={(e) => setNewDutyPriority(e.target.value as any)}
-                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
-                >
-                  <option value="standard">Standard (normaler Feed)</option>
-                  <option value="critical">🚨 Kritisch (Dashboard blockierend)</option>
+                  <option value="questionnaire">Fragebogen / Feedback-Umfrage</option>
                 </select>
               </div>
             </div>
 
+            {/* SECTION 2: ZIELGRUPPE & PRIORITÄT */}
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2. Zielgruppe & Priorität</div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Priorität</label>
+                  <select
+                    value={newDutyPriority}
+                    onChange={(e) => setNewDutyPriority(e.target.value as any)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="standard">Standard (normaler Feed)</option>
+                    <option value="critical">🚨 Kritisch (Dashboard blockierend)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Empfänger-Gruppe</label>
+                  <select
+                    value={newDutyTargetType}
+                    onChange={(e) => setNewDutyTargetType(e.target.value as any)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="all">Alle Lehrkräfte</option>
+                    <option value="group">Instrumenten-Fachgruppe</option>
+                    <option value="individual">Einzelne Lehrkraft</option>
+                  </select>
+                </div>
+              </div>
+
+              {newDutyTargetType === 'group' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Fachgruppe auswählen</label>
+                  <select
+                    value={newDutyTargetGroup}
+                    onChange={(e) => setNewDutyTargetGroup(e.target.value)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="guitar">Gitarre & Bass</option>
+                    <option value="piano">Klavier, Keyboard & Tasten</option>
+                    <option value="vocals">Gesang & Stimme</option>
+                    <option value="drums">Schlagzeug & Rhythmus</option>
+                    <option value="strings">Streichinstrumente (Geige, Cello, Kontrabass etc.)</option>
+                    <option value="winds">Blasinstrumente (Flöte, Trompete, Klarinette etc.)</option>
+                    <option value="early_education">Früherziehung & Grundfächer</option>
+                    <option value="other">Sonstige Instrumente / Theorie & Ensemble</option>
+                  </select>
+                </div>
+              )}
+
+              {newDutyTargetType === 'individual' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Lehrkraft auswählen</label>
+                  <select
+                    value={newDutyTargetTeacherId}
+                    onChange={(e) => setNewDutyTargetTeacherId(e.target.value)}
+                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
+                  >
+                    <option value="">Lehrkraft wählen...</option>
+                    {allUniqueTeachers.map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 3: FRAGEBOGEN-DESIGN */}
             {newDutyType === 'questionnaire' && (
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Fragen im Fragebogen ({newDutyQuestions.length})</label>
-                {newDutyQuestions.map((q, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#334155', flex: 1 }}>{q}</span>
-                    <button 
-                      type="button"
-                      onClick={() => setNewDutyQuestions(newDutyQuestions.filter((_, qIdx) => qIdx !== idx))}
-                      style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase', letterSpacing: '0.05em' }}>3. Fragebogen-Design (Fragen)</div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {newDutyQuestions.map((q, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'center', gap: '6px', background: 'white', padding: '8px 12px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#1e293b', fontWeight: 600, flex: 1 }}>{q}</span>
+                      
+                      <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => handleMoveQuestion(idx, 'up')}
+                          style={{ border: 'none', background: 'transparent', color: idx === 0 ? '#cbd5e1' : '#64748b', cursor: idx === 0 ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '6px' }}
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === newDutyQuestions.length - 1}
+                          onClick={() => handleMoveQuestion(idx, 'down')}
+                          style={{ border: 'none', background: 'transparent', color: idx === newDutyQuestions.length - 1 ? '#cbd5e1' : '#64748b', cursor: idx === newDutyQuestions.length - 1 ? 'not-allowed' : 'pointer', padding: '4px', borderRadius: '6px' }}
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setNewDutyQuestions(newDutyQuestions.filter((_, qIdx) => qIdx !== idx))}
+                          style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', padding: '4px', borderRadius: '6px' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                   <input
                     type="text"
                     value={newDutyQuestionInput}
                     onChange={(e) => setNewDutyQuestionInput(e.target.value)}
                     placeholder="Neue Frage hinzufügen..."
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.8rem', outline: 'none' }}
+                    style={{ flex: 1, padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.82rem', outline: 'none' }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -6990,60 +7236,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         setNewDutyQuestionInput('');
                       }
                     }}
-                    style={{ background: '#ea4335', color: 'white', border: 'none', borderRadius: '10px', padding: '0 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: '#ea4335', color: 'white', border: 'none', borderRadius: '12px', padding: '0 16px', fontSize: '0.9rem', fontWeight: 800, cursor: 'pointer' }}
                   >
                     +
                   </button>
                 </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Empfänger-Gruppe</label>
-              <select
-                value={newDutyTargetType}
-                onChange={(e) => setNewDutyTargetType(e.target.value as any)}
-                style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
-              >
-                <option value="all">Alle Lehrkräfte</option>
-                <option value="group">Instrumenten-Fachgruppe</option>
-                <option value="individual">Einzelne Lehrkraft</option>
-              </select>
-            </div>
-
-            {newDutyTargetType === 'group' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Fachgruppe auswählen</label>
-                <select
-                  value={newDutyTargetGroup}
-                  onChange={(e) => setNewDutyTargetGroup(e.target.value)}
-                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
-                >
-                  <option value="guitar">Gitarre & Bass</option>
-                  <option value="piano">Klavier, Keyboard & Tasten</option>
-                  <option value="vocals">Gesang & Stimme</option>
-                  <option value="drums">Schlagzeug & Rhythmus</option>
-                  <option value="strings">Streichinstrumente (Geige, Cello, Kontrabass etc.)</option>
-                  <option value="winds">Blasinstrumente (Flöte, Trompete, Klarinette etc.)</option>
-                  <option value="early_education">Früherziehung & Grundfächer</option>
-                  <option value="other">Sonstige Instrumente / Theorie & Ensemble</option>
-                </select>
-              </div>
-            )}
-
-            {newDutyTargetType === 'individual' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Lehrkraft auswählen</label>
-                <select
-                  value={newDutyTargetTeacherId}
-                  onChange={(e) => setNewDutyTargetTeacherId(e.target.value)}
-                  style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
-                >
-                  <option value="">Lehrkraft wählen...</option>
-                  {allUniqueTeachers.map((t: any) => (
-                    <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
-                  ))}
-                </select>
               </div>
             )}
 
@@ -7337,8 +7534,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           </div>
 
         </div>
-
-        {/* DETAILS & STATS MODAL */}
         {selectedDutyForStats && (
           <div style={{
             position: 'fixed',
@@ -7358,7 +7553,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               background: '#ffffff',
               borderRadius: '24px',
               width: '100%',
-              maxWidth: '650px',
+              maxWidth: '680px',
               maxHeight: '90vh',
               display: 'flex',
               flexDirection: 'column',
@@ -7381,7 +7576,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               </div>
 
               {/* Modal Content */}
-              <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 
                 {/* Stats Summary Card */}
                 {(() => {
@@ -7393,7 +7588,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', gap: '24px', alignItems: 'center' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>Abschlussquote</div>
-                        <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                        <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                           {percentage}%
                           <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>({completed.length} von {targeted.length} Lehrkräften)</span>
                         </div>
@@ -7422,95 +7617,362 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                   );
                 })()}
 
-                {/* List of targeted teachers */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>Detaillierter Status</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {getTargetedTeachers(selectedDutyForStats).map((t: any) => {
-                      const response = dutyResponsesList.find(res => res.teacher_id === t.id);
-                      const hasCompleted = !!response;
+                {/* Tab selector for questionnaires */}
+                {selectedDutyForStats.questions && selectedDutyForStats.questions.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
+                    <button
+                      onClick={() => setStatsModalTab('status')}
+                      style={{
+                        background: statsModalTab === 'status' ? '#fce8e6' : 'transparent',
+                        color: statsModalTab === 'status' ? '#ea4335' : '#64748b',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Status-Übersicht
+                    </button>
+                    <button
+                      onClick={() => setStatsModalTab('qa')}
+                      style={{
+                        background: statsModalTab === 'qa' ? '#fce8e6' : 'transparent',
+                        color: statsModalTab === 'qa' ? '#ea4335' : '#64748b',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Fragen & Antworten
+                    </button>
+                  </div>
+                )}
 
-                      return (
-                        <div key={t.id} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'flex-start', gap: '12px', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifySelf: 'flex-start', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>
-                              {(t.firstName || t.first_name || 'U')?.[0]}
-                            </span>
-                          </div>
+                {/* Filter and Actions Row */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => setStatsStatusFilter('all')}
+                        style={{
+                          background: statsStatusFilter === 'all' ? '#ea4335' : '#f1f5f9',
+                          color: statsStatusFilter === 'all' ? '#ffffff' : '#475569',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Alle
+                      </button>
+                      <button
+                        onClick={() => setStatsStatusFilter('completed')}
+                        style={{
+                          background: statsStatusFilter === 'completed' ? '#34a853' : '#f1f5f9',
+                          color: statsStatusFilter === 'completed' ? '#ffffff' : '#475569',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Erledigt
+                      </button>
+                      <button
+                        onClick={() => setStatsStatusFilter('pending')}
+                        style={{
+                          background: statsStatusFilter === 'pending' ? '#ef4444' : '#f1f5f9',
+                          color: statsStatusFilter === 'pending' ? '#ffffff' : '#475569',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Offen
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleExportCSV(selectedDutyForStats)}
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#1e293b',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.74rem',
+                          fontWeight: 750,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Download size={12} /> CSV Export
+                      </button>
+                      <button
+                        onClick={() => handleSendReminder(selectedDutyForStats)}
+                        style={{
+                          background: '#fce8e6',
+                          color: '#ea4335',
+                          border: '1px solid #f9d2ce',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.74rem',
+                          fontWeight: 750,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <AlertCircle size={12} /> Erinnerung senden
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      type="text"
+                      value={statsSearchQuery}
+                      onChange={(e) => setStatsSearchQuery(e.target.value)}
+                      placeholder="Nach Name oder Instrument suchen..."
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 32px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.78rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* TAB CONTENT: STATUS-ÜBERSICHT */}
+                {statsModalTab === 'status' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>Detaillierter Status</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {(() => {
+                        const targeted = getTargetedTeachers(selectedDutyForStats);
+                        const filtered = targeted.filter((t: any) => {
+                          const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+                          const hasCompleted = !!response;
                           
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                              {t.firstName || t.first_name} {t.lastName || t.last_name}
+                          if (statsStatusFilter === 'completed' && !hasCompleted) return false;
+                          if (statsStatusFilter === 'pending' && hasCompleted) return false;
+                          
+                          if (statsSearchQuery) {
+                            const name = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.toLowerCase();
+                            const instrument = (t.instrument || '').toLowerCase();
+                            const query = statsSearchQuery.toLowerCase();
+                            return name.includes(query) || instrument.includes(query);
+                          }
+                          return true;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                              Keine Einträge gefunden.
                             </div>
-                            {t.instrument && (
-                              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{t.instrument}</div>
-                            )}
-                            {hasCompleted && response.response_text && (
-                              <div style={{ marginTop: '6px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedResponseIds(prev => ({
-                                    ...prev,
-                                    [response.id]: !prev[response.id]
-                                  }))}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    padding: 0,
-                                    color: '#ea4335',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    fontFamily: 'inherit'
-                                  }}
-                                >
-                                  {expandedResponseIds[response.id] ? '▲ Rückmeldung einklappen' : '▼ Rückmeldung ausklappen'}
-                                </button>
-                                
-                                {expandedResponseIds[response.id] && (
-                                  <div style={{ 
-                                    marginTop: '6px', 
-                                    background: '#f8fafc', 
-                                    padding: '8px 12px', 
-                                    borderRadius: '8px', 
-                                    border: '1px solid #e2e8f0', 
-                                    fontSize: '0.78rem', 
-                                    color: '#334155',
-                                    fontStyle: 'italic',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '2px',
-                                    whiteSpace: 'pre-wrap',
-                                    textAlign: 'left'
-                                  }}>
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', fontStyle: 'normal' }}>Rückmeldung:</span>
-                                    <span>{response.response_text}</span>
+                          );
+                        }
+
+                        return filtered.map((t: any) => {
+                          const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+                          const hasCompleted = !!response;
+
+                          return (
+                            <div key={t.id} style={{ display: 'flex', justifySelf: 'stretch', alignItems: 'flex-start', gap: '12px', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fce8e6', display: 'flex', alignItems: 'center', justifySelf: 'flex-start', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335' }}>
+                                  {(t.firstName || t.first_name || 'U')?.[0]}
+                                </span>
+                              </div>
+                              
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                                  {t.firstName || t.first_name} {t.lastName || t.last_name}
+                                </div>
+                                {t.instrument && (
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>{t.instrument}</div>
+                                )}
+                                {hasCompleted && response.response_text && (
+                                  <div style={{ marginTop: '6px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedResponseIds(prev => ({
+                                        ...prev,
+                                        [response.id]: !prev[response.id]
+                                      }))}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        padding: 0,
+                                        color: '#ea4335',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontFamily: 'inherit'
+                                      }}
+                                    >
+                                      {expandedResponseIds[response.id] ? '▲ Rückmeldung einklappen' : '▼ Rückmeldung ausklappen'}
+                                    </button>
+                                    
+                                    {expandedResponseIds[response.id] && (() => {
+                                      let isJson = false;
+                                      let answersObj: Record<string, string> = {};
+                                      try {
+                                        if (response.response_text.startsWith('{')) {
+                                          answersObj = JSON.parse(response.response_text);
+                                          isJson = true;
+                                        }
+                                      } catch (e) {}
+
+                                      return (
+                                        <div style={{ 
+                                          marginTop: '6px', 
+                                          background: '#f8fafc', 
+                                          padding: '8px 12px', 
+                                          borderRadius: '8px', 
+                                          border: '1px solid #cbd5e1', 
+                                          fontSize: '0.78rem', 
+                                          color: '#334155',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '6px',
+                                          textAlign: 'left'
+                                        }}>
+                                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase' }}>Rückmeldung:</span>
+                                          {isJson ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                              {Object.entries(answersObj).map(([q, ans], ansIdx) => (
+                                                <div key={ansIdx} style={{ borderBottom: ansIdx < Object.keys(answersObj).length - 1 ? '1px solid #e2e8f0' : 'none', paddingBottom: '4px' }}>
+                                                  <div style={{ fontWeight: 800, color: '#475569', fontSize: '0.74rem' }}>{q}</div>
+                                                  <div style={{ color: '#0f172a', fontStyle: 'italic', marginTop: '2px', fontSize: '0.76rem' }}>{ans || '(keine Antwort)'}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div style={{ fontStyle: 'italic', fontWeight: 550, whiteSpace: 'pre-wrap' }}>{response.response_text}</div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
 
-                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            {hasCompleted ? (
-                              <>
-                                <span style={{ background: '#e6f4ea', color: '#34a853', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>✓ Erledigt</span>
-                                <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '4px' }}>
-                                  {new Date(response.created_at).toLocaleDateString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                              </>
-                            ) : (
-                              <span style={{ background: '#fef2f2', color: '#b91c1c', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>Ausstehend</span>
-                            )}
+                              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                {hasCompleted ? (
+                                  <>
+                                    <span style={{ background: '#e6f4ea', color: '#34a853', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>✓ Erledigt</span>
+                                    <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '4px', fontWeight: 500 }}>
+                                      {new Date(response.created_at).toLocaleDateString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <span style={{ background: '#fef2f2', color: '#b91c1c', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px' }}>Ausstehend</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB CONTENT: FRAGEN & ANTWORTEN CLUSTERED */}
+                {statsModalTab === 'qa' && selectedDutyForStats.questions && selectedDutyForStats.questions.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+                    {selectedDutyForStats.questions.map((q: string, qIdx: number) => {
+                      // Find all parsed answers for this question
+                      const answersList: { teacherName: string; answer: string; date: string }[] = [];
+                      
+                      const targeted = getTargetedTeachers(selectedDutyForStats);
+                      targeted.forEach((t: any) => {
+                        const response = dutyResponsesList.find(res => res.teacher_id === t.id);
+                        if (response && response.response_text) {
+                          let ans = '';
+                          try {
+                            if (response.response_text.startsWith('{')) {
+                              const parsed = JSON.parse(response.response_text);
+                              ans = parsed[q] || '';
+                            } else {
+                              ans = response.response_text;
+                            }
+                          } catch (e) {
+                            ans = response.response_text;
+                          }
+                          
+                          answersList.push({
+                            teacherName: `${t.firstName || t.first_name} ${t.lastName || t.last_name}`,
+                            answer: ans.trim(),
+                            date: new Date(response.created_at).toLocaleDateString('de-DE')
+                          });
+                        }
+                      });
+
+                      // Apply search filter on teachers
+                      const filteredAnswers = answersList.filter(item => {
+                        if (statsSearchQuery) {
+                          return item.teacherName.toLowerCase().includes(statsSearchQuery.toLowerCase());
+                        }
+                        return true;
+                      });
+
+                      return (
+                        <div key={qIdx} style={{ background: '#f8fafc', padding: '14px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', marginBottom: '8px' }}>
+                            Frage {qIdx + 1}: {q}
                           </div>
+                          
+                          {filteredAnswers.length === 0 ? (
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', padding: '4px' }}>
+                              Keine Antworten vorhanden.
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {filteredAnswers.map((item, aIdx) => (
+                                <div key={aIdx} style={{ background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>{item.teacherName}</span>
+                                    <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 500 }}>{item.date}</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.76rem', color: '#334155', fontStyle: 'italic', fontWeight: 550 }}>
+                                    {item.answer || '(keine Antwort eingegeben)'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                </div>
+                )}
 
               </div>
 

@@ -139,6 +139,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // Student Dashboard & Gamification States
   const [schedules, setSchedules] = useState<any[]>([]);
   const [occurrences, setOccurrences] = useState<any[]>([]);
+  const [roomBookings, setRoomBookings] = useState<any[]>([]);
   const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
@@ -781,7 +782,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         statsRes,
         avatarRes,
         matrixRes,
-        msgRes
+        msgRes,
+        bookingsRes
       ] = await Promise.all([
         supabase
           .from('schedules')
@@ -820,7 +822,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         supabase
           .from('campus_direct_messages')
           .select('occurrence_id, is_read, recipient_id')
-          .or(`sender_id.eq.${profile.id},recipient_id.eq.${profile.id}`)
+          .or(`sender_id.eq.${profile.id},recipient_id.eq.${profile.id}`),
+        supabase
+          .from('room_bookings')
+          .select('room_id, date, start_time, booked_by, room:rooms(name)')
+          .eq('school_id', profile.school_id)
+          .gte('date', pastLimitStr)
       ]);
 
       const schData = schRes.data;
@@ -829,6 +836,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const avatarData = avatarRes.data;
       const matrixItems = matrixRes.data;
       const allMsgs = msgRes?.data || [];
+      const bookingsData = bookingsRes?.data || [];
+
+      setRoomBookings(bookingsData);
       const unreadIds = allMsgs
         .filter((m: any) => m.recipient_id === profile.id && !m.is_read)
         .map((m: any) => m.occurrence_id)
@@ -4516,6 +4526,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return getVirtualNextLesson();
     })();
 
+    const getLessonRoom = (lesson: any, dateStr: string) => {
+      if (!lesson) return 'Groovelab Raum';
+      const teacherId = lesson.teacher_id || (lesson.schedule && lesson.schedule.teacher_id);
+      const lessonTime = lesson.start_time || lesson.time_slot;
+      if (teacherId && lessonTime && dateStr) {
+        const booking = roomBookings.find(b => 
+          b.booked_by === teacherId &&
+          b.date === dateStr &&
+          b.start_time?.substring(0, 5) === lessonTime.substring(0, 5)
+        );
+        if (booking && booking.room) {
+          return booking.room.name;
+        }
+      }
+      return lesson.schedule?.room?.name || lesson.room?.name || lesson.room_name || 'Groovelab Raum';
+    };
+
     // Check if there is an occurrence today
     const occurrenceToday = occurrences.find(o => o.date === todayStr);
 
@@ -4528,20 +4555,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     let isCanceled = false;
 
     if (occurrenceToday) {
-      lessonToday = occurrenceToday;
+      lessonToday = {
+        ...occurrenceToday,
+        room_name: getLessonRoom(occurrenceToday, todayStr)
+      };
       isTodayLessonScheduled = true;
       isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occurrenceToday.status);
     } else if (scheduleToday) {
       const overridingOcc = occurrences.find(o => o.schedule_id === scheduleToday.id && o.date === todayStr);
       if (overridingOcc) {
-        lessonToday = overridingOcc;
+        lessonToday = {
+          ...overridingOcc,
+          room_name: getLessonRoom(overridingOcc, todayStr)
+        };
         isTodayLessonScheduled = true;
         isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(overridingOcc.status);
       } else {
         lessonToday = {
           ...scheduleToday,
           start_time: scheduleToday.time_slot,
-          room_name: scheduleToday.room?.name || 'Groovelab Raum'
+          room_name: getLessonRoom(scheduleToday, todayStr)
         };
         isTodayLessonScheduled = true;
         isCanceled = scheduleToday.status === 'canceled_by_teacher_sick';

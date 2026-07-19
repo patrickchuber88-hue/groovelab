@@ -377,6 +377,8 @@ interface MobileBriefingViewProps {
   handleSubmitClassFeedInteraction: (postId: string, type: 'poll_vote' | 'quiz_answer', selectedOption: number, isCorrect?: boolean) => Promise<void>;
   feedInteractions: any[];
   handleReactToPost: (postId: string, emoji: string) => Promise<void>;
+  getOccRoomName: (occ: any) => string;
+  unreadClassFeedCount: number;
 }
 
 function MobileBriefingView({
@@ -408,7 +410,9 @@ function MobileBriefingView({
   classFeedInteractions,
   handleSubmitClassFeedInteraction,
   feedInteractions,
-  handleReactToPost
+  handleReactToPost,
+  getOccRoomName,
+  unreadClassFeedCount
 }: MobileBriefingViewProps) {
   const campusSettings = studentUser?.schools?.opening_hours?.campus_settings || {};
   const flamesActive = campusSettings.flames_active !== false;
@@ -1061,7 +1065,7 @@ function MobileBriefingView({
                             <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
-                            {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#fee2e2' }}>{getOccRoomName(occ)}</span>
                           </div>
                         </div>
 
@@ -1130,7 +1134,7 @@ function MobileBriefingView({
                             <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
-                            {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
+                            {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>{getOccRoomName(occ)}</span>
                           </div>
                         </div>
 
@@ -1184,7 +1188,7 @@ function MobileBriefingView({
                       <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#34a853' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span></div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#34a853' }}>{getOccRoomName(occ)}</span></div>
                     </div>
                     <button
                       onClick={() => {
@@ -1383,9 +1387,27 @@ function MobileBriefingView({
               transition: 'all 0.2s'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', position: 'relative' }}>
               <Users size={16} />
               <span>Klassen-Feed</span>
+              {unreadClassFeedCount > 0 && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#ea4335',
+                  color: '#ffffff',
+                  fontSize: '9px',
+                  fontWeight: 'bold',
+                  borderRadius: '10px',
+                  minWidth: '15px',
+                  height: '15px',
+                  padding: '0 3px',
+                  marginLeft: '4px'
+                }}>
+                  {unreadClassFeedCount}
+                </span>
+              )}
             </div>
           </button>
         </div>
@@ -2456,6 +2478,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [occurrencesWithMessages, setOccurrencesWithMessages] = useState<string[]>([]);
   const [briefingLoading, setBriefingLoading] = useState(true);
   const [rawScheduleOccurrences, setRawScheduleOccurrences] = useState<any[]>([]);
+  const [roomBookings, setRoomBookings] = useState<any[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [rawSchoolYearOccurrences, setRawSchoolYearOccurrences] = useState<any[]>([]);
   const [loadingSchoolYearSchedule, setLoadingSchoolYearSchedule] = useState(false);
@@ -2681,6 +2704,52 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [studentFeedTab, setStudentFeedTab] = useState<'campus' | 'class'>('campus');
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
+  const unreadClassFeedCount = useMemo(() => {
+    if (!studentId) return 0;
+    return classFeedPosts.filter((post: any) => {
+      const hasRead = classFeedInteractions.some(i => i.post_id === post.id && i.user_id === studentId);
+      return !hasRead;
+    }).length;
+  }, [classFeedPosts, classFeedInteractions, studentId]);
+
+  const markAllClassPostsAsRead = async (posts: any[], interactions: any[]) => {
+    if (!studentId) return;
+    const unread = posts.filter(post => !interactions.some(i => i.post_id === post.id && i.user_id === studentId));
+    if (unread.length === 0) return;
+
+    try {
+      const newInteractions = unread.map(post => ({
+        post_type: 'class',
+        post_id: post.id,
+        user_id: studentId,
+        interaction_type: 'read'
+      }));
+
+      const { error } = await supabase
+        .from('feed_interactions')
+        .insert(newInteractions);
+
+      if (error) throw error;
+
+      // Reload class interactions
+      const { data: classInterData } = await supabase
+        .from('feed_interactions')
+        .select('*')
+        .eq('post_type', 'class');
+      if (classInterData) {
+        setClassFeedInteractions(classInterData);
+      }
+    } catch (err) {
+      console.error('Error marking posts as read:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (studentFeedTab === 'class') {
+      markAllClassPostsAsRead(classFeedPosts, classFeedInteractions);
+    }
+  }, [studentFeedTab, classFeedPosts, classFeedInteractions]);
+
   // Übe-Ziel (Class Goal) State
   const [classGoals, setClassGoals] = useState<any[]>([]);
   const [classWeeklyMins, setClassWeeklyMins] = useState(0);
@@ -2865,6 +2934,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     } catch (err) {
       console.error('Error sending quick chat message:', err);
     }
+  };
+
+  const fetchRoomBookings = async () => {
+    const schoolId = studentUser?.school_id;
+    if (!schoolId) return;
+    try {
+      const todayDateStr = toLocalYYYYMMDD(new Date());
+      const { data, error } = await supabase
+        .from('room_bookings')
+        .select('room_id, date, start_time, booked_by, room:rooms(name)')
+        .eq('school_id', schoolId)
+        .gte('date', todayDateStr);
+      if (!error && data) {
+        setRoomBookings(data);
+      }
+    } catch (err) {
+      console.error('Error fetching room bookings:', err);
+    }
+  };
+
+  const getOccRoomName = (occ: any) => {
+    if (!occ) return 'Groovelab';
+    const teacherId = occ.teacher_id || occ.schedule?.teacher_id;
+    const lessonTime = occ.start_time || occ.schedule?.time_slot;
+    const dateStr = occ.date;
+    if (teacherId && lessonTime && dateStr) {
+      const booking = roomBookings.find(b => 
+        b.booked_by === teacherId &&
+        b.date === dateStr &&
+        b.start_time?.substring(0, 5) === lessonTime.substring(0, 5)
+      );
+      if (booking && booking.room) {
+        return booking.room.name;
+      }
+    }
+    return occ.schedule?.rooms?.name || occ.schedule?.room?.name || 'Groovelab';
   };
 
   const fetchSchedule = async () => {
@@ -3100,6 +3205,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     fetchSchedule();
     fetchSchoolYearSchedule();
     fetchOccurrencesWithMessages();
+    fetchRoomBookings();
 
     if (!studentId) return;
 
@@ -3117,6 +3223,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           fetchSchedule();
           fetchSchoolYearSchedule();
           fetchBriefingOnly();
+          fetchRoomBookings();
         }
       )
       .subscribe();
@@ -3141,6 +3248,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       supabase.removeChannel(msgChannel);
     };
   }, [studentId]);
+
+  useEffect(() => {
+    if (studentUser?.school_id) {
+      fetchRoomBookings();
+    }
+  }, [studentUser?.school_id]);
 
   const fetchCrisisNotifications = async () => {
     if (!studentId) return;
@@ -5729,34 +5842,59 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             const rawDay = new Date().getDay();
             const todayWeekday = rawDay === 0 ? 7 : rawDay;
+            const todayDateStr = toLocalYYYYMMDD(new Date());
 
-            const { data: todaySchedules } = await supabase
-              .from('schedules')
-              .select(`
-                id,
-                time_slot,
-                status,
-                teacher_id,
-                rooms (name),
-                teacher:users!schedules_teacher_id_fkey (first_name, last_name)
-              `)
-              .eq('student_id', studentId)
-              .eq('day_of_week', todayWeekday)
-              .maybeSingle();
+            const [todaySchedulesRes, bookingsRes] = await Promise.all([
+              supabase
+                .from('schedules')
+                .select(`
+                  id,
+                  time_slot,
+                  status,
+                  teacher_id,
+                  rooms (name),
+                  teacher:users!schedules_teacher_id_fkey (first_name, last_name)
+                `)
+                .eq('student_id', studentId)
+                .eq('day_of_week', todayWeekday)
+                .maybeSingle(),
+              supabase
+                .from('room_bookings')
+                .select('room_id, date, start_time, booked_by, room:rooms(name)')
+                .eq('school_id', currentSchoolId)
+                .eq('date', todayDateStr)
+            ]);
+
+            const todaySchedules = todaySchedulesRes.data;
+            const bookings = bookingsRes.data || [];
 
             let todayLesson = null;
             if (todaySchedules) {
               const teacherName = todaySchedules.teacher 
                 ? `Herr/Frau ${(todaySchedules.teacher as any).last_name}` 
                 : 'Lehrkraft';
+              
+              let resolvedRoom = (todaySchedules.rooms as any)?.name || 'Unterrichtsraum';
+              if (todaySchedules.teacher_id) {
+                const booking = bookings.find((b: any) => 
+                  b.booked_by === todaySchedules.teacher_id && 
+                  b.start_time?.substring(0, 5) === todaySchedules.time_slot?.substring(0, 5)
+                );
+                if (booking && booking.room) {
+                  resolvedRoom = Array.isArray(booking.room)
+                    ? (booking.room[0]?.name || 'Unterrichtsraum')
+                    : (booking.room as any).name || 'Unterrichtsraum';
+                }
+              }
+
               todayLesson = {
                 id: todaySchedules.id,
                 time: todaySchedules.time_slot,
-                room: (todaySchedules.rooms as any)?.name || 'Unterrichtsraum',
+                room: resolvedRoom,
                 teacher: teacherName,
                 teacher_id: todaySchedules.teacher_id,
                 status: todaySchedules.status,
-                displayString: `Heute ${todaySchedules.time_slot} Uhr, ${(todaySchedules.rooms as any)?.name || 'Raum'} bei ${teacherName}`
+                displayString: `Heute ${todaySchedules.time_slot} Uhr, ${resolvedRoom} bei ${teacherName}`
               };
             }
 
@@ -9527,6 +9665,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             handleSubmitClassFeedInteraction={handleSubmitClassFeedInteraction}
             feedInteractions={feedInteractions}
             handleReactToPost={handleReactToPost}
+            getOccRoomName={getOccRoomName}
+            unreadClassFeedCount={unreadClassFeedCount}
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -10619,7 +10759,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Ausfall</span>
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, marginTop: '2px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#fee2e2' }}>{getOccRoomName(occ)}</span>
                                   </div>
                                 </div>
 
@@ -10688,7 +10828,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                     <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                                   </div>
                                   <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
-                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span>
+                                    {occ.start_time?.substring(0,5)} Uhr <span style={{ color: '#b45309' }}>{getOccRoomName(occ)}</span>
                                   </div>
                                 </div>
 
@@ -10742,7 +10882,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               <div style={{ fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#34a853' }}>{occ.schedule?.rooms?.name || 'Groovelab'}</span></div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{occ.start_time?.substring(0,5)} <span style={{ color: '#34a853' }}>{getOccRoomName(occ)}</span></div>
                             </div>
                             <button
                               onClick={() => {
@@ -11158,9 +11298,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       transition: 'all 0.2s'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', position: 'relative' }}>
                       <Users size={16} />
                       <span>Klassen-Feed</span>
+                      {unreadClassFeedCount > 0 && (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: '#ea4335',
+                          color: '#ffffff',
+                          fontSize: '9px',
+                          fontWeight: 'bold',
+                          borderRadius: '10px',
+                          minWidth: '15px',
+                          height: '15px',
+                          padding: '0 3px',
+                          marginLeft: '4px'
+                        }}>
+                          {unreadClassFeedCount}
+                        </span>
+                      )}
                     </div>
                   </button>
                 </div>

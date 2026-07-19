@@ -2200,7 +2200,28 @@ export function TeacherDashboard({
   };
 
   const handleSubmitFeedbackResponse = async (requestId: string) => {
-    if (!responseTextInput.trim()) return;
+    const request = adminFeedbackRequests.find(r => r.id === requestId);
+    const isQuestionnaire = request && request.questions && request.questions.length > 0;
+    
+    let finalResponseText = '';
+    if (isQuestionnaire) {
+      const answersObj: Record<string, string> = {};
+      let hasAnyAnswer = false;
+      request.questions.forEach((q: string) => {
+        const ans = (questionnaireAnswers[q] || '').trim();
+        answersObj[q] = ans;
+        if (ans) hasAnyAnswer = true;
+      });
+      if (!hasAnyAnswer) {
+        alert('Bitte beantworte mindestens eine Frage.');
+        return;
+      }
+      finalResponseText = JSON.stringify(answersObj);
+    } else {
+      if (!responseTextInput.trim()) return;
+      finalResponseText = responseTextInput.trim();
+    }
+
     setSubmittingFeedback(true);
     try {
       const { error } = await supabase
@@ -2208,12 +2229,13 @@ export function TeacherDashboard({
         .insert({
           request_id: requestId,
           teacher_id: userId,
-          response_text: responseTextInput.trim()
+          response_text: finalResponseText
         });
 
       if (error) throw error;
       
       setResponseTextInput('');
+      setQuestionnaireAnswers({});
       setRespondingToRequestId(null);
       setAdminFeedbackTab('done');
       alert('Rückmeldung erfolgreich übermittelt! Vielen Dank.');
@@ -2591,6 +2613,7 @@ export function TeacherDashboard({
   const [submittingClassPost, setSubmittingClassPost] = useState(false);
   const [respondingToRequestId, setRespondingToRequestId] = useState<string | null>(null);
   const [responseTextInput, setResponseTextInput] = useState<string>('');
+  const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({});
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [adminFeedbackTab, setAdminFeedbackTab] = useState<'open' | 'done'>('open');
   const [planningEvents, setPlanningEvents] = useState<any[]>([]);
@@ -6363,246 +6386,154 @@ export function TeacherDashboard({
                                 : [];
 
                               return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: "'Inter', sans-serif" }}>
-                                  {/* Title section with Apple style icon container */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                                    <div style={{ 
-                                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', 
-                                      border: '1px solid rgba(217, 119, 6, 0.2)',
-                                      color: '#d97706', 
-                                      width: '40px', 
-                                      height: '40px', 
-                                      borderRadius: '12px', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center',
-                                      boxShadow: '0 2px 8px rgba(217, 119, 6, 0.08)'
-                                    }}>
-                                      <Calendar size={20} />
-                                    </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', fontFamily: "'Inter', sans-serif" }}>
+                                  {/* Title Section: borderless, simple, calm */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <Calendar size={18} color="#475569" style={{ opacity: 0.8 }} />
                                     <div>
-                                      <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
                                         Vorbereitung
                                       </h4>
-                                      <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>Fahrplan & Änderungen</div>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginTop: '1px' }}>Fahrplan & Änderungen</div>
                                     </div>
                                   </div>
 
-                                  {/* Sleek Appointment Card */}
+                                  {/* Unified Info Flow Container */}
                                   <div style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '16px',
-                                    padding: '16px',
-                                    color: '#1d1d1f',
-                                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+                                    background: '#fafafa',
+                                    borderRadius: '20px',
+                                    padding: '24px',
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '14px'
+                                    flexDirection: 'column',
+                                    gap: '20px'
                                   }}>
-                                    <div style={{ 
-                                      background: 'rgba(0, 122, 255, 0.08)', 
-                                      width: '36px', 
-                                      height: '36px', 
-                                      borderRadius: '10px', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center',
-                                      flexShrink: 0
-                                    }}>
-                                      <Activity size={18} color="#007aff" />
+                                    {/* 1. Lessons count summary */}
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                      <Activity size={16} color="#64748b" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                      <div style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.4 }}>
+                                        Heute stehen <span style={{ fontWeight: 700, color: '#0f172a' }}>{activeLessonsCount} Termine</span> auf dem Fahrplan.
+                                      </div>
                                     </div>
-                                    <div>
-                                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f' }}>
-                                        Heute stehen <strong style={{ color: '#007aff', fontWeight: 800 }}>{activeLessonsCount} Termine</strong> auf dem Fahrplan.
+
+                                    <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                                    {/* 2. Daily Changes */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        Änderungen & Ausfälle heute
                                       </span>
-                                    </div>
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px' }}>
-                                      Änderungen & Ausfälle heute
-                                    </span>
-                                    {dailyChanges.length > 0 ? (
-                                      <div style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '8px'
-                                      }}>
-                                        {dailyChanges.map((slot: any, idx: number) => {
-                                          const isCanceled = slot.status !== 'rescheduled_away';
-                                          const badgeBg = isCanceled ? 'rgba(255, 59, 48, 0.08)' : 'rgba(255, 149, 0, 0.08)';
-                                          const badgeTextColor = isCanceled ? '#ff3b30' : '#ff9500';
-                                          const badgeText = isCanceled ? 'Ausfall' : 'Verschoben';
-                                          const itemBorderLeft = isCanceled ? '3px solid #ff3b30' : '3px solid #ff9500';
-                                          const matchRem = !isCanceled 
-                                            ? briefingData.rescheduledReminders?.find((r: any) => r.studentName === slot.student?.name)
-                                            : null;
-                                          
-                                          return (
-                                            <div key={idx} style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              background: '#ffffff',
-                                              border: '1px solid rgba(0,0,0,0.04)',
-                                              borderLeft: itemBorderLeft,
-                                              borderRadius: '12px',
-                                              padding: '10px 14px',
-                                              fontSize: '0.82rem',
-                                              boxShadow: '0 2px 6px rgba(0,0,0,0.01)'
-                                            }}>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                                <span style={{ fontWeight: 750, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                  {slot.student?.name}
-                                                </span>
-                                                <span style={{ color: '#86868b', fontSize: '0.75rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                                                  ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
-                                                </span>
-                                                {!isCanceled && matchRem && (
-                                                  <span style={{ 
-                                                    color: '#ff9500', 
-                                                    fontSize: '0.75rem', 
-                                                    fontWeight: 700, 
-                                                    marginLeft: '8px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    whiteSpace: 'nowrap'
-                                                  }}>
-                                                    ➔ {matchRem.weekdayShort}. {matchRem.dateStr}.
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <span style={{
-                                                fontSize: '0.66rem',
-                                                fontWeight: 800,
-                                                color: badgeTextColor,
-                                                background: badgeBg,
-                                                padding: '3px 8px',
-                                                borderRadius: '6px',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.03em',
-                                                flexShrink: 0
-                                              }}>
-                                                {badgeText}
-                                              </span>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : (
-                                      <div style={{
-                                        background: 'rgba(52, 168, 83, 0.05)',
-                                        border: '1px solid rgba(52, 168, 83, 0.15)',
-                                        borderRadius: '16px',
-                                        padding: '12px 16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '12px',
-                                        fontSize: '0.82rem',
-                                        color: '#1d271f',
-                                        fontWeight: 600
-                                      }}>
-                                        <div style={{
-                                          background: 'rgba(52, 168, 83, 0.12)',
-                                          width: '26px',
-                                          height: '26px',
-                                          borderRadius: '50%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          flexShrink: 0
-                                        }}>
-                                          <CheckCircle size={15} color="#34c759" />
-                                        </div>
-                                        <span>Alles läuft nach Plan. Keine heutigen Ausfälle.</span>
-                                      </div>
-                                    )}
-
-                                    {/* Other weekly rescheduled appointments (excluding today's changes) */}
-                                    {(() => {
-                                      const otherReschedules = briefingData.rescheduledReminders?.filter((rem: any) => 
-                                        !dailyChanges.some((dc: any) => dc.student?.name === rem.studentName)
-                                      ) || [];
-                                      
-                                      if (otherReschedules.length === 0) return null;
-                                      
-                                      return (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px' }}>
-                                            Weitere Änderungen diese Woche
-                                          </span>
-                                          <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '8px'
-                                          }}>
-                                            {otherReschedules.map((rem: any) => (
-                                              <div key={rem.id} style={{
+                                      {dailyChanges.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                          {dailyChanges.map((slot: any, idx: number) => {
+                                            const isCanceled = slot.status !== 'rescheduled_away';
+                                            const labelColor = isCanceled ? '#ef4444' : '#f59e0b';
+                                            const labelText = isCanceled ? 'Ausfall' : 'Verschoben';
+                                            const matchRem = !isCanceled 
+                                              ? briefingData.rescheduledReminders?.find((r: any) => r.studentName === slot.student?.name)
+                                              : null;
+                                            
+                                            return (
+                                              <div key={idx} style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
-                                                background: '#ffffff',
-                                                border: '1px solid rgba(0,0,0,0.04)',
-                                                borderLeft: '3px solid #007aff',
-                                                borderRadius: '12px',
-                                                padding: '10px 14px',
-                                                fontSize: '0.82rem',
-                                                boxShadow: '0 2px 6px rgba(0,0,0,0.01)'
+                                                fontSize: '0.84rem',
+                                                color: '#475569'
                                               }}>
-                                                <span style={{ fontWeight: 750, color: '#1d1d1f' }}>
-                                                  {rem.studentName}
-                                                </span>
-                                                <span style={{ 
-                                                  fontSize: '0.74rem', 
-                                                  fontWeight: 700, 
-                                                  color: '#007aff',
-                                                  background: 'rgba(0, 122, 255, 0.08)',
-                                                  padding: '3px 8px',
-                                                  borderRadius: '6px'
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                                  <span style={{ fontWeight: 600, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {slot.student?.name}
+                                                  </span>
+                                                  <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
+                                                    ({slot.timeSlot || slot.start_time?.substring(0, 5)} Uhr)
+                                                  </span>
+                                                  {!isCanceled && matchRem && (
+                                                    <span style={{ 
+                                                      color: '#f59e0b', 
+                                                      fontSize: '0.76rem', 
+                                                      fontWeight: 600, 
+                                                      marginLeft: '6px'
+                                                    }}>
+                                                      ➔ {matchRem.weekdayShort}. {matchRem.dateStr}.
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <span style={{
+                                                  fontSize: '0.74rem',
+                                                  fontWeight: 700,
+                                                  color: labelColor
                                                 }}>
-                                                  {rem.weekdayShort}. {rem.dateStr}., {rem.time.replace(':', '.')} Uhr
+                                                  {labelText}
                                                 </span>
                                               </div>
-                                            ))}
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.84rem', color: '#475569' }}>
+                                          <CheckCircle size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                                          <span>Alles läuft nach Plan. Keine heutigen Ausfälle.</span>
+                                        </div>
+                                      )}
+
+                                      {/* Other weekly rescheduled appointments */}
+                                      {(() => {
+                                        const otherReschedules = briefingData.rescheduledReminders?.filter((rem: any) => 
+                                          !dailyChanges.some((dc: any) => dc.student?.name === rem.studentName)
+                                        ) || [];
+                                        
+                                        if (otherReschedules.length === 0) return null;
+                                        
+                                        return (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                              Weitere Änderungen diese Woche
+                                            </span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                              {otherReschedules.map((rem: any) => (
+                                                <div key={rem.id} style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  fontSize: '0.84rem',
+                                                  color: '#475569'
+                                                }}>
+                                                  <span style={{ fontWeight: 600, color: '#334155' }}>
+                                                    {rem.studentName}
+                                                  </span>
+                                                  <span style={{ 
+                                                    fontSize: '0.76rem', 
+                                                    fontWeight: 600, 
+                                                    color: '#475569'
+                                                  }}>
+                                                    {rem.weekdayShort}. {rem.dateStr}., {rem.time.replace(':', '.')} Uhr
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+
+                                    {firstSlotStartStr && (
+                                      <>
+                                        <div style={{ height: '1px', background: '#f1f5f9' }} />
+                                        {/* 3. First Lesson starting time & notes automatic activation */}
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                          <Clock size={16} color="#64748b" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                            <div style={{ fontSize: '0.86rem', color: '#334155' }}>
+                                              Erster Unterricht beginnt um <span style={{ fontWeight: 700, color: '#0f172a' }}>{firstSlotStartStr} Uhr</span>.
+                                            </div>
+                                            <div style={{ fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.4 }}>
+                                              Das Schüler-Notizwidget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
+                                            </div>
                                           </div>
                                         </div>
-                                      );
-                                    })()}
+                                      </>
+                                    )}
                                   </div>
-
-                                  {firstSlotStartStr && (
-                                    <div style={{ 
-                                      background: '#f8fafc',
-                                      border: '1px solid #e2e8f0',
-                                      borderRadius: '16px',
-                                      padding: '16px',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px',
-                                      marginTop: '8px'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1d1d1f', fontSize: '0.82rem', fontWeight: 600 }}>
-                                        <div style={{
-                                          background: 'rgba(0, 122, 255, 0.08)',
-                                          width: '24px',
-                                          height: '24px',
-                                          borderRadius: '50%',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          flexShrink: 0
-                                        }}>
-                                          <Clock size={14} color="#007aff" />
-                                        </div>
-                                        <span>Erster Unterricht beginnt um <strong style={{ color: '#007aff', fontWeight: 800 }}>{firstSlotStartStr} Uhr</strong>.</span>
-                                      </div>
-                                      <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, paddingLeft: '32px', lineHeight: 1.4 }}>
-                                        Das Schüler-Notizwidget aktiviert sich automatisch um {prepCutoffTimeStr} Uhr (15 Min. vorher).
-                                      </div>
-                                    </div>
-                                  )}
                                 </div>
                               );
                             }
@@ -9151,33 +9082,65 @@ export function TeacherDashboard({
                                     <div style={{ marginTop: '2px' }}>
                                       {isResponding ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                          <textarea
-                                            value={responseTextInput}
-                                            onChange={(e) => setResponseTextInput(e.target.value)}
-                                            placeholder="Schreibe deine Antwort an die Verwaltung..."
-                                            rows={2}
-                                            style={{
-                                              width: '100%',
-                                              padding: '8px 10px',
-                                              borderRadius: '8px',
-                                              border: '1px solid #cbd5e1',
-                                              fontSize: '0.76rem',
-                                              fontFamily: 'inherit',
-                                              outline: 'none',
-                                              resize: 'none',
-                                              boxSizing: 'border-box'
-                                            }}
-                                          />
+                                          {item.questions && item.questions.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                              {item.questions.map((q: string, qIdx: number) => (
+                                                <div key={qIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                  <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textAlign: 'left' }}>
+                                                    {q}
+                                                  </label>
+                                                  <textarea
+                                                    value={questionnaireAnswers[q] || ''}
+                                                    onChange={(e) => setQuestionnaireAnswers(prev => ({
+                                                      ...prev,
+                                                      [q]: e.target.value
+                                                    }))}
+                                                    placeholder="Deine Antwort..."
+                                                    rows={2}
+                                                    style={{
+                                                      width: '100%',
+                                                      padding: '8px 10px',
+                                                      borderRadius: '8px',
+                                                      border: '1px solid #cbd5e1',
+                                                      fontSize: '0.76rem',
+                                                      fontFamily: 'inherit',
+                                                      outline: 'none',
+                                                      resize: 'vertical',
+                                                      boxSizing: 'border-box'
+                                                    }}
+                                                  />
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <textarea
+                                              value={responseTextInput}
+                                              onChange={(e) => setResponseTextInput(e.target.value)}
+                                              placeholder="Schreibe deine Antwort an die Verwaltung..."
+                                              rows={2}
+                                              style={{
+                                                width: '100%',
+                                                padding: '8px 10px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #cbd5e1',
+                                                fontSize: '0.76rem',
+                                                fontFamily: 'inherit',
+                                                outline: 'none',
+                                                resize: 'none',
+                                                boxSizing: 'border-box'
+                                              }}
+                                            />
+                                          )}
                                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                                             <button
-                                              onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); }}
+                                              onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); setQuestionnaireAnswers({}); }}
                                               style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '5px 12px', borderRadius: '8px', fontWeight: 600, fontSize: '0.74rem', cursor: 'pointer' }}
                                             >
                                               Abbrechen
                                             </button>
                                             <button
                                               onClick={() => handleSubmitFeedbackResponse(item.id)}
-                                              disabled={submittingFeedback || !responseTextInput.trim()}
+                                              disabled={submittingFeedback || (!item.questions?.length && !responseTextInput.trim())}
                                               style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '5px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.74rem', cursor: 'pointer' }}
                                             >
                                               Senden
@@ -9187,7 +9150,7 @@ export function TeacherDashboard({
                                       ) : (
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                                           <button
-                                            onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); }}
+                                            onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); setQuestionnaireAnswers({}); }}
                                             style={{ 
                                               background: '#e6f4ea', 
                                               color: '#34a853', 
@@ -9300,12 +9263,34 @@ export function TeacherDashboard({
                                     {expandedResponseIds[response.id] ? '▲ Rückmeldung einklappen' : '▼ Deine Rückmeldung anzeigen'}
                                   </button>
 
-                                  {expandedResponseIds[response.id] && (
-                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 10px', borderRadius: '8px', marginTop: '4px', textAlign: 'left' }}>
-                                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>Deine Rückmeldung:</div>
-                                      <div style={{ fontSize: '0.76rem', color: '#334155', fontStyle: 'italic', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{response.response_text}</div>
-                                    </div>
-                                  )}
+                                  {expandedResponseIds[response.id] && (() => {
+                                    let isJson = false;
+                                    let answersObj: Record<string, string> = {};
+                                    try {
+                                      if (response.response_text.startsWith('{')) {
+                                        answersObj = JSON.parse(response.response_text);
+                                        isJson = true;
+                                      }
+                                    } catch (e) {}
+
+                                    return (
+                                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: '8px', marginTop: '4px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Deine Rückmeldung:</div>
+                                        {isJson ? (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            {Object.entries(answersObj).map(([q, ans], ansIdx) => (
+                                              <div key={ansIdx} style={{ fontSize: '0.76rem', borderBottom: ansIdx < Object.keys(answersObj).length - 1 ? '1px solid #e2e8f0' : 'none', paddingBottom: '4px' }}>
+                                                <div style={{ fontWeight: 800, color: '#475569' }}>{q}</div>
+                                                <div style={{ color: '#0f172a', fontStyle: 'italic', marginTop: '2px' }}>{ans || '(keine Antwort)'}</div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div style={{ fontSize: '0.76rem', color: '#334155', fontStyle: 'italic', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{response.response_text}</div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>

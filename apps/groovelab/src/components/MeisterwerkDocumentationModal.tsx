@@ -194,9 +194,26 @@ export const getCleanPageNotes = (notes: any): string => {
     .trim();
 };
 
+const SKILL_TAGS = [
+  { key: 'tempo', label: 'Tempo', icon: '⏱' },
+  { key: 'rhythmus', label: 'Rhythmus', icon: '🥁' },
+  { key: 'intonation', label: 'Töne / Intonation', icon: '🎵' },
+  { key: 'fingersatz', label: 'Fingersatz', icon: '🖖' },
+  { key: 'ausdruck', label: 'Ausdruck', icon: '🎭' },
+  { key: 'auswendig', label: 'Auswendig', icon: '📖' },
+  { key: 'kontinuitaet', label: 'Kontinuität', icon: '🔄' },
+  { key: 'selbststaendigkeit', label: 'Selbst geübt', icon: '💪' },
+];
+
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Skill-Radar & Feedback-Tagging
+  const [showSkillRadar, setShowSkillRadar] = useState(false);
+  const [pendingFeedbackTags, setPendingFeedbackTags] = useState<string[]>([]);
+  const [pendingFeedbackStatus, setPendingFeedbackStatus] = useState<'beherrscht' | 'in_entwicklung' | 'wiederholen' | null>(null);
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const activePlat = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
   const modalContainerRef = useRef<HTMLDivElement>(null);
 
@@ -290,6 +307,82 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [selectedHistoryWeek, setSelectedHistoryWeek] = useState<string | null>(null);
   const [songProgressPercent, setSongProgressPercent] = useState<number>(25);
 
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [newCustomTagInput, setNewCustomTagInput] = useState<string>('');
+
+  const handleAddCustomTag = () => {
+    const val = newCustomTagInput.trim();
+    if (!val) return;
+    if (!SKILL_TAGS.some(st => st.key.toLowerCase() === val.toLowerCase()) && !customTags.some(ct => ct.toLowerCase() === val.toLowerCase())) {
+      setCustomTags(prev => [...prev, val]);
+    }
+    if (pendingFeedbackTags.length < 2) {
+      if (!pendingFeedbackTags.includes(val)) {
+        setPendingFeedbackTags(prev => [...prev, val]);
+      }
+    }
+    setNewCustomTagInput('');
+  };
+
+  // Feedback helpers
+  const getFeedbackForWeek = (wk: string): { status: string; tags: string[]; at: string } | null => {
+    const weekNum = wk.split('-W')[1] || '';
+    const item = progressItems.find(item =>
+      item.topic_name === `Hausaufgabe KW ${weekNum}` && item.homework_notes
+    );
+    if (!item) return null;
+    try {
+      const notes: string[] = JSON.parse(item.homework_notes || '[]');
+      const fbStr = notes.find(n => n.startsWith('FEEDBACK:'));
+      if (!fbStr) return null;
+      return JSON.parse(fbStr.substring(9));
+    } catch { return null; }
+  };
+
+  const saveFeedback = async (wk: string, tags: string[], fbStatus: string | null) => {
+    const weekNum = wk.split('-W')[1] || '';
+    const item = progressItems.find(it =>
+      it.topic_name === `Hausaufgabe KW ${weekNum}` && it.id
+    );
+    const feedbackJson = `FEEDBACK:${JSON.stringify({ status: fbStatus, tags, at: new Date().toISOString() })}`;
+    try {
+      if (item?.id) {
+        // Update existing Hausaufgabe-KW entry
+        const notes: string[] = JSON.parse(item.homework_notes || '[]');
+        const filteredNotes = notes.filter(n => !n.startsWith('FEEDBACK:'));
+        if (fbStatus || tags.length > 0) filteredNotes.push(feedbackJson);
+        const { error } = await supabase
+          .from('progress_matrix')
+          .update({ homework_notes: JSON.stringify(filteredNotes), updated_at: new Date().toISOString() })
+          .eq('id', item.id);
+        if (error) throw error;
+        setProgressItems(prev => prev.map(p => p.id === item.id ? { ...p, homework_notes: JSON.stringify(filteredNotes) } : p));
+      } else {
+        // No Hausaufgabe-KW row yet — create one to hold the feedback
+        const activeTId = await getCurrentTeacherId();
+        const newNotes = (fbStatus || tags.length > 0) ? JSON.stringify([feedbackJson]) : '[]';
+        const { data, error } = await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${weekNum}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: false,
+            teacher_notes: '',
+            homework_notes: newNotes,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        if (data) setProgressItems(prev => [...prev, data]);
+      }
+    } catch (e) {
+      console.error('Error saving feedback:', e);
+    }
+  };
+
   const [textbausteine] = useState<any[]>(() => {
     const stored = localStorage.getItem('groovelab_textbausteine');
     if (stored) {
@@ -326,6 +419,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setActivePageNumber(null);
     setSelectedActiveSongId('');
   }, [student.id]);
+
+  // Load existing feedback when a week is selected in the archive
+  useEffect(() => {
+    if (!selectedHistoryWeek) {
+      setPendingFeedbackTags([]);
+      setPendingFeedbackStatus(null);
+      return;
+    }
+    const fb = getFeedbackForWeek(selectedHistoryWeek);
+    setPendingFeedbackTags(fb?.tags || []);
+    setPendingFeedbackStatus((fb?.status as any) || null);
+  }, [selectedHistoryWeek, progressItems]);
 
   const getLehrwerkColor = (title: string) => {
     const trimmed = (title || '').trim();
@@ -919,6 +1024,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       if (dbError) throw dbError;
       setProgressItems(data || []);
+
+      // Scan and load custom tags from history
+      const customFound: string[] = [];
+      (data || []).forEach(item => {
+        try {
+          const notes: string[] = JSON.parse(item.homework_notes || '[]');
+          const fbStr = notes.find((n: string) => n.startsWith('FEEDBACK:'));
+          if (fbStr) {
+            const fbObj = JSON.parse(fbStr.substring(9));
+            if (Array.isArray(fbObj.tags)) {
+              fbObj.tags.forEach((t: string) => {
+                const normalized = t.trim();
+                if (normalized && !SKILL_TAGS.some(st => st.key === normalized) && !customFound.includes(normalized)) {
+                  customFound.push(normalized);
+                }
+              });
+            }
+          }
+        } catch {}
+      });
+      setCustomTags(customFound);
 
       // Pre-populate homeworkNotes with the current week's active homework notes if found
       const currentWeek = getISOWeek();
@@ -2833,6 +2959,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     );
   };
 
+  const renderSkillRadarButton = (isMobile: boolean = false) => {
+    return (
+      <button
+        type="button"
+        onClick={() => setShowSkillRadar(true)}
+        title="Skill-Radar"
+        style={{
+          background: 'rgba(255,255,255,0.15)',
+          border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '20px',
+          height: isMobile ? 'auto' : '30px',
+          padding: isMobile ? '6px 12px' : '0 10px 0 8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px',
+          cursor: 'pointer',
+          color: '#ffffff',
+          fontSize: isMobile ? '0.74rem' : '0.72rem',
+          fontWeight: isMobile ? 800 : 700,
+          transition: 'all 0.18s ease',
+          flexShrink: 0,
+          marginRight: isMobile ? '0' : '4px',
+          whiteSpace: 'nowrap'
+        }}
+        className="hover-scale"
+      >
+        <Sliders size={isMobile ? 12 : 13} />
+        <span>Skill-Radar</span>
+      </button>
+    );
+  };
+
+
   const renderFullscreenButton = () => {
     return (
       <button
@@ -3094,12 +3253,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
-              <div className="header-desktop-archiv" style={{ display: 'block' }}>
+              <div className="header-desktop-archiv" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {renderSkillRadarButton()}
                 {renderArchivButton()}
               </div>
               {renderFullscreenButton()}
               {renderCloseButton()}
             </div>
+
           </div>
 
           {/* Bottom Row (mobile/tablet only) - Wrapped cleanly in 2 rows, no horizontal scrolling cutoffs */}
@@ -3195,6 +3356,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <Music size={12} />
                 <span>Übe-Begleiter</span>
               </button>
+              {renderSkillRadarButton(true)}
               {renderArchivButton(true)}
             </div>
           )}
@@ -3764,22 +3926,202 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                           className="hover-scale"
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {/* Week header row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '0.86rem', fontWeight: 900, color: isSelected ? '#34a853' : '#0f172a' }}>
                               KW {weekNum}
                             </span>
-                            <span style={{ fontSize: '0.68rem', background: isSelected ? '#34a853' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
-                              {homeworkItemsCount} Aufgaben
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {(() => {
+                                const fb = getFeedbackForWeek(wk);
+                                if (!fb?.status) return null;
+                                const badges: Record<string, { bg: string; color: string; label: string }> = {
+                                  beherrscht: { bg: '#dcfce7', color: '#16a34a', label: '✓ Beherrscht' },
+                                  in_entwicklung: { bg: '#fefce8', color: '#ca8a04', label: '~ In Entwicklung' },
+                                  wiederholen: { bg: '#fee2e2', color: '#dc2626', label: '↩ Wiederholen' },
+                                };
+                                const badge = badges[fb.status];
+                                if (!badge) return null;
+                                return (
+                                  <span style={{ fontSize: '0.62rem', background: badge.bg, color: badge.color, padding: '2px 8px', borderRadius: '10px', fontWeight: 800, flexShrink: 0 }}>
+                                    {badge.label}
+                                  </span>
+                                );
+                              })()}
+                              <span style={{ fontSize: '0.68rem', background: isSelected ? '#34a853' : '#f1f5f9', color: isSelected ? 'white' : '#4b5563', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
+                                {homeworkItemsCount} Aufgaben
+                              </span>
+                            </div>
                           </div>
                           {!isCompact && (
                             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
                               Dokumentiert in Woche {weekNum}
                             </span>
                           )}
+
+                          {/* Inline Feedback Panel — only when selected and not readOnly */}
+                          {isSelected && !readOnly && (
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{ marginTop: '10px', padding: '14px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '12px' }}
+                            >
+                              {/* Status */}
+                              <div>
+                                <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  Wie lief die Aufgabe?
+                                </span>
+                                <div style={{ display: 'flex', gap: '5px', marginTop: '6px' }}>
+                                  {([
+                                    { key: 'beherrscht', label: '✓ Beherrscht', bg: '#dcfce7', color: '#16a34a', border: '#86efac' },
+                                    { key: 'in_entwicklung', label: '~ In Entwicklung', bg: '#fefce8', color: '#ca8a04', border: '#fde68a' },
+                                    { key: 'wiederholen', label: '↩ Wiederholen', bg: '#fee2e2', color: '#dc2626', border: '#fecaca' },
+                                  ] as const).map(opt => (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => setPendingFeedbackStatus(prev => prev === opt.key ? null : opt.key)}
+                                      style={{
+                                        flex: 1, padding: '6px 3px',
+                                        background: pendingFeedbackStatus === opt.key ? opt.bg : 'white',
+                                        border: `1.5px solid ${pendingFeedbackStatus === opt.key ? opt.border : '#e2e8f0'}`,
+                                        borderRadius: '10px', cursor: 'pointer', fontSize: '0.62rem', fontWeight: 800,
+                                        color: pendingFeedbackStatus === opt.key ? opt.color : '#64748b',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >{opt.label}</button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Tags */}
+                              <div>
+                                <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  Schwierigkeiten
+                                </span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
+                                  {SKILL_TAGS.map(tag => {
+                                    const active = pendingFeedbackTags.includes(tag.key);
+                                    const limitReached = !active && pendingFeedbackTags.length >= 2;
+                                    return (
+                                      <button
+                                        key={tag.key}
+                                        type="button"
+                                        onClick={() => setPendingFeedbackTags(prev => {
+                                          if (prev.includes(tag.key)) {
+                                            return prev.filter(t => t !== tag.key);
+                                          }
+                                          if (prev.length >= 2) return prev;
+                                          return [...prev, tag.key];
+                                        })}
+                                        style={{
+                                          padding: '4px 9px',
+                                          background: active ? '#fef2f2' : '#f8fafc',
+                                          border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
+                                          borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
+                                          color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
+                                          opacity: limitReached ? 0.45 : 1
+                                        }}
+                                      >{tag.icon} {tag.label}</button>
+                                    );
+                                  })}
+                                  {customTags.map(tag => {
+                                    const active = pendingFeedbackTags.includes(tag);
+                                    const limitReached = !active && pendingFeedbackTags.length >= 2;
+                                    return (
+                                      <button
+                                        key={tag}
+                                        type="button"
+                                        onClick={() => setPendingFeedbackTags(prev => {
+                                          if (prev.includes(tag)) {
+                                            return prev.filter(t => t !== tag);
+                                          }
+                                          if (prev.length >= 2) return prev;
+                                          return [...prev, tag];
+                                        })}
+                                        style={{
+                                          padding: '4px 9px',
+                                          background: active ? '#fef2f2' : '#f8fafc',
+                                          border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
+                                          borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
+                                          color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
+                                          opacity: limitReached ? 0.45 : 1
+                                        }}
+                                      >✏️ {tag}</button>
+                                    );
+                                  })}
+                                </div>
+                                <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '6px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span>💡</span>
+                                  <span style={{ fontWeight: 600 }}>Wähle maximal 2 Hauptschwierigkeiten aus, um den Schüler gezielt zu fördern.</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Eigene Schwierigkeit..."
+                                    value={newCustomTagInput}
+                                    onChange={e => setNewCustomTagInput(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddCustomTag();
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '4px 10px',
+                                      fontSize: '0.66rem',
+                                      border: '1.5px solid #cbd5e1',
+                                      borderRadius: '20px',
+                                      background: '#f8fafc',
+                                      color: '#334155',
+                                      outline: 'none',
+                                      fontWeight: 650,
+                                      width: '140px'
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={handleAddCustomTag}
+                                    style={{
+                                      background: '#34a853',
+                                      border: 'none',
+                                      borderRadius: '50%',
+                                      width: '22px',
+                                      height: '22px',
+                                      color: 'white',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 900,
+                                      fontSize: '0.8rem'
+                                    }}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Save */}
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setIsSavingFeedback(true);
+                                  await saveFeedback(wk, pendingFeedbackTags, pendingFeedbackStatus);
+                                  setIsSavingFeedback(false);
+                                }}
+                                disabled={isSavingFeedback}
+                                style={{
+                                  background: '#34a853', color: 'white', border: 'none', borderRadius: '10px',
+                                  padding: '9px', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer',
+                                  opacity: isSavingFeedback ? 0.7 : 1, transition: 'all 0.15s ease'
+                                }}
+                              >{isSavingFeedback ? 'Speichern...' : 'Bewertung speichern'}</button>
+                            </div>
+                          )}
                         </div>
                       );
                     });
+
                   })()}
                 </div>
 
@@ -8623,39 +8965,203 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       </div>
     );
 
+    // ── Skill-Radar Drawer ──────────────────────────────────────────────
+    const skillRadarDrawer = showSkillRadar ? createPortal(
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(9,9,11,0.72)', backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        onClick={() => setShowSkillRadar(false)}
+      >
+        <div
+          style={{ background: 'white', borderRadius: '28px', width: '100%', maxWidth: '540px', maxHeight: '85vh', overflowY: 'auto', padding: '28px', boxShadow: '0 30px 80px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: '20px' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>Skill-Radar</h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Häufigste Schwierigkeiten — letzte 12 Bewertungen</p>
+            </div>
+            <button
+              onClick={() => setShowSkillRadar(false)}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={14} color="#475569" />
+            </button>
+          </div>
+
+          {/* Chart + Legend */}
+          {(() => {
+            const feedbackEntries = progressItems
+              .map(item => {
+                try {
+                  const notes: string[] = JSON.parse(item.homework_notes || '[]');
+                  const fbStr = notes.find(n => n.startsWith('FEEDBACK:'));
+                  if (!fbStr) return null;
+                  return JSON.parse(fbStr.substring(9));
+                } catch { return null; }
+              })
+              .filter(Boolean)
+              .slice(-12);
+
+            if (feedbackEntries.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📡</div>
+                  <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: '0 0 4px' }}>Noch keine Bewertungen</p>
+                  <p style={{ fontSize: '0.75rem', margin: 0 }}>Hier werden deine am häufigsten markierten Schwierigkeiten aus den letzten 12 Unterrichtsstunden visualisiert.</p>
+                </div>
+              );
+            }
+
+            const tagCounts = SKILL_TAGS.map(tag => ({
+              ...tag,
+              count: feedbackEntries.filter((fb: any) => fb.tags?.includes(tag.key)).length,
+              pct: feedbackEntries.filter((fb: any) => fb.tags?.includes(tag.key)).length / feedbackEntries.length,
+            }));
+
+            // Calculate custom tags counts in the last 12 entries
+            const customTagCounts: { key: string; count: number }[] = [];
+            feedbackEntries.forEach((fb: any) => {
+              if (Array.isArray(fb.tags)) {
+                fb.tags.forEach((t: string) => {
+                  if (!SKILL_TAGS.some(st => st.key === t)) {
+                    const existing = customTagCounts.find(c => c.key === t);
+                    if (existing) {
+                      existing.count++;
+                    } else {
+                      customTagCounts.push({ key: t, count: 1 });
+                    }
+                  }
+                });
+              }
+            });
+
+            // SVG Radar
+            const N = SKILL_TAGS.length;
+            const cx = 150, cy = 150, r = 110;
+            const getPoint = (i: number, scale: number) => ({
+              x: cx + scale * r * Math.sin((i * 2 * Math.PI) / N),
+              y: cy - scale * r * Math.cos((i * 2 * Math.PI) / N),
+            });
+            const gridLevels = [0.25, 0.5, 0.75, 1.0];
+            const gridPaths = gridLevels.map(lvl =>
+              SKILL_TAGS.map((_, i) => getPoint(i, lvl))
+                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+                .join(' ') + ' Z'
+            );
+            const dataPath = tagCounts
+              .map((tag, i) => { const p = getPoint(i, Math.max(tag.pct, 0.02)); return `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`; })
+              .join(' ') + ' Z';
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <svg width="300" height="300" viewBox="0 0 300 300" style={{ margin: '0 auto', display: 'block' }}>
+                  {gridPaths.map((d, i) => <path key={i} d={d} fill="none" stroke="#e2e8f0" strokeWidth="1" />)}
+                  {SKILL_TAGS.map((_, i) => { const pt = getPoint(i, 1); return <line key={i} x1={cx} y1={cy} x2={pt.x} y2={pt.y} stroke="#e2e8f0" strokeWidth="1" />; })}
+                  <path d={dataPath} fill="rgba(52,168,83,0.18)" stroke="#34a853" strokeWidth="2.5" strokeLinejoin="round" />
+                  {tagCounts.map((tag, i) => { const p = getPoint(i, Math.max(tag.pct, 0.02)); return <circle key={i} cx={p.x} cy={p.y} r={tag.pct > 0 ? 5 : 3} fill={tag.pct > 0 ? '#34a853' : '#e2e8f0'} />; })}
+                  {tagCounts.map((tag, i) => {
+                    const p = getPoint(i, 1.28);
+                    return (
+                      <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fontWeight="700" fill={tag.pct > 0.5 ? '#dc2626' : tag.pct > 0 ? '#ca8a04' : '#94a3b8'}>
+                        {tag.icon} {tag.label}
+                      </text>
+                    );
+                  })}
+                </svg>
+
+                {/* Tag pills sorted by frequency */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {tagCounts.filter(t => t.count > 0).sort((a, b) => b.count - a.count).map(tag => (
+                    <span key={tag.key} style={{
+                      background: tag.pct > 0.5 ? '#fef2f2' : '#fefce8',
+                      color: tag.pct > 0.5 ? '#dc2626' : '#ca8a04',
+                      border: `1px solid ${tag.pct > 0.5 ? '#fecaca' : '#fde68a'}`,
+                      padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
+                    }}>
+                      {tag.icon} {tag.label} · {tag.count}×
+                    </span>
+                  ))}
+                  {tagCounts.every(t => t.count === 0) && customTagCounts.length === 0 && (
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Keine Schwierigkeiten erfasst</span>
+                  )}
+                </div>
+
+                {/* Custom tag pills */}
+                {customTagCounts.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Weitere dokumentierte Schwierigkeiten
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {customTagCounts.sort((a, b) => b.count - a.count).map(tag => (
+                        <span key={tag.key} style={{
+                          background: '#f8fafc',
+                          color: '#475569',
+                          border: '1px solid #e2e8f0',
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
+                        }}>
+                          ✏️ {tag.key} · {tag.count}×
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p style={{ margin: 0, fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center' }}>
+                  Basierend auf {feedbackEntries.length} Bewertung{feedbackEntries.length !== 1 ? 'en' : ''}
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      </div>,
+      document.body
+    ) : null;
+    // ────────────────────────────────────────────────────────────────────
+
     // Embed-Modus ohne Fullscreen: normal eingebettet (kein Overlay)
     if (isEmbed && !isFullscreen) {
       return (
-        <div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '600px', fontFamily: '"Inter", sans-serif' }}>
-          {content}
-        </div>
+        <>
+          <div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '600px', fontFamily: '"Inter", sans-serif' }}>
+            {content}
+          </div>
+          {skillRadarDrawer}
+        </>
       );
     }
 
     // Embed-Modus MIT Fullscreen ODER normales Modal → immer als Portal über alles
-    return createPortal(
-      <div 
-        ref={modalContainerRef}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 99999,
-          background: isFullscreen ? 'transparent' : 'rgba(9, 9, 11, 0.65)',
-          backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: isFullscreen ? '0' : '20px',
-          fontFamily: '"Inter", sans-serif',
-          overflow: 'hidden',
-          transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-        }}
-      >
-        {content}
-      </div>,
-      document.body
+    return (
+      <>
+        {createPortal(
+          <div
+            ref={modalContainerRef}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 99999,
+              background: isFullscreen ? 'transparent' : 'rgba(9, 9, 11, 0.65)',
+              backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: isFullscreen ? '0' : '20px',
+              fontFamily: '"Inter", sans-serif',
+              overflow: 'hidden',
+              transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+          >
+            {content}
+          </div>,
+          document.body
+        )}
+        {skillRadarDrawer}
+      </>
     );
   };
+
 
 
 const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {

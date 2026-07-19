@@ -1646,7 +1646,7 @@ export function ScheduleCalendarView({
         ] = await Promise.all([
           supabase.from('room_bookings').select('room_id, date, start_time, room:rooms(name)').eq('booked_by', userId).gte('date', startDateStr).lte('date', endDateStr),
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, teacher:users(first_name, last_name)').eq('school_id', schoolId).not('room_id', 'is', null),
-          supabase.from('schedules').select('time_slot, duration, day_of_week').eq('teacher_id', userId).eq('school_id', schoolId),
+          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week').eq('teacher_id', userId).eq('school_id', schoolId),
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
           supabase.from('schedule_occurrences').select('id, date, start_time, duration, status, teacher_id, student_id, schedule_id, schedules!schedule_occurrences_schedule_id_fkey(room_id)').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
@@ -1692,6 +1692,29 @@ export function ScheduleCalendarView({
                 } : {
                   room_id: booking.room_id,
                   room: booking.room
+                }
+              };
+            }
+            // Fallback: Resolve room from the teacher's recurring schedule matching day of week & time slot
+            const occDate = new Date(occ.date + 'T00:00:00');
+            const occDayOfWeek = occDate.getDay() || 7;
+            const matchingSlot = mergedSchedules.find((s: any) => 
+              s.teacher_id === occ.teacher_id &&
+              s.day_of_week === occDayOfWeek &&
+              s.time_slot?.substring(0, 5) === occ.start_time.substring(0, 5)
+            );
+            if (matchingSlot && matchingSlot.room_id) {
+              const roomObj = rooms.find(r => r.id === matchingSlot.room_id);
+              return {
+                ...occ,
+                template_room_id: occ.schedules?.room_id || null,
+                schedules: occ.schedules ? {
+                  ...occ.schedules,
+                  room_id: matchingSlot.room_id,
+                  room: roomObj ? { name: roomObj.name } : occ.schedules.room
+                } : {
+                  room_id: matchingSlot.room_id,
+                  room: roomObj ? { name: roomObj.name } : null
                 }
               };
             }
@@ -6202,13 +6225,22 @@ export function ScheduleCalendarView({
                               ) : (
                                 studentProgressHistory.map((item, index) => {
                                   const dateStr = item.updated_at ? new Date(item.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-                                  let hwText = item.homework_notes || '';
+
+                                  // Clean parser: strip internal codes, keep human-readable text
+                                  let hwText = '';
                                   try {
-                                    if (hwText.startsWith('[')) {
-                                      const parsed = JSON.parse(hwText);
-                                      hwText = Array.isArray(parsed) ? parsed.join(', ') : hwText;
-                                    }
-                                  } catch (e) {}
+                                    const raw = item.homework_notes || '';
+                                    const entries: string[] = raw.startsWith('[') ? JSON.parse(raw) : raw ? [raw] : [];
+                                    const readable = entries
+                                      .filter(e =>
+                                        !e.startsWith('AUDIO:') &&
+                                        !e.startsWith('STICKER:') &&
+                                        !e.startsWith('FEEDBACK:')
+                                      )
+                                      .map(e => e.trim())
+                                      .filter(e => e.length > 0);
+                                    hwText = readable.join(' · ');
+                                  } catch { hwText = ''; }
 
                                   return (
                                     <div key={item.id || index} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -6220,10 +6252,12 @@ export function ScheduleCalendarView({
                                           {dateStr}
                                         </span>
                                       </div>
-                                      {hwText && (
+                                      {hwText ? (
                                         <p style={{ margin: 0, fontSize: '0.74rem', color: '#515154', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                           {hwText}
                                         </p>
+                                      ) : (
+                                        <span style={{ fontSize: '0.72rem', color: '#b0b0b5', fontStyle: 'italic' }}>Keine Notizen</span>
                                       )}
                                     </div>
                                   );
@@ -6231,6 +6265,7 @@ export function ScheduleCalendarView({
                               )}
                             </div>
                           </div>
+
                         </div>
                       )}
 
