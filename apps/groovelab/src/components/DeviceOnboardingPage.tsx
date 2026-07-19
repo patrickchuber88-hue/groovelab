@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Smartphone, Monitor, Check, ArrowRight, Loader2, AlertTriangle, Share2 } from 'lucide-react';
+import { Smartphone, Monitor, Check, ArrowRight, Loader2, AlertTriangle, Share2, Tablet } from 'lucide-react';
 
 interface DeviceOnboardingPageProps {
   token: string;
@@ -178,22 +178,40 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090b', color: '#64748b', fontFamily: 'system-ui' }}>
-        <Loader2 className="animate-spin" size={40} style={{ color: '#eab308', marginBottom: '16px' }} />
-        <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Geräte-Setup wird geladen...</p>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#000000', color: '#f5f5f7', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <Loader2 className="custom-animate-spin" size={36} style={{ color: '#facc15', marginBottom: '24px' }} />
+        <p style={{ fontWeight: 600, fontSize: '0.95rem', letterSpacing: '-0.01em', opacity: 0.8 }}>Geräte-Setup wird geladen...</p>
       </div>
     );
   }
 
   if (error || !school) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090b', color: '#ef4444', padding: '24px', textAlign: 'center', fontFamily: 'system-ui' }}>
-        <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '50%', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-          <AlertTriangle size={32} color="#ef4444" />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#000000', color: '#ff453a', padding: '24px', textAlign: 'center', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ background: 'rgba(255, 69, 58, 0.1)', border: '1px solid rgba(255, 69, 58, 0.2)', borderRadius: '50%', width: '56px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px' }}>
+          <AlertTriangle size={24} color="#ff453a" />
         </div>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '8px', color: '#fca5a5' }}>Ungültiger Link</h3>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', maxWidth: '320px', marginBottom: '24px', lineHeight: 1.5 }}>{error || 'Der Setup-Link konnte nicht verifiziert werden.'}</p>
-        <button onClick={() => window.location.replace('/')} style={{ background: '#1e293b', border: 'none', color: '#ffffff', padding: '12px 24px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer' }}>Zur Startseite</button>
+        <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '10px', color: '#ffffff', letterSpacing: '-0.02em' }}>Verbindung fehlgeschlagen</h3>
+        <p style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '0.9rem', maxWidth: '340px', marginBottom: '32px', lineHeight: 1.5 }}>{error || 'Der Setup-Link konnte nicht verifiziert werden.'}</p>
+        <button 
+          onClick={() => window.location.replace('/')} 
+          style={{ 
+            background: '#ffffff', 
+            border: 'none', 
+            color: '#000000', 
+            padding: '12px 28px', 
+            borderRadius: '9999px', 
+            fontSize: '0.85rem', 
+            fontWeight: 600, 
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)',
+            transition: 'transform 0.2s, background-color 0.2s'
+          }}
+          onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+          onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        >
+          Zur Startseite
+        </button>
       </div>
     );
   }
@@ -201,44 +219,303 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
   const roomStations = stations.filter(s => s.room_id === selectedRoomId);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(circle at top, #1e293b 0%, #09090b 100%)', color: '#f8fafc', padding: '32px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', fontFamily: 'system-ui, sans-serif', boxSizing: 'border-box' }}>
-      
+    <div className="apple-glow-container">
+      {/* Dynamic Style Block for Apple Senior Design System */}
+      <style>{`
+        .apple-glow-container {
+          position: relative;
+          width: 100%;
+          min-height: 100vh;
+          background: radial-gradient(circle at top, #141416 0%, #000000 100%);
+          color: #f5f5f7;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 32px;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+          box-sizing: border-box;
+          padding: 48px 24px;
+          overflow: hidden;
+        }
+
+        .apple-ambient-glow {
+          position: absolute;
+          top: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 700px;
+          height: 350px;
+          background: radial-gradient(circle, rgba(250, 204, 21, 0.055) 0%, transparent 70%);
+          filter: blur(80px);
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .apple-card {
+          background: rgba(28, 28, 30, 0.55);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(30px);
+          -webkit-backdrop-filter: blur(30px);
+          border-radius: 26px;
+          padding: 30px;
+          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+          z-index: 1;
+        }
+
+        .apple-segmented {
+          display: flex;
+          background: rgba(120, 120, 128, 0.18);
+          border-radius: 12px;
+          padding: 2.5px;
+          gap: 2px;
+          width: 100%;
+          border: 0.5px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .apple-segmented-item {
+          flex: 1;
+          padding: 9px 14px;
+          border-radius: 10px;
+          border: none;
+          background: transparent;
+          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+
+        .apple-segmented-item:hover {
+          color: #ffffff;
+        }
+
+        .apple-segmented-item.active {
+          background: rgba(255, 255, 255, 0.12);
+          color: #facc15;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        .apple-device-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+          width: 100%;
+        }
+
+        .apple-device-card {
+          padding: 20px 16px;
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          background: rgba(255, 255, 255, 0.02);
+          color: #ffffff;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .apple-device-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: radial-gradient(circle at center, rgba(255,255,255,0.02) 0%, transparent 70%);
+          opacity: 0;
+          transition: opacity 0.3s;
+          pointer-events: none;
+        }
+
+        .apple-device-card:hover::before {
+          opacity: 1;
+        }
+
+        .apple-device-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.04);
+        }
+
+        .apple-device-card:active {
+          transform: scale(0.97);
+        }
+
+        .apple-device-card.selected {
+          border: 1.5px solid #facc15;
+          background: rgba(250, 204, 21, 0.05);
+          box-shadow: 0 0 25px rgba(250, 204, 21, 0.12);
+        }
+
+        .apple-device-card.selected:hover {
+          border-color: #fde047;
+        }
+
+        .apple-btn-primary {
+          width: 100%;
+          border-radius: 9999px;
+          padding: 16px;
+          font-size: 0.9rem;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          border: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
+        .apple-btn-primary.enabled {
+          background: linear-gradient(180deg, #fde047 0%, #facc15 100%);
+          color: #000000;
+          box-shadow: 0 8px 24px rgba(250, 204, 21, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+
+        .apple-btn-primary.enabled:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 12px 28px rgba(250, 204, 21, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        }
+
+        .apple-btn-primary.enabled:active {
+          transform: scale(0.98);
+        }
+
+        .apple-btn-primary.disabled {
+          background: rgba(255, 255, 255, 0.04);
+          color: rgba(255, 255, 255, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.02);
+          cursor: not-allowed;
+        }
+
+        @keyframes buttonPulse {
+          0% { box-shadow: 0 8px 24px rgba(250, 204, 21, 0.2), 0 0 0 0 rgba(250, 204, 21, 0.45); }
+          70% { box-shadow: 0 8px 24px rgba(250, 204, 21, 0.25), 0 0 0 10px rgba(250, 204, 21, 0); }
+          100% { box-shadow: 0 8px 24px rgba(250, 204, 21, 0.2), 0 0 0 0 rgba(250, 204, 21, 0); }
+        }
+
+        .apple-btn-primary.enabled.pulsing {
+          animation: buttonPulse 2.2s infinite ease-in-out;
+        }
+
+        @keyframes laserSweep {
+          0% { transform: translateY(0); }
+          50% { transform: translateY(58px); }
+          100% { transform: translateY(0); }
+        }
+
+        .apple-laser {
+          animation: laserSweep 3s ease-in-out infinite;
+        }
+
+        @keyframes wirelessPulse {
+          0% { opacity: 0.25; transform: scale(0.96); }
+          50% { opacity: 0.9; transform: scale(1.04); }
+          100% { opacity: 0.25; transform: scale(0.96); }
+        }
+
+        .apple-pulse-line {
+          animation: wirelessPulse 2s ease-in-out infinite;
+          transform-origin: 60px 60px;
+        }
+
+        .apple-pulse-delay {
+          animation: wirelessPulse 2s ease-in-out infinite;
+          animation-delay: 0.7s;
+          transform-origin: 60px 60px;
+        }
+      `}</style>
+
+      {/* Decorative Ambient Radial Glow */}
+      <div className="apple-ambient-glow" />
+
       {/* Header */}
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px' }}>Campus-Groovelab Geräte-Onboarding</h1>
-        <p style={{ fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 600 }}>Richte dieses Gerät als Kiosk-Scanner ein</p>
+      <div style={{ textAlign: 'center', marginTop: '16px', zIndex: 1 }}>
+        <h1 style={{ fontSize: '1.95rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '8px', color: '#ffffff' }}>
+          Campus-Groovelab Geräte-Onboarding
+        </h1>
+        <p style={{ fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.55)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+          Richte dieses Gerät als Kiosk-Scanner ein
+        </p>
       </div>
 
-      <div style={{ maxWidth: '480px', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ maxWidth: '480px', width: '100%', display: 'flex', flexDirection: 'column', gap: '28px', zIndex: 1 }}>
         
         {/* Main Setup Card */}
-        <div style={{ background: 'rgba(30, 41, 59, 0.5)', border: '1.5px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '28px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="apple-card">
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '12px 16px', borderRadius: '16px' }}>
-            <Monitor size={22} color="#eab308" />
+          {/* Animated SVG Hero Onboarding Indicator */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 4px 20px rgba(250, 204, 21, 0.15))' }}>
+              <circle cx="60" cy="60" r="48" stroke="rgba(250, 204, 21, 0.15)" strokeWidth="1" strokeDasharray="4 4" className="apple-pulse-delay" />
+              <circle cx="60" cy="60" r="38" stroke="rgba(250, 204, 21, 0.25)" strokeWidth="1.5" className="apple-pulse-line" />
+              
+              {/* iPad Body */}
+              <rect x="36" y="22" width="48" height="76" rx="8" fill="#141416" stroke="rgba(255, 255, 255, 0.2)" strokeWidth="2" />
+              {/* Screen */}
+              <rect x="40" y="28" width="40" height="64" rx="4" fill="#000000" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="1" />
+              {/* Camera dot */}
+              <circle cx="60" cy="25" r="1.2" fill="rgba(255, 255, 255, 0.3)" />
+              {/* Home indicator bar */}
+              <line x1="52" y1="89" x2="68" y2="89" stroke="rgba(255, 255, 255, 0.25)" strokeWidth="1.5" strokeLinecap="round" />
+              
+              {/* QR Code framing brackets inside screen */}
+              <path d="M46 38v-4h4M74 38v-4h-4M46 66v4h4M74 66v4h-4" stroke="rgba(250, 204, 21, 0.4)" strokeWidth="1" strokeLinecap="round" />
+              <rect x="52" y="42" width="5" height="5" fill="#facc15" opacity="0.6" rx="0.5" />
+              <rect x="63" y="42" width="5" height="5" fill="#facc15" opacity="0.6" rx="0.5" />
+              <rect x="52" y="53" width="5" height="5" fill="#facc15" opacity="0.6" rx="0.5" />
+              <rect x="63" y="53" width="5" height="5" fill="#facc15" opacity="0.6" rx="0.5" />
+              
+              {/* Laser line scanning */}
+              <g className="apple-laser">
+                <line x1="41" y1="32" x2="79" y2="32" stroke="#facc15" strokeWidth="1.5" strokeLinecap="round" />
+                <polygon points="41,32 79,32 79,35 41,35" fill="url(#laserGlow)" style={{ mixBlendMode: 'plus-lighter' }} />
+              </g>
+              
+              <defs>
+                <linearGradient id="laserGlow" x1="60" y1="32" x2="60" y2="35" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#facc15" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#facc15" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+
+          {/* School Banner */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: 'rgba(250, 204, 21, 0.08)', border: '1px solid rgba(250, 204, 21, 0.15)', padding: '14px 18px', borderRadius: '18px' }}>
+            <Monitor size={20} color="#facc15" />
             <div>
-              <div style={{ fontSize: '0.65rem', color: '#eab308', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Musikschule erkannt</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#ffffff' }}>{school.name}</div>
+              <div style={{ fontSize: '0.68rem', color: '#facc15', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>Musikschule erkannt</div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>{school.name}</div>
             </div>
           </div>
 
           {setupSuccess ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 0', gap: '16px', textAlign: 'center' }}>
-              <div style={{ background: '#22c55e', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 20px rgba(34,197,94,0.3)' }}>
-                <Check size={32} color="#ffffff" />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 0', gap: '18px', textAlign: 'center' }}>
+              <div style={{ background: '#30d158', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 24px rgba(48,209,88,0.25)' }}>
+                <Check size={28} color="#ffffff" strokeWidth={3} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#ffffff', marginBottom: '4px' }}>Erfolgreich gekoppelt!</h3>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Das Gerät startet jetzt...</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', marginBottom: '6px', letterSpacing: '-0.02em' }}>Erfolgreich gekoppelt!</h3>
+                <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>Das Kiosk-Gerät startet jetzt...</p>
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               {/* Room Selection */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>1. Raum auswählen</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>1. Raum auswählen</label>
+                <div className="apple-segmented">
                   {rooms.map(r => (
                     <button
                       key={r.id}
@@ -246,17 +523,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
                         setSelectedRoomId(r.id);
                         setSelectedStationId('');
                       }}
-                      style={{
-                        padding: '10px 16px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        background: selectedRoomId === r.id ? '#eab308' : 'rgba(255,255,255,0.06)',
-                        color: selectedRoomId === r.id ? '#0f172a' : '#cbd5e1',
-                        fontWeight: 800,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
+                      className={`apple-segmented-item ${selectedRoomId === r.id ? 'active' : ''}`}
                     >
                       {r.name}
                     </button>
@@ -267,9 +534,9 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
               {/* Station Selection */}
               {selectedRoomId && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>2. Geräteplatzierung auswählen</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>2. Geräteplatzierung auswählen</label>
                   {roomStations.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                    <div className="apple-device-grid">
                       {roomStations.map(s => {
                         const isSetup = kiosks.some(k => k.station_id === s.id);
                         const isSelected = selectedStationId === s.id;
@@ -277,31 +544,30 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
                           <button
                             key={s.id}
                             onClick={() => setSelectedStationId(s.id)}
-                            style={{
-                              padding: '16px 12px',
-                              borderRadius: '16px',
-                              border: isSelected ? '2px solid #eab308' : '1px solid rgba(255,255,255,0.08)',
-                              background: isSelected ? 'rgba(234, 179, 8, 0.08)' : 'rgba(255,255,255,0.03)',
-                              color: '#ffffff',
-                              textAlign: 'center',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
+                            className={`apple-device-card ${isSelected ? 'selected' : ''}`}
                           >
-                            <span style={{ fontSize: '0.85rem', fontWeight: 850 }}>{s.name}</span>
-                            <span style={{ fontSize: '0.62rem', color: isSetup ? '#eab308' : '#64748b', fontWeight: 700 }}>
-                              {isSetup ? 'Bereits konfiguriert' : 'Nicht gekoppelt'}
-                            </span>
+                            <Tablet size={22} style={{ color: isSelected ? '#facc15' : 'rgba(255, 255, 255, 0.45)', transition: 'color 0.25s' }} />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 650, letterSpacing: '-0.01em' }}>{s.name}</span>
+                            
+                            {/* Setup Status Badge */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                              <span style={{ 
+                                width: '6px', 
+                                height: '6px', 
+                                borderRadius: '50%', 
+                                background: isSetup ? '#facc15' : 'rgba(255,255,255,0.15)',
+                                display: 'inline-block'
+                              }} />
+                              <span style={{ fontSize: '0.62rem', color: isSetup ? 'rgba(250, 204, 21, 0.85)' : 'rgba(255,255,255,0.35)', fontWeight: 600 }}>
+                                {isSetup ? 'Bereits gekoppelt' : 'Frei zum Koppeln'}
+                              </span>
+                            </div>
                           </button>
                         );
                       })}
                     </div>
                   ) : (
-                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '8px 0 0 0' }}>Keine Geräte in diesem Raum angelegt.</p>
+                    <p style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.4)', margin: '8px 0 0 0', textAlign: 'center', fontStyle: 'italic' }}>Keine Geräte in diesem Raum angelegt.</p>
                   )}
                 </div>
               )}
@@ -310,25 +576,9 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
               <button
                 onClick={handleSaveSetup}
                 disabled={!selectedStationId}
-                style={{
-                  width: '100%',
-                  background: selectedStationId ? '#eab308' : 'rgba(255,255,255,0.04)',
-                  color: selectedStationId ? '#0f172a' : '#64748b',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '14px',
-                  fontSize: '0.85rem',
-                  fontWeight: 900,
-                  cursor: selectedStationId ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginTop: '12px',
-                  transition: 'all 0.2s'
-                }}
+                className={`apple-btn-primary ${selectedStationId ? 'enabled pulsing' : 'disabled'}`}
               >
-                Gerät koppeln & Kiosk starten <ArrowRight size={16} />
+                Gerät koppeln & Kiosk starten <ArrowRight size={16} strokeWidth={2.5} />
               </button>
             </div>
           )}
@@ -336,25 +586,34 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
         </div>
 
         {/* PWA / App Installation Guidance */}
-        <div id="pwa-install-guide" style={{ background: 'rgba(30, 41, 59, 0.4)', border: '1.5px solid rgba(255,255,255,0.05)', borderRadius: '24px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0' }}>
-            <Smartphone size={18} color="#eab308" /> Campus-Groovelab App installieren
+        <div id="pwa-install-guide" style={{ 
+          background: 'rgba(255, 255, 255, 0.02)', 
+          border: '1px solid rgba(255, 255, 255, 0.06)', 
+          borderRadius: '24px', 
+          padding: '24px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '16px', 
+          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)' 
+        }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', margin: '0', letterSpacing: '-0.015em' }}>
+            <Smartphone size={18} color="#facc15" /> Campus-Groovelab App installieren
           </h3>
-          <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0', lineHeight: 1.4 }}>
+          <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.55)', margin: '0', lineHeight: 1.45 }}>
             Installiere die App auf diesem iPad für schnellen Zugriff und verlässlichen Vollbildmodus:
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem', marginTop: '4px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span style={{ background: 'rgba(255,255,255,0.08)', color: '#eab308', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800 }}>1</span>
-              <div>
-                <span style={{ fontWeight: 800, color: '#ffffff' }}>iOS (Safari):</span> Tippe auf das Teilen-Symbol <Share2 size={13} style={{ display: 'inline', verticalAlign: 'middle', margin: '0 2px', color: '#cbd5e1' }} /> und wähle <span style={{ fontWeight: 800, color: '#ffffff' }}>"Zum Home-Bildschirm"</span>.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.8rem', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <span style={{ background: 'rgba(250, 204, 21, 0.1)', color: '#facc15', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '0.72rem' }}>1</span>
+              <div style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                <span style={{ fontWeight: 650, color: '#ffffff' }}>iOS (Safari):</span> Tippe auf das Teilen-Symbol <Share2 size={13} style={{ display: 'inline', verticalAlign: 'middle', margin: '0 2px', color: '#facc15' }} /> und wähle <span style={{ fontWeight: 650, color: '#ffffff' }}>"Zum Home-Bildschirm"</span>.
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span style={{ background: 'rgba(255,255,255,0.08)', color: '#eab308', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800 }}>2</span>
-              <div>
-                <span style={{ fontWeight: 800, color: '#ffffff' }}>Android (Chrome):</span> Tippe auf die drei Punkte oben rechts und wähle <span style={{ fontWeight: 800, color: '#ffffff' }}>"App installieren"</span>.
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <span style={{ background: 'rgba(250, 204, 21, 0.1)', color: '#facc15', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '0.72rem' }}>2</span>
+              <div style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
+                <span style={{ fontWeight: 650, color: '#ffffff' }}>Android (Chrome):</span> Tippe auf die drei Punkte oben rechts und wähle <span style={{ fontWeight: 650, color: '#ffffff' }}>"App installieren"</span>.
               </div>
             </div>
           </div>
@@ -370,13 +629,14 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
           left: '50%',
           transform: 'translateX(-50%)',
           width: '92%',
-          maxWidth: '400px',
-          background: 'rgba(21, 21, 28, 0.95)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '22px',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.2)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          padding: '16px',
+          maxWidth: '380px',
+          background: 'rgba(28, 28, 30, 0.82)',
+          backdropFilter: 'blur(30px)',
+          WebkitBackdropFilter: 'blur(30px)',
+          borderRadius: '20px',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          padding: '14px 16px',
           display: 'flex',
           gap: '12px',
           alignItems: 'center',
@@ -393,26 +653,26 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
           
           {/* App Icon */}
           <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '11px',
-            background: '#eab308',
+            width: '38px',
+            height: '38px',
+            borderRadius: '9px',
+            background: 'linear-gradient(135deg, #fde047 0%, #facc15 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
             flexShrink: 0
           }}>
-            <Smartphone size={20} style={{ color: '#0f172a' }} />
+            <Tablet size={18} style={{ color: '#000000' }} />
           </div>
           
           {/* Text Content */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', marginBottom: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', marginBottom: '1px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Campus-Groovelab</span>
-              <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>JETZT</span>
+              <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>JETZT</span>
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#cbd5e1', lineHeight: 1.3, fontWeight: 500 }}>
+            <div style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.35, fontWeight: 500 }}>
               Möchtest du die Campus-Groovelab App auf diesem Gerät installieren?
             </div>
           </div>
@@ -425,28 +685,33 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
                 background: '#ffffff',
                 color: '#000000',
                 border: 'none',
-                borderRadius: '10px',
-                padding: '6px 12px',
+                borderRadius: '8px',
+                padding: '5px 12px',
                 fontSize: '0.7rem',
-                fontWeight: 800,
+                fontWeight: 700,
                 cursor: 'pointer',
-                transition: 'background 0.2s'
+                transition: 'background 0.2s',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               Laden
             </button>
             <button
               onClick={() => setShowNotification(false)}
               style={{
-                background: 'rgba(255,255,255,0.08)',
-                color: '#94a3b8',
+                background: 'rgba(255,255,255,0.06)',
+                color: 'rgba(255,255,255,0.6)',
                 border: 'none',
-                borderRadius: '10px',
-                padding: '6px 12px',
+                borderRadius: '8px',
+                padding: '5px 12px',
                 fontSize: '0.7rem',
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: 'pointer'
               }}
+              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.95)')}
+              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               Später
             </button>

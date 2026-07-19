@@ -28334,15 +28334,13 @@ status: status,
             borderRadius: '32px',
             boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
             border: '1px solid #f1f5f9',
-            padding: '36px',
             maxWidth: '560px',
             width: '100%',
             maxHeight: '80vh',
-            overflowY: 'auto',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px'
+            overflow: 'hidden'
           }}>
             <button 
               onClick={() => setShowPrivacy(false)} 
@@ -28360,11 +28358,20 @@ status: status,
                 justifyContent: 'center',
                 cursor: 'pointer',
                 color: '#64748b',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                zIndex: 50
               }}
             >
               <X size={20} />
             </button>
+
+            <div style={{
+              overflowY: 'auto',
+              padding: '36px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#eab308' }}>
@@ -28410,6 +28417,7 @@ status: status,
                 <p style={{ margin: 0 }}>Campus-Groovelab wird zu 100% auf Servern in Deutschland (Hetzner Falkenstein) gehostet, um einen sicheren, performanten und datenschutzkonformen Betrieb zu gewährleisten. Sowohl das Web-Frontend als auch die Datenbankinfrastruktur werden über die <strong>Hetzner Online GmbH</strong> (Hetzner.com) am Standort Falkenstein betrieben. Mit diesem Dienstleister wurde ein gesetzeskonformer Vertrag zur Auftragsverarbeitung (AV-Vertrag nach Art. 28 DSGVO) geschlossen, um den Schutz Ihrer Daten zu jeder Zeit im Einklang mit der DSGVO zu gewährleisten.</p>
               </div>
             </div>
+          </div>
           </div>
         </div>
       )}

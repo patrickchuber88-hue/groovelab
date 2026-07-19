@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -990,6 +990,433 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     };
     fetchData();
   }, [student.id, refreshTrigger]);
+
+  const handleExportDSGVOJson = () => {
+    let localHomework = [];
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        localHomework = parsed.filter((item: any) => item.studentId === student.id);
+      }
+    } catch (e) {
+      console.error('Error parsing homework progress for JSON export:', e);
+    }
+
+    const exportData = {
+      exportMetadata: {
+        document_type: "Datenschutzauskunft gem. Art. 15 DSGVO",
+        platform_name: "Campus-Groovelab",
+        technical_provider: "Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden",
+        responsible_controller: schoolName || "Kooperations-Musikschule",
+        export_date: new Date().toISOString()
+      },
+      studentProfile: {
+        id: student.id,
+        first_name: firstName,
+        last_name: lastName,
+        nickname: student.nickname || null,
+        instrument: student.instrument || null,
+        lesson_duration_minutes: lessonDuration,
+        app_usage_mode: appUsageMode,
+        is_campus_active: isCampusActive,
+        is_groovelab_active: isGroovelabActive,
+        is_premium_active: isPremiumActive,
+        exempt_from_direct_billing: exemptFromDirectBilling,
+        created_at: student.created_at || null,
+        parent_pin_set: !!parentPin
+      },
+      consentLogs: consentLogs.map((log: any) => ({
+        created_at: log.created_at,
+        ip_address: log.ip_address || "Anonymisiert",
+        user_agent: log.user_agent || "Unbekannt",
+        consent_type: log.consent_type === 'terms_privacy' ? 'AGB & Datenschutz akzeptiert' : 'Direkt-Kommunikation freigegeben'
+      })),
+      groupLinkage: {
+        group_id: groupId,
+        linked_partners: groupStudents.map((s: any) => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name
+        }))
+      },
+      bands: bands.map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        created_at: b.created_at
+      })),
+      gamificationProgress: studentStats ? {
+        xp: studentStats.xp || 0,
+        streak_flame: studentStats.streak_flame || 0,
+        stickers: studentStats.stickers || []
+      } : null,
+      schedules: schedulesList.map((s: any) => ({
+        id: s.id,
+        time_slot: s.time_slot,
+        day_of_week: s.day_of_week,
+        status: s.status,
+        room: s.rooms?.name || null,
+        teacher: s.teacher ? `${s.teacher.first_name} ${s.teacher.last_name}` : null
+      })),
+      presenceSessions: sessionsList.map((s: any) => ({
+        id: s.id,
+        check_in_time: s.check_in_time,
+        check_out_time: s.check_out_time,
+        station_name: s.stations?.name || "Live Lab Terminal"
+      })),
+      homeworkAndLearningProgress: localHomework.map((item: any) => {
+        const bookName = globalLehrwerke.find((b: any) => b.id === item.lehrwerkId)?.title || `Lehrwerk (ID: ${item.lehrwerkId})`;
+        return {
+          lehrwerk_title: bookName,
+          lehrwerk_id: item.lehrwerkId,
+          page_states: item.pageStates
+        };
+      })
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dsgvo-auskunft-${firstName}-${lastName}-${student.id}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportDSGVOPdf = () => {
+    let localHomework = [];
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        localHomework = parsed.filter((item: any) => item.studentId === student.id);
+      }
+    } catch (e) {
+      console.error('Error parsing homework progress for PDF export:', e);
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Bitte erlauben Sie Popups für diese App, um den PDF-Export anzuzeigen.');
+      return;
+    }
+
+    let html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>DSGVO-Auskunft - ${firstName} ${lastName}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&display=swap');
+          body {
+            font-family: 'Outfit', sans-serif;
+            color: #1e293b;
+            margin: 40px;
+            line-height: 1.5;
+            background: #ffffff;
+          }
+          .header {
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #0f172a;
+          }
+          .header-meta {
+            font-size: 0.82rem;
+            color: #64748b;
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+          }
+          .section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+          }
+          .section-title {
+            font-size: 1.05rem;
+            font-weight: 850;
+            color: #0f172a;
+            border-bottom: 1.5px solid #f1f5f9;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+          }
+          .data-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+          }
+          .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f5f9;
+          }
+          .data-row:last-child {
+            border-bottom: none;
+          }
+          .data-label {
+            font-weight: 600;
+            color: #475569;
+          }
+          .data-value {
+            font-weight: 700;
+            color: #0f172a;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            margin-top: 8px;
+          }
+          th, td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          th {
+            background: #f8fafc;
+            font-weight: 800;
+            color: #475569;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            letter-spacing: 0.03em;
+          }
+          .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 0.68rem;
+            font-weight: 800;
+          }
+          .badge-active {
+            background: #e6f4ea;
+            color: #137333;
+          }
+          .badge-inactive {
+            background: #f1f5f9;
+            color: #5f6368;
+          }
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.72rem;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 16px;
+          }
+          @media print {
+            body { margin: 20px; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Datenschutzauskunft gem. Art. 15 DSGVO</h1>
+          <div class="header-meta">
+            <div><strong>Verantwortliche Stelle:</strong> ${schoolName || 'Kooperations-Musikschule'}</div>
+            <div><strong>Technischer Dienstleister:</strong> Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden</div>
+            <div><strong>Exportiert am:</strong> ${new Date().toLocaleString('de-DE')}</div>
+            <div><strong>Plattform:</strong> Campus-Groovelab</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">1. Schüler-Stammdaten</div>
+          <div class="grid-2">
+            <div class="data-box">
+              <div class="data-row"><span class="data-label">Mitglieds-ID:</span><span class="data-value">${student.id}</span></div>
+              <div class="data-row"><span class="data-label">Vorname:</span><span class="data-value">${firstName}</span></div>
+              <div class="data-row"><span class="data-label">Nachname (Klartext):</span><span class="data-value">${lastName}</span></div>
+              <div class="data-row"><span class="data-label">Künstlername/Nickname:</span><span class="data-value">${student.nickname || '-'}</span></div>
+            </div>
+            <div class="data-box">
+              <div class="data-row"><span class="data-label">Instrument:</span><span class="data-value">${student.instrument || '-'}</span></div>
+              <div class="data-row"><span class="data-label">Unterrichtszeit:</span><span class="data-value">${lessonDuration} Min.</span></div>
+              <div class="data-row"><span class="data-label">Lizenzstatus Campus:</span><span class="data-value"><span class="badge ${isCampusActive ? 'badge-active' : 'badge-inactive'}">${isCampusActive ? 'Aktiv' : 'Inaktiv'}</span></span></div>
+              <div class="data-row"><span class="data-label">Lizenzstatus GrooveLab:</span><span class="data-value"><span class="badge ${isGroovelabActive ? 'badge-active' : 'badge-inactive'}">${isGroovelabActive ? 'Aktiv' : 'Inaktiv'}</span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">2. Revisionssichere Einwilligungsprotokolle (DSGVO)</div>
+          ${consentLogs.length === 0 ? '<p style="font-size:0.8rem; font-style:italic; color:#64748b;">Keine expliziten Einwilligungsprotokolle vorhanden (z.B. bei rein interner Schülerdatenverwaltung ohne Login).</p>' : `
+          <table>
+            <thead>
+              <tr>
+                <th>Zeitpunkt (DE)</th>
+                <th>Einwilligungstyp</th>
+                <th>IP-Adresse</th>
+                <th>Browser / User-Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${consentLogs.map((log: any) => `
+                <tr>
+                  <td>${new Date(log.created_at).toLocaleString('de-DE')}</td>
+                  <td><strong>${log.consent_type === 'terms_privacy' ? 'AGB &amp; Datenschutzerklärung akzeptiert' : 'Direktnachrichten / Chat freigegeben'}</strong></td>
+                  <td>${log.ip_address || 'Anonymisiert'}</td>
+                  <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${log.user_agent || 'Unbekannt'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          `}
+        </div>
+
+        <div class="section">
+          <div class="section-title">3. Gamification- &amp; Aktivitäts-Fortschritte</div>
+          <div class="data-box">
+            <div class="grid-2">
+              <div>
+                <div class="data-row"><span class="data-label">Erfahrungspunkte (XP):</span><span class="data-value">${studentStats?.xp || 0} XP</span></div>
+                <div class="data-row"><span class="data-label">Aktuelle Übe-Streak:</span><span class="data-value">${studentStats?.streak_flame || 0} Tage 🔥</span></div>
+              </div>
+              <div>
+                <div class="data-row"><span class="data-label">Erhaltene Sticker:</span><span class="data-value">${(studentStats?.stickers || []).length} Sticker</span></div>
+                <div class="data-row">
+                  <span class="data-label">Stickernamen:</span>
+                  <span class="data-value" style="font-size:0.75rem;">
+                    ${(studentStats?.stickers || []).join(', ') || 'Keine'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">4. Stundenpläne &amp; Gruppenverknüpfungen</div>
+          <div class="grid-2">
+            <div class="data-box">
+              <strong>Stundenplan-Einträge:</strong>
+              ${schedulesList.length === 0 ? '<div style="margin-top:6px; color:#64748b; font-style:italic;">Keine Einträge</div>' : `
+                <div style="margin-top:6px; font-size:0.8rem; display:flex; flex-direction:column; gap:4px;">
+                  ${schedulesList.map((s: any) => `
+                    <div>&bull; ${s.day_of_week} ${s.time_slot} Uhr (${s.rooms?.name || 'Kein Raum'}) bei ${s.teacher ? `${s.teacher.first_name} ${s.teacher.last_name}` : 'Lehrkraft'} [${s.status}]</div>
+                  `).join('')}
+                </div>
+              `}
+            </div>
+            <div class="data-box">
+              <strong>Gruppenunterricht-Verknüpfung:</strong>
+              ${groupId ? `
+                <div style="margin-top:6px; font-size:0.8rem;">
+                  Gruppen-ID: ${groupId}<br/>
+                  Verknüpfte Partner: ${groupStudents.map((s: any) => `${s.first_name} ${s.last_name}`).join(', ')}
+                </div>
+              ` : '<div style="margin-top:6px; color:#64748b; font-style:italic;">Einzelunterricht (keine Gruppenpartner)</div>'}
+              <div style="margin-top:8px; border-top:1px solid #e2e8f0; padding-top:6px;">
+                <strong>Bands/Ensembles:</strong>
+                ${bands.length === 0 ? '<span style="color:#64748b; font-style:italic;"> Keine</span>' : `
+                  <div style="margin-top:4px; font-size:0.8rem;">
+                    ${bands.map((b: any) => `&bull; ${b.name}`).join('<br/>')}
+                  </div>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">5. Hausaufgabenheft &amp; Lernfortschritt</div>
+          ${localHomework.length === 0 ? '<p style="font-size:0.8rem; font-style:italic; color:#64748b;">Kein Lernfortschritt im Hausaufgabenheft für diesen Schüler vorhanden.</p>' : `
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              ${localHomework.map((item: any) => {
+                const bookTitle = globalLehrwerke.find((b: any) => b.id === item.lehrwerkId)?.title || `Lehrwerk (ID: ${item.lehrwerkId})`;
+                const pages = Object.entries(item.pageStates || {});
+                return `
+                  <div class="data-box">
+                    <strong style="display:block; margin-bottom:6px; font-size:0.88rem; color:#0f172a;">${bookTitle}</strong>
+                    ${pages.length === 0 ? '<span style="color:#64748b; font-style:italic; font-size:0.8rem;">Keine bearbeiteten Seiten</span>' : `
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style="width:10%">Seite</th>
+                            <th style="width:20%">Status</th>
+                            <th style="width:45%">Notizen / Hausaufgabe</th>
+                            <th style="width:25%">Aktualisiert am</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${pages.map(([pNum, state]: any) => `
+                            <tr>
+                              <td><strong>S. ${pNum}</strong></td>
+                              <td><span class="badge ${state.status === 'mastered' ? 'badge-active' : 'badge-inactive'}">${state.status === 'homework' ? 'Hausaufgabe' : state.status === 'mastered' ? 'Meisterwerk' : 'Gesperrt'}</span></td>
+                              <td>${state.notes || '-'}</td>
+                              <td>${state.updatedAt ? new Date(state.updatedAt).toLocaleString('de-DE') : '-'}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    `}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+
+        <div class="section">
+          <div class="section-title">6. Anwesenheits- &amp; Terminal-Checkins</div>
+          ${sessionsList.length === 0 ? '<p style="font-size:0.8rem; font-style:italic; color:#64748b;">Keine Anwesenheitszeiten erfasst.</p>' : `
+          <table>
+            <thead>
+              <tr>
+                <th>Check-In Zeit</th>
+                <th>Check-Out Zeit</th>
+                <th>Terminal-Station</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sessionsList.map((s: any) => `
+                <tr>
+                  <td>${new Date(s.check_in_time).toLocaleString('de-DE')}</td>
+                  <td>${s.check_out_time ? new Date(s.check_out_time).toLocaleString('de-DE') : 'automatisch ausgecheckt'}</td>
+                  <td><strong>${s.stations?.name || 'Live Lab Terminal'}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          `}
+        </div>
+
+        <div class="footer">
+          Erstellt am ${new Date().toLocaleString('de-DE')} im Auftrag der Schulleitung &middot; &copy; Campus-Groovelab
+        </div>
+
+        <script>
+          window.addEventListener('load', () => {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          });
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
 
 
 
@@ -2281,6 +2708,74 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </button>
                 )}
 
+                {/* DSGVO Datenschutzauskunft section */}
+                {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher') && (
+                  <section style={{ 
+                    background: '#ffffff', 
+                    borderRadius: '24px', 
+                    padding: '16px 20px', 
+                    border: '1.5px solid #f1f5f9',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+                  }}>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ShieldCheck size={16} style={{ color: '#34a853' }} /> Datenschutz &amp; Auskunft
+                    </h4>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 14px 0', lineHeight: 1.4, fontWeight: 550 }}>
+                      Exportiere alle personenbezogenen Daten dieses Schülers gesetzeskonform nach Art. 15 DSGVO.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        onClick={handleExportDSGVOPdf}
+                        style={{
+                          width: '100%',
+                          background: '#f8fafc',
+                          color: '#1e293b',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '12px',
+                          padding: '8px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                      >
+                        <Printer size={14} style={{ color: '#64748b' }} />
+                        <span>Datenblatt drucken (PDF)</span>
+                      </button>
+                      <button
+                        onClick={handleExportDSGVOJson}
+                        style={{
+                          width: '100%',
+                          background: '#f8fafc',
+                          color: '#1e293b',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '12px',
+                          padding: '8px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                      >
+                        <Download size={14} style={{ color: '#64748b' }} />
+                        <span>Daten exportieren (JSON)</span>
+                      </button>
+                    </div>
+                  </section>
+                )}
+
                 {/* 2. Module & Einstellungen — below the pass */}
                 <section style={{ 
                   background: '#ffffff', 
@@ -3039,6 +3534,75 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </ResponsiveContainer>
                 </div>
               </section>
+
+              {/* DSGVO Datenschutzauskunft section */}
+              {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher') && (
+                <section style={{ 
+                  background: '#ffffff', 
+                  borderRadius: '24px', 
+                  padding: '16px 20px', 
+                  border: '1.5px solid #fef9c3',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                  marginTop: '16px'
+                }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldCheck size={16} style={{ color: '#eab308' }} /> Datenschutz &amp; Auskunft
+                  </h4>
+                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 14px 0', lineHeight: 1.4, fontWeight: 650 }}>
+                    Exportiere alle personenbezogenen Daten dieses Schülers gesetzeskonform nach Art. 15 DSGVO.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button
+                      onClick={handleExportDSGVOPdf}
+                      style={{
+                        width: '100%',
+                        background: '#f8fafc',
+                        color: '#1e293b',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                    >
+                      <Printer size={14} style={{ color: '#64748b' }} />
+                      <span>Datenblatt drucken (PDF)</span>
+                    </button>
+                    <button
+                      onClick={handleExportDSGVOJson}
+                      style={{
+                        width: '100%',
+                        background: '#f8fafc',
+                        color: '#1e293b',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '8px 12px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
+                    >
+                      <Download size={14} style={{ color: '#64748b' }} />
+                      <span>Daten exportieren (JSON)</span>
+                    </button>
+                  </div>
+                </section>
+              )}
             </aside>
           )}
         </div>

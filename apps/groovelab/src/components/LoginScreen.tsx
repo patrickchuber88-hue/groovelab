@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
@@ -43,9 +43,38 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastFacingModeRef = useRef<'user' | 'environment' | null>(null);
   const [needsManualActivation, setNeedsManualActivation] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
 
+  // Keep stable refs to avoid recreating the animation loop or triggers when handlers change
+  const onScanRef = useRef(onScan);
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  // 1. Separate Effect to handle unmount cleanup only
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        requestRef.current = null;
+      }
+    };
+  }, []);
+
+  // 2. Primary Effect to manage camera lifecycle
   useEffect(() => {
     let active = true;
     loadJSQR(); // Start loading/getting jsQR in background when scanner mounts
@@ -55,11 +84,24 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
       await new Promise(resolve => setTimeout(resolve, 150));
       if (!active) return;
 
-      try {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
+      // If we already have an active stream with the correct facing mode, keep it!
+      if (streamRef.current) {
+        const videoTrack = streamRef.current.getVideoTracks()[0];
+        if (videoTrack && videoTrack.readyState === 'live' && lastFacingModeRef.current === facingMode) {
+          return;
         }
+        // Stop current stream before changing mode
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
 
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const err = new Error('Kamera-API wird in diesem Kontext nicht unterstützt (z.B. kein HTTPS).');
+        onErrorRef.current(err);
+        return;
+      }
+
+      try {
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: facingMode,
@@ -84,46 +126,59 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         }
 
         streamRef.current = stream;
+        lastFacingModeRef.current = facingMode;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.setAttribute('playsinline', 'true');
           videoRef.current.play().catch(err => {
             console.warn('[Scanner] Play failed:', err);
+            // Safety: Stop tracks on failure so they do not run silently in the background
+            if (stream) {
+              stream.getTracks().forEach(track => track.stop());
+            }
+            if (streamRef.current === stream) {
+              streamRef.current = null;
+            }
+            if (videoRef.current) {
+              videoRef.current.srcObject = null;
+            }
             setNeedsManualActivation(true);
           });
         }
       } catch (err: any) {
         console.error('[Scanner] getUserMedia error:', err);
-        if (err.name === 'NotAllowedError' || err.name === 'NotFoundError' || String(err).toLowerCase().includes('allow') || retryCount === 0) {
-          setNeedsManualActivation(true);
-        } else {
-          onError(err);
+        // Safety: ensure any allocated tracks are stopped
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
         }
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+        // On mount failure (usually permission prompt blocked/need gesture), set manual activation
+        setNeedsManualActivation(true);
       }
     }
 
     if (!paused && !needsManualActivation) {
       startCamera();
-    } else {
+    } else if (paused) {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
+        lastFacingModeRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
       }
     }
 
     return () => {
       active = false;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-        requestRef.current = null;
-      }
     };
-  }, [facingMode, paused, retryCount, needsManualActivation]);
+  }, [facingMode, paused, needsManualActivation]);
 
+  // 3. Effect to manage canvas rendering and jsQR parsing frame-loop
   useEffect(() => {
     if (paused) {
       if (requestRef.current) {
@@ -155,7 +210,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
                 inversionAttempts: 'dontInvert'
               });
               if (code && code.data) {
-                onScan(code.data);
+                onScanRef.current(code.data);
               }
             }
           }
@@ -172,7 +227,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         requestRef.current = null;
       }
     };
-  }, [paused, onScan]);
+  }, [paused]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: 'black' }}>
@@ -187,6 +242,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         <div style={{ 
           position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', 
           alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', zIndex: 10 
+          // Note: Monochrome design accents rules are followed (yellow highlight for button matches groovelab theme color)
         }}>
           <div style={{ background: 'white', padding: '12px', borderRadius: '50%', marginBottom: '16px' }}>
             <Camera size={32} color="#1e293b" />
@@ -195,11 +251,60 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
             Kamera-Zugriff erforderlich
           </p>
           <button 
-            onClick={(e) => {
+            onClick={async (e) => {
               e.preventDefault();
               e.stopPropagation();
-              setNeedsManualActivation(false);
-              setRetryCount(c => c + 1);
+              
+              if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                const err = new Error('Kamera-API wird in diesem Kontext nicht unterstützt (z.B. kein HTTPS).');
+                onErrorRef.current(err);
+                return;
+              }
+              
+              try {
+                if (streamRef.current) {
+                  streamRef.current.getTracks().forEach(track => track.stop());
+                  streamRef.current = null;
+                }
+                
+                const constraints: MediaStreamConstraints = {
+                  video: {
+                    facingMode: facingMode,
+                    width: { ideal: 480 },
+                    height: { ideal: 480 }
+                  },
+                  audio: false
+                };
+                
+                let stream: MediaStream;
+                try {
+                  stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (err) {
+                  console.warn('[Scanner] Manual: getUserMedia with constraints failed, retrying simple:', err);
+                  stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                }
+                
+                streamRef.current = stream;
+                lastFacingModeRef.current = facingMode;
+                
+                if (videoRef.current) {
+                  videoRef.current.srcObject = stream;
+                  videoRef.current.setAttribute('playsinline', 'true');
+                  await videoRef.current.play();
+                }
+                
+                setNeedsManualActivation(false);
+              } catch (err: any) {
+                console.error('[Scanner] Manual activation failed:', err);
+                if (streamRef.current) {
+                  streamRef.current.getTracks().forEach(track => track.stop());
+                  streamRef.current = null;
+                }
+                if (videoRef.current) {
+                  videoRef.current.srcObject = null;
+                }
+                onErrorRef.current(err);
+              }
             }}
             style={{ 
               background: '#facc15', color: '#1e293b', border: 'none', 
@@ -444,7 +549,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return !!kioskStationId || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab';
+    const hasKioskToken = typeof window !== 'undefined' && !!localStorage.getItem('groovelab_kiosk_token');
+    const hasActivePlatformGroovelab = typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab';
+    return !!kioskStationId || hasKioskToken || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab' || hasActivePlatformGroovelab;
   });
   const [hasAutoCheckedPlatform, setHasAutoCheckedPlatform] = useState(false);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
@@ -3677,7 +3784,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             transition: 'color 0.5s ease'
           }}
         >
-          {isGroovelabKiosk ? 'GrooveLab-Login' : 'Campus-Login'}
+          {isGroovelabKiosk ? 'Campus-Groovelab-Login' : 'Campus-Login'}
         </h1>
         <p style={{ 
           color: isGroovelabKiosk ? '#78350f' : (qrScanPrompt ? '#fde047' : '#e6f4ea'), 
@@ -3717,7 +3824,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }}>
         <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
           <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#e6f4ea' }} />
-          {isGroovelabKiosk ? 'GrooveLab QR-Code scannen' : 'Standard Login über Campus QR-Ausweis'}
+          {isGroovelabKiosk ? 'Campus-Groovelab QR-Code scannen' : 'Standard Login über Campus-Groovelab QR-Ausweis'}
         </div>
 
         <div style={{
@@ -3849,7 +3956,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                  boxSizing: 'border-box'
                }}>
                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
-                   {!effectiveStationId ? <Tablet size={24} color="#eab308" /> : (cameraHasError ? <span style={{ fontSize: '20px' }}>📷🚫</span> : <Tablet size={24} />)}
+                   {!effectiveStationId ? <Tablet size={24} color="#eab308" /> : (cameraHasError ? <CameraOff size={24} style={{ color: '#ef4444' }} /> : <Tablet size={24} />)}
                  </div>
                  {!effectiveStationId ? (
                    <>
@@ -3932,62 +4039,162 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         {/* Removed Passwort Anmeldung button for Kiosk Mode */}
         {/* Coupled Kiosk Station indicator inside the card */}
         {isGroovelabKiosk && effectiveStationId && (
-          <div style={{
-            width: '100%',
-            marginTop: '20px',
-            background: 'rgba(254, 252, 232, 0.7)',
-            border: '1px solid rgba(234, 179, 8, 0.3)',
-            borderRadius: '16px',
-            padding: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-            boxSizing: 'border-box'
-          }}>
+          <>
+            <style>{`
+              @keyframes statusPulseRing {
+                0% { transform: scale(1); opacity: 0.8; }
+                100% { transform: scale(2.4); opacity: 0; }
+              }
+              .kiosk-status-dot-pulse {
+                position: relative;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #166534;
+                border: 1.5px solid #fff;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+              }
+              .kiosk-status-dot-pulse::after {
+                content: '';
+                position: absolute;
+                inset: -1.5px;
+                border-radius: 50%;
+                border: 1.5px solid #166534;
+                animation: statusPulseRing 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+              }
+            `}</style>
             <div style={{
+              width: '100%',
+              marginTop: '20px',
+              background: 'rgba(255, 255, 255, 0.75)',
+              backdropFilter: 'blur(20px) saturate(190%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+              border: '1px solid rgba(133, 77, 14, 0.18)',
+              borderRadius: '20px',
+              padding: '14px 18px',
               display: 'flex',
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              color: '#78350f',
-              fontSize: '13px',
-              fontWeight: 800
+              justifyContent: 'space-between',
+              gap: '12px',
+              boxSizing: 'border-box',
+              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
             }}>
-              <Tablet size={15} style={{ color: '#ca8a04' }} />
-              <span>Gekoppelt mit: <strong>{coupledStationName || 'Station'}</strong></span>
+              {/* Left: Device Icon & Info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Device Icon Circle */}
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'rgba(133, 77, 14, 0.06)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(133, 77, 14, 0.12)',
+                  boxShadow: '0 2px 8px rgba(133, 77, 14, 0.05)',
+                  flexShrink: 0,
+                  position: 'relative'
+                }}>
+                  <Tablet size={18} style={{ color: '#854d0e' }} />
+                  {/* Green active sonar pulsing dot */}
+                  <span 
+                    className="kiosk-status-dot-pulse" 
+                    style={{
+                      position: 'absolute',
+                      bottom: '-2px',
+                      right: '-2px'
+                    }} 
+                  />
+                </div>
+
+                {/* Text info */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      color: '#854d0e',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                    }}>
+                      Campus-Groovelab Kiosk
+                    </span>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      color: '#166534',
+                      background: 'rgba(22, 101, 52, 0.08)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      letterSpacing: '0.02em',
+                      lineHeight: 1
+                    }}>
+                      AKTIV
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    color: '#1e293b',
+                    lineHeight: 1.2
+                  }}>
+                    {coupledStationName || 'Station'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: Change Coupling Action */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Möchtest du die Kopplung mit „${coupledStationName || 'dieser Station'}“ wirklich aufheben, um das Gerät neu zu koppeln?`)) {
+                    localStorage.removeItem('groovelab_station_id');
+                    localStorage.removeItem('groovelab_kiosk_token');
+                    localStorage.removeItem('groovelab_kiosk_room_id');
+                    window.location.reload();
+                  }
+                }}
+                style={{
+                  background: 'rgba(133, 77, 14, 0.06)',
+                  border: '1px solid rgba(133, 77, 14, 0.15)',
+                  color: '#854d0e',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  height: '38px',
+                  padding: '0 16px',
+                  borderRadius: '19px',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  outline: 'none',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(133, 77, 14, 0.12)';
+                  e.currentTarget.style.borderColor = 'rgba(133, 77, 14, 0.3)';
+                  e.currentTarget.style.color = '#78350f';
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(133, 77, 14, 0.06)';
+                  e.currentTarget.style.borderColor = 'rgba(133, 77, 14, 0.15)';
+                  e.currentTarget.style.color = '#854d0e';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                Trennen
+              </button>
             </div>
-            
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`Möchtest du die Kopplung mit „${coupledStationName || 'dieser Station'}“ wirklich aufheben, um das Gerät neu zu koppeln?`)) {
-                  localStorage.removeItem('groovelab_station_id');
-                  localStorage.removeItem('groovelab_kiosk_token');
-                  localStorage.removeItem('groovelab_kiosk_room_id');
-                  window.location.reload();
-                }
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ca8a04',
-                fontSize: '11px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                padding: '4px 8px',
-                transition: 'color 0.2s',
-                outline: 'none',
-                display: 'inline-flex',
-                alignItems: 'center'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.color = '#78350f'; }}
-              onMouseOut={(e) => { e.currentTarget.style.color = '#ca8a04'; }}
-            >
-              Kopplung aufheben / Station wechseln
-            </button>
-          </div>
+          </>
         )}
 
         {/* iOS-Style GrooveLab check-in button - Hidden in Kiosk Mode */}
@@ -6345,15 +6552,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             borderRadius: '32px',
             boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
             border: '1px solid #f1f5f9',
-            padding: '36px',
             maxWidth: '560px',
             width: '100%',
             maxHeight: '80vh',
-            overflowY: 'auto',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px'
+            overflow: 'hidden'
           }}>
             <button 
               onClick={() => setShowPrivacy(false)} 
@@ -6371,13 +6576,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 justifyContent: 'center',
                 cursor: 'pointer',
                 color: '#64748b',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                zIndex: 50
               }}
-              
-              
             >
               <X size={20} />
             </button>
+
+            <div style={{
+              overflowY: 'auto',
+              padding: '36px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#eab308' }}>
@@ -6424,6 +6636,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
             </div>
           </div>
+          </div>
         </div>
       )}
 
@@ -6446,15 +6659,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             borderRadius: '32px',
             boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18)',
             border: '1px solid #f1f5f9',
-            padding: '36px',
             maxWidth: '560px',
             width: '100%',
             maxHeight: '80vh',
-            overflowY: 'auto',
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px'
+            overflow: 'hidden'
           }}>
             <button 
               onClick={() => setShowImpressum(false)} 
@@ -6472,13 +6683,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 justifyContent: 'center',
                 cursor: 'pointer',
                 color: '#64748b',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                zIndex: 50
               }}
-              
-              
             >
               <X size={20} />
             </button>
+
+            <div style={{
+              overflowY: 'auto',
+              padding: '36px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#eab308' }}>
@@ -6540,6 +6758,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </p>
               </div>
             </div>
+          </div>
           </div>
         </div>
       )}

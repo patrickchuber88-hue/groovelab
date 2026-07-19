@@ -2387,13 +2387,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               background: 'white',
               borderRadius: '24px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              padding: '28px 24px',
               maxWidth: '500px',
               width: '100%',
               maxHeight: '80vh',
-              overflowY: 'auto',
               position: 'relative',
-              color: '#1e293b'
+              color: '#1e293b',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
             }}>
               <button 
                 onClick={() => setShowParentAgb(false)}
@@ -2411,11 +2412,20 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   fontWeight: 'bold',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  zIndex: 50
                 }}
               >
                 ✕
               </button>
+
+              <div style={{
+                overflowY: 'auto',
+                padding: '28px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800 }}>Nutzungsbedingungen</h3>
               <div style={{ fontSize: '13px', lineHeight: '1.6', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <p><strong>Vertragspartner und Anbieter:</strong><br/>Patrick Huber (Einzelunternehmer), Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, nachfolgend „Anbieter“</p>
@@ -2424,6 +2434,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 <p><strong>§ 3 ZUGANGSSICHERHEIT & AUTOMATISCHE SPERRUNG</strong><br/>Gibt der Endnutzer dreimal hintereinander eine falsche PIN ein, wird das Benutzerkonto aus Sicherheitsgründen automatisch gesperrt. Eine Entsperrung ist dann nur über die Verwaltung der Musikschule möglich.</p>
               </div>
             </div>
+          </div>
           </div>
         )}
 
@@ -2443,13 +2454,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               background: 'white',
               borderRadius: '24px',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              padding: '28px 24px',
               maxWidth: '500px',
               width: '100%',
               maxHeight: '80vh',
-              overflowY: 'auto',
               position: 'relative',
-              color: '#1e293b'
+              color: '#1e293b',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
             }}>
               <button 
                 onClick={() => setShowPrivacy(false)}
@@ -2467,11 +2479,20 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   fontWeight: 'bold',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  zIndex: 50
                 }}
               >
                 ✕
               </button>
+
+              <div style={{
+                overflowY: 'auto',
+                padding: '28px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800 }}>Datenschutzerklärung</h3>
               <div style={{ fontSize: '13px', lineHeight: '1.6', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <p>Wir verarbeiten personenbezogene Daten unserer Nutzer stets unter Einhaltung der geltenden Datenschutzbestimmungen (DSGVO).</p>
@@ -2479,6 +2500,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 <p><strong>2. Geräteregistrierung (Device-Pairing):</strong><br/>Zur Vermeidung unbefugter Zugriffe wird ein eindeutiger Geräteschlüssel (UUID) im lokalen Speicher deines Browsers abgelegt und an unsere Datenbank übermittelt. Dies dient dem Schutz deiner personenbezogenen Lerndaten.</p>
               </div>
             </div>
+          </div>
           </div>
         )}
 
