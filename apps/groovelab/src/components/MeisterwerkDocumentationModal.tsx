@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
@@ -197,6 +198,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const activePlat = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
+  const modalContainerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => !prev);
+  };
+
+  // Tastatur-Shortcut: F-Taste toggelt Vollbild
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+         activeEl.tagName === 'TEXTAREA' ||
+         activeEl.getAttribute('contenteditable') === 'true')
+      ) return;
+
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        setIsFullscreen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const displayedStudentName = useMemo(() => {
     return readOnly
@@ -2810,26 +2837,32 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return (
       <button
         type="button"
-        onClick={() => setIsFullscreen(!isFullscreen)}
-        title={isFullscreen ? "Vollbild beenden" : "Vollbild"}
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Vollbild beenden' : 'Vollbild'}
         style={{
           background: 'rgba(255,255,255,0.15)',
           border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '50%',
-          width: '30px',
+          borderRadius: isFullscreen ? '20px' : '50%',
           height: '30px',
+          padding: isFullscreen ? '0 10px 0 8px' : '0',
+          width: isFullscreen ? 'auto' : '30px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: '5px',
           cursor: 'pointer',
           color: '#ffffff',
+          fontSize: '0.72rem',
+          fontWeight: 700,
           transition: 'all 0.18s ease',
           flexShrink: 0,
-          marginRight: '4px'
+          marginRight: '4px',
+          whiteSpace: 'nowrap'
         }}
         className="hover-scale"
       >
         {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+        {isFullscreen && <span>Vollbild beenden</span>}
       </button>
     );
   };
@@ -2867,9 +2900,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
             : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
         : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
-      borderRadius: isFullscreen ? '0' : '32px',
+      borderRadius: isFullscreen ? '0' : '20px',
       width: '100%',
-      maxWidth: isFullscreen ? '100%' : '1360px',
+      maxWidth: isFullscreen ? '100vw' : '1360px',
       height: isEmbed ? '100%' : (isFullscreen ? '100vh' : '92vh'),
       boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
       display: 'flex',
@@ -2879,7 +2912,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         ? 'none' 
         : '1px solid rgba(0, 0, 0, 0.05)',
       padding: useNotebookLayout ? '6px' : '0',
-      position: 'relative'
+      position: 'relative',
+      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
     }} className="animation-slide-up">
                 {/* Header - Apple-style compact redesign */}
         <div style={{
@@ -8589,7 +8623,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       </div>
     );
 
-    if (isEmbed) {
+    // Embed-Modus ohne Fullscreen: normal eingebettet (kein Overlay)
+    if (isEmbed && !isFullscreen) {
       return (
         <div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '600px', fontFamily: '"Inter", sans-serif' }}>
           {content}
@@ -8597,23 +8632,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       );
     }
 
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        background: isFullscreen ? '#09090b' : 'rgba(9, 9, 11, 0.65)',
-        backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: isFullscreen ? '0' : '20px',
-        fontFamily: '"Inter", sans-serif'
-      }}>
+    // Embed-Modus MIT Fullscreen ODER normales Modal → immer als Portal über alles
+    return createPortal(
+      <div 
+        ref={modalContainerRef}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99999,
+          background: isFullscreen ? 'transparent' : 'rgba(9, 9, 11, 0.65)',
+          backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: isFullscreen ? '0' : '20px',
+          fontFamily: '"Inter", sans-serif',
+          overflow: 'hidden',
+          transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}
+      >
         {content}
-      </div>
+      </div>,
+      document.body
     );
   };
+
 
 const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {
   return (
