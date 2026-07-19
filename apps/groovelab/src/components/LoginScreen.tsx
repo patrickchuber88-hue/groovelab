@@ -7118,6 +7118,173 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
+      {/* Fullscreen Kiosk Scanner Modal */}
+      {showKioskScanner && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px',
+          boxSizing: 'border-box',
+          color: '#ffffff'
+        }}>
+          {/* Scanner Card */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.12)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '40px',
+            padding: '28px',
+            maxWidth: '420px',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            boxShadow: '0 40px 100px rgba(0, 0, 0, 0.45)',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
+              <Tablet size={14} style={{ color: '#eab308' }} />
+              Campus-Groovelab QR-Code scannen
+            </div>
+
+            {/* Camera Box */}
+            <div style={{
+              width: '100%',
+              aspectRatio: '1/1',
+              borderRadius: '32px',
+              overflow: 'hidden',
+              background: '#ffffff',
+              position: 'relative',
+              boxShadow: 'inset 0 3px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05), 0 16px 36px rgba(0, 0, 0, 0.07)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              padding: '4.5px',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: '26px',
+                overflow: 'hidden',
+                position: 'relative',
+                background: '#0c0f12'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  boxShadow: 'inset 0 5px 15px rgba(0, 0, 0, 0.4)',
+                  borderRadius: '26px',
+                  pointerEvents: 'none',
+                  zIndex: 9
+                }} />
+                
+                {isCameraActive && !cameraHasError ? (
+                  <>
+                    <CustomQRScanner
+                      onScan={(val) => {
+                        console.log('[KioskScanner] Extracted QR value:', val);
+                        handleScan(val);
+                        setShowKioskScanner(false);
+                      }}
+                      onError={(err: any) => {
+                        console.error('[KioskScanner] Camera error:', err);
+                        setCameraHasError(true);
+                        const errMsg = err?.message || String(err || '');
+                        if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
+                          setError(`Kamera-Fehler: ${errMsg}`);
+                        }
+                      }}
+                      paused={loading || !showKioskScanner}
+                      facingMode={facingMode}
+                    />
+
+                    {/* Target Corners */}
+                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
+                      <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #facc15', borderLeft: '3px solid #facc15', borderTopLeftRadius: '8px' }} />
+                      <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #facc15', borderRight: '3px solid #facc15', borderTopRightRadius: '8px' }} />
+                      <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #facc15', borderLeft: '3px solid #facc15', borderBottomLeftRadius: '8px' }} />
+                      <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #facc15', borderRight: '3px solid #facc15', borderBottomRightRadius: '8px' }} />
+                      <div style={{
+                        position: 'absolute',
+                        left: 0,
+                        width: '100%',
+                        height: '80px',
+                        background: 'linear-gradient(180deg, rgba(250, 204, 21, 0) 0%, rgba(250, 204, 21, 0.08) 50%, rgba(250, 204, 21, 0) 100%)',
+                        filter: 'blur(6px)',
+                        animation: 'scanLaser 4s ease-in-out infinite'
+                      }} />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '16px',
+                    color: 'white',
+                    padding: '24px',
+                    textAlign: 'center',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#facc15' }}>
+                      {cameraHasError ? <CameraOff size={24} style={{ color: '#ef4444' }} /> : <RotateCw className="spin" size={24} />}
+                    </div>
+                    {cameraHasError ? (
+                      <>
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
+                          Kamerazugriff blockiert
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
+                          Bitte erteilen Sie der App Kameraberechtigungen oder verwenden Sie den PIN-Login.
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#e6f4ea' }}>
+                        Kamera wird gestartet...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Cancel Button */}
+            <button
+              type="button"
+              onClick={() => setShowKioskScanner(false)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                height: '38px',
+                padding: '0 24px',
+                borderRadius: '19px',
+                marginTop: '24px',
+                transition: 'all 0.2s',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hidden Master Admin Credentials Login Modal */}
       {showAdminModal && (
         <div style={{
