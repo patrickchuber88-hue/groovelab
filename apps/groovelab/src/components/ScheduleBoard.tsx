@@ -285,45 +285,71 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     textAccentColor = '#ca8a04'; // Dark yellow text
   }
 
-  // Guided Tour Configuration & State
-  const tourSteps = useMemo(() => [
+  // Guided Tour Configuration & State for Designer
+  const designerTourSteps = useMemo(() => [
     {
-      title: "Willkommen bei Campus-Groovelab! 👋",
-      description: "Lass uns kurz durchgehen, wie du deinen Stundenplan hier erstellst und verwaltest. Die Plattform hilft dir, deine Schüler optimal einzuteilen und Raumkonflikte zu vermeiden.",
+      title: "Willkommen beim Stundenplan-Designer! 🛠️",
+      description: "Lass uns kurz durchgehen, wie du deinen Stundenplan hier planst. Die Plattform hilft dir, deine Schüler optimal einzuteilen und Raumkonflikte zu vermeiden.",
       selector: undefined
     },
     {
       title: "Der Schüler-Pool 👥",
-      description: "Hier findest du all deine Schüler. Die Karten zeigen dir die Instrumente und die Unterrichtsdauer an. Nicht eingeteilte Schüler haben ein graues Label links. Du kannst sie per Drag & Drop auf die Wochentage ziehen.",
+      description: "Hier siehst du alle noch nicht eingeteilten Schüler (graues Label links). Ziehe Schüler einfach per Drag & Drop auf deine Unterrichtstage.",
       selector: "tour-student-pool"
     },
     {
-      title: "Deine Wochen-Boards 📅",
-      description: "Das ist deine Arbeitsfläche. Jeder Wochentag hat ein eigenes Spalten-Board, dem ein Unterrichtsraum zugewiesen ist. Die Zeiten passen sich beim Ziehen automatisch an.",
+      title: "Deine Wochentags-Boards 📅",
+      description: "Jeder Unterrichtstag hat ein eigenes Board, zugeteilt auf einen Raum. Die Unterrichtszeiten passen sich beim Hinzufügen von Schülern automatisch an.",
       selector: "tour-day-boards"
     },
     {
-      title: "Pausen & Gruppen-Modus ☕",
-      description: "Ziehe einfach einen Pausen-Block auf deine Boards, um unterrichtsfreie Zeiten einzuplanen, oder nutze den Gruppen-Modus, um mehrere Schüler gemeinsam zu unterrichten.",
+      title: "Pausen & Gruppen ☕",
+      description: "Ziehe einfach einen Pausen-Block auf deine Boards, um unterrichtsfreie Zeiten einzuplanen, oder aktiviere den Gruppen-Modus für gemeinsamen Unterricht.",
       selector: "tour-special-features"
     },
     {
-      title: "Echtzeit-Konflikterkennung ⚠️",
-      description: "Das System prüft im Hintergrund automatisch auf Raumkollisionen mit anderen Lehrern und eigene Doppelbelegungen. Konflikt-Karten werden rot hervorgehoben.",
-      selector: "tour-day-boards"
-    },
-    {
-      title: "Absenden zur Freigabe 🚀",
-      description: "Wenn dein Stundenplan-Entwurf fertig ist, klicke auf 'Einloggen & Senden'. Die Musikschul-Verwaltung erhält ihn dann zur Prüfung und Freigabe.",
+      title: "Einloggen & Senden 🚀",
+      description: "Wenn dein Stundenplan-Entwurf fertig ist, klicke auf 'Einloggen & Senden', um ihn zur Freigabe an die Verwaltung zu übermitteln.",
       selector: "tour-submit-section"
     }
   ], []);
 
-  const { TourComponent, startTour } = usePremiumOnboardingTour({
-    tourKey: `campus_groovelab_tour_completed_${selectedTeacherId}`,
-    steps: tourSteps,
+  // Guided Tour Configuration & State for Calendar (Stundenplan)
+  const calendarTourSteps = useMemo(() => [
+    {
+      title: "Deine Wochenübersicht 📅",
+      description: "Dies ist dein freigegebener Stundenplan. Hier siehst du all deine Termine auf einen Blick.",
+      selector: undefined
+    },
+    {
+      title: "Die Röntgen-Ansicht 🔍",
+      description: "Verwende die Röntgen-Ansicht, um Raumbelegungen von dir und anderen Lehrkräften transparent übereinander zu legen und Belegungen zu prüfen.",
+      selector: "tour-calendar-xray"
+    },
+    {
+      title: "Optionen & Aktionen ⚙️",
+      description: "Hier kannst du das Wochenende ein- oder ausblenden, Gruppen organisieren oder ganze Wochenkopien erstellen und einfügen.",
+      selector: "tour-calendar-actions"
+    },
+    {
+      title: "Zurück zum Designer 🛠️",
+      description: "Möchtest du deinen Stundenplan anpassen? Wechsle hier jederzeit zurück in den Stundenplan-Designer.",
+      selector: "tour-calendar-switch"
+    }
+  ], []);
+
+  const { TourComponent: DesignerTourComponent, startTour: startDesignerTour } = usePremiumOnboardingTour({
+    tourKey: `campus_groovelab_designer_tour_completed_${selectedTeacherId}`,
+    steps: designerTourSteps,
     platformTheme: localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'
   });
+
+  const { TourComponent: CalendarTourComponent, startTour: startCalendarTour } = usePremiumOnboardingTour({
+    tourKey: `campus_groovelab_calendar_tour_completed_${selectedTeacherId}`,
+    steps: calendarTourSteps,
+    platformTheme: localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'
+  });
+
 
 
   // ── Optimized Conflict Detection Caching (Map Lookups) ──
@@ -1125,12 +1151,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setBoards(reconstructedBoards);
       setStudents(finalGroupedStudents);
       
-      // Set activeTab dynamically based on submission status and whether the schedule is empty
-      if (currentUserRole === 'teacher') {
-        const isSubmitted = !!(schedData && schedData.length > 0);
-        const totalAssigned = reconstructedBoards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak).length, 0);
-        setActiveTab((isSubmitted && totalAssigned > 0) ? 'calendar' : 'designer');
-      }
+      // Set activeTab dynamically based on whether the schedule is empty (0 assigned students) or full (>0 assigned students)
+      const totalAssigned = reconstructedBoards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak).length, 0);
+      setActiveTab(totalAssigned > 0 ? 'calendar' : 'designer');
       
       setIsInitialLoadDone(true);
 
@@ -3204,6 +3227,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           0% { opacity: 0.6; }
           100% { opacity: 1; }
         }
+        @keyframes conflictPulse {
+          0% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.2); }
+          50% { border-color: rgba(239, 68, 68, 0.9); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.15); }
+          100% { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.2); }
+        }
+        .conflict-pulse-card {
+          animation: conflictPulse 2s infinite ease-in-out !important;
+        }
+        .designer-student-card {
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .designer-student-card:hover {
+          transform: translateY(-1.5px) scale(1.015) !important;
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.05) !important;
+          z-index: 5 !important;
+        }
       `}</style>
       
       {activeTab === 'calendar' ? (
@@ -3220,8 +3259,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           hasSubmittedSchedule={hasSubmittedSchedule}
           scheduleStatus={scheduleStatus}
           onStartTour={() => {
-            setActiveTab('designer');
-            startTour();
+            startCalendarTour();
           }}
         />
       ) : (
@@ -3278,7 +3316,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+              <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
                 <button 
                   onClick={() => setActiveTab('calendar')}
                   className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
@@ -3295,7 +3333,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </button>
               </div>
               {currentUserRole === 'teacher' && (
-                <TourStartButton onClick={startTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
+                <TourStartButton onClick={startDesignerTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
               )}
             </div>
 
@@ -3803,7 +3841,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       onDrop={() => {
                         handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined);
                       }}
-                      style={{ position: 'relative', height: `${columnHeightPx}px`, flexShrink: 0, marginTop: '4px' }}
+                      style={{ 
+                        position: 'relative', 
+                        height: `${columnHeightPx}px`, 
+                        flexShrink: 0, 
+                        marginTop: '4px',
+                        backgroundColor: dragOverBoardId === board.id ? lightBg : 'transparent',
+                        outline: dragOverBoardId === board.id ? `1.5px dashed ${brandColor}` : 'none',
+                        borderRadius: '12px',
+                        transition: 'all 0.15s ease'
+                      }}
                     >
                        {/* Hour marker & 15-minute subdivision lines */}
                       {hourMarkers.map(m => {
@@ -4217,81 +4264,97 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           ? `Doppelbelegung Lehrkraft: Zeitgleich mit ${teacherConflictStudentName} in ${teacherConflictRoomName}`
                           : `Raumkonflikt: Raum besetzt durch Lehrkraft ${roomConflictTeacherName} (Schüler: ${roomConflictStudentName})`;
 
-                        const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-                        const campusPrimary = '#34a853';
-                        const campusBg = 'rgba(230, 244, 234, 0.65)';
-                        const campusBorder = 'rgba(52, 168, 83, 0.2)';
-                        const campusText = '#34a853';
+                        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
+                        const isGroovelabTheme = localStorage.getItem('groovelab_active_platform') === 'groovelab';
+                        const isAdminViewTheme = currentUserRole === 'admin' || currentUserRole === 'secretary';
+
+                        let cardPrimaryColor = '#34a853'; // Campus Green
+                        let cardLightBg = 'rgba(52, 168, 83, 0.06)';
+                        let cardBorderColor = 'rgba(52, 168, 83, 0.2)';
+                        let cardTextColor = '#34a853';
+                        let cardLightText = '#1e3524';
+
+                        if (isAdminViewTheme) {
+                          cardPrimaryColor = '#ea4335'; // Admin Red
+                          cardLightBg = 'rgba(234, 67, 53, 0.06)';
+                          cardBorderColor = 'rgba(234, 67, 53, 0.2)';
+                          cardTextColor = '#dc2626';
+                          cardLightText = '#450a0a';
+                        } else if (isGroovelabTheme) {
+                          cardPrimaryColor = '#ca8a04'; // GrooveLab Dark Yellow
+                          cardLightBg = 'rgba(254, 252, 232, 0.9)'; // Sleek yellow glassmorphism
+                          cardBorderColor = 'rgba(234, 179, 8, 0.25)';
+                          cardTextColor = '#854d0e';
+                          cardLightText = '#422006';
+                        } else if (!isCampusTheme) {
+                          // Blue fallback
+                          cardPrimaryColor = '#3b82f6';
+                          cardLightBg = 'rgba(59, 130, 246, 0.06)';
+                          cardBorderColor = 'rgba(59, 130, 246, 0.2)';
+                          cardTextColor = '#1d4ed8';
+                          cardLightText = '#1e3a8a';
+                        }
 
                         const cardBg = hasConflict
                           ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
                           : (isInsideWunsch
-                              ? '#34a853'
+                              ? cardPrimaryColor
                               : (isSelected 
-                                  ? (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
+                                  ? cardLightBg
                                   : (isSubmitted 
                                       ? 'rgba(230, 244, 234, 0.5)' 
-                                      : (isCampus ? campusBg : 'rgba(219, 234, 254, 0.65)'))));
+                                      : cardLightBg)));
 
                         const cardBorder = hasConflict
                           ? '1.5px solid #ef4444'
                           : (isInsideWunsch
-                              ? '1px solid #34a853'
+                              ? `1px solid ${cardPrimaryColor}`
                               : (isSelected 
-                                  ? (isCampus ? `1.5px solid ${campusPrimary}` : '1.5px solid #007aff') 
-                                  : (isSubmitted 
-                                      ? '1px solid rgba(52, 168, 83, 0.18)' 
-                                      : (isCampus ? `1px solid ${campusBorder}` : '1px solid rgba(59, 130, 246, 0.2)'))));
+                                  ? `1.5px solid ${cardPrimaryColor}`
+                                  : `1px solid ${cardBorderColor}`));
 
                         const cardBorderLeft = hasConflict
                           ? '4px solid #dc2626'
                           : (isInsideWunsch
-                              ? '4px solid #34a853'
-                              : (isSelected 
-                                  ? (isCampus ? `4px solid ${campusPrimary}` : '4px solid #007aff') 
-                                  : (isSubmitted ? '4px solid #34a853' : (isCampus ? `4px solid ${campusPrimary}` : '4px solid #3b82f6'))));
+                              ? `4px solid ${cardPrimaryColor}`
+                              : `4px solid ${cardPrimaryColor}`);
 
                         const textColor = hasConflict
                           ? '#991b1b'
                           : (isInsideWunsch
                               ? '#ffffff'
                               : (isSelected 
-                                  ? (isCampus ? campusText : '#007aff') 
-                                  : (isSubmitted ? '#34a853' : (isCampus ? campusText : '#1e3a8a'))));
+                                  ? cardTextColor
+                                  : cardLightText));
 
                         const badgeBg = hasConflict
                           ? 'rgba(239, 68, 68, 0.1)'
                           : (isInsideWunsch
                               ? 'rgba(255, 255, 255, 0.2)'
-                              : (isSelected 
-                                  ? (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(0, 122, 255, 0.08)') 
-                                  : (isSubmitted ? 'rgba(52, 168, 83, 0.08)' : (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(59, 130, 246, 0.08)'))));
+                              : 'rgba(255, 255, 255, 0.45)');
 
                         const badgeColor = hasConflict
                           ? '#ef4444'
                           : (isInsideWunsch
                               ? '#ffffff'
-                              : (isSelected 
-                                  ? (isCampus ? campusText : '#007aff') 
-                                  : (isSubmitted ? '#34a853' : (isCampus ? campusText : '#1d4ed8'))));
+                              : cardTextColor);
 
                         const shadowColor = isSubmitted 
-                          ? 'rgba(52,168,83,0.06)' 
-                          : (isCampus ? 'rgba(52, 168, 83,0.06)' : 'rgba(59,130,246,0.06)');
+                          ? 'rgba(0,0,0,0.02)' 
+                          : 'rgba(0,0,0,0.03)';
                         const shadowHoverColor = isSubmitted 
-                          ? 'rgba(52,168,83,0.14)' 
-                          : (isCampus ? 'rgba(52, 168, 83,0.14)' : 'rgba(59,130,246,0.14)');
+                          ? 'rgba(0,0,0,0.06)' 
+                          : 'rgba(0,0,0,0.08)';
                         const cardShadow = hasConflict
                           ? '0 4px 10px rgba(239, 68, 68, 0.15)'
                           : (isInsideWunsch
-                              ? '0 6px 16px rgba(52, 168, 83, 0.25)'
+                              ? `0 6px 16px ${cardPrimaryColor}33`
                               : (isSelected 
-                                  ? (isCampus ? `0 0 10px ${campusPrimary}40` : '0 0 10px rgba(0, 122, 255, 0.25)') 
+                                  ? `0 0 10px ${cardPrimaryColor}40`
                                   : `0 2px 6px ${shadowColor}`));
 
                         const isSelectedForGroup = selectedForGroup.includes(bs.id);
-                        const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
-                        const highlightColor = isCampusTheme ? '#34a853' : '#007aff';
+                        const highlightColor = cardPrimaryColor;
 
                         if (bs.isGroup) {
                           return (
@@ -4308,18 +4371,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }}
                               onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
                               onClick={(e) => { e.stopPropagation(); }}
+                              className={`${isShaking ? 'card-shake' : ''} designer-student-card`}
                               style={{
                                 position: 'absolute', left: 0, right: 0,
                                 top: `${Math.max(cardTopPx, 0)}px`,
                                 height: `${Math.max(cardHeightPx, 32)}px`,
-                                background: isCampusTheme ? 'rgba(230, 244, 234, 0.95)' : 'rgba(219, 234, 254, 0.95)',
-                                border: isSelected ? `1.5px solid ${highlightColor}` : '1px solid rgba(52, 168, 83, 0.25)',
-                                borderLeft: `4px solid ${highlightColor}`,
+                                background: cardLightBg,
+                                border: isSelected ? `1.5px solid ${cardPrimaryColor}` : `1px solid ${cardBorderColor}`,
+                                borderLeft: `4px solid ${cardPrimaryColor}`,
                                 borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                                 cursor: 'grab', display: 'flex', flexDirection: 'column',
                                 justifyContent: 'center', gap: '2px',
                                 zIndex: 2,
-                                boxShadow: isSelected ? `0 0 10px ${highlightColor}` : '0 2px 6px rgba(0,0,0,0.05)',
+                                boxShadow: isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                               }}
                             >
@@ -4414,7 +4478,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 handleSelectStudent(bs.id);
                               }
                             }}
-                            className={isShaking ? 'card-shake' : ''}
+                            className={`${isShaking ? 'card-shake' : ''} ${hasConflict ? 'conflict-pulse-card' : ''} designer-student-card`}
                             style={{
                               position: 'absolute', left: 0, right: 0,
                               top: `${Math.max(cardTopPx, 0)}px`,
@@ -4477,7 +4541,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             {bs.first_name} {maskLastName(bs.last_name)}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? '#34a853' : (isCampus ? campusText : '#2563eb'))), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
                           )}
                         </div>
                       );
@@ -5372,7 +5436,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         );
       })()}
 
-            <TourComponent />
+            {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
 
     </div>
   );

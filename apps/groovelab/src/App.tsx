@@ -1156,16 +1156,20 @@ function GroupedSongCard({ songGroup, onUpdateProgress, onSubmitForApproval, isB
 
 // Auto-setup kiosk mode from URL parameters
 const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+const isStandalone = typeof window !== 'undefined' && 
+  (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
 
 // Handle platform override from URL (e.g. from LandingPage search)
 const targetPlatform = params.get('platform');
 if (targetPlatform && (targetPlatform === 'campus' || targetPlatform === 'groovelab' || targetPlatform === 'ensembles')) {
   localStorage.setItem('groovelab_active_platform', targetPlatform);
-  params.delete('platform');
-  const newSearch = params.toString();
-  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-  if (typeof window !== 'undefined' && window.history) {
-    window.history.replaceState({}, '', newUrl);
+  if (isStandalone) {
+    params.delete('platform');
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+    if (typeof window !== 'undefined' && window.history) {
+      window.history.replaceState({}, '', newUrl);
+    }
   }
 }
 
@@ -1193,14 +1197,16 @@ if (kioskTokenParam) {
   localStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_location_mode');
   
-  // Strip parameters and redirect to clean up URL
-  params.delete('kiosk_token');
-  params.delete('station_id');
-  params.delete('kiosk_station_id');
-  params.delete('kiosk_room_id');
-  const newSearch = params.toString();
-  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-  window.location.replace(newUrl);
+  // Strip parameters and redirect to clean up URL ONLY in standalone mode
+  if (isStandalone) {
+    params.delete('kiosk_token');
+    params.delete('station_id');
+    params.delete('kiosk_station_id');
+    params.delete('kiosk_room_id');
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+    window.location.replace(newUrl);
+  }
 }
 
 const kioskStationId = params.get('kiosk_station_id') || params.get('station_id');
@@ -1210,12 +1216,14 @@ if (kioskStationId) {
   localStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_location_mode');
   
-  // Strip parameters and redirect to clean up URL
-  params.delete('kiosk_station_id');
-  params.delete('station_id');
-  const newSearch = params.toString();
-  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-  window.location.replace(newUrl);
+  // Strip parameters and redirect to clean up URL ONLY in standalone mode
+  if (isStandalone) {
+    params.delete('kiosk_station_id');
+    params.delete('station_id');
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+    window.location.replace(newUrl);
+  }
 }
 
 // Persist kiosk_room_id to localStorage so we can restore it on "Beenden"
@@ -6948,7 +6956,12 @@ function App() {
         return !!sub;
       })();
 
-      const isParentOnboarding = urlParams.has('invite_school_id') || urlParams.get('onboarding') === 'parent' || hasSubdomain || isKioskMode;
+      const isParentOnboarding = urlParams.has('invite_school_id') || 
+                                 urlParams.get('onboarding') === 'parent' || 
+                                 urlParams.get('platform') === 'groovelab' ||
+                                 activePlatform === 'groovelab' ||
+                                 hasSubdomain || 
+                                 isKioskMode;
       if (isParentOnboarding) {
         return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
       }

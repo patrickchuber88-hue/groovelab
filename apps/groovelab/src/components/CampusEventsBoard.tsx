@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { usePremiumOnboardingTour, TourStartButton } from './PremiumOnboardingTour';
 import { 
   Calendar, 
   Plus, 
@@ -123,7 +124,111 @@ const formatToLocalDatetime = (isoString: string | null | undefined): string => 
 };
 
 export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor: passedBrandColor }: CampusEventsBoardProps) {
-  const brandColor = '#34a853';
+  // Dynamic Theme calculations
+  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+  const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
+  const isAdminView = role === 'admin' || role === 'secretary';
+
+  let brandColor = '#34a853'; // Campus Green
+  let lightBg = 'rgba(52, 168, 83, 0.06)';
+  let hoverBg = 'rgba(52, 168, 83, 0.12)';
+  let textAccentColor = '#34a853';
+
+  if (isAdminView) {
+    brandColor = '#ea4335'; // Admin Red
+    lightBg = 'rgba(234, 67, 53, 0.06)';
+    hoverBg = 'rgba(234, 67, 53, 0.12)';
+    textAccentColor = '#ea4335';
+  } else if (isGroovelab) {
+    brandColor = '#eab308'; // GrooveLab Yellow
+    lightBg = 'rgba(234, 179, 8, 0.06)';
+    hoverBg = 'rgba(234, 179, 8, 0.12)';
+    textAccentColor = '#ca8a04'; // Dark yellow text
+  }
+
+  // Rollenbasierte Onboarding Touren
+  const teacherTourSteps = useMemo(() => [
+    {
+      title: "Willkommen auf deinem Termine-Board! 👋",
+      description: "Hier siehst du deine Unterrichtstunden und alle Schulveranstaltungen auf einen Blick.",
+      selector: undefined
+    },
+    {
+      title: "Deine Unterrichtstermine 👤",
+      description: "In dieser Spalte werden deine persönlichen Unterrichtsstunden angezeigt. Mit dem 'Abonnieren'-Button kannst du die Termine live als iCal auf dein Handy laden.",
+      selector: "tour-lessons-column"
+    },
+    {
+      title: "Campus & Schultermine 🏛️",
+      description: "Die Musikschul-Timeline: Alle anstehenden Events wie Konzerte, Vorspiele und Feiertage werden hier chronologisch aufgeführt.",
+      selector: "tour-timeline-column"
+    },
+    {
+      title: "Event-Planung für Lehrer ⚙️",
+      description: "Plane hier eigene Konzerte oder melde Schüler und Programmpunkte für offizielle Musikschulveranstaltungen an.",
+      selector: "tour-planning-column"
+    }
+  ], []);
+
+  const studentTourSteps = useMemo(() => [
+    {
+      title: "Willkommen auf deinem Termine-Board! 👋",
+      description: "Verpasse keine Unterrichtsstunde oder Schulkonzert mehr. Lass uns kurz die Bereiche durchgehen.",
+      selector: undefined
+    },
+    {
+      title: "Deine Unterrichtstunden 👤",
+      description: "Hier siehst du deine anstehenden Unterrichtstermine. Klicke auf 'Abonnieren', um sie direkt auf dein Handy zu übertragen.",
+      selector: "tour-lessons-column"
+    },
+    {
+      title: "Campus & Schultermine 🏛️",
+      description: "Hier findest du alle Konzerte und Aktionen der Musikschule. Du kannst dich zu Veranstaltungen anmelden, um nichts zu verpassen.",
+      selector: "tour-timeline-column"
+    },
+    {
+      title: "Deine Auftritte & Feedback 👥",
+      description: "Siehst du ein Event, bei dem du mitspielst? Hier werden deine Konzertauftritte aufgelistet, und du kannst Feedback abgeben.",
+      selector: "tour-student-events"
+    }
+  ], []);
+
+  const coordinatorTourSteps = useMemo(() => [
+    {
+      title: "Willkommen im Koordinator-Panel! 👑",
+      description: "Als Administrator oder Sekretär kannst du hier den gesamten Veranstaltungsbetrieb der Musikschule koordinieren.",
+      selector: undefined
+    },
+    {
+      title: "Schultermine & Events 🏛️",
+      description: "Die Timeline zeigt dir alle Events an. Wähle eine Veranstaltung aus, um das Planungsmodul und den Ablaufplan zu öffnen.",
+      selector: "tour-timeline-column"
+    },
+    {
+      title: "Der Ablaufplaner ⚙️",
+      description: "Koordiniere Programmpunkte per Drag & Drop, belege Bühnen und verwalte die Technik-Rider sowie Doppelbelegungen in Echtzeit.",
+      selector: "tour-planning-column"
+    },
+    {
+      title: "Infos & News 📢",
+      description: "Verfasse hier offizielle Ankündigungen und News, die direkt im Dashboard für Lehrer und Schüler angezeigt werden.",
+      selector: "tour-announcements-column"
+    }
+  ], []);
+
+  // Wähle die passende Tour basierend auf der Benutzerrolle
+  const activeTourSteps = useMemo(() => {
+    if (role === 'student') return studentTourSteps;
+    if (role === 'admin' || role === 'secretary') return coordinatorTourSteps;
+    return teacherTourSteps;
+  }, [role, studentTourSteps, coordinatorTourSteps, teacherTourSteps]);
+
+  const { TourComponent, startTour } = usePremiumOnboardingTour({
+    tourKey: `campus_groovelab_events_tour_completed_${role}_${userId}`,
+    steps: activeTourSteps,
+    platformTheme: isAdminView ? 'admin' : (isGroovelab ? 'groovelab' : 'campus')
+  });
+
   // Tabs for Column 1 (My Lessons)
   const [lessonTab, setLessonTab] = useState<'upcoming' | 'past'>('upcoming');
 
@@ -3917,7 +4022,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const renderLessonsColumn = () => {
     return (
-      <div style={{
+      <div id="tour-lessons-column" style={{
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
@@ -3934,6 +4039,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           <div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CalendarDays size={18} color={brandColor} /> Unterrichtstermine
+              <TourStartButton onClick={startTour} platformTheme={isAdminView ? 'admin' : (isGroovelab ? 'groovelab' : 'campus')} />
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
               Deine persönlichen Stundenplandaten
@@ -3990,7 +4096,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               flex: 1,
               border: 'none',
               background: lessonTab === 'upcoming' ? '#ffffff' : 'transparent',
-              color: lessonTab === 'upcoming' ? '#0f172a' : '#64748b',
+              color: lessonTab === 'upcoming' ? brandColor : '#64748b',
               padding: '8px 12px',
               borderRadius: '8px',
               fontWeight: 800,
@@ -4014,7 +4120,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               flex: 1,
               border: 'none',
               background: lessonTab === 'past' ? '#ffffff' : 'transparent',
-              color: lessonTab === 'past' ? '#0f172a' : '#64748b',
+              color: lessonTab === 'past' ? brandColor : '#64748b',
               padding: '8px 12px',
               borderRadius: '8px',
               fontWeight: 800,
@@ -4336,7 +4442,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const renderTimelineColumn = () => {
     return (
-      <div style={{
+      <div id="tour-timeline-column" style={{
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
@@ -4352,6 +4458,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         <div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Calendar size={18} color={brandColor} /> Campus &amp; Schultermine
+            {isAdminOrSecretary && (
+              <TourStartButton onClick={startTour} platformTheme="admin" />
+            )}
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
             Konzerte, Klassenvorspiele &amp; Termine
@@ -4516,7 +4625,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const activeEventsList = studentTab === 'upcoming' ? upcomingEvents : pastEvents;
 
     return (
-      <div style={{
+      <div id="tour-student-events" style={{
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
@@ -4927,7 +5036,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   const renderAnnouncementsColumn = () => {
     return (
-      <div style={{
+      <div id="tour-announcements-column" style={{
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
@@ -5197,6 +5306,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
     return (
       <div 
+        id="tour-planning-column"
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -8916,6 +9026,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                              return (
                                <div
                                  key={pp.id}
+                                 className={hasConflict ? 'conflict-pulse-card' : ''}
                                  draggable={role === 'admin' || role === 'secretary'}
                                  onDragOver={e => {
                                     e.preventDefault();
@@ -10004,8 +10115,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               fontSize: '0.72rem',
                               fontWeight: 700,
                               cursor: 'pointer',
-                              background: isSelected ? '#34a853' : 'transparent',
-                              color: isSelected ? '#ffffff' : theme.textMuted,
+                              background: isSelected ? brandColor : 'transparent',
+                              color: isSelected ? (brandColor === '#eab308' ? '#1d1d1f' : '#ffffff') : theme.textMuted,
                               transition: 'all 0.2s',
                               outline: 'none'
                             }}
@@ -10024,8 +10135,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           fontSize: '0.72rem',
                           fontWeight: 700,
                           cursor: 'pointer',
-                          background: techViewMode === 'all' ? '#34a853' : 'transparent',
-                          color: techViewMode === 'all' ? '#ffffff' : theme.textMuted,
+                          background: techViewMode === 'all' ? brandColor : 'transparent',
+                          color: techViewMode === 'all' ? (brandColor === '#eab308' ? '#1d1d1f' : '#ffffff') : theme.textMuted,
                           transition: 'all 0.2s',
                           outline: 'none'
                         }}
@@ -10042,20 +10153,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: '#34a853',
-                        color: '#ffffff',
+                        background: brandColor,
+                        color: brandColor === '#eab308' ? '#1d1d1f' : '#ffffff',
                         border: 'none',
                         padding: '7px 14px',
                         borderRadius: '10px',
                         fontSize: '0.74rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 5px rgba(52,168,83,0.2)',
+                        boxShadow: `0 2px 5px ${brandColor}30`,
                         transition: 'all 0.2s',
                         outline: 'none'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#34a853'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#34a853'}
+                      onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                     >
                       <span>Speichern</span>
                       <span>PDF speichern</span>
@@ -10535,6 +10646,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
         .pulse-calendar {
           animation: calendarPulse 2s infinite ease-in-out;
+        }
+        @keyframes conflictPulse {
+          0% {
+            border-color: rgba(239, 68, 68, 0.4);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.05);
+          }
+          50% {
+            border-color: rgba(239, 68, 68, 0.85);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+            transform: scale(1.005);
+          }
+          100% {
+            border-color: rgba(239, 68, 68, 0.4);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.05);
+          }
+        }
+        .conflict-pulse-card {
+          animation: conflictPulse 2s infinite ease-in-out !important;
         }
         @media (max-width: 900px) {
           .campus-events-grid {
@@ -11162,6 +11291,44 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               {/* Content / Buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 
+                {/* QR-Code section */}
+                {(() => {
+                  const feedUrl = `https://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`;
+                  return (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '16px',
+                      padding: '16px',
+                      margin: '0 auto',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569' }}>
+                        📱 Einfach mit dem Smartphone scannen:
+                      </span>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(feedUrl)}`}
+                        alt="Calendar QR Code"
+                        style={{
+                          width: '130px',
+                          height: '130px',
+                          borderRadius: '8px',
+                          border: '4px solid #ffffff',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.62rem', color: '#64748b', textAlign: 'center', lineHeight: 1.3 }}>
+                        Unterstützt Apple Kalender, Google Kalender und alle gängigen Kalender-Apps.
+                      </span>
+                    </div>
+                  );
+                })()}
+
                 {/* Option 1: Direct Subscription */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <a
@@ -11581,6 +11748,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'} {toast.message}
         </div>
       )}
+      <TourComponent />
     </div>
   );
 }

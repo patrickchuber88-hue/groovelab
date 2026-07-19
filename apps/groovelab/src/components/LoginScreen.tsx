@@ -5,6 +5,9 @@ import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, Ar
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 
+const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
+
 const getInstrumentAvatarUrl = (instr: string) => {
   const low = (instr || '').toLowerCase();
   if (low.includes('gitarre') || low.includes('guitar')) return '/gitarre_avatar_new.png';
@@ -44,7 +47,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const lastFacingModeRef = useRef<'user' | 'environment' | null>(null);
-  const [needsManualActivation, setNeedsManualActivation] = useState(false);
+  const [needsManualActivation, setNeedsManualActivation] = useState(isIOS && isStandalone);
 
   // Keep stable refs to avoid recreating the animation loop or triggers when handlers change
   const onScanRef = useRef(onScan);
@@ -4026,9 +4029,32 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
                         Kamerazugriff blockiert oder nicht verfügbar
                       </div>
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', lineHeight: '1.4', maxWidth: '240px' }}>
-                        Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung.
+                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '4px', lineHeight: '1.4', maxWidth: '240px' }}>
+                        {isIOS && isStandalone 
+                          ? "Auf dem iPad Home-Bildschirm ist eine erneute Freigabe der Kamera erforderlich."
+                          : "Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung."
+                        }
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPermissionHelp(true)}
+                        style={{
+                          marginTop: '8px',
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          color: '#fca5a5',
+                          fontWeight: 800,
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                      >
+                        Anleitung zur Freigabe
+                      </button>
                     </>
                   ) : (
                     <>
@@ -4246,33 +4272,56 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     {cameraHasError ? (
                       <>
                         <div style={{ fontSize: '12px', fontWeight: 800, color: '#fca5a5' }}>Kamerazugriff blockiert</div>
-                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', lineHeight: '1.3', maxWidth: '180px' }}>
-                          Kamerazugriff in den Browser-Einstellungen erlauben, dann erneut versuchen.
+                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', lineHeight: '1.3', maxWidth: '180px' }}>
+                          {isIOS && isStandalone 
+                            ? "Auf dem iPad Home-Bildschirm ist eine erneute Freigabe erforderlich."
+                            : "Kamerazugriff in den Browser-Einstellungen erlauben, dann erneut versuchen."
+                          }
                         </div>
-                        <button
-                          onClick={() => { setCameraHasError(false); setIsCameraActive(true); setError(''); }}
-                          style={{
-                            marginTop: '4px',
-                            background: 'rgba(250, 204, 21, 0.15)',
-                            border: '1px solid rgba(250, 204, 21, 0.4)',
-                            color: '#facc15',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            borderRadius: '20px',
-                            padding: '6px 14px',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(250, 204, 21, 0.25)'}
-                          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(250, 204, 21, 0.15)'}
-                        >
-                          <RotateCw size={11} />
-                          Erneut versuchen
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => { setCameraHasError(false); setIsCameraActive(true); setError(''); }}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              color: '#ffffff',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              borderRadius: '20px',
+                              padding: '5px 12px',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                          >
+                            <RotateCw size={10} />
+                            Erneut versuchen
+                          </button>
+                          <button
+                            onClick={() => setShowPermissionHelp(true)}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#fca5a5',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              borderRadius: '20px',
+                              padding: '5px 12px',
+                              cursor: 'pointer',
+                              outline: 'none',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                          >
+                            Anleitung
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <div style={{ fontSize: '12px', fontWeight: 800, color: '#e6f4ea' }}>Kamera wird gestartet...</div>
@@ -7090,16 +7139,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Safari / iOS */}
-              <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#e6f4ea' }}>
-                   Safari (iPhone, iPad, Mac)
-                </h4>
-                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#d4d4d8', lineHeight: '1.6' }}>
-                  <li>Tippe in der Adressleiste links auf das <strong>„aA“</strong>-Symbol oder das Einstellungen-Symbol.</li>
-                  <li>Wähle <strong>„Website-Einstellungen“</strong>.</li>
-                  <li>Setze <strong>Kamera</strong> und <strong>Standort</strong> auf <strong>„Erlauben“</strong>.</li>
-                </ul>
-              </div>
+              {isIOS && isStandalone ? (
+                <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
+                     iPad / iPhone Home-Bildschirm App (PWA)
+                  </h4>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#e4e4e7', lineHeight: '1.4' }}>
+                    Auf dem Home-Bildschirm blockiert Apple den Kamerazugriff nach einmaligem Ablehnen dauerhaft. So behebst du es:
+                  </p>
+                  <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#d4d4d8', lineHeight: '1.6' }}>
+                    <li style={{ marginBottom: '4px' }}>Lösche diese App vom Home-Bildschirm (Symbol gedrückt halten &gt; Lesezeichen löschen).</li>
+                    <li style={{ marginBottom: '4px' }}>Öffne <strong>Safari</strong> und rufe diese Website erneut auf.</li>
+                    <li style={{ marginBottom: '4px' }}>Erlaube dort die Kamera über das <strong>„aA“</strong>-Symbol links in der Adressleiste &gt; Website-Einstellungen &gt; Kamera: <strong>Erlauben</strong>.</li>
+                    <li>Tippe auf das Teilen-Symbol und wähle wieder <strong>„Zum Home-Bildschirm hinzufügen“</strong>.</li>
+                  </ol>
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#e6f4ea' }}>
+                     Safari (iPhone, iPad, Mac)
+                  </h4>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#d4d4d8', lineHeight: '1.6' }}>
+                    <li>Tippe in der Adressleiste links auf das <strong>„aA“</strong>-Symbol oder das Einstellungen-Symbol.</li>
+                    <li>Wähle <strong>„Website-Einstellungen“</strong>.</li>
+                    <li>Setze <strong>Kamera</strong> und <strong>Standort</strong> auf <strong>„Erlauben“</strong>.</li>
+                  </ul>
+                </div>
+              )}
 
               {/* Google Chrome */}
               <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>

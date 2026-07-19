@@ -3212,7 +3212,7 @@ export function ScheduleCalendarView({
           {/* Center: Tab switch */}
           {activeTab && setActiveTab && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+              <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
                 <button 
                   onClick={() => setActiveTab('calendar')}
                   className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
@@ -3266,7 +3266,7 @@ export function ScheduleCalendarView({
         {/* Row 2: Röntgen Filter & Utilities */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
           {/* Left: Röntgen selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div id="tour-calendar-xray" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
@@ -3324,7 +3324,7 @@ export function ScheduleCalendarView({
           {/* Right: Actions */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Unified Segmented Control for View & Actions */}
-            <div className="apple-btn-group">
+            <div id="tour-calendar-actions" className="apple-btn-group">
               {/* Group A: Ansicht & Filter */}
               <button
                 type="button"
@@ -3537,7 +3537,7 @@ export function ScheduleCalendarView({
           `}
         </style>
 
-        <div ref={gridRef} style={{ 
+        <div id="tour-calendar-grid" ref={gridRef} style={{ 
           display: 'grid', 
           gridTemplateColumns: focusedDayOffset !== null ? '1fr' : (isWeekendVisible ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))'), 
           gap: '0px',
