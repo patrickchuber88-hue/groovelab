@@ -4206,6 +4206,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                 .from('kiosks')
                                 .select('*')
                                 .eq('station_id', newSelection)
+                                .limit(1)
                                 .maybeSingle();
 
                               if (fetchErr) throw fetchErr;
