@@ -313,11 +313,41 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
               background: '#facc15', color: '#1e293b', border: 'none', 
               padding: '12px 24px', borderRadius: '12px', fontWeight: 800, 
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-              boxShadow: '0 4px 12px rgba(250, 204, 21, 0.4)'
+              boxShadow: '0 4px 12px rgba(250, 204, 21, 0.4)',
+              width: isIOS && isStandalone ? '200px' : 'auto',
+              justifyContent: 'center'
             }}
           >
             Kamera aktivieren
           </button>
+          {isIOS && isStandalone && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(window.location.href, '_blank');
+              }}
+              style={{
+                marginTop: '10px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                padding: '10px 20px',
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '200px',
+                justifyContent: 'center'
+              }}
+            >
+              In Safari öffnen
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -4035,26 +4065,66 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           : "Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung."
                         }
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowPermissionHelp(true)}
-                        style={{
-                          marginTop: '8px',
-                          padding: '8px 16px',
-                          borderRadius: '10px',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          color: '#fca5a5',
-                          fontWeight: 800,
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
-                        onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                      >
-                        Anleitung zur Freigabe
-                      </button>
+                      {isIOS && isStandalone ? (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              window.open(window.location.href, '_blank');
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '10px',
+                              border: 'none',
+                              background: '#eab308',
+                              color: '#062413',
+                              fontWeight: 800,
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 10px rgba(234, 179, 8, 0.2)'
+                            }}
+                          >
+                            In Safari öffnen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowPermissionHelp(true)}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              color: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Hilfe
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowPermissionHelp(true)}
+                          style={{
+                            marginTop: '8px',
+                            padding: '8px 16px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#fca5a5',
+                            fontWeight: 800,
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                        >
+                          Anleitung zur Freigabe
+                        </button>
+                      )}
                     </>
                   ) : (
                     <>
@@ -4279,48 +4349,91 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           }
                         </div>
                         <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'center' }}>
-                          <button
-                            onClick={() => { setCameraHasError(false); setIsCameraActive(true); setError(''); }}
-                            style={{
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              color: '#ffffff',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              borderRadius: '20px',
-                              padding: '5px 12px',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-                          >
-                            <RotateCw size={10} />
-                            Erneut versuchen
-                          </button>
-                          <button
-                            onClick={() => setShowPermissionHelp(true)}
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#fca5a5',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              borderRadius: '20px',
-                              padding: '5px 12px',
-                              cursor: 'pointer',
-                              outline: 'none',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
-                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                          >
-                            Anleitung
-                          </button>
+                          {isIOS && isStandalone ? (
+                            <>
+                              <button
+                                onClick={() => { window.open(window.location.href, '_blank'); }}
+                                style={{
+                                  background: '#facc15',
+                                  border: 'none',
+                                  color: '#062413',
+                                  fontSize: '10px',
+                                  fontWeight: 800,
+                                  borderRadius: '20px',
+                                  padding: '5px 12px',
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                  boxShadow: '0 4px 10px rgba(250, 204, 21, 0.3)',
+                                  transition: 'transform 0.2s'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                              >
+                                In Safari öffnen
+                              </button>
+                              <button
+                                onClick={() => setShowPermissionHelp(true)}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  color: '#ffffff',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  borderRadius: '20px',
+                                  padding: '5px 12px',
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                }}
+                              >
+                                Hilfe
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => { setCameraHasError(false); setIsCameraActive(true); setError(''); }}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  color: '#ffffff',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  borderRadius: '20px',
+                                  padding: '5px 12px',
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                              >
+                                <RotateCw size={10} />
+                                Erneut versuchen
+                              </button>
+                              <button
+                                onClick={() => setShowPermissionHelp(true)}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  color: '#fca5a5',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  borderRadius: '20px',
+                                  padding: '5px 12px',
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                              >
+                                Anleitung
+                              </button>
+                            </>
+                          )}
                         </div>
                       </>
                     ) : (

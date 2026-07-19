@@ -18,6 +18,9 @@
                           window.location.pathname.indexOf('/device-onboarding') !== -1 || 
                           safeGetItem('groovelab_active_platform') === 'groovelab';
         
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var displayMode = isIOS ? 'browser' : 'standalone';
+        
         var themeColor = isGrooveLab ? '#eab308' : '#34a853';
         var title = isGrooveLab ? 'GrooveLab' : 'Campus-Groovelab';
         var appleTouchIcon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/apple-touch-icon.png';
@@ -57,7 +60,7 @@
             "scope": "/",
             "background_color": "#0c0f12",
             "theme_color": "#eab308",
-            "display": "standalone",
+            "display": displayMode,
             "orientation": "any"
           };
         } else {
@@ -80,7 +83,7 @@
             "scope": "/",
             "background_color": "#062413",
             "theme_color": "#34a853",
-            "display": "standalone",
+            "display": displayMode,
             "orientation": "any"
           };
         }
@@ -100,9 +103,11 @@
         document.write('<meta name="apple-mobile-web-app-title" content="' + title + '" />');
         document.write('<link rel="apple-touch-icon" href="' + appleTouchIcon + '" />');
         document.write('<link rel="icon" type="image/png" href="' + favicon + '" />');
+        
+        var appleCapable = isIOS ? 'no' : 'yes';
+        document.write('<meta name="apple-mobile-web-app-capable" content="' + appleCapable + '" />');
       })();
     </script>
-    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
