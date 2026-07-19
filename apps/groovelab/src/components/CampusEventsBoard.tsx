@@ -2533,7 +2533,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         .select(`
           *,
           teacher:teacher_id(first_name, last_name),
-          student:student_id(first_name, last_name)
+          student:student_id(first_name, last_name),
+          schedule:schedule_id(status)
         `);
 
       if (role === 'student') {
@@ -4277,6 +4278,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               {isWeekExpanded && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
                                   {wGroup.items.map(occ => {
+                                    const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
                                     const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
                                     const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
                                     const hasMessages = activeChatOccIds.has(occ.id);
@@ -4301,6 +4303,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       rowBorder = '1px solid #fef3c7';
                                       textColor = '#92400e';
                                       subColor = '#d97706';
+                                    } else if (isPendingReview) {
+                                      rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                                      rowBorder = '1px dashed #eab308';
+                                      textColor = '#713f12';
+                                      subColor = '#ca8a04';
                                     }
 
                                     const opponentName = role === 'student'
@@ -4333,7 +4340,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             flexDirection: 'column',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            background: isCanceled ? '#fee2e2' : hasMessages ? '#fef08a' : isRescheduled ? '#fef3c7' : '#f8fafc',
+                                            background: isCanceled ? '#fee2e2' : hasMessages ? '#fef08a' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f8fafc',
                                             borderRadius: '6px',
                                             padding: '2px',
                                             width: '34px',
@@ -4351,10 +4358,27 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                                           {/* Details */}
                                           <div style={{ minWidth: 0, flex: 1 }}>
-                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
                                               <span style={{ fontSize: '12px', fontWeight: 800, color: textColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 {opponentName}
                                               </span>
+                                              {isPendingReview && (
+                                                <span style={{
+                                                  fontSize: '7px',
+                                                  fontWeight: 800,
+                                                  background: '#fffbeb',
+                                                  color: '#b45309',
+                                                  border: '1px solid #fef3c7',
+                                                  padding: '1px 4px',
+                                                  borderRadius: '4px',
+                                                  textTransform: 'uppercase',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '2px'
+                                                }} title="Stundenplan befindet sich in der Zuteilung durch das Sekretariat.">
+                                                  ⏳ In Prüfung
+                                                </span>
+                                              )}
                                               {isRescheduled && (
                                                 <span style={{
                                                   fontSize: '7px',

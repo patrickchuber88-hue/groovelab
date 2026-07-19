@@ -6959,7 +6959,6 @@ function App() {
       const isParentOnboarding = urlParams.has('invite_school_id') || 
                                  urlParams.get('onboarding') === 'parent' || 
                                  urlParams.get('platform') === 'groovelab' ||
-                                 activePlatform === 'groovelab' ||
                                  hasSubdomain || 
                                  isKioskMode;
       if (isParentOnboarding) {

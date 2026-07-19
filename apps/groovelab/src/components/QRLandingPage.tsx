@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { maskLastName } from '../utils/nameHelper';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -138,6 +139,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // Student Dashboard & Gamification States
   const [schedules, setSchedules] = useState<any[]>([]);
   const [occurrences, setOccurrences] = useState<any[]>([]);
+  const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatTypedMessage, setChatTypedMessage] = useState('');
+  const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
+  const chatMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const [stats, setStats] = useState<any | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
@@ -209,7 +215,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // Multi-Mode specific states
   const [progressItems, setProgressItems] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'action' | 'homework'>('action');
+  const [activeTab, setActiveTab] = useState<'action' | 'homework' | 'lessons'>('action');
+  const [lessonsUnlocked, setLessonsUnlocked] = useState(false);
+  const [lessonsPinAttempts, setLessonsPinAttempts] = useState(0);
+  const [pendingCancelOccId, setPendingCancelOccId] = useState<string | null>(null);
+  const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   
@@ -255,6 +265,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setProfile(prev => prev ? { ...prev, has_parent_pin: true } : null);
       setIsInitialPinSetup(false);
       setParentUnlocked(true);
+      sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
+      setLessonsUnlocked(true);
       setShowPinPrompt(false);
       setNewPinInput('');
       setNewPinConfirm('');
@@ -272,6 +284,20 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   useEffect(() => {
     preStartCountdownRef.current = preStartCountdown;
   }, [preStartCountdown]);
+
+  useEffect(() => {
+    setPinInput('');
+    setPinError(null);
+    setPendingCancelOccId(null);
+    setCollapsedMonths({});
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      const unlocked = sessionStorage.getItem(`groovelab_lessons_unlocked_${profile.id}`) === 'true';
+      setLessonsUnlocked(unlocked);
+    }
+  }, [profile?.id]);
 
   // Countdown timer effect for pre-start instructions
   useEffect(() => {
@@ -763,7 +789,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .select(`
             *,
             teacher:teacher_id(first_name, last_name),
-            schedule:schedule_id(room:room_id(name))
+            schedule:schedule_id(status, room:room_id(name))
           `)
           .eq('student_id', profile.id)
           .gte('date', todayStr)
@@ -802,8 +828,77 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       });
       const deduplicatedMatrixItems = Array.from(uniqueMatrixItemsMap.values());
 
+      // Merge recurring schedules into virtual occurrences for the next 4 weeks
+      const allMergedOccurrences: any[] = [];
+      const usedActualIds = new Set<string>();
+
+      const startRange = new Date();
+      // Adjust startRange to Monday of this week
+      const day = startRange.getDay() || 7;
+      startRange.setDate(startRange.getDate() - day + 1);
+      
+      const endRange = new Date(startRange);
+      endRange.setDate(startRange.getDate() + 28); // 4 weeks in the future
+
+      if (schData) {
+        schData.forEach((sch: any) => {
+          const current = new Date(startRange);
+          while (current <= endRange) {
+            const currentDay = current.getDay() || 7;
+            const diff = sch.day_of_week - currentDay;
+            const targetDate = new Date(current);
+            targetDate.setDate(current.getDate() + diff);
+
+            if (targetDate >= startRange && targetDate <= endRange) {
+              const yyyy = targetDate.getFullYear();
+              const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+              const dd = String(targetDate.getDate()).padStart(2, '0');
+              const dateStr = `${yyyy}-${mm}-${dd}`;
+
+              // Find if there is an actual occurrence override in the DB
+              const actual = (occData || []).find((occ: any) => 
+                occ.schedule_id === sch.id && 
+                (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
+              );
+
+              if (actual) {
+                allMergedOccurrences.push({
+                  ...actual,
+                  schedule: sch
+                });
+                usedActualIds.add(actual.id);
+              } else {
+                allMergedOccurrences.push({
+                  id: `virtual-${sch.id}-${dateStr}`,
+                  schedule_id: sch.id,
+                  student_id: profile.id,
+                  teacher_id: sch.teacher_id,
+                  date: dateStr,
+                  start_time: sch.time_slot + (sch.time_slot.split(':').length === 2 ? ':00' : ''),
+                  duration: sch.duration || 45,
+                  status: 'scheduled',
+                  is_virtual: true,
+                  teacher: sch.teacher,
+                  schedule: sch
+                });
+              }
+            }
+            current.setDate(current.getDate() + 7);
+          }
+        });
+      }
+
+      // Add any other actual occurrences that weren't matched
+      if (occData) {
+        occData.forEach((occ: any) => {
+          if (!usedActualIds.has(occ.id)) {
+            allMergedOccurrences.push(occ);
+          }
+        });
+      }
+
       setSchedules(schData || []);
-      setOccurrences(occData || []);
+      setOccurrences(allMergedOccurrences);
       setStats(statsData || null);
       setAvatar(avatarData || null);
       setProgressItems(deduplicatedMatrixItems);
@@ -1711,6 +1806,866 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return `${m}:${s}`;
   };
 
+  // Fetch occurrence-specific chat messages for Shoutbox
+  const fetchChat = async (studentId: string, occurrenceId: string) => {
+    if (!studentId || !occurrenceId) return;
+    try {
+      const { data, error } = await supabase
+        .from('campus_direct_messages')
+        .select('*')
+        .eq('occurrence_id', occurrenceId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      if (data) {
+        setChatMessages(data);
+        setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      }
+    } catch (err) {
+      console.error('Error fetching chat messages for occurrence:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeChatOcc || !profile?.id) {
+      setChatMessages([]);
+      return;
+    }
+    const studentId = profile.id;
+
+    fetchChat(studentId, activeChatOcc.id);
+
+    const channel = supabase
+      .channel(`chat_occ_board_${activeChatOcc.id}`)
+      .on('postgres_changes', { 
+        schema: 'public', 
+        event: '*', 
+        table: 'campus_direct_messages', 
+        filter: `occurrence_id=eq.${activeChatOcc.id}` 
+      }, () => {
+        fetchChat(studentId, activeChatOcc.id);
+        setActiveChatOccIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(activeChatOcc.id);
+          return newSet;
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeChatOcc, profile?.id]);
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatTypedMessage.trim() || !activeChatOcc || !profile?.id) return;
+
+    const studentId = profile.id;
+    const recipientId = activeChatOcc.teacher_id;
+    if (!studentId || !recipientId) return;
+
+    const messageContent = chatTypedMessage.trim();
+    setChatTypedMessage('');
+
+    try {
+      // Optimistic update
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage = {
+        id: tempId,
+        sender_id: studentId,
+        recipient_id: recipientId,
+        content: messageContent,
+        occurrence_id: activeChatOcc.id,
+        created_at: new Date().toISOString(),
+        is_read: false
+      };
+      setChatMessages(prev => [...prev, optimisticMessage]);
+      setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
+      const { error } = await supabase.from('campus_direct_messages').insert({
+        sender_id: studentId,
+        recipient_id: recipientId,
+        content: messageContent,
+        occurrence_id: activeChatOcc.id
+      });
+      if (error) throw error;
+
+      setActiveChatOccIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(activeChatOcc.id);
+        return newSet;
+      });
+
+      // Send push notification to teacher
+      try {
+        const { data: senderProfile } = await supabase
+          .from('users')
+          .select('first_name')
+          .eq('id', studentId)
+          .single();
+        const senderName = `${senderProfile?.first_name || 'Ein Schüler'} ${maskLastName(profile.last_name)}`;
+
+        await supabase.functions.invoke('send-push', {
+          body: {
+            userId: recipientId,
+            title: `Termin-Shoutbox`,
+            body: `${senderName}: ${messageContent}`,
+            url: '/'
+          }
+        });
+      } catch (pushErr) {
+        console.error('Failed to dispatch push notification for shoutbox:', pushErr);
+      }
+
+      await fetchChat(studentId, activeChatOcc.id);
+    } catch (err) {
+      console.error('Error sending chat message:', err);
+    }
+  };
+
+  const handleCancelOccurrence = async (occ: any) => {
+    const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
+
+    try {
+      if (occ.id.toString().startsWith('virtual-') || occ.is_virtual) {
+        const { error: insertErr } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: occ.schedule_id,
+            student_id: occ.student_id,
+            teacher_id: occ.teacher_id,
+            date: occ.date,
+            start_time: occ.start_time,
+            duration: occ.duration || 45,
+            status: 'cancelled',
+            student_acknowledged: true
+          });
+        if (insertErr) throw insertErr;
+      } else {
+        const { error: updateErr } = await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'cancelled', student_acknowledged: true })
+          .eq('id', occ.id);
+        if (updateErr) throw updateErr;
+      }
+
+      // Add system alert
+      try {
+        const userName = `${profile?.first_name || 'Schüler'} ${maskLastName(profile?.last_name)}`;
+        await supabase.from('system_alerts').insert({
+          school_id: profile?.school_id || null,
+          teacher_id: occ.teacher_id,
+          type: 'Termin abgesagt',
+          message: `❌ Absage: Schüler ${userName} hat den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr abgesagt.`
+        });
+      } catch (alertErr) {
+        console.warn('Could not create system alert:', alertErr);
+      }
+
+      // Send a chat message informing about the cancellation
+      try {
+        await supabase.from('campus_direct_messages').insert({
+          sender_id: profile?.id,
+          recipient_id: occ.teacher_id,
+          content: `❌ Termin am ${formattedDate} abgesagt.`,
+          occurrence_id: occ.id
+        });
+      } catch (chatErr) {
+        console.warn('Could not send cancellation chat msg:', chatErr);
+      }
+
+      await fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error canceling occurrence:', err);
+      alert('Fehler beim Absagen des Termins: ' + err.message);
+    }
+  };
+
+  const handleUndoCancel = async (occ: any) => {
+    if (!confirm('Möchtest du diese Absage wirklich rückgängig machen?')) return;
+    try {
+      if (!occ.id) return;
+
+      if (occ.id.toString().startsWith('virtual-')) {
+        return;
+      }
+
+      if (occ.schedule_id) {
+        // Recurring override: delete it to restore template
+        const { error: delErr } = await supabase
+          .from('schedule_occurrences')
+          .delete()
+          .eq('id', occ.id);
+        if (delErr) throw delErr;
+      } else {
+        const { error: updErr } = await supabase
+          .from('schedule_occurrences')
+          .update({ status: 'scheduled' })
+          .eq('id', occ.id);
+        if (updErr) throw updErr;
+      }
+
+      await fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error undoing cancellation:', err);
+      alert('Fehler beim Reaktivieren: ' + err.message);
+    }
+  };
+
+  const handleAcknowledgeOccurrence = async (occ: any) => {
+    try {
+      const isRescheduled = occ.status === 'pending_reschedule';
+      const updateData: any = { student_acknowledged: true };
+      if (isRescheduled) {
+        updateData.status = 'rescheduled_confirmed';
+      }
+      
+      const { error } = await supabase
+        .from('schedule_occurrences')
+        .update(updateData)
+        .eq('id', occ.id);
+      if (error) throw error;
+      
+      await fetchDashboardData();
+    } catch (err) {
+      console.error('Error acknowledging occurrence:', err);
+    }
+  };
+
+  const handleLessonsPinSubmit = async (inputPin: string) => {
+    if (!inputPin || inputPin.length !== 4 || pinLoading || !profile) return;
+    if (lessonsPinAttempts >= MAX_ATTEMPTS) {
+      setPinError(`Zu viele Fehlversuche. Bitte wende dich an deine Schule.`);
+      return;
+    }
+
+    setPinLoading(true);
+    setPinError(null);
+
+    try {
+      const { data: isCorrect, error } = await supabase.rpc('verify_parent_pin', {
+        student_id: profile.id,
+        input_pin: inputPin,
+      });
+
+      if (error) throw error;
+
+      if (isCorrect === true) {
+        setLessonsPinAttempts(0);
+        sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
+        setLessonsUnlocked(true);
+        setPinInput('');
+      } else {
+        const remaining = MAX_ATTEMPTS - (lessonsPinAttempts + 1);
+        setLessonsPinAttempts(prev => prev + 1);
+        if (remaining <= 0) {
+          setPinError('Zu viele Fehlversuche. Dieses Konto wurde aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Schule.');
+          await supabase
+            .from('users')
+            .update({ is_campus_active: false, is_groovelab_active: false })
+            .eq('id', profile.id);
+        } else {
+          setPinError(`Falsche PIN. Noch ${remaining} Versuch${remaining === 1 ? '' : 'e'}.`);
+        }
+        setPinInput('');
+      }
+    } catch (err: any) {
+      console.error('[QRLanding] verify_parent_pin error:', err);
+      setPinError('Verbindungsfehler. Bitte versuche es erneut.');
+      setPinInput('');
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
+  const renderLessonsWidget = () => {
+    if (!lessonsUnlocked) {
+      const blocked = lessonsPinAttempts >= MAX_ATTEMPTS;
+      
+      const handleLessonsPinDigit = (digit: string) => {
+        if (pinInput.length < 4) {
+          const newVal = pinInput + digit;
+          setPinInput(newVal);
+          if (newVal.length === 4) {
+            handleLessonsPinSubmit(newVal);
+          }
+        }
+      };
+
+      const handleLessonsPinDelete = () => {
+        setPinInput(prev => prev.slice(0, -1));
+      };
+
+      if (!profile?.has_parent_pin) {
+        // Initial setup for safety PIN
+        return (
+          <div style={{
+            ...styles.card,
+            padding: '24px 20px',
+            gap: '16px',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+                <Key size={24} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>🔒 Sicherheits-PIN einrichten</h3>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                Um deine Unterrichtstermine und Chats zu schützen, richte bitte eine persönliche 4-stellige Sicherheits-PIN ein.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>Neue 4-stellige PIN:</label>
+                <input
+                  type="password"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPinInput}
+                  onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    fontSize: '1.2rem',
+                    textAlign: 'center',
+                    border: '2px solid #cbd5e1',
+                    borderRadius: '12px',
+                    outline: 'none',
+                    letterSpacing: '0.4em',
+                    fontWeight: 900,
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '10px', color: '#475569', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>PIN wiederholen:</label>
+                <input
+                  type="password"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPinConfirm}
+                  onChange={(e) => setNewPinConfirm(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    fontSize: '1.2rem',
+                    textAlign: 'center',
+                    border: '2px solid #cbd5e1',
+                    borderRadius: '12px',
+                    outline: 'none',
+                    letterSpacing: '0.4em',
+                    fontWeight: 900,
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={newPinInput.length !== 4 || newPinConfirm.length !== 4 || pinChangeLoading}
+              onClick={handleSaveInitialPin}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                border: 'none',
+                background: newPinInput.length === 4 && newPinConfirm.length === 4 ? '#34a853' : '#e2e8f0',
+                color: newPinInput.length === 4 && newPinConfirm.length === 4 ? 'white' : '#94a3b8',
+                fontSize: '0.85rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              {pinChangeLoading ? <span style={styles.spinnerInline} /> : <>Speichern & freischalten</>}
+            </button>
+          </div>
+        );
+      }
+
+      // Enter safety PIN view
+      return (
+        <div style={{
+          ...styles.card,
+          padding: '24px 20px',
+          gap: '20px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+              <Lock size={22} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>🔒 Bereich geschützt</h3>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+              Gib deine 4-stellige Sicherheits-PIN ein, um deine Termine und Chats freizuschalten.
+            </p>
+          </div>
+
+          {/* PIN Display circles */}
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} style={{
+                width: '40px',
+                height: '48px',
+                borderRadius: '12px',
+                background: '#f8fafc',
+                border: `2px solid ${pinInput.length > i ? '#34a853' : '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.4rem',
+                fontWeight: 900,
+                color: '#0f172a',
+                transition: 'border-color 0.2s',
+                boxShadow: pinInput.length > i ? '0 0 0 3px rgba(52, 168, 83,0.1)' : 'none'
+              }}>
+                {pinInput[i] ? '●' : ''}
+              </div>
+            ))}
+          </div>
+
+          {pinError && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '12px',
+              padding: '10px',
+              fontSize: '0.75rem',
+              color: '#dc2626',
+              fontWeight: 700,
+              textAlign: 'center'
+            }}>
+              {pinError}
+            </div>
+          )}
+
+          {!blocked && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={pinLoading || !key}
+                  onClick={() => {
+                    if (key === '⌫') handleLessonsPinDelete();
+                    else if (key) handleLessonsPinDigit(key);
+                  }}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: key === '⌫' ? '#fee2e2' : key === '' ? 'transparent' : '#f1f5f9',
+                    color: key === '⌫' ? '#ef4444' : '#0f172a',
+                    fontSize: key === '⌫' ? '1rem' : '1.2rem',
+                    fontWeight: 800,
+                    cursor: key ? 'pointer' : 'default',
+                    transition: 'background 0.15s, transform 0.1s',
+                    visibility: key === '' ? 'hidden' : 'visible',
+                  }}
+                  onMouseDown={e => e.currentTarget.style.transform = key ? 'scale(0.92)' : ''}
+                  onMouseUp={e => e.currentTarget.style.transform = ''}
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Sort occurrences by date and time
+    const sortedOccurrences = [...occurrences].sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.start_time.localeCompare(b.start_time);
+    });
+
+    if (sortedOccurrences.length === 0) {
+      return (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1.5px dashed #cbd5e1',
+          borderRadius: '24px',
+          padding: '24px',
+          textAlign: 'center',
+          color: '#64748b'
+        }}>
+          <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', fontWeight: 650 }}>
+            Keine anstehenden Termine erfasst
+          </p>
+        </div>
+      );
+    }
+
+    // Group occurrences by month
+    const monthGroups: Record<string, { label: string; items: any[] }> = {};
+    
+    sortedOccurrences.forEach(occ => {
+      const d = new Date(occ.date);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const monthKey = `${yyyy}-${mm}`;
+      
+      if (!monthGroups[monthKey]) {
+        const label = d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        monthGroups[monthKey] = {
+          label,
+          items: []
+        };
+      }
+      monthGroups[monthKey].items.push(occ);
+    });
+
+    const sortedMonthKeys = Object.keys(monthGroups).sort();
+
+    const toggleMonth = (monthKey: string) => {
+      setCollapsedMonths(prev => ({
+        ...prev,
+        [monthKey]: !prev[monthKey]
+      }));
+    };
+
+    const formatDateGerman = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const formatWeekday = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('de-DE', { weekday: 'short' }).substring(0, 2);
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+        {sortedMonthKeys.map(monthKey => {
+          const group = monthGroups[monthKey];
+          const isCollapsed = collapsedMonths[monthKey] ?? false;
+
+          return (
+            <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div 
+                onClick={() => toggleMonth(monthKey)}
+                style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 900,
+                  color: '#475569',
+                  padding: '10px 14px',
+                  background: '#f8fafc',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                  transition: 'background 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Calendar size={14} color="#34a853" />
+                  <span>{group.label}</span>
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>
+                    ({group.items.length} {group.items.length === 1 ? 'Termin' : 'Termine'})
+                  </span>
+                </div>
+                <span style={{ 
+                  transition: 'transform 0.2s', 
+                  transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#64748b'
+                }}>
+                  <ChevronDown size={16} />
+                </span>
+              </div>
+              
+              {!isCollapsed && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {group.items.map(occ => {
+                    const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                    const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+                    const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
+                    const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
+
+                    let rowBg = '#ffffff';
+                    let rowBorder = '1px solid #e2e8f0';
+                    let textColor = '#0f172a';
+                    let subColor = '#64748b';
+
+                    if (isCanceled) {
+                      rowBg = '#fef2f2';
+                      rowBorder = '1px solid #fee2e2';
+                      textColor = '#991b1b';
+                      subColor = '#ef4444';
+                    } else if (isRescheduled) {
+                      rowBg = '#fffbeb';
+                      rowBorder = '1px solid #fef3c7';
+                      textColor = '#92400e';
+                      subColor = '#d97706';
+                    } else if (isPendingReview) {
+                      rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                      rowBorder = '1px dashed #eab308';
+                      textColor = '#713f12';
+                      subColor = '#ca8a04';
+                    } else if (needsAcknowledge) {
+                      rowBg = 'repeating-linear-gradient(-45deg, #fff7ed 0px, #fff7ed 8px, #ffffff 8px, #ffffff 16px)';
+                      rowBorder = '1px dashed #f97316';
+                      textColor = '#ea580c';
+                      subColor = '#f97316';
+                    }
+
+                    const teacherName = `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`;
+
+                    return (
+                      <div
+                        key={occ.id}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          padding: '12px',
+                          borderRadius: '16px',
+                          background: rowBg,
+                          border: rowBorder,
+                          gap: '8px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f1f5f9',
+                              borderRadius: '8px',
+                              width: '36px',
+                              height: '36px',
+                              border: '1px solid rgba(0,0,0,0.03)',
+                              flexShrink: 0
+                            }}>
+                              <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
+                                {formatWeekday(occ.date)}
+                              </span>
+                              <span style={{ fontSize: '13px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
+                                {occ.date.substring(8, 10)}
+                              </span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor }}>
+                                {teacherName}
+                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: subColor, fontWeight: 700 }}>
+                                <span>{formatDateGerman(occ.date)}</span>
+                                <span>•</span>
+                                <span>{occ.start_time.substring(0, 5)} Uhr</span>
+                                <span>•</span>
+                                <span>{occ.duration} Min</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setActiveChatOcc(occ)}
+                              style={{
+                                border: 'none',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="Shoutbox öffnen"
+                            >
+                              <MessageSquare size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Action buttons for student confirmations/cancellations */}
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          {needsAcknowledge && (
+                            <button
+                              type="button"
+                              onClick={() => handleAcknowledgeOccurrence(occ)}
+                              style={{
+                                flex: 1,
+                                background: '#34a853',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Check size={12} /> Bestätigen
+                            </button>
+                          )}
+                          
+                          {!isCanceled ? (
+                            pendingCancelOccId === occ.id ? (
+                              <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCancelOccurrence(occ);
+                                    setPendingCancelOccId(null);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: '#ef4444',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '8px 12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  Ja, sicher absagen
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPendingCancelOccId(null)}
+                                  style={{
+                                    flex: 1,
+                                    background: '#e2e8f0',
+                                    color: '#475569',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '8px 12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  Behalten
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPendingCancelOccId(occ.id)}
+                                style={{
+                                  flex: 1,
+                                  background: '#f1f5f9',
+                                  color: '#475569',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '8px',
+                                  padding: '8px 12px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <X size={12} /> Absagen
+                              </button>
+                            )
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleUndoCancel(occ)}
+                              style={{
+                                flex: 1,
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              Reaktivieren
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Visual status labels */}
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {isPendingReview && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                              ⏳ In Prüfung
+                            </span>
+                          )}
+                          {isRescheduled && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                              Verschoben
+                            </span>
+                          )}
+                          {isCanceled && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                              Abgesagt
+                            </span>
+                          )}
+                          {needsAcknowledge && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                              ⏳ Bestätigung ausstehend
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderHomeworkWidget = (compressed = false) => {
     const lessonDay = schedules.length > 0 ? schedules[0].day_of_week : 1;
     const latestItem = progressItems.find(item => item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW '));
@@ -1901,14 +2856,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <div style={{
           ...styles.card,
           padding: '16px',
-          gap: '12px'
+          gap: '12px',
+          border: nextLesson.isPendingReview ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0'),
+          background: nextLesson.isPendingReview ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : (styles.card ? styles.card.background : '#ffffff')
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: nextLesson.isPendingReview ? '#b45309' : '#34a853', background: nextLesson.isPendingReview ? '#fef3c7' : '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
               Nächster Unterrichtstermin
             </span>
+            {nextLesson.isPendingReview && (
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                ⏳ In Prüfung
+              </span>
+            )}
           </div>
-
+ 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Calendar size={16} color="#64748b" />
@@ -1922,6 +2884,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
               </span>
             </div>
+            {nextLesson.isPendingReview && (
+              <div style={{ fontSize: '0.72rem', color: '#854d0e', fontWeight: 700, marginTop: '4px', background: '#fef9c3', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                Hinweis: Dieser Termin steht noch unter Vorbehalt der finalen Raumzuteilung durch das Sekretariat.
+              </div>
+            )}
           </div>
         </div>
       );
@@ -1985,6 +2952,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           }}
         >
           <><BookOpen size={14} style={{ marginRight: 6 }} /> Hausaufgaben</>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('lessons')}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            border: 'none',
+            borderRadius: '10px',
+            background: activeTab === 'lessons' ? '#ffffff' : 'transparent',
+            color: activeTab === 'lessons' ? '#000000' : '#636366',
+            fontSize: '0.85rem',
+            fontWeight: activeTab === 'lessons' ? 700 : 500,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: activeTab === 'lessons' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <><Calendar size={14} style={{ marginRight: 6 }} /> Termine</>
         </button>
       </div>
     );
@@ -2336,7 +3326,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const d = new Date(nextOcc.date);
         return {
           dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-          time: nextOcc.start_time
+          time: nextOcc.start_time,
+          isPendingReview: nextOcc.schedule?.status === 'ready_for_admin_review'
         };
       }
       return getVirtualNextLesson();
@@ -3301,7 +4292,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const d = new Date(nextOcc.date);
         return {
           dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-          time: nextOcc.start_time
+          time: nextOcc.start_time,
+          isPendingReview: nextOcc.schedule?.status === 'ready_for_admin_review'
         };
       }
       return getVirtualNextLesson();
@@ -3877,8 +4869,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </div>
                     </div>
                   )
-                ) : (
+                ) : activeTab === 'homework' ? (
                   renderHomeworkWidget()
+                ) : (
+                  renderLessonsWidget()
                 )}
 
                 {profile.app_usage_mode === 'parent_hybrid' && parentUnlocked && (
@@ -4342,8 +5336,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </div>
                     )}
                   </div>
-                ) : (
+                ) : activeTab === 'homework' ? (
                   renderHomeworkWidget(false)
+                ) : (
+                  renderLessonsWidget()
                 )}
                 </> : renderHomeworkWidget(true)}
 
@@ -4610,7 +5606,245 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             , document.body)}
 
-            {/* 3. Anti-Cheat Checkpoint Overlay */}
+          {activeChatOcc && createPortal(
+            (() => {
+              const teacherName = activeChatOcc.teacher ? `${activeChatOcc.teacher.first_name || 'Lehrer'} ${activeChatOcc.teacher.last_name || ''}` : 'Lehrkraft';
+              const titleText = `1:1 Shoutbox: ${teacherName}`;
+              
+              let isFrozen = false;
+              try {
+                const timePart = activeChatOcc.start_time.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time}:00`;
+                const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
+                isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
+              } catch (e) {}
+
+              const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
+
+              return (
+                <div
+                  onClick={() => setActiveChatOcc(null)}
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 11000,
+                    background: 'rgba(15,23,42,0.65)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '24px',
+                  }}
+                >
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      width: '100%',
+                      maxWidth: '480px',
+                      boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      position: 'relative',
+                      maxHeight: '85vh'
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                      padding: '24px',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>Rückfragen</span> {titleText}
+                        </h3>
+                        <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                          Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setActiveChatOcc(null)}
+                        style={{
+                          border: 'none',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: '#ffffff',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* Messages Viewport */}
+                    <div style={{
+                      flex: 1,
+                      overflowY: 'auto',
+                      padding: '24px',
+                      background: '#fafbfc',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      minHeight: '280px',
+                      maxHeight: '400px'
+                    }}>
+                      {isFrozen && (
+                        <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                          Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                        </div>
+                      )}
+                      {chatMessages.length === 0 ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
+                          <MessageSquare size={32} style={{ opacity: 0.3 }} />
+                          <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
+                        </div>
+                      ) : (
+                        chatMessages.map((msg, idx) => {
+                          const isMe = msg.sender_id === profile.id;
+                          return (
+                            <div key={msg.id || idx} style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignSelf: isMe ? 'flex-end' : 'flex-start',
+                              maxWidth: '80%',
+                              alignItems: isMe ? 'flex-end' : 'flex-start',
+                              gap: '2px'
+                            }}>
+                              <div style={{
+                                background: isMe ? 'linear-gradient(135deg, #34a853, #34a853)' : '#ffffff',
+                                color: isMe ? '#ffffff' : '#1e293b',
+                                padding: '10px 14px',
+                                borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                                fontSize: '0.85rem',
+                                lineHeight: 1.4,
+                                wordBreak: 'break-word',
+                                border: isMe ? 'none' : '1px solid #e2e8f0',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                              }}>
+                                {msg.content}
+                              </div>
+                              <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
+                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                      <div ref={chatMessagesEndRef} />
+                    </div>
+
+                    <form onSubmit={handleSendChatMessage} style={{
+                      padding: '16px 24px',
+                      borderTop: '1px solid #f1f5f9',
+                      background: '#f8fafc',
+                      display: 'flex',
+                      gap: '10px'
+                    }}>
+                      <input
+                        type="text"
+                        placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
+                        disabled={isFrozen}
+                        value={chatTypedMessage}
+                        onChange={e => setChatTypedMessage(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #e2e8f0',
+                          background: isFrozen ? '#f1f5f9' : '#ffffff',
+                          fontSize: '0.85rem',
+                          outline: 'none',
+                          fontWeight: 650
+                        }}
+                      />
+                      {isCanceled ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleUndoCancel(activeChatOcc);
+                            setActiveChatOcc(null);
+                          }}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '12px',
+                            padding: '10px 16px',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                        >
+                          Reaktivieren
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleCancelOccurrence(activeChatOcc);
+                            setActiveChatOcc(null);
+                          }}
+                          style={{
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            padding: '10px 16px',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                        >
+                          Absagen
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isFrozen || !chatTypedMessage.trim()}
+                        style={{
+                          background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #248a3d)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 16px',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
+                          cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        Senden
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              );
+            })(),
+            document.body
+          )}
+          {/* 3. Anti-Cheat Checkpoint Overlay */}
             {showCheckpoint && createPortal(
               <div 
                 style={{
