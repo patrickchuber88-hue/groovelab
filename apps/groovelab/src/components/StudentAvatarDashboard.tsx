@@ -3276,14 +3276,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             date: occ.date,
             start_time: occ.start_time,
             duration: occ.duration || 45,
-            status: 'canceled_by_student',
+            status: 'cancelled',
             student_acknowledged: true
           });
         if (insertErr) throw insertErr;
       } else {
         const { error: updateErr } = await supabase
           .from('schedule_occurrences')
-          .update({ status: 'canceled_by_student', student_acknowledged: true })
+          .update({ status: 'cancelled', student_acknowledged: true })
           .eq('id', occ.id);
         if (updateErr) throw updateErr;
       }

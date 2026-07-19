@@ -220,6 +220,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [lessonsPinAttempts, setLessonsPinAttempts] = useState(0);
   const [pendingCancelOccId, setPendingCancelOccId] = useState<string | null>(null);
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
+  const [unreadMessageOccurrences, setUnreadMessageOccurrences] = useState<string[]>([]);
+  const [pastSectionExpanded, setPastSectionExpanded] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   
@@ -766,7 +768,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile) return;
     setLoadingDashboard(true);
     try {
-      const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+      const todayDate = new Date();
+      const todayStr = todayDate.toLocaleDateString('en-CA');
+      const pastLimitDate = new Date(todayDate);
+      pastLimitDate.setDate(todayDate.getDate() - 30);
+      const pastLimitStr = pastLimitDate.toLocaleDateString('en-CA');
 
       // Fetch all dashboard data in parallel for optimal performance
       const [
@@ -774,7 +780,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         occRes,
         statsRes,
         avatarRes,
-        matrixRes
+        matrixRes,
+        msgRes
       ] = await Promise.all([
         supabase
           .from('schedules')
@@ -792,7 +799,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             schedule:schedule_id(status, room:room_id(name))
           `)
           .eq('student_id', profile.id)
-          .gte('date', todayStr)
+          .gte('date', pastLimitStr)
           .order('date', { ascending: true })
           .order('start_time', { ascending: true }),
         supabase
@@ -809,7 +816,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .from('progress_matrix')
           .select('*')
           .eq('student_id', profile.id)
-          .order('updated_at', { ascending: false })
+          .order('updated_at', { ascending: false }),
+        supabase
+          .from('campus_direct_messages')
+          .select('occurrence_id')
+          .eq('recipient_id', profile.id)
+          .eq('is_read', false)
       ]);
 
       const schData = schRes.data;
@@ -817,6 +829,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const statsData = statsRes.data;
       const avatarData = avatarRes.data;
       const matrixItems = matrixRes.data;
+      const unreadMsgsData = msgRes?.data || [];
+      const unreadIds = unreadMsgsData.map((m: any) => m.occurrence_id).filter(Boolean);
+      setUnreadMessageOccurrences(unreadIds);
 
       // Deduplicate matrixItems by topic_name (latest wins)
       const uniqueMatrixItemsMap = new Map<string, any>();
@@ -1834,6 +1849,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     fetchChat(studentId, activeChatOcc.id);
 
+    const markAsRead = async () => {
+      try {
+        await supabase
+          .from('campus_direct_messages')
+          .update({ is_read: true })
+          .eq('occurrence_id', activeChatOcc.id)
+          .eq('recipient_id', studentId)
+          .eq('is_read', false);
+        setUnreadMessageOccurrences(prev => prev.filter(id => id !== activeChatOcc.id));
+      } catch (err) {
+        console.warn('Could not mark messages as read:', err);
+      }
+    };
+    markAsRead();
+
     const channel = supabase
       .channel(`chat_occ_board_${activeChatOcc.id}`)
       .on('postgres_changes', { 
@@ -2295,6 +2325,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return a.start_time.localeCompare(b.start_time);
     });
 
+    const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
+    const upcomingOccurrences = sortedOccurrences.filter(occ => occ.date >= todayStr);
+    const pastOccurrences = sortedOccurrences.filter(occ => occ.date < todayStr);
+
     if (sortedOccurrences.length === 0) {
       return (
         <div style={{
@@ -2314,26 +2348,62 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       );
     }
 
-    // Group occurrences by month
-    const monthGroups: Record<string, { label: string; items: any[] }> = {};
-    
-    sortedOccurrences.forEach(occ => {
+    // Group upcoming occurrences by month
+    const upcomingMonthGroups: Record<string, { label: string; items: any[] }> = {};
+    upcomingOccurrences.forEach(occ => {
       const d = new Date(occ.date);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const monthKey = `${yyyy}-${mm}`;
       
-      if (!monthGroups[monthKey]) {
+      if (!upcomingMonthGroups[monthKey]) {
         const label = d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-        monthGroups[monthKey] = {
+        upcomingMonthGroups[monthKey] = {
           label,
           items: []
         };
       }
-      monthGroups[monthKey].items.push(occ);
+      upcomingMonthGroups[monthKey].items.push(occ);
     });
 
-    const sortedMonthKeys = Object.keys(monthGroups).sort();
+    // Group past occurrences by month
+    const pastMonthGroups: Record<string, { label: string; items: any[] }> = {};
+    pastOccurrences.forEach(occ => {
+      const d = new Date(occ.date);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const monthKey = `${yyyy}-${mm}`;
+      
+      if (!pastMonthGroups[monthKey]) {
+        const label = d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        pastMonthGroups[monthKey] = {
+          label,
+          items: []
+        };
+      }
+      pastMonthGroups[monthKey].items.push(occ);
+    });
+
+    // Sort past occurrences descending inside their groups
+    Object.keys(pastMonthGroups).forEach(key => {
+      pastMonthGroups[key].items.sort((a, b) => {
+        const dateCompare = b.date.localeCompare(a.date);
+        if (dateCompare !== 0) return dateCompare;
+        return b.start_time.localeCompare(a.start_time);
+      });
+    });
+
+    // Sort upcoming occurrences ascending inside their groups
+    Object.keys(upcomingMonthGroups).forEach(key => {
+      upcomingMonthGroups[key].items.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.start_time.localeCompare(b.start_time);
+      });
+    });
+
+    const sortedUpcomingMonthKeys = Object.keys(upcomingMonthGroups).sort();
+    const sortedPastMonthKeys = Object.keys(pastMonthGroups).sort((a, b) => b.localeCompare(a));
 
     const toggleMonth = (monthKey: string) => {
       setCollapsedMonths(prev => ({
@@ -2352,171 +2422,231 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return d.toLocaleDateString('de-DE', { weekday: 'short' }).substring(0, 2);
     };
 
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-        {sortedMonthKeys.map(monthKey => {
-          const group = monthGroups[monthKey];
-          const isCollapsed = collapsedMonths[monthKey] ?? false;
+    const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-          return (
-            <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div 
-                onClick={() => toggleMonth(monthKey)}
-                style={{
-                  fontSize: '0.85rem',
-                  fontWeight: 900,
-                  color: '#475569',
-                  padding: '10px 14px',
-                  background: '#f8fafc',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'background 0.2s'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Calendar size={14} color="#34a853" />
-                  <span>{group.label}</span>
-                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>
-                    ({group.items.length} {group.items.length === 1 ? 'Termin' : 'Termine'})
-                  </span>
-                </div>
+    const hasUnreadUpdate = (occ: any) => {
+      const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+      const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student';
+      const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
+      const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
+      return needsAck || hasUnreadMsg;
+    };
+
+    const renderMonthGroup = (monthKey: string, group: any, defaultCollapsed: boolean) => {
+      const isCollapsed = collapsedMonths[monthKey] ?? defaultCollapsed;
+      const monthHasUpdate = group.items.some((occ: any) => hasUnreadUpdate(occ));
+
+      return (
+        <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div 
+            onClick={() => toggleMonth(monthKey)}
+            style={{
+              fontSize: '0.85rem',
+              fontWeight: 900,
+              color: '#475569',
+              padding: '10px 14px',
+              background: '#f8fafc',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              userSelect: 'none',
+              border: monthHasUpdate ? '1.5px solid #ef4444' : '1px solid #e2e8f0',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+              transition: 'background 0.2s'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+              <Calendar size={14} color={monthHasUpdate ? '#ef4444' : '#34a853'} />
+              <span style={{ color: monthHasUpdate ? '#0f172a' : '#475569' }}>{group.label}</span>
+              {monthHasUpdate && (
                 <span style={{ 
-                  transition: 'transform 0.2s', 
-                  transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: '#64748b'
-                }}>
-                  <ChevronDown size={16} />
-                </span>
-              </div>
-              
-              {!isCollapsed && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {group.items.map(occ => {
-                    const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
-                    const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-                    const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
-                    const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  background: '#ef4444', 
+                  display: 'inline-block' 
+                }} />
+              )}
+              <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>
+                ({group.items.length} {group.items.length === 1 ? 'Termin' : 'Termine'})
+              </span>
+            </div>
+            <span style={{ 
+              transition: 'transform 0.2s', 
+              transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+              display: 'flex',
+              alignItems: 'center',
+              color: '#64748b'
+            }}>
+              <ChevronDown size={16} />
+            </span>
+          </div>
+          
+          {!isCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {group.items.map((occ: any) => {
+                const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+                const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
+                const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
 
-                    let rowBg = '#ffffff';
-                    let rowBorder = '1px solid #e2e8f0';
-                    let textColor = '#0f172a';
-                    let subColor = '#64748b';
+                let rowBg = '#ffffff';
+                let rowBorder = '1px solid #e2e8f0';
+                let textColor = '#0f172a';
+                let subColor = '#64748b';
 
-                    if (isCanceled) {
-                      rowBg = '#fef2f2';
-                      rowBorder = '1px solid #fee2e2';
-                      textColor = '#991b1b';
-                      subColor = '#ef4444';
-                    } else if (isRescheduled) {
-                      rowBg = '#fffbeb';
-                      rowBorder = '1px solid #fef3c7';
-                      textColor = '#92400e';
-                      subColor = '#d97706';
-                    } else if (isPendingReview) {
-                      rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                      rowBorder = '1px dashed #eab308';
-                      textColor = '#713f12';
-                      subColor = '#ca8a04';
-                    } else if (needsAcknowledge) {
-                      rowBg = 'repeating-linear-gradient(-45deg, #fff7ed 0px, #fff7ed 8px, #ffffff 8px, #ffffff 16px)';
-                      rowBorder = '1px dashed #f97316';
-                      textColor = '#ea580c';
-                      subColor = '#f97316';
-                    }
+                if (isCanceled) {
+                  rowBg = '#fef2f2';
+                  rowBorder = '1px solid #fee2e2';
+                  textColor = '#991b1b';
+                  subColor = '#ef4444';
+                } else if (isRescheduled) {
+                  rowBg = '#fffbeb';
+                  rowBorder = '1px solid #fef3c7';
+                  textColor = '#92400e';
+                  subColor = '#d97706';
+                } else if (isPendingReview) {
+                  rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                  rowBorder = '1px dashed #eab308';
+                  textColor = '#713f12';
+                  subColor = '#ca8a04';
+                } else if (needsAcknowledge) {
+                  rowBg = 'repeating-linear-gradient(-45deg, #fff7ed 0px, #fff7ed 8px, #ffffff 8px, #ffffff 16px)';
+                  rowBorder = '1px dashed #f97316';
+                  textColor = '#ea580c';
+                  subColor = '#f97316';
+                }
 
-                    const teacherName = `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`;
+                const teacherName = `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`;
 
-                    return (
-                      <div
-                        key={occ.id}
-                        style={{
+                return (
+                  <div
+                    key={occ.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      padding: '12px',
+                      borderRadius: '16px',
+                      background: rowBg,
+                      border: rowBorder,
+                      gap: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          padding: '12px',
-                          borderRadius: '16px',
-                          background: rowBg,
-                          border: rowBorder,
-                          gap: '8px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f1f5f9',
-                              borderRadius: '8px',
-                              width: '36px',
-                              height: '36px',
-                              border: '1px solid rgba(0,0,0,0.03)',
-                              flexShrink: 0
-                            }}>
-                              <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
-                                {formatWeekday(occ.date)}
-                              </span>
-                              <span style={{ fontSize: '13px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
-                                {occ.date.substring(8, 10)}
-                              </span>
-                            </div>
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor }}>
-                                {teacherName}
-                              </span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: subColor, fontWeight: 700 }}>
-                                <span>{formatDateGerman(occ.date)}</span>
-                                <span>•</span>
-                                <span>{occ.start_time.substring(0, 5)} Uhr</span>
-                                <span>•</span>
-                                <span>{occ.duration} Min</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <button
-                              type="button"
-                              onClick={() => setActiveChatOcc(occ)}
-                              style={{
-                                border: 'none',
-                                background: '#f1f5f9',
-                                color: '#475569',
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                              }}
-                              title="Shoutbox öffnen"
-                            >
-                              <MessageSquare size={14} />
-                            </button>
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f1f5f9',
+                          borderRadius: '8px',
+                          width: '36px',
+                          height: '36px',
+                          border: '1px solid rgba(0,0,0,0.03)',
+                          flexShrink: 0
+                        }}>
+                          <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
+                            {formatWeekday(occ.date)}
+                          </span>
+                          <span style={{ fontSize: '13px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
+                            {occ.date.substring(8, 10)}
+                          </span>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor }}>
+                            {teacherName}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: subColor, fontWeight: 700 }}>
+                            <span>{formatDateGerman(occ.date)}</span>
+                            <span>•</span>
+                            <span>{occ.start_time.substring(0, 5)} Uhr</span>
+                            <span>•</span>
+                            <span>{occ.duration} Min</span>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Action buttons for student confirmations/cancellations */}
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                          {needsAcknowledge && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveChatOcc(occ)}
+                          style={{
+                            border: 'none',
+                            background: unreadMessageOccurrences.includes(occ.id) ? '#fee2e2' : '#f1f5f9',
+                            color: unreadMessageOccurrences.includes(occ.id) ? '#ef4444' : '#475569',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative'
+                          }}
+                          title="Shoutbox öffnen"
+                        >
+                          <MessageSquare size={14} />
+                          {unreadMessageOccurrences.includes(occ.id) && (
+                            <span style={{
+                              position: 'absolute',
+                              top: '-2px',
+                              right: '-2px',
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              background: '#ef4444',
+                              border: '1.5px solid #ffffff'
+                            }} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Action buttons for student confirmations/cancellations */}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      {needsAcknowledge && (
+                        <button
+                          type="button"
+                          onClick={() => handleAcknowledgeOccurrence(occ)}
+                          style={{
+                            flex: 1,
+                            background: '#34a853',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Check size={12} /> Bestätigen
+                        </button>
+                      )}
+                      
+                      {!isCanceled ? (
+                        pendingCancelOccId === occ.id ? (
+                          <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
                             <button
                               type="button"
-                              onClick={() => handleAcknowledgeOccurrence(occ)}
+                              onClick={() => {
+                                handleCancelOccurrence(occ);
+                                setPendingCancelOccId(null);
+                              }}
                               style={{
                                 flex: 1,
-                                background: '#34a853',
+                                background: '#ef4444',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '8px',
@@ -2530,91 +2660,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 gap: '4px'
                               }}
                             >
-                              <Check size={12} /> Bestätigen
+                              Ja, sicher absagen
                             </button>
-                          )}
-                          
-                          {!isCanceled ? (
-                            pendingCancelOccId === occ.id ? (
-                              <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    handleCancelOccurrence(occ);
-                                    setPendingCancelOccId(null);
-                                  }}
-                                  style={{
-                                    flex: 1,
-                                    background: '#ef4444',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    padding: '8px 12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  Ja, sicher absagen
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setPendingCancelOccId(null)}
-                                  style={{
-                                    flex: 1,
-                                    background: '#e2e8f0',
-                                    color: '#475569',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    padding: '8px 12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  Behalten
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setPendingCancelOccId(occ.id)}
-                                style={{
-                                  flex: 1,
-                                  background: '#f1f5f9',
-                                  color: '#475569',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: '8px',
-                                  padding: '8px 12px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                <X size={12} /> Absagen
-                              </button>
-                            )
-                          ) : (
                             <button
                               type="button"
-                              onClick={() => handleUndoCancel(occ)}
+                              onClick={() => setPendingCancelOccId(null)}
                               style={{
                                 flex: 1,
-                                background: '#f1f5f9',
+                                background: '#e2e8f0',
                                 color: '#475569',
-                                border: '1px solid #cbd5e1',
+                                border: 'none',
                                 borderRadius: '8px',
                                 padding: '8px 12px',
                                 fontSize: '0.78rem',
@@ -2626,42 +2681,162 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 gap: '4px'
                               }}
                             >
-                              Reaktivieren
+                              Behalten
                             </button>
-                          )}
-                        </div>
-                        
-                        {/* Visual status labels */}
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {isPendingReview && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                              ⏳ In Prüfung
-                            </span>
-                          )}
-                          {isRescheduled && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                              Verschoben
-                            </span>
-                          )}
-                          {isCanceled && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                              Abgesagt
-                            </span>
-                          )}
-                          {needsAcknowledge && (
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                              ⏳ Bestätigung ausstehend
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPendingCancelOccId(occ.id)}
+                            style={{
+                              flex: 1,
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <X size={12} /> Absagen
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleUndoCancel(occ)}
+                          style={{
+                            flex: 1,
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          Reaktivieren
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Visual status labels */}
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {isPendingReview && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                          ⏳ In Prüfung
+                        </span>
+                      )}
+                      {isRescheduled && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                          Verschoben
+                        </span>
+                      )}
+                      {isCanceled && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                          Abgesagt
+                        </span>
+                      )}
+                      {needsAcknowledge && (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                          ⏳ Bestätigung ausstehend
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+        {/* Upcoming appointments month groups */}
+        {sortedUpcomingMonthKeys.length > 0 ? (
+          sortedUpcomingMonthKeys.map(monthKey => 
+            renderMonthGroup(monthKey, upcomingMonthGroups[monthKey], monthKey !== currentMonthKey)
+          )
+        ) : (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.75)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1.5px dashed #cbd5e1',
+            borderRadius: '24px',
+            padding: '24px',
+            textAlign: 'center',
+            color: '#64748b'
+          }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', fontWeight: 650 }}>
+              Keine anstehenden Termine erfasst
+            </p>
+          </div>
+        )}
+
+        {/* Vergangene Termine section */}
+        {sortedPastMonthKeys.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            <div
+              onClick={() => setPastSectionExpanded(!pastSectionExpanded)}
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 900,
+                color: '#64748b',
+                padding: '12px 14px',
+                background: '#f1f5f9',
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none',
+                transition: 'all 0.2s',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar size={14} color="#64748b" />
+                <span>Vergangene Termine</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 750 }}>
+                  ({pastOccurrences.length} {pastOccurrences.length === 1 ? 'Termin' : 'Termine'})
+                </span>
+              </div>
+              <span style={{
+                transition: 'transform 0.2s',
+                transform: pastSectionExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#64748b'
+              }}>
+                <ChevronDown size={16} />
+              </span>
+            </div>
+
+            {pastSectionExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '4px' }}>
+                {sortedPastMonthKeys.map(monthKey => 
+                  renderMonthGroup(monthKey, pastMonthGroups[monthKey], true) // Default collapsed for past months!
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -2971,10 +3146,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px'
+            gap: '6px',
+            position: 'relative'
           }}
         >
-          <><Calendar size={14} style={{ marginRight: 6 }} /> Termine</>
+          <Calendar size={14} style={{ marginRight: 6 }} />
+          <span>Termine</span>
+          {occurrences.some(occ => {
+            const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+            const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student';
+            const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
+            const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
+            return needsAck || hasUnreadMsg;
+          }) && (
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: '#ef4444',
+              display: 'inline-block',
+              marginLeft: '4px'
+            }} />
+          )}
         </button>
       </div>
     );

@@ -3032,7 +3032,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     if (!confirm(`Möchtest du den Termin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr wirklich absagen?`)) return;
 
     try {
-      const cancelStatus = role === 'student' ? 'canceled_by_student' : 'cancelled';
+      const cancelStatus = 'cancelled';
       
       if (occ.is_virtual) {
         const { error: insertErr } = await supabase
