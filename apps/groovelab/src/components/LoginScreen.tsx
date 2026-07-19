@@ -3929,40 +3929,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             )}
           </div>
 
-        {/* Passwort Anmeldung button for Kiosk Mode inside the card under the camera image */}
-        {isGroovelabKiosk && (
-          <div style={{ marginTop: '20px', width: '100%' }}>
-            <button 
-              onClick={() => setExpandedSection('pin')}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                borderRadius: '16px',
-                background: 'rgba(0, 0, 0, 0.05)',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                color: '#062413',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                textAlign: 'center',
-                boxSizing: 'border-box',
-                height: '48px',
-                outline: 'none'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; }}
-            >
-              <KeyRound size={16} color="#78350f" />
-              Passwort Anmeldung
-            </button>
-          </div>
-        )}
-        
+        {/* Removed Passwort Anmeldung button for Kiosk Mode */}
         {/* Coupled Kiosk Station indicator inside the card */}
         {isGroovelabKiosk && effectiveStationId && (
           <div style={{
@@ -4268,8 +4235,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                 localStorage.setItem('groovelab_station_id', newSelection);
                                 localStorage.setItem('groovelab_kiosk_room_id', station.room_id);
                                 localStorage.setItem('groovelab_active_platform', 'groovelab');
-                                // Force reload the window cleanly so App.tsx loads kiosk details from token
-                                window.location.reload();
+                                // Force a redirect with full URL params so iOS Safari uses this as the PWA start_url
+                                const redirectUrl = `/?platform=groovelab&kiosk_token=${encodeURIComponent(kioskRecord.secret_token)}&station_id=${encodeURIComponent(newSelection)}${station.room_id ? `&kiosk_room_id=${encodeURIComponent(station.room_id)}` : ''}`;
+                                window.location.href = redirectUrl;
                               } else {
                                 throw new Error('Kopplungs-Token konnte nicht geladen werden.');
                               }
@@ -4414,32 +4382,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
           )}
 
-          <button 
-            onClick={() => setExpandedSection('pin')}
-            style={{ 
-              background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', 
-              border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.15)', 
-              padding: '10px 24px',
-              borderRadius: '100px',
-              color: isGroovelabKiosk ? '#062413' : '#ffffff', 
-              fontSize: '12px', 
-              fontWeight: 800, 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.05em', 
-              cursor: 'pointer', 
-              transition: 'all 0.2s',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)'; }}
-          >
-            <KeyRound size={14} color={isGroovelabKiosk ? '#062413' : '#e6f4ea'} />
-            Passwort Anmeldung
-          </button>
+          {!isGroovelabKiosk && (
+            <button 
+              onClick={() => setExpandedSection('pin')}
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.08)', 
+                border: '1px solid rgba(255, 255, 255, 0.15)', 
+                padding: '10px 24px',
+                borderRadius: '100px',
+                color: '#ffffff', 
+                fontSize: '12px', 
+                fontWeight: 800, 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em', 
+                cursor: 'pointer', 
+                transition: 'all 0.2s',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+            >
+              <KeyRound size={14} color="#e6f4ea" />
+              Passwort Anmeldung
+            </button>
+          )}
         </div>
       )}
 
