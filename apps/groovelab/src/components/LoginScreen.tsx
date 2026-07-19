@@ -4228,10 +4228,50 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           const newSelection = isSelected ? null : station.id;
                           setSelectedKioskStationId(newSelection);
                           if (newSelection) {
-                            if (schoolData?.groovelab_kiosk_token) {
-                              localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                            try {
+                              // Check if kiosk record already exists for this station
+                              const { data: existingKiosk, error: fetchErr } = await supabase
+                                .from('kiosks')
+                                .select('*')
+                                .eq('station_id', newSelection)
+                                .maybeSingle();
+
+                              if (fetchErr) throw fetchErr;
+
+                              let kioskRecord = existingKiosk;
+
+                              if (!kioskRecord) {
+                                // Create new kiosk record if none exists
+                                const { data: newKiosk, error: insertErr } = await supabase
+                                  .from('kiosks')
+                                  .insert({
+                                    school_id: schoolData.id,
+                                    name: station.name || 'iPad Kiosk',
+                                    room_id: station.room_id,
+                                    station_id: station.id
+                                  })
+                                  .select()
+                                  .single();
+
+                                if (insertErr) throw insertErr;
+                                kioskRecord = newKiosk;
+                              }
+
+                              if (kioskRecord && kioskRecord.secret_token) {
+                                localStorage.setItem('groovelab_kiosk_token', kioskRecord.secret_token);
+                                localStorage.setItem('groovelab_station_id', newSelection);
+                                localStorage.setItem('groovelab_kiosk_room_id', station.room_id);
+                                localStorage.setItem('groovelab_active_platform', 'groovelab');
+                                // Force reload the window cleanly so App.tsx loads kiosk details from token
+                                window.location.reload();
+                              } else {
+                                throw new Error('Kopplungs-Token konnte nicht geladen werden.');
+                              }
+                            } catch (err: any) {
+                              console.error('[KioskActivation] Coupling failed:', err);
+                              alert('Kopplung fehlgeschlagen: ' + err.message);
+                              setSelectedKioskStationId(null);
                             }
-                            localStorage.setItem('groovelab_station_id', newSelection);
                             
                             // Trigger GPS request pre-emptively on user click gesture!
                             if (navigator.geolocation) {
