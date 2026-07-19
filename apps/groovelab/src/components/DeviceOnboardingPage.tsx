@@ -137,7 +137,7 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
       let kioskRecord = kiosks.find(k => k.station_id === selectedStationId);
 
       if (!kioskRecord) {
-        const { data, error: insertErr } = await supabase
+        const { data: insertedRows, error: insertErr } = await supabase
           .from('kiosks')
           .insert({
             school_id: school.id,
@@ -145,11 +145,13 @@ export const DeviceOnboardingPage: React.FC<DeviceOnboardingPageProps> = ({ toke
             room_id: selectedStation.room_id,
             station_id: selectedStation.id
           })
-          .select()
-          .single();
+          .select();
 
         if (insertErr) throw insertErr;
-        kioskRecord = data;
+        if (!insertedRows || insertedRows.length === 0) {
+          throw new Error('Kopplungs-Eintrag konnte nicht erstellt werden.');
+        }
+        kioskRecord = insertedRows[0];
       }
 
       if (kioskRecord && kioskRecord.secret_token) {

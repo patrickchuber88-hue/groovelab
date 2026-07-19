@@ -4215,7 +4215,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
                               if (!kioskRecord) {
                                 // Create new kiosk record if none exists
-                                const { data: newKiosk, error: insertErr } = await supabase
+                                const { data: insertedRows, error: insertErr } = await supabase
                                   .from('kiosks')
                                   .insert({
                                     school_id: schoolData.id,
@@ -4223,11 +4223,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                     room_id: station.room_id,
                                     station_id: station.id
                                   })
-                                  .select()
-                                  .single();
+                                  .select();
 
                                 if (insertErr) throw insertErr;
-                                kioskRecord = newKiosk;
+                                if (!insertedRows || insertedRows.length === 0) {
+                                  throw new Error('Kopplungs-Eintrag konnte nicht erstellt werden.');
+                                }
+                                kioskRecord = insertedRows[0];
                               }
 
                               if (kioskRecord && kioskRecord.secret_token) {

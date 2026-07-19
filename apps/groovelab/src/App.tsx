@@ -2052,6 +2052,17 @@ function App() {
         .then((reg) => {
           console.log('Service Worker registered successfully on load:', reg.scope);
 
+          // If there is already a waiting worker, prompt user to update immediately
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            console.log('[PWA] Waiting service worker found on load.');
+            const confirmUpdate = window.confirm(
+              'Eine neue Version von Campus-Groovelab ist verfügbar. Jetzt aktualisieren, um die neuesten Funktionen zu laden?'
+            );
+            if (confirmUpdate) {
+              window.location.replace(window.location.pathname + '?reload_manual=1');
+            }
+          }
+
           // Check for updates on the server periodically (every 5 minutes)
           setInterval(() => {
             reg.update();
