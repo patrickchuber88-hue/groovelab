@@ -6406,8 +6406,11 @@ function App() {
       await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
     }
 
-    setLoggedInUserId(userId);
-    setLocationMode(mode);
+    // Do NOT update loggedInUserId and locationMode in React state here, 
+    // because that would trigger data fetching queries which will be aborted 
+    // when we reload the page 100ms later (causing brief glitchy error flashes).
+    // Instead, we only store them in sessionStorage, and they will be cleanly
+    // initialized on mount after the reload.
     sessionStorage.setItem('groovelab_user_id', userId);
     sessionStorage.setItem('groovelab_location_mode', mode);
 
