@@ -4229,6 +4229,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           setSelectedKioskStationId(newSelection);
                           if (newSelection) {
                             try {
+                              // Temporarily set the school's kiosk token to authenticate the Supabase request
+                              if (schoolData?.groovelab_kiosk_token) {
+                                localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                              }
+
                               // Check if kiosk record already exists for this station
                               const { data: existingKiosk, error: fetchErr } = await supabase
                                 .from('kiosks')
@@ -4258,6 +4263,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                               }
 
                               if (kioskRecord && kioskRecord.secret_token) {
+                                // Overwrite the temporary school token with the kiosk's specific secret token
                                 localStorage.setItem('groovelab_kiosk_token', kioskRecord.secret_token);
                                 localStorage.setItem('groovelab_station_id', newSelection);
                                 localStorage.setItem('groovelab_kiosk_room_id', station.room_id);
@@ -4269,6 +4275,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                               }
                             } catch (err: any) {
                               console.error('[KioskActivation] Coupling failed:', err);
+                              // Clear the temporary token on failure
+                              localStorage.removeItem('groovelab_kiosk_token');
                               alert('Kopplung fehlgeschlagen: ' + err.message);
                               setSelectedKioskStationId(null);
                             }
