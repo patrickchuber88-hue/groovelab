@@ -1714,10 +1714,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const { data: curStation } = await supabase.from('stations').select('name').eq('id', stationId).maybeSingle();
           const stationName = curStation?.name?.toLowerCase() || '';
           if (stationName.includes('lehrer') || stationName.includes('teacher')) {
-            console.log(`[Login] Student tried to log in on teacher station. Forcing Home mode.`);
-            alert("Hinweis: Schüler können sich nicht am Lehrer-iPad einloggen. Du wirst automatisch im Home-Modus angemeldet.");
-            isHome = true;
-            finalStationId = null;
+            alert("Login verweigert. Am Lehrer-iPad dürfen sich Schüler nicht einloggen.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
           } else {
             finalStationId = stationId;
           }
@@ -1761,9 +1761,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       // 2. Session Management (Only for Academy/Lab sessions)
       // 2. Global Cleanup & Station Cleanup in parallel
       if (!isCampus) {
+        let isTeacherStation = false;
+        if (!isHome && finalStationId) {
+          const { data: stData } = await supabase.from('stations').select('name').eq('id', finalStationId).maybeSingle();
+          const nameLower = stData?.name?.toLowerCase() || '';
+          if (nameLower.includes('lehrer') || nameLower.includes('teacher')) {
+            isTeacherStation = true;
+          }
+        }
+
         await Promise.all([
           supabase.from('sessions').update({ check_out_time: now }).eq('user_id', user.id).is('check_out_time', null),
-          (!isHome && finalStationId && !isTeacher)
+          (!isHome && finalStationId && !isTeacherStation)
             ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', finalStationId).is('check_out_time', null)
             : Promise.resolve()
         ]);
@@ -4454,7 +4463,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   }}
                 >
                   {adjustPositions(
-                    kioskStations.filter(s => s.room_id === kioskSelectedRoomId && !s.name.toLowerCase().includes('lehrer') && !s.name.toLowerCase().includes('teacher')),
+                    kioskStations.filter(s => s.room_id === kioskSelectedRoomId),
                     kioskMapWidth
                   ).map((station) => {
                     const isOccupied = activeSessionStationIds.includes(station.id);
