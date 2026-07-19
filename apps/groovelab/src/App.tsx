@@ -2046,10 +2046,43 @@ function App() {
       localStorage.removeItem('groovelab_install_prompt_dismissed');
     }
 
-    // Register service worker immediately to ensure PWA installability
+    // Register service worker immediately to ensure PWA installability and update checking
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then((reg) => console.log('Service Worker registered successfully on load:', reg.scope))
+        .then((reg) => {
+          console.log('Service Worker registered successfully on load:', reg.scope);
+
+          // Check for updates on the server periodically (every 5 minutes)
+          setInterval(() => {
+            reg.update();
+            console.log('[PWA] Checking for updates on the server...');
+          }, 1000 * 60 * 5);
+
+          // Handle updates
+          reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    console.log('[PWA] New content is available; prompt user to refresh.');
+                    
+                    // Show confirmation popup to user
+                    const confirmUpdate = window.confirm(
+                      'Eine neue Version von Campus-Groovelab ist verfügbar. Jetzt aktualisieren, um die neuesten Funktionen zu laden?'
+                    );
+                    if (confirmUpdate) {
+                      // Redirect with cache-bypass parameter defined in sw.js fetch handler
+                      window.location.replace(window.location.pathname + '?reload_manual=1');
+                    }
+                  } else {
+                    console.log('[PWA] Content is cached for offline use.');
+                  }
+                }
+              };
+            }
+          };
+        })
         .catch((err) => console.error('Service Worker registration failed on load:', err));
     }
 
