@@ -79,3 +79,10 @@
 
 ## Future Plans & Notes (Zukünftige Vorhaben)
 - **Profilauswahl-Sicherheit im Campus-Modul**: Das Netflix-Prinzip (Schnellwahl lokaler Profile ohne PIN-Abfrage) ist für Familien mit mehreren Kindern im Campus-Modul gewollt. Im GrooveLab-Modul wird dies nicht benötigt. Bei zukünftigen Modifikationen des Campus-Moduls soll dieses Prinzip dort verankert und gepflegt werden.
+
+## PWA & Deployment Rules
+- **PWA Auto-Update Mechanism**: Ensure the automatic Service Worker update checker (`reg.update()`) remains active in `App.tsx` and checks every 5 minutes.
+- **Cache-Busting on Deploy**: During deployments, the `CACHE_NAME` version in `sw.js` must be bumped (e.g. from `groovelab-static-v2` to `groovelab-static-v3`) to force client PWA cache invalidation.
+- **Sandboxed Deployments Bypass**: Always compile the production bundle and run `./deploy.sh` with `BypassSandbox: true` so the files are successfully copied to the remote Hetzner Server (`178.105.10.2`).
+- **Kiosk Map Coupling Token Integrity**: Device coupling directly from the interactive map in `LoginScreen.tsx` must always fetch or create a kiosk record in the `kiosks` table and save its unique `secret_token` in `localStorage`, never the school's general onboarding token.
+
