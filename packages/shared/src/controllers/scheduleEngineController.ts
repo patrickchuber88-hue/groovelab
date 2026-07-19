@@ -125,19 +125,53 @@ export async function calculateScheduleHandler(req: Request, res: Response): Pro
       const teacher = teachers.find(t => t.id === teacherId);
       const requiredEquipment = teacher?.required_equipment || [];
       
-      for (const room of schoolRooms) {
-        const allowed = (room.allowed_instruments || []).map((ins: string) => ins.toLowerCase());
-        
-        // Check if room allows the student instrument
-        const meetsInstrument = allowed.includes(formattedInstrument) || allowed.length === 0;
-        // Check if room has all the equipment required by the teacher
-        const meetsEquipment = requiredEquipment.every((reqEq: string) => allowed.includes(reqEq.toLowerCase()));
+      // Define hard equipment keywords (those that are structurally/physically required for the lesson)
+      const hardKeywords = ['schlagzeug', 'drums', 'drumkit', 'schlagwerk', 'klavier', 'piano', 'keyboard', 'synthesizer', 'digitalpiano', 'e-piano', 'tasten'];
+      
+      const hardReqs = requiredEquipment.filter((req: string) => {
+        const rLower = req.trim().toLowerCase();
+        return hardKeywords.some(kw => rLower.includes(kw));
+      });
+      const softReqs = requiredEquipment.filter((req: string) => {
+        const rLower = req.trim().toLowerCase();
+        return !hardKeywords.some(kw => rLower.includes(kw));
+      });
 
-        if (meetsInstrument && meetsEquipment) {
-          const roomSlotKey = getRoomSlotKey(room.id, day, slot);
-          if (!roomAssignedSlots.has(roomSlotKey)) {
-            return { id: room.id, name: room.name };
+      const candidateRooms: Array<{ room: typeof schoolRooms[0]; score: number }> = [];
+
+      for (const room of schoolRooms) {
+        const allowed = (room.allowed_instruments || []).map((ins: string) => ins.toLowerCase().trim());
+        
+        // 1. Check if room allows the student instrument (or if room has no constraints at all)
+        const meetsInstrument = allowed.includes(formattedInstrument) || allowed.length === 0;
+        if (!meetsInstrument) continue;
+
+        // 2. Check if room has all the hard equipment required by the teacher
+        const meetsHardEquipment = hardReqs.every((reqEq: string) => {
+          const reqLower = reqEq.trim().toLowerCase();
+          return allowed.some((allowStr: string) => allowStr.includes(reqLower) || reqLower.includes(allowStr));
+        });
+        if (!meetsHardEquipment) continue;
+
+        // 3. Calculate soft match score for additional wishes (e.g. Cajon, bongos, whiteboard etc.)
+        let score = 0;
+        softReqs.forEach((reqEq: string) => {
+          const reqLower = reqEq.trim().toLowerCase();
+          if (allowed.some((allowStr: string) => allowStr.includes(reqLower) || reqLower.includes(allowStr))) {
+            score += 10; // Fulfilling a soft requirement increases room preference score
           }
+        });
+
+        candidateRooms.push({ room, score });
+      }
+
+      // Sort candidate rooms by score descending to assign the best matched rooms first
+      candidateRooms.sort((a, b) => b.score - a.score);
+
+      for (const candidate of candidateRooms) {
+        const roomSlotKey = getRoomSlotKey(candidate.room.id, day, slot);
+        if (!roomAssignedSlots.has(roomSlotKey)) {
+          return { id: candidate.room.id, name: candidate.room.name };
         }
       }
       return null;

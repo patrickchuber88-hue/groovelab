@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -683,6 +683,14 @@ export function AdminDashboard({
   } | null>(null);
   const [draftPurpose, setDraftPurpose] = useState<string>('');
   const [dragOverCell, setDragOverCell] = useState<{ dayIdx: number; hour: string } | null>(null);
+  
+  // External blocking / cooperations states
+  const [bookingTargetType, setBookingTargetType] = useState<'internal' | 'external'>('internal');
+  const [selectedCooperationId, setSelectedCooperationId] = useState<string>('');
+  const [customCooperationName, setCustomCooperationName] = useState<string>('');
+  const [cooperationsList, setCooperationsList] = useState<any[]>([]);
+  const [roomBlockedSlots, setRoomBlockedSlots] = useState<any[]>([]);
+
 
 
   // Textbausteine states
@@ -2251,6 +2259,22 @@ export function AdminDashboard({
             .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
             .eq('school_id', adminData.school_id);
           setSchedules(schedulesData || []);
+
+          // Fetch cooperations for school
+          const { data: coopsData } = await supabase
+            .from('cooperations')
+            .select('*')
+            .eq('school_id', adminData.school_id)
+            .eq('is_active', true);
+          setCooperationsList(coopsData || []);
+
+          // Fetch weekly recurring room blocked slots
+          const { data: blockedSlotsData } = await supabase
+            .from('room_blocked_slots')
+            .select('*')
+            .eq('school_id', adminData.school_id);
+          setRoomBlockedSlots(blockedSlotsData || []);
+
 
           const { data: occursData } = await supabase
             .from('schedule_occurrences')
@@ -5834,6 +5858,7 @@ export function AdminDashboard({
   const renderCampusRoomsTab = () => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
+    const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
     
     const handleQuickDuration = (mins: number) => {
       const [sh, sm] = bookingStartTime.split(':').map(Number);
@@ -5950,6 +5975,23 @@ export function AdminDashboard({
     const handleCancelBooking = async (bookingId: string | string[]) => {
       const ids = Array.isArray(bookingId) ? bookingId : [bookingId];
       
+      const blockedSlotIds = ids.filter(id => roomBlockedSlots.some(s => s.id === id));
+      if (blockedSlotIds.length > 0) {
+        if (!window.confirm('Möchtest du diese wöchentliche Blockierung wirklich löschen?')) return;
+        try {
+          const { error } = await supabase
+            .from('room_blocked_slots')
+            .delete()
+            .in('id', blockedSlotIds);
+          if (error) throw error;
+          await fetchData();
+        } catch (err: any) {
+          console.error('Error deleting blocked slot:', err);
+          alert('Fehler beim Löschen der Blockierung: ' + err.message);
+        }
+        return;
+      }
+
       const localManualIds = ids.filter(id => !id.includes('-') && !scheduleOccurrences.some(o => o.id === id));
       const dbBookingIds = ids.filter(id => dbRoomBookings.some(b => b.id === id));
       const occurIds = ids.filter(id => 
@@ -6455,6 +6497,52 @@ export function AdminDashboard({
         };
       });
 
+      // 2b. Weekly recurring blocked slots (Sperrzeiten)
+      const blockedSlotsForSlot = roomBlockedSlots.filter((s: any) => {
+        if (s.room_id !== selectedRoom.id) return false;
+        if (s.day_of_week !== targetDayInt) return false;
+
+        const startTimeStr = s.start_time ? s.start_time.substring(0, 5) : '';
+        const endTimeStr = s.end_time ? s.end_time.substring(0, 5) : '';
+        if (!startTimeStr || !endTimeStr) return false;
+
+        const slotHour = parseInt(hourStr.split(':')[0]);
+        const slotStartMin = slotHour * 60;
+        const slotEndMin = (slotHour + 1) * 60;
+
+        const [shStr, smStr] = startTimeStr.split(':');
+        const sh = parseInt(shStr) || 0;
+        const sm = parseInt(smStr) || 0;
+        const bStartMin = sh * 60 + sm;
+
+        const [ehStr, emStr] = endTimeStr.split(':');
+        const eh = parseInt(ehStr) || 0;
+        const em = parseInt(emStr) || 0;
+        const bEndMin = eh * 60 + em;
+
+        return bStartMin < slotEndMin && bEndMin > slotStartMin;
+      });
+
+      const mappedBlockedSlots = blockedSlotsForSlot.map((s: any) => {
+        const startTimeStr = s.start_time.substring(0, 5);
+        const endTimeStr = s.end_time.substring(0, 5);
+
+        return {
+          id: s.id,
+          roomId: s.room_id,
+          roomName: selectedRoom.name,
+          date: '', // Weekly recurring
+          startTime: startTimeStr,
+          endTime: endTimeStr,
+          purpose: s.reason || 'Sperrung',
+          teacherId: null,
+          teacherName: 'Kooperation',
+          isBlockedSlot: true,
+          isSchedule: true,
+          isApproved: true
+        };
+      });
+
       // 3. Dynamic rescheduled occurrences
       const dynamicForSlot = scheduleOccurrences.filter((occ: any) => {
         const roomId = occ.schedules?.room_id || null;
@@ -6636,7 +6724,7 @@ export function AdminDashboard({
             toM(manual.startTime) >= toM(sched.startTime) &&
             toM(manual.endTime) <= toM(sched.endTime)
           );
-        }), ...allowedDynamics, ...draftPreviewBooking];
+        }), ...allowedDynamics, ...mappedBlockedSlots, ...draftPreviewBooking];
       }
 
       if (dayIdx === 4 && hourStr.startsWith('16:00')) {
@@ -6672,7 +6760,7 @@ export function AdminDashboard({
         return !coveredByOwnSchedule;
       });
 
-      return [...filteredManuals, ...mappedSchedules, ...mappedDynamics, ...draftPreviewBooking];
+      return [...filteredManuals, ...mappedSchedules, ...mappedBlockedSlots, ...mappedDynamics, ...draftPreviewBooking];
     };
 
     // Check if room is occupied during selected time slot
@@ -6702,6 +6790,8 @@ export function AdminDashboard({
         if (b.date !== bookingDate) return false;
         if (selectedBooking && b.id === selectedBooking.id) return false;
         if (!(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime)) {
+          // External bookings are completely untouchable and cannot be overlapped
+          if (b.title?.startsWith('[EXTERN]') || b.purpose?.startsWith('[EXTERN]')) return true;
           // Overlap detected — but allow if new booking is fully inside own block
           if (isCoveredByOwnBlock(toMin(b.startTime), toMin(b.endTime), b.teacherId)) return false;
           return true;
@@ -6713,6 +6803,7 @@ export function AdminDashboard({
         if (b.roomId !== roomId) return false;
         if (selectedBooking && b.id === selectedBooking.id) return false;
         if (!(b.endTime <= bookingStartTime || b.startTime >= bookingEndTime)) {
+          if (b.purpose?.startsWith('[EXTERN]') || b.title?.startsWith('[EXTERN]')) return true;
           if (isCoveredByOwnBlock(toMin(b.startTime), toMin(b.endTime), b.teacherId)) return false;
           return true;
         }
@@ -6795,7 +6886,17 @@ export function AdminDashboard({
         return true;
       });
 
-      return hasBooking || hasSchedule || hasDynamic;
+      const hasBlockedSlot = roomBlockedSlots.some((s: any) => {
+        if (s.room_id !== roomId) return false;
+        if (s.day_of_week !== targetDayInt) return false;
+
+        const blockStart = toMin(s.start_time.substring(0, 5));
+        const blockEnd   = toMin(s.end_time.substring(0, 5));
+
+        return blockStart < newEnd && blockEnd > newStart;
+      });
+
+      return hasBooking || hasSchedule || hasDynamic || hasBlockedSlot;
     };
 
     // Check if room is occupied *right now* (Ist-Zustand)
@@ -6893,37 +6994,78 @@ export function AdminDashboard({
       }
       const finalTeacherName = isStaff ? 'Schule' : creatorName;
 
+      let externalInstitutionName = '';
+      if (bookingTargetType === 'external') {
+        if (selectedCooperationId === 'custom') {
+          externalInstitutionName = customCooperationName.trim() || 'Externe Kooperation';
+        } else {
+          const coop = cooperationsList.find((c: any) => c.id === selectedCooperationId);
+          externalInstitutionName = coop ? coop.name : 'Externe Kooperation';
+        }
+      }
+
       if (isRecurring) {
-        // Build the recurring schedule
-        const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const parts = bookingDate.split('-');
-        const d = parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date(bookingDate);
-        const targetDayName = DAYS_MAP[d.getDay()];
+        if (bookingTargetType === 'external') {
+          const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === roomId)?.school_id);
+          const parts = bookingDate.split('-');
+          const d = parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date(bookingDate);
+          const rawDay = d.getDay();
+          const dayOfWeekInt = rawDay === 0 ? 7 : rawDay;
 
-        const [shStr, smStr] = bookingStartTime.split(':');
-        const [ehStr, emStr] = bookingEndTime.split(':');
-        const startMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
-        const endMin = (parseInt(ehStr) || 0) * 60 + (parseInt(emStr) || 0);
-        const durationMin = Math.max(15, endMin - startMin);
+          try {
+            const { error } = await supabase
+              .from('room_blocked_slots')
+              .insert({
+                school_id: resolvedSchoolId,
+                room_id: roomId,
+                day_of_week: dayOfWeekInt,
+                start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
+                end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
+                reason: `[EXTERN] ${externalInstitutionName}` + (bookingPurpose ? ` | ${bookingPurpose}` : '')
+              });
 
-        const newSchedule = {
-          id: 'sched_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-          room_id: roomId,
-          day_of_week: targetDayName,
-          time_slot: bookingStartTime,
-          duration: durationMin,
-          purpose: finalPurpose,
-          teacher_id: userId,
-          teacher: { first_name: finalTeacherName, last_name: '' },
-          status: 'approved',
-          start_date: bookingDate,
-          interval_weeks: recurringInterval
-        };
+            if (error) throw error;
+            await fetchData();
+          } catch (dbErr: any) {
+            console.error('Error inserting room blocked slot:', dbErr);
+            alert('Fehler beim Speichern der wöchentlichen Blockierung: ' + dbErr.message);
+            return;
+          }
+        } else {
+          // Build the recurring schedule
+          const DAYS_MAP = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const parts = bookingDate.split('-');
+          const d = parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : new Date(bookingDate);
+          const targetDayName = DAYS_MAP[d.getDay()];
 
-        setSchedules(prev => [...prev, newSchedule]);
+          const [shStr, smStr] = bookingStartTime.split(':');
+          const [ehStr, emStr] = bookingEndTime.split(':');
+          const startMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
+          const endMin = (parseInt(ehStr) || 0) * 60 + (parseInt(emStr) || 0);
+          const durationMin = Math.max(15, endMin - startMin);
+
+          const newSchedule = {
+            id: 'sched_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            room_id: roomId,
+            day_of_week: targetDayName,
+            time_slot: bookingStartTime,
+            duration: durationMin,
+            purpose: finalPurpose,
+            teacher_id: userId,
+            teacher: { first_name: finalTeacherName, last_name: '' },
+            status: 'approved',
+            start_date: bookingDate,
+            interval_weeks: recurringInterval
+          };
+
+          setSchedules(prev => [...prev, newSchedule]);
+        }
       } else {
         const resolvedSchoolId = admin?.school_id || (rooms.find(r => r.id === roomId)?.school_id);
         const status = isStaff ? 'approved' : 'pending';
+        const finalTitle = bookingTargetType === 'external'
+          ? `[EXTERN] ${externalInstitutionName}` + (bookingPurpose ? ` | ${bookingPurpose}` : '')
+          : finalPurpose;
 
         try {
           const { error } = await supabase
@@ -6935,7 +7077,7 @@ export function AdminDashboard({
               date: bookingDate,
               start_time: bookingStartTime.length === 5 ? `${bookingStartTime}:00` : bookingStartTime,
               end_time: bookingEndTime.length === 5 ? `${bookingEndTime}:00` : bookingEndTime,
-              title: finalPurpose,
+              title: finalTitle,
               status: status
             });
             
@@ -6961,6 +7103,9 @@ export function AdminDashboard({
       setIsRecurring(false);
       setShowPreviewField(false);
       setRecurringInterval(1);
+      setBookingTargetType('internal');
+      setSelectedCooperationId('custom');
+      setCustomCooperationName('');
     };
 
     const handleUpdateBooking = async () => {
@@ -7214,6 +7359,50 @@ export function AdminDashboard({
       const newStartTime = formatMinutesToTime(newStartMins);
       const newEndTime = formatMinutesToTime(newEndMins);
 
+      const toMin = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
+
+      // Validate against external blockings (recurring)
+      const hasBlockedConflict = roomBlockedSlots.some((s: any) => {
+        if (s.room_id !== booking.roomId) return false;
+        if (s.day_of_week !== (targetDayIdx + 1)) return false;
+
+        const blockStart = toMin(s.start_time.substring(0, 5));
+        const blockEnd   = toMin(s.end_time.substring(0, 5));
+
+        return blockStart < newEndMins && blockEnd > newStartMins;
+      });
+
+      // Validate against single external bookings (DB)
+      const hasDbConflict = dbRoomBookings.some((dbB: any) => {
+        if (dbB.roomId !== booking.roomId) return false;
+        if (dbB.date !== targetDateStr) return false;
+        if (dbB.id === bookingId) return false;
+        if (dbB.title?.startsWith('[EXTERN]') || dbB.purpose?.startsWith('[EXTERN]')) {
+          const dbStart = toMin(dbB.startTime.substring(0, 5));
+          const dbEnd = toMin(dbB.endTime.substring(0, 5));
+          return dbStart < newEndMins && dbEnd > newStartMins;
+        }
+        return false;
+      });
+
+      // Validate against single external bookings (local)
+      const hasLocalConflict = campusBookings.some((cb: any) => {
+        if (cb.roomId !== booking.roomId) return false;
+        if (cb.date !== targetDateStr) return false;
+        if (cb.id === bookingId) return false;
+        if (cb.purpose?.startsWith('[EXTERN]') || cb.title?.startsWith('[EXTERN]')) {
+          const cbStart = toMin(cb.startTime.substring(0, 5));
+          const cbEnd = toMin(cb.endTime.substring(0, 5));
+          return cbStart < newEndMins && cbEnd > newStartMins;
+        }
+        return false;
+      });
+
+      if (hasBlockedConflict || hasDbConflict || hasLocalConflict) {
+        alert('Verschieben blockiert: Dieser Zeitraum überschneidet sich mit einer externen Blockierung/Kooperation.');
+        return;
+      }
+
       // Update the booking in local state
       setCampusBookings(prev => prev.map((b: any) => {
         if (b.id === bookingId) {
@@ -7292,6 +7481,69 @@ export function AdminDashboard({
         handleElement.releasePointerCapture(upEvent.pointerId);
         handleElement.removeEventListener('pointermove', onPointerMove);
         handleElement.removeEventListener('pointerup', onPointerUp);
+
+        // Check if final size overlaps with an external block
+        setCampusBookings(currentBookings => {
+          const finalB = currentBookings.find(b => b.id === booking.id);
+          if (!finalB) return currentBookings;
+
+          const toMin = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
+          const finalStart = toMin(finalB.startTime);
+          const finalEnd = toMin(finalB.endTime);
+
+          // Recurring check
+          const parsedD = parseLocalDate(finalB.date);
+          const rawDay = parsedD.getUTCDay();
+          const targetDayIntVal = rawDay === 0 ? 7 : rawDay;
+
+          const hasBlockedConflict = roomBlockedSlots.some((s: any) => {
+            if (s.room_id !== finalB.roomId) return false;
+            if (s.day_of_week !== targetDayIntVal) return false;
+
+            const blockStart = toMin(s.start_time.substring(0, 5));
+            const blockEnd   = toMin(s.end_time.substring(0, 5));
+
+            return blockStart < finalEnd && blockEnd > finalStart;
+          });
+
+          // DB external check
+          const hasDbConflict = dbRoomBookings.some((dbB: any) => {
+            if (dbB.roomId !== finalB.roomId) return false;
+            if (dbB.date !== finalB.date) return false;
+            if (dbB.id === finalB.id) return false;
+            if (dbB.title?.startsWith('[EXTERN]') || dbB.purpose?.startsWith('[EXTERN]')) {
+              const dbStart = toMin(dbB.startTime.substring(0, 5));
+              const dbEnd = toMin(dbB.endTime.substring(0, 5));
+              return dbStart < finalEnd && dbEnd > finalStart;
+            }
+            return false;
+          });
+
+          // Local external check
+          const hasLocalConflict = currentBookings.some((cb: any) => {
+            if (cb.roomId !== finalB.roomId) return false;
+            if (cb.date !== finalB.date) return false;
+            if (cb.id === finalB.id) return false;
+            if (cb.purpose?.startsWith('[EXTERN]') || cb.title?.startsWith('[EXTERN]')) {
+              const cbStart = toMin(cb.startTime.substring(0, 5));
+              const cbEnd = toMin(cb.endTime.substring(0, 5));
+              return cbStart < finalEnd && cbEnd > finalStart;
+            }
+            return false;
+          });
+
+          if (hasBlockedConflict || hasDbConflict || hasLocalConflict) {
+            alert('Größenänderung blockiert: Der ausgewählte Zeitraum überschneidet sich mit einer externen Blockierung/Kooperation.');
+            // Revert
+            return currentBookings.map(b => b.id === booking.id ? {
+              ...b,
+              startTime: formatMinutesToTime(initialStartMins),
+              endTime: formatMinutesToTime(initialEndMins)
+            } : b);
+          }
+
+          return currentBookings;
+        });
       };
 
       handleElement.addEventListener('pointermove', onPointerMove);
@@ -8156,7 +8408,10 @@ export function AdminDashboard({
 
 
                                 {slotBookings.map((b: any, bIdx: number) => {
+                                  const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
+                                  const isExternal = b.isBlockedSlot || (b.purpose && b.purpose.startsWith('[EXTERN]'));
                                   const isOwnBooking = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
+                                  const canDelete = (isOwnBooking && !isExternal) || isStaff;
                                   const colWidth = 100;
                                   const colLeft = 0;
                                   const isSchedule = b.isSchedule;
@@ -8251,30 +8506,40 @@ export function AdminDashboard({
                                       style={{
                                         background: b.isPreview 
                                           ? '#f0f9ff' 
-                                          : (isUnapprovedSchedule
-                                            ? `repeating-linear-gradient(-45deg, rgba(52, 168, 83, 0.18) 0px, rgba(52, 168, 83, 0.18) 8px, #ffffff 8px, #ffffff 16px)`
-                                            : (isPending 
-                                              ? `repeating-linear-gradient(-45deg, rgba(175, 82, 222, 0.14) 0px, rgba(175, 82, 222, 0.14) 8px, #ffffff 8px, #ffffff 16px)`
-                                              : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg))),
+                                          : (isExternal
+                                            ? '#fef2f2'
+                                            : (isUnapprovedSchedule
+                                              ? `repeating-linear-gradient(-45deg, rgba(52, 168, 83, 0.18) 0px, rgba(52, 168, 83, 0.18) 8px, #ffffff 8px, #ffffff 16px)`
+                                              : (isPending 
+                                                ? `repeating-linear-gradient(-45deg, rgba(175, 82, 222, 0.14) 0px, rgba(175, 82, 222, 0.14) 8px, #ffffff 8px, #ffffff 16px)`
+                                                : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg)))),
                                         border: b.isPreview 
                                           ? '2.2px dashed #0284c7' 
-                                          : (isUnapprovedSchedule
-                                            ? `1.5px solid ${leftAccentColor}50`
-                                            : (isPending 
-                                              ? `1.5px dashed ${leftAccentColor}` 
-                                              : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`)),
+                                          : (isExternal
+                                            ? '1.5px dashed #ef4444'
+                                            : (isUnapprovedSchedule
+                                              ? `1.5px solid ${leftAccentColor}50`
+                                              : (isPending 
+                                                ? `1.5px dashed ${leftAccentColor}` 
+                                                : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`))),
                                         borderLeft: b.isPreview 
                                           ? '2.2px dashed #0284c7' 
-                                          : (isUnapprovedSchedule
-                                            ? `3px solid ${leftAccentColor}`
-                                            : (isPending 
-                                              ? `3.5px dashed ${leftAccentColor}` 
-                                              : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`)),
+                                          : (isExternal
+                                            ? '3.5px dashed #ef4444'
+                                            : (isUnapprovedSchedule
+                                              ? `3px solid ${leftAccentColor}`
+                                              : (isPending 
+                                                ? `3.5px dashed ${leftAccentColor}` 
+                                                : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`))),
                                         borderRadius: '8px',
                                         padding: '6px 8px',
                                         fontSize: '0.70rem',
                                         fontWeight: 800,
-                                        color: b.isPreview ? '#0369a1' : (isOwnSchedule && !b.isPreview && !isUnapprovedSchedule ? '#ffffff' : textColor),
+                                        color: b.isPreview 
+                                          ? '#0369a1' 
+                                          : (isExternal
+                                            ? '#b91c1c'
+                                            : (isOwnSchedule && !b.isPreview && !isUnapprovedSchedule ? '#ffffff' : textColor)),
                                         position: 'absolute',
                                         top: `calc(${(sm / 60) * 100}% + 4px)`,
                                         left: `calc(${colLeft}% + 4px)`,
@@ -8291,7 +8556,7 @@ export function AdminDashboard({
                                     >
                                       
                                       {/* Delete Button for Own Bookings */}
-                                      {isOwnBooking && !b.isPreview && (
+                                      {canDelete && !b.isPreview && (
                                         <button
                                           onClick={async (e) => {
                                             e.stopPropagation();
@@ -8438,7 +8703,34 @@ export function AdminDashboard({
                                         </div>
                                       )}
 
-                                      {isOwnSchedule && !b.isPreview ? (
+                                      {isExternal ? (
+                                        <>
+                                          {/* Time range with School icon */}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', marginBottom: '4px', fontWeight: 800 }}>
+                                            <span style={{ display: 'flex', alignItems: 'center' }}>
+                                              <School size={10} style={{ marginRight: '3px' }} />
+                                              {b.startTime} - {b.endTime}
+                                            </span>
+                                            {b.isBlockedSlot && (
+                                              <span style={{ fontSize: '0.55rem', textTransform: 'uppercase', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '1px 4px', borderRadius: '4px', fontWeight: 900 }}>
+                                                Serie
+                                              </span>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Institution Name / Purpose */}
+                                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 900, fontSize: '0.72rem' }}>
+                                            {b.purpose ? b.purpose.replace(/^\[EXTERN\]\s*/, '') : (b.reason || 'Sperrzeit')}
+                                          </div>
+                                          
+                                          {/* Recurring note or detail */}
+                                          {b.isBlockedSlot && b.reason && (
+                                            <div style={{ fontSize: '0.62rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                              {b.reason}
+                                            </div>
+                                          )}
+                                        </>
+                                      ) : isOwnSchedule && !b.isPreview ? (
                                         <>
                                           <div style={{
                                             background: '#ffffff',
@@ -8964,10 +9256,117 @@ export function AdminDashboard({
                   </button>
                 </div>
 
+                {isStaff && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Buchungs-Zweck</label>
+                    <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookingTargetType('internal');
+                          setBookingPurpose('');
+                        }}
+                        style={{
+                          flex: 1,
+                          background: bookingTargetType === 'internal' ? '#ffffff' : 'transparent',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '6px 0',
+                          fontSize: '0.74rem',
+                          fontWeight: bookingTargetType === 'internal' ? 800 : 600,
+                          color: bookingTargetType === 'internal' ? '#1c1c1e' : '#8e8e93',
+                          boxShadow: bookingTargetType === 'internal' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        Interne Buchung
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBookingTargetType('external');
+                          if (cooperationsList.length > 0) {
+                            setSelectedCooperationId(cooperationsList[0].id);
+                          } else {
+                            setSelectedCooperationId('custom');
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          background: bookingTargetType === 'external' ? '#ffffff' : 'transparent',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '6px 0',
+                          fontSize: '0.74rem',
+                          fontWeight: bookingTargetType === 'external' ? 800 : 600,
+                          color: bookingTargetType === 'external' ? '#1c1c1e' : '#8e8e93',
+                          boxShadow: bookingTargetType === 'external' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        Externe Kooperation
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {isStaff && bookingTargetType === 'external' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Kooperation / Schule</label>
+                      <select
+                        value={selectedCooperationId}
+                        onChange={(e) => setSelectedCooperationId(e.target.value)}
+                        className="premium-input"
+                        style={{
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          background: '#ffffff',
+                          color: '#1c1c1e',
+                          height: '36px',
+                          padding: '6px 28px 6px 10px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          borderRadius: '10px',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 10px center',
+                          backgroundSize: '11px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {cooperationsList.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                        <option value="custom">Freitext / Andere Institution...</option>
+                      </select>
+                    </div>
+
+                    {selectedCooperationId === 'custom' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Name der Institution</label>
+                        <input
+                          type="text"
+                          placeholder="z.B. Grundschule West"
+                          value={customCooperationName}
+                          onChange={(e) => setCustomCooperationName(e.target.value)}
+                          className="premium-input"
+                          style={{ height: '36px', padding: '6px 10px', fontSize: '0.78rem' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Notiz (nur für dich sichtbar)</label>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                    {bookingTargetType === 'external' ? 'Zweck / Notiz' : 'Notiz (nur für dich sichtbar)'}
+                  </label>
                   <input
-                    placeholder="z.B. Klavierübung, Setup vorbereiten..."
+                    placeholder={bookingTargetType === 'external' ? 'z.B. Mittagsschule, AG, Kursangebot...' : 'z.B. Klavierübung, Setup vorbereiten...'}
                     value={bookingPurpose}
                     onChange={(e) => setBookingPurpose(e.target.value)}
                     className="premium-input"
@@ -9102,7 +9501,9 @@ export function AdminDashboard({
                     ? 'Wähle einen Raum' 
                     : isEditing 
                       ? (selectedBooking?.isSchedule ? 'Als Einzeltermin übernehmen' : 'Änderung speichern')
-                      : `${selectedRoom.name} buchen`}
+                      : bookingTargetType === 'external'
+                        ? 'Externe Blockierung speichern'
+                        : `${selectedRoom.name} buchen`}
 
                 </button>
 

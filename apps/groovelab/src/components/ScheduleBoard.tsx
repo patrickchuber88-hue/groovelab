@@ -258,6 +258,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
   const [otherTeachersSchedules, setOtherTeachersSchedules] = useState<any[]>([]);
+  const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
   const [siblingInfo, setSiblingInfo] = useState<any | null>(null);
 
   // Focus Day Zoom state
@@ -902,6 +903,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .neq('teacher_id', selectedTeacherId);
       setOtherTeachersSchedules(otherSchedData || []);
 
+      // Fetch wöchentliche Blockierungen (room_blocked_slots)
+      const { data: blockedSlotsData } = await supabase
+        .from('room_blocked_slots')
+        .select('*')
+        .eq('school_id', schoolId);
+      setBlockedSlots(blockedSlotsData || []);
+
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
         // Default submittedDraftId to current active draft if none was saved in DB
@@ -1163,6 +1171,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditTeacherAvailability = async () => {
+    const proceed = await showConfirm(
+      "Möchtest du deine Unterrichtstage und Unterrichtszeiten ändern?\n\n" +
+      "Bestehende Zuteilungen an Tagen, die du abwählst, werden entfernt. Andere Tage bleiben erhalten.",
+      "Ja, Zeiten ändern",
+      "Abbrechen"
+    );
+    if (!proceed) return;
+
+    // Populate onboardingAvailability from teacherAvailability
+    const updatedOnboarding: any = {
+      1: { checked: false, start: '', end: '' },
+      2: { checked: false, start: '', end: '' },
+      3: { checked: false, start: '', end: '' },
+      4: { checked: false, start: '', end: '' },
+      5: { checked: false, start: '', end: '' },
+      6: { checked: false, start: '', end: '' },
+      7: { checked: false, start: '', end: '' }
+    };
+    
+    Object.entries(teacherAvailability || {}).forEach(([dayNum, cfg]: [string, any]) => {
+      const day = Number(dayNum);
+      if (updatedOnboarding[day]) {
+        updatedOnboarding[day].checked = true;
+        updatedOnboarding[day].start = cfg.start || '';
+        updatedOnboarding[day].end = cfg.end || '';
+      }
+    });
+    
+    setOnboardingAvailability(updatedOnboarding);
+    setIsOnboardingCompleted(false);
   };
 
   const handleTeacherOnboardingSubmit = async () => {
@@ -2117,6 +2158,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const startMin = sh * 60 + sm;
           const endMin = startMin + student.duration;
 
+          // Check if this overlaps with any wöchentliche Blockierung (blockedSlots) in this room
+          if (targetBoard.roomId) {
+            const hasBlockedConflict = blockedSlots.some((s: any) => {
+              if (s.room_id !== targetBoard.roomId) return false;
+              if (s.day_of_week !== targetBoard.dayOfWeek) return false;
+
+              const [bsh, bsm] = parseTime(s.start_time.substring(0, 5));
+              const bStart = bsh * 60 + bsm;
+              const [beh, bem] = parseTime(s.end_time.substring(0, 5));
+              const bEnd = beh * 60 + bem;
+
+              return startMin < bEnd && endMin > bStart;
+            });
+
+            if (hasBlockedConflict) {
+              setShakingStudentId(sourceId);
+              setTimeout(() => setShakingStudentId(null), 500);
+              setToast({
+                message: `Raumkonflikt: Der Raum ist in diesem Zeitraum durch einen externen Termin blockiert!`,
+                type: 'warning'
+              });
+
+              // Reset drag tracking and stop execution
+              setDraggedStudentId(null);
+              setDragSource(null);
+              setDragSourceBoardId(null);
+              setDragOverBoardId(null);
+              setDragOverIndex(null);
+              return;
+            }
+          }
+
           try {
             // Fetch student's 'gesperrt' preferences from Supabase
             const { data: prefs, error } = await supabase
@@ -2717,6 +2790,49 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       if (!await showConfirm('Möchtest du diesen Stundenplan final einloggen und an die Verwaltung senden?')) {
         return;
       }
+    }
+
+    // Validate if any assigned student in the draft overlaps with wöchentliche Blockierungen
+    let hasBlockedConflict = false;
+    let conflictStudentName = '';
+    let conflictRoomName = '';
+    
+    for (const board of boards) {
+      if (!board.roomId) continue;
+      
+      for (const bs of board.students) {
+        if (bs.isBreak || !bs.assignedTime) continue;
+        
+        const [sh, sm] = parseTime(bs.assignedTime);
+        const startMin = sh * 60 + sm;
+        const endMin = startMin + bs.duration;
+        
+        const matchedBlocked = blockedSlots.find((s: any) => {
+          if (s.room_id !== board.roomId) return false;
+          if (s.day_of_week !== board.dayOfWeek) return false;
+
+          const [bsh, bsm] = parseTime(s.start_time.substring(0, 5));
+          const bStart = bsh * 60 + bsm;
+          const [beh, bem] = parseTime(s.end_time.substring(0, 5));
+          const bEnd = beh * 60 + bem;
+
+          return startMin < bEnd && endMin > bStart;
+        });
+        
+        if (matchedBlocked) {
+          hasBlockedConflict = true;
+          conflictStudentName = `${bs.first_name} ${bs.last_name}`;
+          const r = rooms.find(room => room.id === board.roomId);
+          conflictRoomName = r ? r.name : 'Raum';
+          break;
+        }
+      }
+      if (hasBlockedConflict) break;
+    }
+    
+    if (hasBlockedConflict) {
+      await showAlert(`Einreichen blockiert: Der Unterricht von ${conflictStudentName} in ${conflictRoomName} überschneidet sich mit einer externen Blockierung/Kooperation. Bitte verschiebe den Termin oder wähle einen anderen Raum.`);
+      return;
     }
 
     try {
@@ -3340,6 +3456,35 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               {/* Group A: Onboarding & Setup */}
               <div className="apple-btn-group">
+                {currentUserRole === 'teacher' && selectedTeacherId === userId ? (
+                  <button
+                    type="button"
+                    onClick={handleEditTeacherAvailability}
+                    className="apple-btn"
+                    title="Unterrichtszeiten & Wunschtage ändern"
+                  >
+                    <Clock size={13} />
+                    <span>Zeiten ändern</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
+                      if (availableDays.length === 0) {
+                        showAlert("Alle Wochentage wurden bereits hinzugefügt.");
+                        return;
+                      }
+                      setNewBoardDay(availableDays[0].value);
+                      setShowAddBoardForm(true);
+                    }}
+                    className="apple-btn"
+                    title="Tag anlegen"
+                  >
+                    <Plus size={13} />
+                    <span>Tag anlegen</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={async () => {
@@ -3352,23 +3497,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 >
                   <Send size={13} />
                   <span>Onboarding-Link</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
-                    if (availableDays.length === 0) {
-                      showAlert("Alle Wochentage wurden bereits hinzugefügt.");
-                      return;
-                    }
-                    setNewBoardDay(availableDays[0].value);
-                    setShowAddBoardForm(true);
-                  }}
-                  className="apple-btn"
-                  title="Tag anlegen"
-                >
-                  <Plus size={13} />
-                  <span>Tag anlegen</span>
                 </button>
                 <label 
                   htmlFor="pdf-upload"
@@ -4257,12 +4385,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
 
+                        // Check conflict with recurring external blocked slots
+                        let blockedSlotReason = '';
+                        if (board.roomId && bs.assignedTime) {
+                          const [sh, sm] = parseTime(bs.assignedTime);
+                          const startMin = sh * 60 + sm;
+                          const endMin = startMin + bs.duration;
+
+                          const matchedBlocked = blockedSlots.find((s: any) => {
+                            if (s.room_id !== board.roomId) return false;
+                            if (s.day_of_week !== board.dayOfWeek) return false;
+
+                            const [bsh, bsm] = parseTime(s.start_time.substring(0, 5));
+                            const bStart = bsh * 60 + bsm;
+                            const [beh, bem] = parseTime(s.end_time.substring(0, 5));
+                            const bEnd = beh * 60 + bem;
+
+                            return startMin < bEnd && endMin > bStart;
+                          });
+
+                          if (matchedBlocked) {
+                            blockedSlotReason = matchedBlocked.reason || 'Kooperation / Externe Blockierung';
+                          }
+                        }
+
                         const isTeacherConflict = teacherConflictStudentName !== '';
                         const isRoomConflict = roomConflictTeacherName !== '';
-                        const hasConflict = isTeacherConflict || isRoomConflict;
-                        const conflictMsg = isTeacherConflict
-                          ? `Doppelbelegung Lehrkraft: Zeitgleich mit ${teacherConflictStudentName} in ${teacherConflictRoomName}`
-                          : `Raumkonflikt: Raum besetzt durch Lehrkraft ${roomConflictTeacherName} (Schüler: ${roomConflictStudentName})`;
+                        const isBlockedConflict = blockedSlotReason !== '';
+                        const hasConflict = isTeacherConflict || isRoomConflict || isBlockedConflict;
+                        const conflictMsg = isBlockedConflict
+                          ? `Gesperrt durch externe Blockierung: ${blockedSlotReason}`
+                          : (isTeacherConflict
+                            ? `Doppelbelegung Lehrkraft: Zeitgleich mit ${teacherConflictStudentName} in ${teacherConflictRoomName}`
+                            : `Raumkonflikt: Raum besetzt durch Lehrkraft ${roomConflictTeacherName} (Schüler: ${roomConflictStudentName})`);
 
                         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
                         const isGroovelabTheme = localStorage.getItem('groovelab_active_platform') === 'groovelab';

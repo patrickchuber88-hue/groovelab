@@ -1301,6 +1301,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [newEventAttachmentUrl, setNewEventAttachmentUrl] = useState<string>('');
   const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
   const [manageTeacher, setManageTeacher] = useState<any | null>(null);
+  const [isAddingCustomEq, setIsAddingCustomEq] = useState<boolean>(false);
+  const [customEqInput, setCustomEqInput] = useState<string>('');
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
   const [crisisTabMode, setCrisisTabMode] = useState<'live' | 'history'>('live');
   const [selectedArchiveLog, setSelectedArchiveLog] = useState<any | null>(null);
@@ -27539,23 +27541,24 @@ status: status,
             position: 'fixed',
             top: 0,
             right: 0,
-            width: '460px',
+            width: '680px',
             height: '100vh',
             background: '#ffffff',
             color: '#0f172a',
-            boxShadow: '-12px 0 40px rgba(15, 23, 42, 0.12)',
+            boxShadow: '-16px 0 48px rgba(15, 23, 42, 0.08)',
             zIndex: 1000,
             display: 'flex',
             flexDirection: 'column',
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-            borderLeft: '1px solid #e2e8f0',
-            fontFamily: 'Inter, sans-serif'
+            transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+            borderLeft: '1px solid rgba(0, 0, 0, 0.06)',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
           }}>
             {/* Header with gradient and large dynamic initials avatar */}
             <div style={{
-              padding: '28px 24px',
-              borderBottom: '1px solid #f1f5f9',
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              padding: '24px 28px',
+              borderBottom: '1.5px solid rgba(0, 0, 0, 0.06)',
+              background: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(20px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -27588,8 +27591,8 @@ status: status,
               <button 
                 onClick={() => setManageTeacher(null)}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
+                  background: 'rgba(0, 0, 0, 0.04)',
+                  border: 'none',
                   cursor: 'pointer',
                   color: '#64748b',
                   padding: '8px',
@@ -27605,7 +27608,7 @@ status: status,
                   e.currentTarget.style.color = '#34a853';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#ffffff';
+                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)';
                   e.currentTarget.style.color = '#64748b';
                 }}
               >
@@ -27614,301 +27617,552 @@ status: status,
             </div>
 
             {/* Form Content */}
-            <div style={{ padding: '24px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ padding: '28px', flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: '28px' }}>
               
-              {/* GENERAL INFO CARD */}
-              <div>
-                {/* Students KPI Card */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
-                  border: '1px solid #e6f4ea',
-                  padding: '16px',
-                  borderRadius: '16px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-                }}>
-                  <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
-                  <strong style={{ display: 'block', fontSize: '1.45rem', color: '#34a853', marginTop: '4px', fontWeight: 900 }}>{manageTeacher.studentCount || 0}</strong>
+              {/* TWO COLUMN GRID */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1.05fr 0.95fr',
+                gap: '28px',
+                alignItems: 'start'
+              }}>
+                {/* LEFT COLUMN: Stammdaten & Ausstattung */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stammdaten &amp; Ausstattung</h4>
+
+                  {/* Schüleranzahl KPI Card inside left column */}
+                  <div style={{
+                    background: '#f4fbf7',
+                    border: '1px solid #e6f4ea',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Schüleranzahl</span>
+                      <strong style={{ display: 'block', fontSize: '1.45rem', color: '#34a853', marginTop: '2px', fontWeight: 900 }}>{manageTeacher.studentCount || 0}</strong>
+                    </div>
+                    <GraduationCap size={24} style={{ color: '#34a853', opacity: 0.8 }} />
+                  </div>
+
+                  {/* Vorname & Nachname fields */}
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Vorname</label>
+                      <input 
+                        type="text" 
+                        value={manageTeacher.firstName} 
+                        onChange={(e) => setManageTeacher({ ...manageTeacher, firstName: e.target.value })}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          fontSize: '0.85rem',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#34a853'}
+                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                      />
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Nachname</label>
+                      <input 
+                        type="text" 
+                        value={manageTeacher.lastName} 
+                        onChange={(e) => setManageTeacher({ ...manageTeacher, lastName: e.target.value })}
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          fontSize: '0.85rem',
+                          outline: 'none',
+                          transition: 'border-color 0.2s',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#34a853'}
+                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Instrumente/Fächer */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Instrumente/Fächer</label>
+                    <AppleStyleTokenField
+                      label=""
+                      selectedString={manageTeacher.instrument}
+                      onChange={(val) => {
+                        const prevVal = manageTeacher.instrument || '';
+                        let updatedEq = manageTeacher.requiredEquipment || manageTeacher.required_equipment || [];
+                        if (typeof updatedEq === 'string') {
+                          try { updatedEq = JSON.parse(updatedEq); } catch(e) { updatedEq = updatedEq.split(',').map((s: string) => s.trim()).filter(Boolean); }
+                        }
+                        
+                        // If a new instrument was added
+                        if (val.length > prevVal.length) {
+                          const prevTokens = prevVal.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+                          const newTokens = val.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+                          const addedTokens = newTokens.filter((t: string) => !prevTokens.includes(t));
+                          
+                          const suggested = new Set<string>(updatedEq);
+                          const mapping: Record<string, string> = {
+                            'schlagzeug': 'Schlagzeug',
+                            'drums': 'Schlagzeug',
+                            'cajon': 'Cajon',
+                            'bongo': 'Bongos',
+                            'pauke': 'Pauken',
+                            'timpani': 'Pauken',
+                            'klavier': 'Klavier',
+                            'piano': 'Klavier',
+                            'e-piano': 'E-Piano',
+                            'digitalpiano': 'E-Piano',
+                            'keyboard': 'Keyboard',
+                            'synthesizer': 'Keyboard',
+                          };
+                          
+                          addedTokens.forEach((subj: string) => {
+                            Object.entries(mapping).forEach(([key, value]) => {
+                              if (subj.includes(key)) {
+                                suggested.add(value);
+                              }
+                            });
+                          });
+                          
+                          setManageTeacher({ 
+                            ...manageTeacher, 
+                            instrument: val, 
+                            requiredEquipment: Array.from(suggested) 
+                          });
+                        } else {
+                          setManageTeacher({ 
+                            ...manageTeacher, 
+                            instrument: val 
+                          });
+                        }
+                      }}
+                      suggestions={activeSubjectsList}
+                      placeholder="Unterrichtsfächer auswählen..."
+                    />
+                  </div>
+
+                  {/* Ausstattung */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Benötigte Ausstattung (Für Räume)</label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {(() => {
+                        const availableEquipment = ['Schlagzeug', 'Cajon', 'Bongos', 'Pauken', 'Klavier', 'E-Piano', 'Keyboard'];
+                        const cleanName = (name: string) => name.replace(/\s*#\d+$/, '').trim();
+                        
+                        const dbEq = Array.isArray(manageTeacher.requiredEquipment) ? manageTeacher.requiredEquipment : (Array.isArray(manageTeacher.required_equipment) ? manageTeacher.required_equipment : []);
+                        const requiredEquipment = Array.from(new Set(dbEq.map(cleanName))).filter(Boolean) as string[];
+                        
+                        const allTags = Array.from(new Set([...availableEquipment, ...requiredEquipment]));
+
+                        const handleAddCustomEq = () => {
+                          const val = customEqInput.trim();
+                          if (val && !requiredEquipment.includes(val)) {
+                            setManageTeacher({
+                              ...manageTeacher,
+                              requiredEquipment: [...requiredEquipment, val]
+                            });
+                          }
+                          setIsAddingCustomEq(false);
+                          setCustomEqInput('');
+                        };
+                        
+                        return (
+                          <>
+                            {allTags.map((tag: string) => {
+                              const active = requiredEquipment.includes(tag);
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => {
+                                    const newEq = active ? requiredEquipment.filter((t: string) => t !== tag) : [...requiredEquipment, tag];
+                                    setManageTeacher({ ...manageTeacher, requiredEquipment: newEq });
+                                  }}
+                                  style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '20px',
+                                    border: `1px solid ${active ? '#34a853' : '#e2e8f0'}`,
+                                    background: active ? '#e6f4ea' : 'white',
+                                    color: active ? '#34a853' : '#64748b',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                                >
+                                  {tag}
+                                </button>
+                              );
+                            })}
+                            {isAddingCustomEq ? (
+                              <input 
+                                type="text"
+                                autoFocus
+                                placeholder="z. B. Mischpult"
+                                value={customEqInput}
+                                onChange={(e) => setCustomEqInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddCustomEq();
+                                  } else if (e.key === 'Escape') {
+                                    setIsAddingCustomEq(false);
+                                    setCustomEqInput('');
+                                  }
+                                }}
+                                onBlur={handleAddCustomEq}
+                                style={{
+                                  padding: '5px 12px',
+                                  borderRadius: '20px',
+                                  border: '1.5px solid #34a853',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontSize: '0.75rem',
+                                  outline: 'none',
+                                  width: '100px',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsAddingCustomEq(true);
+                                  setCustomEqInput('');
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '20px',
+                                  border: '1.5px dashed #cbd5e1',
+                                  background: 'transparent',
+                                  color: '#64748b',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#94a3b8'}
+                                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+                              >
+                                + Eigene
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* INPUT FIELDS */}
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Vorname</label>
-                  <input 
-                    type="text" 
-                    value={manageTeacher.firstName} 
-                    onChange={(e) => setManageTeacher({ ...manageTeacher, firstName: e.target.value })}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#ffffff',
-                      fontSize: '0.85rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Nachname</label>
-                  <input 
-                    type="text" 
-                    value={manageTeacher.lastName} 
-                    onChange={(e) => setManageTeacher({ ...manageTeacher, lastName: e.target.value })}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#ffffff',
-                      fontSize: '0.85rem',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
+                {/* RIGHT COLUMN: Sicherheit & Berechtigungen */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sicherheit &amp; Berechtigungen</h4>
 
+                  {/* Contract expiration date */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Vertragsende (Zugriff erlischt automatisch)</label>
+                    <input 
+                      type="date" 
+                      value={manageTeacher.contractEndsAt ? new Date(manageTeacher.contractEndsAt).toISOString().split('T')[0] : ''} 
+                      onChange={(e) => setManageTeacher({ ...manageTeacher, contractEndsAt: e.target.value || null })}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#34a853'}
+                      onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                  </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Instrumente/Fächer</label>
-                <AppleStyleTokenField
-                  label=""
-                  selectedString={manageTeacher.instrument}
-                  onChange={(val) => setManageTeacher({ ...manageTeacher, instrument: val })}
-                  suggestions={activeSubjectsList}
-                  placeholder="Unterrichtsfächer auswählen..."
-                />
-              </div>
+                  {/* Support PIN Section */}
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '16px',
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#854d0e', display: 'block', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Support-PIN (Ausweis ID)</span>
+                        <strong style={{ fontSize: '1.2rem', fontFamily: 'monospace', color: '#b45309', letterSpacing: '0.05em', display: 'block', marginTop: '2px' }}>{manageTeacher.ausweisNummer || 'Keine'}</strong>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          const newPin = generateStarterPin(manageTeacher.role || 'teacher', manageTeacher.isCampusActive ?? false, manageTeacher.isGroovelabActive ?? false);
+                          try {
+                            const { error } = await supabase
+                              .from('users')
+                              .update({ 
+                                ausweis_nummer: newPin, 
+                                is_pin_activated: false,
+                                personal_pin: null
+                              })
+                              .eq('id', manageTeacher.id);
+                            if (error) throw error;
+                            setManageTeacher({ ...manageTeacher, ausweisNummer: newPin });
+                            fetchDashboardData();
+                          } catch (err: any) {
+                            alert('Fehler beim Zurücksetzen: ' + err.message);
+                          }
+                        }}
+                        style={{ 
+                          padding: '6px 12px', 
+                          fontSize: '0.72rem', 
+                          fontWeight: 700,
+                          borderRadius: '10px', 
+                          background: '#ffffff', 
+                          color: '#b45309', 
+                          border: '1px solid #fcd34d',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#fffbeb'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                      >
+                        Neu generieren
+                      </button>
+                    </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Benötigte Ausstattung (Für Räume)</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {manageTeacher.ausweisNummer && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(manageTeacher.ausweisNummer);
+                          const emailRecipient = manageTeacher.email || '';
+                          const activeSchoolName = schoolName || 'deiner Musikschule';
+                          const subject = encodeURIComponent('Dein Campus-Groovelab Zugang 🎓');
+                          const body = encodeURIComponent(
+                            `Hallo ${manageTeacher.firstName || 'Mitarbeiter(in)'},\n\n` +
+                            `willkommen im Team von ${activeSchoolName}!\n\n` +
+                            `Dein persönlicher Mitarbeiter-PIN (Ausweis ID) für die Anmeldung und Profilverknüpfung lautet:\n` +
+                            `👉 ${manageTeacher.ausweisNummer}\n\n` +
+                            `(Die PIN wurde soeben auch in deine Zwischenablage kopiert)\n\n` +
+                            `Damit kannst du dich auf dem Campus-Groovelab Portal anmelden und dein Profil aktivieren.\n\n` +
+                            `Viele Grüße,\n` +
+                            `${activeSchoolName}`
+                          );
+                          window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
+                        }}
+                        style={{ 
+                          width: '100%',
+                          padding: '8px 12px', 
+                          fontSize: '0.72rem', 
+                          fontWeight: 700,
+                          borderRadius: '10px', 
+                          background: '#b45309', 
+                          color: '#ffffff', 
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#9a3412'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#b45309'}
+                      >
+                        📬 PIN teilen &amp; kopieren
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Modulberechtigungen & Status in vertical list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Modulberechtigungen &amp; Status</span>
+                    
+                    {/* Campus Toggle */}
+                    <label style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      background: '#f8fafc', 
+                      padding: '10px 14px', 
+                      borderRadius: '12px', 
+                      border: '1px solid #e2e8f0', 
+                      cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed',
+                      opacity: manageTeacher.isActive ? 1 : 0.55,
+                      transition: 'all 0.2s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><GraduationCap size={15} style={{ color: '#34a853' }} /> Campus</span>
+                      <input 
+                        type="checkbox" 
+                        checked={manageTeacher.isCampusActive} 
+                        disabled={!manageTeacher.isActive}
+                        onChange={(e) => setManageTeacher({ ...manageTeacher, isCampusActive: e.target.checked })}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          accentColor: '#34a853',
+                          cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
+                        }}
+                      />
+                    </label>
+
+                    {/* GrooveLab Toggle */}
+                    <label style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      background: '#f8fafc', 
+                      padding: '10px 14px', 
+                      borderRadius: '12px', 
+                      border: '1px solid #e2e8f0', 
+                      cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed',
+                      opacity: manageTeacher.isActive ? 1 : 0.55,
+                      transition: 'all 0.2s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Music size={15} style={{ color: '#f59e0b' }} /> GrooveLab</span>
+                      <input 
+                        type="checkbox" 
+                        checked={manageTeacher.isGroovelabActive} 
+                        disabled={!manageTeacher.isActive}
+                        onChange={(e) => setManageTeacher({ ...manageTeacher, isGroovelabActive: e.target.checked })}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          accentColor: '#f59e0b',
+                          cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
+                        }}
+                      />
+                    </label>
+
+                    {/* Account Active Toggle */}
+                    <label style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      background: '#f8fafc', 
+                      padding: '10px 14px', 
+                      borderRadius: '12px', 
+                      border: '1px solid #e2e8f0', 
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={15} style={{ color: '#34a853' }} /> Account Aktiv</span>
+                      <input 
+                        type="checkbox" 
+                        checked={manageTeacher.isActive} 
+                        onChange={(e) => setManageTeacher({ ...manageTeacher, isActive: e.target.checked })}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          accentColor: '#34a853',
+                          cursor: 'pointer'
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* QR Code Container */}
                   {(() => {
-                    const availableEquipment = ['Schlagzeug', 'Cajon', 'Bongos', 'Pauken', 'Klavier', 'E-Piano', 'Keyboard'];
-                    const cleanName = (name: string) => name.replace(/\s*#\d+$/, '').trim();
-                    
-                    const dbEq = Array.isArray(manageTeacher.requiredEquipment) ? manageTeacher.requiredEquipment : (Array.isArray(manageTeacher.required_equipment) ? manageTeacher.required_equipment : []);
-                    const requiredEquipment = Array.from(new Set(dbEq.map(cleanName))).filter(Boolean) as string[];
-                    
-                    return availableEquipment.map((tag: string) => {
-                      const active = requiredEquipment.includes(tag);
-                      return (
+                    const token = manageTeacher.teacherQrToken || '';
+                    const isUserActive = manageTeacher.isActive || manageTeacher.is_active;
+                    const link = token ? (token.startsWith('http') ? token : `${window.location.origin}/qr/${token}`) : '';
+                    const label = isUserActive ? 'Login-QR-Code' : 'Aktivierungs-QR-Code';
+                    return link ? (
+                      <div style={{
+                        padding: '16px',
+                        borderRadius: '16px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                        boxSizing: 'border-box',
+                        width: '100%'
+                      }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{label}</span>
+                        <div style={{ 
+                          background: '#ffffff', 
+                          padding: '12px', 
+                          borderRadius: '12px', 
+                          display: 'inline-flex',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <QRCode id="qr-code-svg" value={link} size={110} />
+                        </div>
                         <button
-                          key={tag}
-                          onClick={() => {
-                            const newEq = active ? requiredEquipment.filter((t: string) => t !== tag) : [...requiredEquipment, tag];
-                            setManageTeacher({ ...manageTeacher, requiredEquipment: newEq });
+                          type="button"
+                          onClick={downloadQRCode}
+                          style={{ 
+                            width: '100%', 
+                            padding: '8px 12px', 
+                            fontSize: '0.72rem', 
+                            fontWeight: 700, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            gap: '6px', 
+                            background: '#ffffff', 
+                            border: '1px solid #cbd5e1', 
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            color: '#475569',
+                            transition: 'all 0.15s ease',
+                            boxSizing: 'border-box'
                           }}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '20px',
-                            border: `1px solid ${active ? '#34a853' : '#e2e8f0'}`,
-                            background: active ? '#e6f4ea' : 'white',
-                            color: active ? '#34a853' : '#64748b',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
                         >
-                          {tag}
+                          📥 Speichern (SVG)
                         </button>
-                      );
-                    });
+                      </div>
+                    ) : null;
                   })()}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Endzeit / Vertragsende (Zugriff erlischt automatisch)</label>
-                <input 
-                  type="date" 
-                  value={manageTeacher.contractEndsAt ? new Date(manageTeacher.contractEndsAt).toISOString().split('T')[0] : ''} 
-                  onChange={(e) => setManageTeacher({ ...manageTeacher, contractEndsAt: e.target.value || null })}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    fontSize: '0.85rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              {/* Support PIN Section */}
-              <div style={{
-                padding: '16px 20px',
-                borderRadius: '16px',
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', display: 'block', textTransform: 'uppercase' }}>Support-PIN (Ausweis ID)</span>
-                  <strong style={{ fontSize: '1.25rem', fontFamily: 'monospace', color: '#b45309', letterSpacing: '0.05em' }}>{manageTeacher.ausweisNummer || 'Keine'}</strong>
-                </div>
-                <button 
-                  onClick={async () => {
-                    const newPin = generateStarterPin(manageTeacher.role || 'teacher', manageTeacher.isCampusActive ?? false, manageTeacher.isGroovelabActive ?? false);
-                    try {
-                      const { error } = await supabase
-                        .from('users')
-                        .update({ 
-                          ausweis_nummer: newPin, 
-                          is_pin_activated: false,
-                          personal_pin: null
-                        })
-                        .eq('id', manageTeacher.id);
-                      if (error) throw error;
-                      setManageTeacher({ ...manageTeacher, ausweisNummer: newPin });
-                      fetchDashboardData();
-                    } catch (err: any) {
-                      alert('Fehler beim Zurücksetzen: ' + err.message);
-                    }
-                  }}
-                  className="google-btn-secondary"
-                  style={{ padding: '8px 14px', fontSize: '0.75rem', borderRadius: '10px', background: '#ffffff', color: '#b45309', borderColor: '#fcd34d' }}
-                >
-                  Neu generieren
-                </button>
-              </div>
-
-              {/* QR Code Activation Link Section */}
-              {(() => {
-                const token = manageTeacher.teacherQrToken || '';
-                const isActive = manageTeacher.isActive || manageTeacher.is_active;
-                const link = token ? (token.startsWith('http') ? token : `${window.location.origin}/qr/${token}`) : '';
-                const label = isActive ? 'Login-QR-Code (Ausweis)' : 'Aktivierungs-QR-Code';
-                return link ? (
-                  <div style={{
-                    padding: '20px',
-                    borderRadius: '16px',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '14px'
-                  }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', alignSelf: 'flex-start', textTransform: 'uppercase' }}>{label}</span>
-                    <div style={{ 
-                      background: '#ffffff', 
-                      padding: '16px', 
-                      borderRadius: '16px', 
-                      display: 'inline-flex',
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.04)',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <QRCode id="qr-code-svg" value={link} size={130} />
-                    </div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', marginTop: '-4px', marginBottom: '2px', textAlign: 'center' }}>
-                      {manageTeacher.firstName || ''} {manageTeacher.lastName || ''}
-                    </div>
-                    <button
-                      onClick={downloadQRCode}
-                      className="google-btn-secondary"
-                      style={{ width: '100%', padding: '10px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '12px' }}
-                    >
-                      📥 QR-Code speichern (SVG)
-                    </button>
-                  </div>
-                ) : null;
-              })()}
-
-              {/* Permissions Switches */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Modulberechtigungen &amp; Status</label>
-                
-                {/* Campus Toggle */}
-                <label style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  background: '#f8fafc', 
-                  padding: '10px 14px', 
-                  borderRadius: '12px', 
-                  border: '1px solid #e2e8f0', 
-                  cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed',
-                  opacity: manageTeacher.isActive ? 1 : 0.5,
-                  transition: 'all 0.2s ease'
-                }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><GraduationCap size={15} style={{ color: '#64748b' }} /> Campus Freigabe</span>
-                  <input 
-                    type="checkbox" 
-                    checked={manageTeacher.isCampusActive} 
-                    disabled={!manageTeacher.isActive}
-                    onChange={(e) => setManageTeacher({ ...manageTeacher, isCampusActive: e.target.checked })}
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      accentColor: '#34a853',
-                      cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
-                    }}
-                  />
-                </label>
-
-                {/* GrooveLab Toggle */}
-                <label style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  background: '#f8fafc', 
-                  padding: '10px 14px', 
-                  borderRadius: '12px', 
-                  border: '1px solid #e2e8f0', 
-                  cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed',
-                  opacity: manageTeacher.isActive ? 1 : 0.5,
-                  transition: 'all 0.2s ease'
-                }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Music size={15} style={{ color: '#64748b' }} /> GrooveLab Freigabe</span>
-                  <input 
-                    type="checkbox" 
-                    checked={manageTeacher.isGroovelabActive} 
-                    disabled={!manageTeacher.isActive}
-                    onChange={(e) => setManageTeacher({ ...manageTeacher, isGroovelabActive: e.target.checked })}
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      accentColor: '#f59e0b',
-                      cursor: manageTeacher.isActive ? 'pointer' : 'not-allowed'
-                    }}
-                  />
-                </label>
-
-                {/* Account Active Toggle */}
-                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={15} style={{ color: '#64748b' }} /> Account Aktiviert</span>
-                  <input 
-                    type="checkbox" 
-                    checked={manageTeacher.isActive} 
-                    onChange={(e) => setManageTeacher({ ...manageTeacher, isActive: e.target.checked })}
-                    style={{
-                      width: '18px',
-                      height: '18px',
-                      accentColor: '#34a853',
-                      cursor: 'pointer'
-                    }}
-                  />
-                </label>
-              </div>
-
               {/* Danger Zone */}
               <div style={{
-                marginTop: '16px',
-                padding: '16px',
+                marginTop: '8px',
+                padding: '16px 20px',
                 borderRadius: '16px',
-                border: '1px solid #fecaca',
+                border: '1.5px solid #fee2e2',
                 background: '#fef2f2',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                boxSizing: 'border-box',
+                width: '100%'
               }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#dc2626', display: 'block' }}>Gefahrenzone</span>
                   <span style={{ fontSize: '0.7rem', color: '#991b1b' }}>Diesen Lehrer permanent aus der Schule entfernen.</span>
                 </div>
                 <button 
+                  type="button"
                   onClick={async () => {
                     if (confirm('Diesen Mitarbeiter wirklich unwiderruflich löschen?')) {
                       await handleDeleteUser(manageTeacher.id);
@@ -27919,13 +28173,16 @@ status: status,
                     background: '#ef4444',
                     color: 'white',
                     border: 'none',
-                    padding: '8px 14px',
-                    borderRadius: '10px',
+                    padding: '8px 16px',
+                    borderRadius: '12px',
                     fontSize: '0.75rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)'
+                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.15)',
+                    transition: 'all 0.2s'
                   }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
                 >
                   Löschen
                 </button>
@@ -27934,7 +28191,7 @@ status: status,
 
             {/* Footer Actions */}
             <div style={{
-              padding: '20px 24px',
+              padding: '20px 28px',
               borderTop: '1px solid #e2e8f0',
               display: 'flex',
               justifyContent: 'flex-end',

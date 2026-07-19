@@ -3709,7 +3709,13 @@ function App() {
           
           const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
           const storedTab = localStorage.getItem(storageKey);
-          const startTab = storedTab ? storedTab : 'live';
+          let startTab = storedTab ? storedTab : 'live';
+          
+          // Auto-correct student-only tabs for teachers immediately on startup
+          const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+          if (studentTabs.includes(startTab)) {
+            startTab = 'live';
+          }
           
           setActiveStudentTab(startTab);
           localStorage.setItem(storageKey, startTab);
@@ -3733,12 +3739,30 @@ function App() {
 
           if (allowedPlatform === 'campus') {
             const storedTab = localStorage.getItem('campus_active_tab');
-            const defaultTab = storedTab ? storedTab : (isStudent ? 'briefing' : 'live');
+            let defaultTab = storedTab ? storedTab : (isStudent ? 'briefing' : 'live');
+            
+            const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin';
+            if (isTeacherOrAdmin) {
+              const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+              if (studentTabs.includes(defaultTab)) {
+                defaultTab = 'live';
+              }
+            }
+            
             setActiveStudentTab(defaultTab);
             localStorage.setItem('campus_active_tab', defaultTab);
           } else {
             const storedTab = localStorage.getItem('groovelab_active_tab');
-            const defaultTab = storedTab ? storedTab : 'live';
+            let defaultTab = storedTab ? storedTab : 'live';
+            
+            const isTeacherOrAdmin = userData.role?.toLowerCase() === 'teacher' || userData.role?.toLowerCase() === 'admin';
+            if (isTeacherOrAdmin) {
+              const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+              if (studentTabs.includes(defaultTab)) {
+                defaultTab = 'live';
+              }
+            }
+            
             setActiveStudentTab(defaultTab);
             localStorage.setItem('groovelab_active_tab', defaultTab);
           }
@@ -6501,9 +6525,7 @@ function App() {
         // Auto-correct if teacher/admin somehow has a student-only tab active
         const isTeacherOrAdmin = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
         if (isTeacherOrAdmin) {
-          const studentTabs = activePlatform === 'campus'
-            ? ['practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching']
-            : ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
+          const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
           if (studentTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
             console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
