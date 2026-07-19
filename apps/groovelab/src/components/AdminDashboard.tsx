@@ -1473,13 +1473,8 @@ export function AdminDashboard({
   const currentPlatformTeachersManageStudents = activePlatform === 'campus' ? campusTeachersManageStudents : teachersManageStudents;
   const currentPlatformTeachersManageTeachers = activePlatform === 'campus' ? campusTeachersManageTeachers : teachersManageTeachers;
 
-  const isOrgAdminOrSecretary = 
-    admin?.role === 'admin' || 
-    admin?.role === 'secretary' || 
-    (Array.isArray(admin?.roles) && (admin.roles.includes('admin') || admin.roles.includes('secretary')));
-
-  const canManageStudents = isOrgAdminOrSecretary || (admin?.role === 'teacher' && currentPlatformTeachersManageStudents);
-  const canManageTeachers = isOrgAdminOrSecretary || (admin?.role === 'teacher' && currentPlatformTeachersManageTeachers);
+  const canManageStudents = currentPlatformTeachersManageStudents;
+  const canManageTeachers = currentPlatformTeachersManageTeachers;
 
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
@@ -3049,12 +3044,16 @@ export function AdminDashboard({
     const studentInstrument = newStudent.isExternalVocalist ? 'Vocals' : (newStudent.instrument || 'Gitarre');
     const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
     
+    const hasCampus = schoolObj?.has_campus_subscription !== false;
+    const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
+    const finalBirthDate = hasCampus ? (newStudent.birthDate ? newStudent.birthDate : null) : null;
+
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
       role: 'student', 
       first_name: newStudent.firstName, 
-      last_name: newStudent.lastName, 
-      birth_date: null,
+      last_name: finalLastName, 
+      birth_date: finalBirthDate,
       photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
       avatar_url: studentAvatarUrl,
       qr_token: qrToken,
@@ -3113,17 +3112,19 @@ export function AdminDashboard({
 
     // Check limits - BYPASSED (Limits strictly removed)
 
+    const hasCampus = schoolObj?.has_campus_subscription !== false;
     const studentsToInsert = parsedStudents.map(student => {
       const qrToken = crypto.randomUUID();
       const isVocalist = student.instrument === 'Gesang';
       const studentInstrument = isVocalist ? 'Vocals' : student.instrument;
       const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
+      const finalLastName = hasCampus ? student.lastName : (student.lastName?.trim() ? student.lastName.trim().charAt(0).toUpperCase() + '.' : '');
       
       return {
         school_id: admin.school_id, 
         role: 'student', 
         first_name: student.firstName, 
-        last_name: student.lastName, 
+        last_name: finalLastName, 
         birth_date: null,
         photo_url: '/avatar_ghost.jpg',
         avatar_url: studentAvatarUrl,
@@ -3176,10 +3177,14 @@ export function AdminDashboard({
     const studentInstrument = editingStudent.instrument || 'Gitarre';
     const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
 
+    const hasCampus = schoolObj?.has_campus_subscription !== false;
+    const finalLastName = hasCampus ? editingStudent.last_name : (editingStudent.last_name?.trim() ? editingStudent.last_name.trim().charAt(0).toUpperCase() + '.' : '');
+    const finalBirthDate = hasCampus ? (editingStudent.birth_date || null) : null;
+
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
-      last_name: editingStudent.last_name,
-      birth_date: editingStudent.birth_date,
+      last_name: finalLastName,
+      birth_date: finalBirthDate,
       status: editingStudent.status || 'active',
       is_trial: editingStudent.is_trial || false,
       trial_ends_at: editingStudent.trial_ends_at || null,
@@ -4957,10 +4962,17 @@ export function AdminDashboard({
                   <input required placeholder="Vorname" value={newStudent.firstName} onChange={e => setNewStudent({...newStudent, firstName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname (Initial)</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>{schoolObj?.has_campus_subscription !== false ? 'Nachname' : 'Nachname (Initial)'}</label>
                   <input required placeholder="Nachname" value={newStudent.lastName} onChange={e => setNewStudent({...newStudent, lastName: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
                 </div>
               </div>
+
+              {schoolObj?.has_campus_subscription !== false && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Geburtsdatum *</label>
+                  <input type="date" required value={newStudent.birthDate || ''} onChange={e => setNewStudent({...newStudent, birthDate: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrument</label>
@@ -5133,7 +5145,20 @@ export function AdminDashboard({
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#34a853' }}>Schüler bearbeiten</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
-                <input required placeholder="Nachname" value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+                <input required placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
+
+                {schoolObj?.has_campus_subscription !== false && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Geburtsdatum *</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={editingStudent.birth_date ? (editingStudent.birth_date.includes('.') ? editingStudent.birth_date.split('.').reverse().join('-') : editingStudent.birth_date.substring(0, 10)) : ''} 
+                      onChange={e => setEditingStudent({...editingStudent, birth_date: e.target.value})} 
+                      style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} 
+                    />
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>Instrument</label>

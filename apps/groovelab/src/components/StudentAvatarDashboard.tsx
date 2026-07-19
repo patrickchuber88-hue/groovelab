@@ -9758,12 +9758,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     lineHeight: 1.1,
                     letterSpacing: '-0.02em'
                   }}>
-                    Willkommen <span style={{ 
+                    Willkommen zurück, <span style={{ 
                       background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       fontWeight: 950
-                    }}>zurück!</span> 👋
+                    }}>{studentUser?.first_name || ''}</span>! 👋
                   </h3>
                   
                   <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>

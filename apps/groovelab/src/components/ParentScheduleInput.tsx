@@ -53,6 +53,7 @@ export function ParentScheduleInput({ onSuccess }: ParentScheduleInputProps) {
   const [activeChildIndex, setActiveChildIndex] = useState<number>(0);
   const [showSiblingForm, setShowSiblingForm] = useState(false);
   const [schoolId, setSchoolId] = useState<string | null>(null);
+  const [hasCampusSub, setHasCampusSub] = useState<boolean>(true);
 
   // Sibling input form states
   const [sibFirstName, setSibFirstName] = useState('');
@@ -100,6 +101,15 @@ export function ParentScheduleInput({ onSuccess }: ParentScheduleInputProps) {
       }
 
       setSchoolId(student.school_id);
+
+      if (student.school_id) {
+        const { data: schData } = await supabase
+          .from('schools')
+          .select('has_campus_subscription')
+          .eq('id', student.school_id)
+          .maybeSingle();
+        setHasCampusSub(schData?.has_campus_subscription !== false);
+      }
 
       // Load existing availabilities for this student
       const { data: availabilities, error: availError } = await supabase
@@ -286,14 +296,17 @@ export function ParentScheduleInput({ onSuccess }: ParentScheduleInputProps) {
           const qrToken = crypto.randomUUID();
           const avatarUrl = getInstrumentAvatarUrl(child.instrument);
 
+          const finalLastName = hasCampusSub ? child.lastName : (child.lastName?.trim() ? child.lastName.trim().charAt(0).toUpperCase() + '.' : '');
+          const finalBirthDate = hasCampusSub ? (child.birthDate || null) : null;
+
           const { data: newStud, error: insertError } = await supabase
             .from('users')
             .insert({
               school_id: schoolId,
               role: 'student',
               first_name: child.firstName,
-              last_name: child.lastName,
-              birth_date: child.birthDate || null,
+              last_name: finalLastName,
+              birth_date: finalBirthDate,
               photo_url: '/avatar_ghost.jpg',
               avatar_url: avatarUrl,
               qr_token: qrToken,
@@ -511,15 +524,17 @@ export function ParentScheduleInput({ onSuccess }: ParentScheduleInputProps) {
                         <option value="Bands & Ensembles">Bands & Ensembles</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Geburtsdatum (optional)</label>
-                      <input
-                        type="date"
-                        value={sibBirthDate}
-                        onChange={e => setSibBirthDate(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
+                    {hasCampusSub && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Geburtsdatum (optional)</label>
+                        <input
+                          type="date"
+                          value={sibBirthDate}
+                          onChange={e => setSibBirthDate(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-3 justify-end pt-2">
                     <button

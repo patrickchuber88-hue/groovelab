@@ -2056,8 +2056,6 @@ function App() {
 
   const [showAutoLockWarning, setShowAutoLockWarning] = useState(false);
   const [autoLockCountdown, setAutoLockCountdown] = useState(30);
-  const [showCampusUnlockScanner, setShowCampusUnlockScanner] = useState(false);
-  const [campusUnlockError, setCampusUnlockError] = useState<string | null>(null);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
@@ -2094,7 +2092,9 @@ function App() {
 
           // Check for updates on the server periodically (every 5 minutes)
           setInterval(() => {
-            reg.update();
+            reg.update().catch((err) => {
+              console.warn('[PWA] Service Worker update check failed:', err);
+            });
             console.log('[PWA] Checking for updates on the server...');
           }, 1000 * 60 * 5);
 
@@ -2504,13 +2504,6 @@ function App() {
     } else if (targetVal === 'groovelab' && !schoolHasGroove) {
       targetVal = 'campus';
     }
-
-    // Intercept switching to campus if student in lab mode
-    if (targetVal === 'campus' && locationMode === 'lab' && user?.role === 'student' && !forceUnlock) {
-      setShowCampusUnlockScanner(true);
-      return;
-    }
-
     React.startTransition(() => {
       setActivePlatformRaw(targetVal);
       localStorage.setItem('groovelab_active_platform', targetVal);
@@ -7363,6 +7356,12 @@ function App() {
         lightBg: 'rgba(245, 158, 11, 0.12)', lightBorder: 'rgba(245, 158, 11, 0.5)', lightText: '#d97706'
       };
     }
+    if (nameLower.includes('manuel')) {
+      return {
+        solidBg: '#ea4335', solidBorder: '#c62828',
+        lightBg: 'rgba(234, 67, 53, 0.12)', lightBorder: 'rgba(234, 67, 53, 0.5)', lightText: '#ea4335'
+      };
+    }
     if (nameLower.includes('boris')) {
       return {
         solidBg: '#34a853', solidBorder: '#34a853',
@@ -7389,15 +7388,30 @@ function App() {
   const getTeacherColorStyle = (teachersInSlot: any[], loggedInUserId: string | undefined) => {
     if (teachersInSlot.length > 1) {
       const containsMe = teachersInSlot.some(t => t.user_id === loggedInUserId);
+      // Sort consistently by first_name to ensure same order of colors & initials (e.g. M+P)
+      const sortedTeachers = [...teachersInSlot].sort((a, b) => {
+        const nameA = a.profiles?.first_name || '';
+        const nameB = b.profiles?.first_name || '';
+        return nameA.localeCompare(nameB, 'de-DE');
+      });
+      const themes = sortedTeachers.map(t => {
+        const name = (t.profiles?.first_name || '').toLowerCase();
+        return getTeacherTheme(name, t.user_id || '');
+      });
+      const color1 = themes[0]?.solidBg || '#f59e0b';
+      const color2 = themes[1]?.solidBg || '#34a853';
+      const lightColor1 = themes[0]?.lightBg || 'rgba(245, 158, 11, 0.12)';
+      const lightColor2 = themes[1]?.lightBg || 'rgba(52, 168, 83, 0.12)';
+
       if (containsMe) {
         return {
-          bgColor: 'linear-gradient(135deg, #f59e0b 0%, #34a853 100%)',
+          bgColor: `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`,
           border: '1px solid #cbd5e1',
           textColor: 'white'
         };
       } else {
         return {
-          bgColor: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(52, 168, 83, 0.12) 100%)',
+          bgColor: `linear-gradient(135deg, ${lightColor1} 0%, ${lightColor2} 100%)`,
           border: '1px dashed #cbd5e1',
           textColor: '#475569'
         };
@@ -8676,8 +8690,6 @@ function App() {
                     </span>
                   </div>
                 )}
-              {activePlatform === 'campus' ? (
-                <>
                   {/* Trial Pill */}
                   {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
                     <div style={{ 
@@ -8843,29 +8855,9 @@ function App() {
                       );
                     }
                   })()}
-                </>
-              ) : (
-                <>
-                  {/* Trial Pill */}
-                  {(user?.role === 'teacher' || user?.role === 'admin') && school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
-                    <div style={{ 
-                      display: 'flex', alignItems: 'center', gap: '8px', 
-                      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', 
-                      padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', borderRadius: '12px', 
-                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
-                      color: 'white'
-                    }}>
-                      <AlertCircle size={14} color="white" />
-                      <span style={{ color: 'white', fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {trialDaysLeft > 0 
-                          ? `Probezeit: ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'}`
-                          : 'Probezeit abgelaufen'}
-                      </span>
-                    </div>
-                  )}
 
                   {/* Location Pill */}
-                  {(() => {
+                  {activePlatform === 'groovelab' && (() => {
                     const getContrastColor = (hex: string) => {
                       if (!hex || !hex.startsWith('#')) return '#ffffff';
                       const cleanHex = hex.replace('#', '');
@@ -8960,7 +8952,7 @@ function App() {
                   })()}
 
                   {/* Lab Count Pill */}
-                  {(() => {
+                  {activePlatform === 'groovelab' && (() => {
                     const getContrastColor = (hex: string) => {
                       if (!hex || !hex.startsWith('#')) return '#ffffff';
                       const cleanHex = hex.replace('#', '');
@@ -9017,8 +9009,6 @@ function App() {
                       </div>
                     );
                   })()}
-                </>
-              )}
               </div>
             )}
 
@@ -9244,14 +9234,13 @@ function App() {
                     overflow: 'hidden',
                     borderRight: '1px solid rgba(52, 168, 83, 0.15)',
                   }}>
-                    <img
-                      src={user.photo_url || '/avatar_ghost.jpg'}
-                      alt=""
+                    <StudioAvatar
+                      src={user.photo_url}
+                      user={user}
+                      activePlatform={activePlatform}
                       style={{
                         width: '100%',
                         height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
                       }}
                     />
                   </div>
@@ -10209,17 +10198,26 @@ function App() {
                                   </div>
                                 );
                               })}
-                              {activeTeachers.length > 1 && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
-                                  <div style={{ 
-                                    width: '12px', 
-                                    height: '12px', 
-                                    borderRadius: '3px', 
-                                    background: 'linear-gradient(135deg, #f59e0b 0%, #34a853 100%)', 
-                                    border: '1px solid #cbd5e1'
-                                  }}></div> {activeTeachers.length === 2 ? 'Beide' : 'Mehrere'}
-                                </div>
-                              )}
+                              {activeTeachers.length > 1 && (() => {
+                                const sortedActive = [...activeTeachers].sort((a, b) => {
+                                  const nameA = a.first_name || '';
+                                  const nameB = b.first_name || '';
+                                  return nameA.localeCompare(nameB, 'de-DE');
+                                });
+                                const theme1 = getTeacherTheme(sortedActive[0].first_name || '', sortedActive[0].id);
+                                const theme2 = getTeacherTheme(sortedActive[1].first_name || '', sortedActive[1].id);
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                                    <div style={{ 
+                                      width: '12px', 
+                                      height: '12px', 
+                                      borderRadius: '3px', 
+                                      background: `linear-gradient(135deg, ${theme1.solidBg} 0%, ${theme2.solidBg} 100%)`, 
+                                      border: '1px solid #cbd5e1'
+                                    }}></div> {activeTeachers.length === 2 ? 'Beide' : 'Mehrere'}
+                                  </div>
+                                );
+                              })()}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
                                 <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(79, 70, 229, 0.4)' }}></div> Lab voll
                               </div>
@@ -10340,11 +10338,16 @@ function App() {
 
                                             // 2. Determine Inner Content (Teachers' initials)
                                             if (teachersInSlot.length > 0) {
-                                              const initials = teachersInSlot
+                                              const sortedTeachers = [...teachersInSlot].sort((a, b) => {
+                                                const nameA = a.profiles?.first_name || '';
+                                                const nameB = b.profiles?.first_name || '';
+                                                return nameA.localeCompare(nameB, 'de-DE');
+                                              });
+                                              const initials = sortedTeachers
                                                 .map(t => t.profiles?.first_name?.[0] || 'L')
                                                 .join('+');
                                               content = (
-                                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: textColor }} title={teachersInSlot.map(t => t.profiles?.first_name).join(', ')}>
+                                                <span style={{ fontSize: '0.65rem', fontWeight: 900, color: textColor }} title={sortedTeachers.map(t => t.profiles?.first_name).join(', ')}>
                                                   {initials}
                                                 </span>
                                               );
@@ -14114,145 +14117,6 @@ function App() {
         </div>
       )}
 
-      {/* Campus Unlock QR-Scanner Modal (Lab Mode security) */}
-      {showCampusUnlockScanner && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px',
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-        }}>
-          <div className="glass-panel animation-slide-up" style={{
-            background: '#ffffff',
-            border: '1px solid rgba(52, 168, 83, 0.2)',
-            padding: '36px',
-            borderRadius: '28px',
-            maxWidth: '460px',
-            width: '100%',
-            textAlign: 'center',
-            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '20px'
-          }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: '#e6f4ea',
-              color: '#34a853',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)'
-            }}>
-              <Lock size={24} />
-            </div>
-
-            <div>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                🔒 Campus freischalten
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5, fontWeight: 550 }}>
-                Bitte scanne deinen Schüler-Ausweis (QR-Code) ein, um das Campus-Modul freizuschalten.
-              </p>
-            </div>
-
-            {/* Camera View Finder */}
-            <div style={{
-              position: 'relative',
-              width: '260px',
-              height: '260px',
-              borderRadius: '24px',
-              overflow: 'hidden',
-              background: '#09090b',
-              border: '4px solid #34a853',
-              boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)'
-            }}>
-              <CustomQRScanner
-                facingMode="user"
-                onScan={(val) => {
-                  if (val === user?.qr_token) {
-                    console.log('[Campus Unlock] Verification successful!');
-                    setShowCampusUnlockScanner(false);
-                    setCampusUnlockError(null);
-                    setActivePlatform('campus', true);
-                  } else {
-                    console.warn('[Campus Unlock] Token mismatch:', val);
-                    setCampusUnlockError('Falscher Ausweis! Scanne bitte deinen eigenen Ausweis.');
-                  }
-                }}
-                onError={(err) => {
-                  console.error('[Campus Unlock] Scanner error:', err);
-                }}
-              />
-              {/* Corner brackets */}
-              <div style={{ position: 'absolute', top: 16, left: 16, width: 24, height: 24, borderLeft: '4px solid #34a853', borderTop: '4px solid #34a853', borderRadius: '4px 0 0 0' }} />
-              <div style={{ position: 'absolute', top: 16, right: 16, width: 24, height: 24, borderRight: '4px solid #34a853', borderTop: '4px solid #34a853', borderRadius: '0 4px 0 0' }} />
-              <div style={{ position: 'absolute', bottom: 16, left: 16, width: 24, height: 24, borderLeft: '4px solid #34a853', borderBottom: '4px solid #34a853', borderRadius: '0 0 0 4px' }} />
-              <div style={{ position: 'absolute', bottom: 16, right: 16, width: 24, height: 24, borderRight: '4px solid #34a853', borderBottom: '4px solid #34a853', borderRadius: '0 0 4px 0' }} />
-              
-              {/* Laser animation */}
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: '3px',
-                background: 'rgba(52, 168, 83, 0.8)',
-                boxShadow: '0 0 8px #34a853',
-                animation: 'scan-laser 2s linear infinite'
-              }} />
-            </div>
-
-            {campusUnlockError && (
-              <div style={{
-                color: '#ef4444',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                background: '#fef2f2',
-                padding: '10px 14px',
-                borderRadius: '12px',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-                width: '100%',
-                boxSizing: 'border-box'
-              }}>
-                ⚠️ {campusUnlockError}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowCampusUnlockScanner(false);
-                setCampusUnlockError(null);
-              }}
-              style={{
-                background: '#f1f5f9',
-                color: '#475569',
-                border: 'none',
-                padding: '14px 24px',
-                borderRadius: '16px',
-                fontSize: '0.95rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                width: '100%'
-              }}
-              className="hover-scale"
-            >
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Edit Profile Modal */}
       {showEditProfile && editingProfile && (

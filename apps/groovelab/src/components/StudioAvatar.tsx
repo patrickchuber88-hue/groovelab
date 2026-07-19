@@ -67,12 +67,25 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   let displaySrc = src;
   const targetUser = user;
   const role = (targetUser?.role || '').toLowerCase();
+  const hasTeacherOrStudentRole = 
+    role === 'teacher' || 
+    role === 'student' || 
+    (targetUser?.roles && (targetUser.roles.includes('teacher') || targetUser.roles.includes('student')));
+
+  const isPureAdminOrSecretary = !hasTeacherOrStudentRole && (
+    role === 'admin' || 
+    role === 'secretary' || 
+    (targetUser?.roles && (targetUser.roles.includes('admin') || targetUser.roles.includes('secretary')))
+  );
   
-  if (activePlat === 'secretary') {
+  if (isPureAdminOrSecretary) {
+    // Pure administrative users always display the chalkboard image in all modules
+    displaySrc = '/campus_login_hero.png';
+  } else if (activePlat === 'secretary' || activePlat === 'admin') {
     // In administration/secretariat module, always display the chalkboard
     displaySrc = '/campus_login_hero.png';
   } else if (activePlat === 'campus') {
-    // In Campus module, display the instrument avatar for all roles (student, teacher, admin, secretary)
+    // In Campus module, display the instrument avatar for all roles (student, teacher)
     // We only show custom non-avatar photos if available, otherwise default to instrument avatar
     const isMusicianOrInstrumentAvatar = src && (
       src.includes('student_') ||
@@ -114,6 +127,7 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       src.includes('oboe_avatar') ||
       src.includes('teacher_') ||
       src.includes('avatar_teacher') ||
+      src.includes('avatar_ghost') ||
       src === '/campus_login_hero.png'
     );
     if (!src || isMusicianOrInstrumentAvatar) {

@@ -509,7 +509,35 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   );
 });
 
+const getUniqueCoaches = (list: any[]) => {
+  const filtered = (list || []).filter(Boolean);
+  const sorted = [...filtered].sort((a, b) => {
+    const aUser = a.users || a;
+    const bUser = b.users || b;
+    const aHasRole = aUser?.role === 'teacher' || aUser?.role === 'student';
+    const bHasRole = bUser?.role === 'teacher' || bUser?.role === 'student';
+    if (aHasRole && !bHasRole) return -1;
+    if (!aHasRole && bHasRole) return 1;
+    return 0;
+  });
+
+  const seenNames = new Set();
+  const result = [];
+  for (const item of sorted) {
+    const userObj = item.users || item;
+    if (userObj) {
+      const fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim().toLowerCase();
+      if (!seenNames.has(fullName)) {
+        seenNames.add(fullName);
+        result.push(item);
+      }
+    }
+  }
+  return result;
+};
+
 const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string }) => {
+  const uniqueList = getUniqueCoaches(coaches);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -529,8 +557,8 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
         justifyContent: 'center',
         boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
       }}>
-        {coaches.map((c, idx) => {
-          const total = coaches.length;
+        {uniqueList.map((c, idx) => {
+          const total = uniqueList.length;
           const offset = total > 1 ? (idx - (total - 1) / 2) * 54 : 0;
           const verticalOffset = total > 1 ? (idx % 2 === 0 ? -12 : 12) : 0;
           const labelAbove = total > 1 && idx % 2 === 0;
@@ -1885,6 +1913,39 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [calendarUrls, setCalendarUrls] = useState<string[]>([]);
   const [newCalendarUrlInput, setNewCalendarUrlInput] = useState<string>('');
   
+  // Danger Zone / School Reset States
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const [resetConfirmText, setResetConfirmText] = useState<string>('');
+  const [isResetting, setIsResetting] = useState<boolean>(false);
+
+  const handleResetSchool = async () => {
+    if (resetConfirmText !== schoolName) {
+      alert(`Fehler: Bitte geben Sie genau den Namen der Musikschule („${schoolName}“) zur Bestätigung ein.`);
+      return;
+    }
+    
+    setIsResetting(true);
+    try {
+      const { error } = await supabase.rpc('reset_school_data', {
+        p_school_id: schoolId,
+        p_admin_id: userId
+      });
+      if (error) throw error;
+      
+      alert('Erfolg: Die Musikschule wurde erfolgreich auf Werkseinstellungen zurückgesetzt! Alle Schüler- und Lehrerdaten wurden gelöscht. Ihr Administrator-Profil ist weiterhin aktiv.');
+      setShowResetModal(false);
+      setResetConfirmText('');
+      
+      fetchDashboardData();
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Error resetting school:', err);
+      alert('Fehler beim Zurücksetzen der Musikschule: ' + (err.message || err));
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   // Backup & Restore States & Functions
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
@@ -5075,19 +5136,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
   const handleCreateStudentCampus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentFirstName || !newStudentLastName || !newStudentBirthDate) {
-      alert('Bitte Vorname, Nachname und Geburtsdatum ausfüllen.');
+    if (!newStudentFirstName || !newStudentLastName || (hasCampusSub && !newStudentBirthDate)) {
+      alert(hasCampusSub ? 'Bitte Vorname, Nachname und Geburtsdatum ausfüllen.' : 'Bitte Vorname und Nachname ausfüllen.');
       return;
     }
 
     try {
       const teacherId = newStudentTeacherId || null;
+      const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
+      const finalBirthDate = hasCampusSub ? (newStudentBirthDate ? newStudentBirthDate.trim() : null) : null;
 
       // 1. Call import_student RPC (5-Tabellen anonymisiertes Onboarding)
       const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
         first_name: newStudentFirstName,
-        last_name: newStudentLastName,
-        birth_date: newStudentBirthDate.trim(),
+        last_name: finalLastName,
+        birth_date: finalBirthDate,
         instrument: newStudentInstrument || 'Nicht festgelegt',
         school_id: schoolId,
         teacher_id: teacherId
@@ -5114,19 +5177,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
   const handleCreateStudentGroovelab = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentFirstName || !newStudentLastName || !newStudentBirthDate) {
-      alert('Bitte Vorname, Nachname und Geburtsdatum ausfüllen.');
+    if (!newStudentFirstName || !newStudentLastName || (hasCampusSub && !newStudentBirthDate)) {
+      alert(hasCampusSub ? 'Bitte Vorname, Nachname und Geburtsdatum ausfüllen.' : 'Bitte Vorname und Nachname ausfüllen.');
       return;
     }
 
     try {
       const teacherId = newStudentTeacherId || null;
+      const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
+      const finalBirthDate = hasCampusSub ? (newStudentBirthDate ? newStudentBirthDate.trim() : null) : null;
 
       // 1. Call import_student RPC
       const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
         first_name: newStudentFirstName,
-        last_name: newStudentLastName,
-        birth_date: newStudentBirthDate.trim(),
+        last_name: finalLastName,
+        birth_date: finalBirthDate,
         instrument: newStudentInstrument || 'Nicht festgelegt',
         school_id: schoolId,
         teacher_id: teacherId
@@ -5285,10 +5350,13 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         }
 
         try {
+          const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
+          const finalBirthDate = hasCampusSub ? (birthDate || '01.01.2000') : null;
+
           const { data, error: rpcError } = await supabase.rpc('import_student', {
             first_name: firstName,
-            last_name: lastName,
-            birth_date: birthDate || '01.01.2000', // Default to 01.01.2000 if not provided
+            last_name: finalLastName,
+            birth_date: finalBirthDate,
             instrument: instrument,
             school_id: schoolId,
             teacher_id: teacherId || null
@@ -5386,6 +5454,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
         const finalEmail = `student.${studentId}@campus-groovelab.local`;
 
+        const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
+
         const { data: insertedStudent, error: insertError } = await supabase
           .from('users')
           .insert({
@@ -5394,7 +5464,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
             teacher_id: teacherId,
             role: 'student',
             first_name: firstName,
-            last_name: lastName,
+            last_name: finalLastName,
             email: finalEmail,
             instrument: finalInstrument || 'Nicht festgelegt',
             avatar_url: defaultAvatarUrl,
@@ -5852,6 +5922,112 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         </div>
 
 
+
+        {/* Modal: School Reset Confirmation */}
+        {showResetModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '540px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              
+              {/* Header */}
+              <div style={{ padding: '24px', borderBottom: '1px solid #fee2e2', background: '#fff5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#c53030', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldAlert size={20} /> Werkseinstellungen zurücksetzen
+                </h3>
+                <button 
+                  onClick={() => {
+                    setShowResetModal(false);
+                    setResetConfirmText('');
+                  }}
+                  style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#742a2a', fontWeight: 'bold' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ background: '#fff5f5', border: '1.5px solid #feb2b2', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <ShieldAlert size={24} style={{ color: '#e53e3e', flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ fontSize: '0.8rem', color: '#742a2a', lineHeight: '1.45' }}>
+                    <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.84rem' }}>Achtung: Dies ist eine destruktive Aktion!</strong>
+                    Durch diesen Vorgang werden alle Schülerprofile, Lehrerprofile, Ausweise, Wochenpläne, Stunden, Bands, Chathistorien und zugehörigen Übungsdaten <strong>unwiderruflich gelöscht</strong>. Nur Ihr Administrator-Konto bleibt aktiv.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
+                    Bitte bestätigen Sie diesen Vorgang, indem Sie den genauen Namen Ihrer Musikschule eingeben:
+                  </span>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center', userSelect: 'none' }}>
+                    {schoolName}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Namen der Musikschule hier eingeben..."
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    style={{ 
+                      padding: '12px 14px', 
+                      borderRadius: '10px', 
+                      border: '1.5px solid',
+                      borderColor: resetConfirmText === schoolName ? '#34a853' : '#cbd5e1', 
+                      fontSize: '0.84rem', 
+                      outline: 'none',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      transition: 'all 0.15s'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer / Action Buttons */}
+              <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResetModal(false);
+                    setResetConfirmText('');
+                  }}
+                  style={{ 
+                    padding: '10px 18px', 
+                    fontSize: '0.78rem', 
+                    fontWeight: 700, 
+                    borderRadius: '10px', 
+                    border: '1px solid #cbd5e1', 
+                    background: '#ffffff', 
+                    color: '#475569', 
+                    cursor: 'pointer' 
+                  }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetSchool}
+                  disabled={resetConfirmText !== schoolName || isResetting}
+                  style={{ 
+                    padding: '10px 20px', 
+                    fontSize: '0.78rem', 
+                    fontWeight: 800, 
+                    borderRadius: '10px', 
+                    border: 'none', 
+                    background: resetConfirmText === schoolName ? '#e53e3e' : '#cbd5e1', 
+                    color: '#ffffff', 
+                    cursor: resetConfirmText === schoolName ? 'pointer' : 'not-allowed',
+                    opacity: resetConfirmText === schoolName ? 1 : 0.6,
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  {isResetting ? 'Wird zurückgesetzt...' : 'Ja, alle Daten unwiderruflich löschen'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
 
         {/* Modal: Add Subject */}
         {showAddSubjectModal && (
@@ -11352,15 +11528,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
             <div style={{ position: 'relative' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                 <img 
-                  src={
-                    activeTab === 'secretary'
-                      ? '/campus_login_hero.png'
-                      : activeTab === 'campus'
-                      ? getInstrumentAvatarUrl(currentUserProfile?.instrument)
-                      : (!currentUserProfile?.photo_url || currentUserProfile?.photo_url === '/campus_login_hero.png'
-                          ? '/avatar_ghost.jpg'
-                          : currentUserProfile?.photo_url)
-                  } 
+                  src="/campus_login_hero.png"
                   alt="" 
                   style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} 
                   loading="lazy" 
@@ -19156,13 +19324,33 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               const activeRoom = groovelabRooms.find(r => r.id === selectedRoomId) || groovelabRooms[0];
               const roomStations = stations.filter(s => s.room_id === (activeRoom?.id || selectedRoomId));
 
-              const activeCoachesForLayout = activeSessions
-                .filter(s => s.users?.role === 'teacher' || s.users?.role === 'admin')
+              const rawCoaches = activeSessions
+                .filter(s => s && s.users && (s.users.role === 'teacher' || s.users.role === 'admin' || s.users.role === 'secretary'))
                 .map(s => ({
                   id: s.user_id,
                   users: s.users,
                   session: s
                 }));
+
+              const sortedRawCoaches = [...rawCoaches].sort((a, b) => {
+                const aHasRole = a.users?.role === 'teacher' || a.users?.role === 'student';
+                const bHasRole = b.users?.role === 'teacher' || b.users?.role === 'student';
+                if (aHasRole && !bHasRole) return -1;
+                if (!aHasRole && bHasRole) return 1;
+                return 0;
+              });
+
+              const seenNames = new Set();
+              const activeCoachesForLayout: any[] = [];
+              for (const c of sortedRawCoaches) {
+                if (c && c.users) {
+                  const fullName = `${c.users.first_name || ''} ${c.users.last_name || ''}`.trim().toLowerCase();
+                  if (!seenNames.has(fullName)) {
+                    seenNames.add(fullName);
+                    activeCoachesForLayout.push(c);
+                  }
+                }
+              }
 
               if (isMobileView) {
                 return (
@@ -26912,6 +27100,54 @@ status: status,
                         <option value="never">Nie löschen (manuell)</option>
                       </select>
                     </div>
+                    {/* Gefahrenbereich (Danger Zone) */}
+                    <div style={{ 
+                      marginTop: '12px',
+                      background: '#fff5f5', 
+                      border: '1.5px solid #feb2b2', 
+                      borderRadius: '16px', 
+                      padding: '20px', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '12px' 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <ShieldAlert size={18} style={{ color: '#e53e3e' }} />
+                        <strong style={{ fontSize: '0.88rem', color: '#c53030', fontWeight: 800 }}>Gefahrenzone: Werkseinstellungen</strong>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#742a2a', lineHeight: '1.45', flex: 1 }}>
+                          Setzt Ihre komplette Musikschule auf Werkseinstellungen zurück. 
+                          Alle Schüler- und Lehrer-Profile, Avatare, Wochenstundenpläne, Unterrichtsstunden, gebildeten Bands und Chathistorien werden <strong>unwiderruflich gelöscht</strong>. 
+                          Lediglich Ihr Administrator-Konto bleibt aktiv, sodass Sie die Schule sofort von null auf neu aufbauen können.
+                        </span>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResetConfirmText('');
+                            setShowResetModal(true);
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            background: '#e53e3e',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 4px rgba(229, 62, 62, 0.2)'
+                          }}
+                          className="hover-scale"
+                        >
+                          Werkseinstellungen zurücksetzen
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 )}
 

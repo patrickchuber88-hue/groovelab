@@ -11,7 +11,7 @@ import {
   Users, 
   Bell,
   Link2
-} from 'lucide-react';
+} from 'lucide-react';import { generateConsentPDF } from '../utils/pdfGenerator';
 
 interface CampusSetupScreenProps {
   school: any;
@@ -413,56 +413,14 @@ export function CampusSetupScreen({
                 }}>
                   <div style={{ flex: 1 }}>
                     <strong style={{ fontSize: '0.84rem', color: '#854d0e', display: 'block', marginBottom: '2px' }}>Eltern-Information &amp; Einwilligung (Vorlage)</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#a16207', display: 'block' }}>Rechtssichere Vorlage als Textdatei zum Ausdrucken oder Versenden.</span>
+                    <span style={{ fontSize: '0.72rem', color: '#a16207', display: 'block' }}>Rechtssichere Vorlage als PDF-Datei zum Ausdrucken und Unterschreiben.</span>
                   </div>
                   <button 
                     onClick={() => {
                       const hasCampus = effectiveSchool?.has_campus_subscription ?? false;
                       const hasGroove = effectiveSchool?.has_groovelab_subscription ?? false;
-                      
-                      const isGrooveOnly = !hasCampus && hasGroove;
-                      const isCampusOnly = hasCampus && !hasGroove;
-
-                      let appName = 'Campus-Groovelab';
-                      let subjectPhrase = 'Instrumental- und Groovelab-Unterrichts';
-                      if (isGrooveOnly) {
-                        appName = 'GrooveLab';
-                        subjectPhrase = 'Groovelab-Unterrichts';
-                      } else if (isCampusOnly) {
-                        appName = 'Campus';
-                        subjectPhrase = 'Instrumentalunterrichts';
-                      }
-
-                      const filename = isGrooveOnly 
-                        ? 'Eltern_Information_Einwilligung_Groovelab.txt' 
-                        : isCampusOnly
-                          ? 'Eltern_Information_Einwilligung_Campus.txt'
-                          : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
-
-                      const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR ERPROBUNG DER LERN-APP ${appName.toUpperCase()}
-
-Sehr geehrte Eltern, liebe Erziehungsberechtigte,
-
-im Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).
-
-DATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:
-- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos.
-- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.
-- Zur Identifizierung wird lediglich ein Profil mit dem Vornamen sowie dem ersten Buchstaben des Nachnamens (z. B. „Jonas M.“) angelegt.
-- Das Hosting findet zu 100 % in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH) statt.
-- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.
-
-Mit der Teilnahme an der Pilotphase willigen Sie ein, dass wir ein anonymisiertes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.
-
-Vielen Dank für Ihre Unterstützung!`;
-                      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = filename;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
+                      const activePlat = (!hasCampus && hasGroove) ? 'groovelab' : (hasCampus && !hasGroove) ? 'campus' : 'both';
+                      generateConsentPDF(schoolName || 'Meine Musikschule', activePlat, effectiveSchool?.student_billing_option);
                     }}
                     style={{ 
                       padding: '8px 16px',

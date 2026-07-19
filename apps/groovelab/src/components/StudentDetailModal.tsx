@@ -157,9 +157,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleTabChange = (tab: 'campus' | 'groovelab') => {
     setLocalTab(tab);
-    if (onSwitchPlatform) {
-      onSwitchPlatform(tab);
-    }
   };
 
   const [skills, setSkills] = useState<any[]>([]);

@@ -1,14 +1,28 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, X, ShieldCheck } from 'lucide-react';
+import { Music, Tablet, X, ShieldCheck, FileText } from 'lucide-react';
+import { generateConsentPDF } from '../utils/pdfGenerator';
+
+interface DeviceSetupScreenProps {
+  school?: any;
+  admin?: any;
+  brandColor?: string;
+  onUpdate?: () => void;
+}
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
 };
 
-export function DeviceSetupScreen() {
+export function DeviceSetupScreen({
+  school,
+  admin,
+  brandColor = '#eab308',
+  onUpdate
+}: DeviceSetupScreenProps = {}) {
   const [rooms, setRooms] = useState<any[]>([]);
+  const [setupTab, setSetupTab] = useState<'device' | 'datenschutz'>('device');
   const [stations, setStations] = useState<any[]>([]);
   const [activeStationIds, setActiveStationIds] = useState<string[]>([]);
   const [busySessions, setBusySessions] = useState<any[]>([]);
@@ -277,14 +291,52 @@ export function DeviceSetupScreen() {
         }}
         style={{ fontSize: '1.5rem', marginBottom: '8px', cursor: 'default', userSelect: 'none' }}
       >
-        Geräte-Setup
+        {setupTab === 'device' ? 'Geräte-Setup' : 'Datenschutz & Rechtliches'}
       </h1>
-      <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.875rem', maxWidth: '280px' }}>
-        Weise diesem Gerät eine feste Nummer zu, um es als Schüler-Terminal zu nutzen.
+      <p style={{ color: 'var(--text-muted)', marginBottom: '32px', fontSize: '0.875rem', maxWidth: '400px' }}>
+        {setupTab === 'device' 
+          ? 'Weise diesem Gerät eine feste Nummer zu, um es als Schüler-Terminal zu nutzen.'
+          : 'AVV-Status einsehen und Unterlagen zur Schüler-Einwilligung herunterladen.'}
       </p>
 
       <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '32px', background: 'white', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
+        {/* Tab-Bar */}
+        <div style={{ 
+          display: 'flex', 
+          borderBottom: '1px solid #e2e8f0', 
+          marginBottom: '8px', 
+          gap: '24px',
+          paddingBottom: '12px'
+        }}>
+          {[
+            { id: 'device', label: 'Geräte-Setup' },
+            { id: 'datenschutz', label: 'Datenschutz & AVV' }
+          ].map((tab) => {
+            const isSelected = setupTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setSetupTab(tab.id as any)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: isSelected ? `3px solid ${brandColor}` : '3px solid transparent',
+                  color: isSelected ? '#1e293b' : '#64748b',
+                  fontSize: '0.875rem',
+                  fontWeight: 800,
+                  padding: '4px 8px 8px 8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  marginBottom: '-13px'
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
         {error && (
           <div style={{ color: '#ef4444', fontSize: '0.875rem', padding: '12px', background: '#fef2f2', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <span>{error}</span>
@@ -297,7 +349,9 @@ export function DeviceSetupScreen() {
           </div>
         )}
         
-        <div style={{ textAlign: 'left' }}>
+        {setupTab === 'device' ? (
+          <>
+            <div style={{ textAlign: 'left' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Raum auswählen</label>
           <div style={{ display: 'inline-flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px', flexWrap: 'wrap' }}>
             {rooms.map((room, idx) => {
@@ -673,7 +727,88 @@ export function DeviceSetupScreen() {
             Setup überspringen (nur Home-Mode)
           </button>
         </div>
-      </div>
+      </>
+    ) : (
+      <>
+        {/* Datenschutz & AVV tab content for GrooveLab settings */}
+        <div style={{ 
+          color: '#854d0e', 
+          background: '#fefce8', 
+          padding: '16px', 
+          borderRadius: '16px', 
+          fontSize: '0.78rem', 
+          lineHeight: '1.45', 
+          border: '1px solid #fef08a', 
+          textAlign: 'left' 
+        }}>
+          <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>Rechtssicherer Pilotbetrieb</strong>
+          <div style={{ marginTop: '4px' }}>
+            Um den gesetzlichen Anforderungen an Schulsoftware gerecht zu werden, müssen vor dem Eintragen von Schülernamen (nur Vorname + erster Buchstabe Nachname) die Einverständniserklärungen der Erziehungsberechtigten vorliegen. Nutze dafür unser vorbereitetes Infoblatt.
+          </div>
+        </div>
+
+        {/* Download Card */}
+        <div style={{ 
+          background: '#fefce8', 
+          border: '1px solid #fef08a', 
+          borderRadius: '16px', 
+          padding: '16px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          gap: '12px',
+          textAlign: 'left'
+        }}>
+          <div style={{ flex: 1 }}>
+            <strong style={{ fontSize: '0.84rem', color: '#854d0e', display: 'block', marginBottom: '2px' }}>Eltern-Information &amp; Einwilligung (Vorlage)</strong>
+            <span style={{ fontSize: '0.72rem', color: '#a16207', display: 'block' }}>Rechtssichere Vorlage als PDF-Datei zum Ausdrucken und Unterschreiben.</span>
+          </div>
+          <button 
+            onClick={() => {
+              const effectiveSchool = Array.isArray(school) ? school[0] : school;
+              const schoolName = effectiveSchool?.name || admin?.schoolName || 'Meine Musikschule';
+              
+              const hasCampus = effectiveSchool?.has_campus_subscription ?? false;
+              const hasGroove = effectiveSchool?.has_groovelab_subscription ?? false;
+              const activePlat = (!hasCampus && hasGroove) ? 'groovelab' : (hasCampus && !hasGroove) ? 'campus' : 'both';
+              
+              generateConsentPDF(schoolName, activePlat, effectiveSchool?.student_billing_option);
+            }}
+            style={{ 
+              padding: '8px 16px',
+              background: brandColor,
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: `0 2px 4px rgba(234, 179, 8, 0.2)`,
+              transition: 'transform 0.15s'
+            }}
+            className="hover-scale"
+          >
+            Download
+          </button>
+        </div>
+
+        {/* AVV Card */}
+        <div style={{ 
+          background: '#e6f4ea', 
+          border: '1px solid #a7f3d0', 
+          borderRadius: '16px', 
+          padding: '16px', 
+          fontSize: '0.76rem',
+          color: '#34a853',
+          lineHeight: '1.45',
+          textAlign: 'left'
+        }}>
+          <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#34a853' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong>
+          Der AVV nach Art. 28 DSGVO (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Pilotphasen-Freischaltung digital gezeichnet.
+        </div>
+      </>
+    )}
+  </div>
 
       {/* Hidden Master Admin Credentials Login Modal */}
       {showAdminModal && (

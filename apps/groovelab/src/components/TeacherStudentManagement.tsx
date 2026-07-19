@@ -107,6 +107,15 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
     setError(null);
 
     try {
+      // Load school subscription details
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('has_campus_subscription')
+        .eq('id', schoolId)
+        .single();
+      const hasCampus = schoolData?.has_campus_subscription !== false;
+      const finalLastName = hasCampus ? lastName.trim() : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
+
       // 1. Try to hit backend endpoint
       const token = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id'); // mock token for auth header or direct
       const response = await fetch('/api/students/onboard', {
@@ -117,7 +126,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
         },
         body: JSON.stringify({
           firstName,
-          lastName,
+          lastName: finalLastName,
           instrument,
           isAppUser
         })
@@ -150,7 +159,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
         teacher_id: teacherId,
         role: 'student',
         first_name: firstName.trim(),
-        last_name: lastName.trim(),
+        last_name: finalLastName,
         instrument: instrument.trim(),
         avatar_url: defaultAvatarUrl,
         is_app_user: isAppUser,

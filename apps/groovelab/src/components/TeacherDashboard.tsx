@@ -675,7 +675,35 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
   );
 });
 
+const getUniqueCoaches = (list: any[]) => {
+  const filtered = (list || []).filter(Boolean);
+  const sorted = [...filtered].sort((a, b) => {
+    const aUser = a.users || a;
+    const bUser = b.users || b;
+    const aHasRole = aUser?.role === 'teacher' || aUser?.role === 'student';
+    const bHasRole = bUser?.role === 'teacher' || bUser?.role === 'student';
+    if (aHasRole && !bHasRole) return -1;
+    if (!aHasRole && bHasRole) return 1;
+    return 0;
+  });
+
+  const seenNames = new Set();
+  const result = [];
+  for (const item of sorted) {
+    const userObj = item.users || item;
+    if (userObj) {
+      const fullName = `${userObj.first_name || ''} ${userObj.last_name || ''}`.trim().toLowerCase();
+      if (!seenNames.has(fullName)) {
+        seenNames.add(fullName);
+        result.push(item);
+      }
+    }
+  }
+  return result;
+};
+
 const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, currentUserId, onSelfCheckout, onCoachCheckout, viewMode }: { coaches: any[], onProfileSelect: (u: any) => void, activePlatform?: string, currentUserId?: string, onSelfCheckout?: () => void, onCoachCheckout?: (coach: any) => void, viewMode?: string }) => {
+  const uniqueList = getUniqueCoaches(coaches);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
       <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -695,8 +723,8 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
         justifyContent: 'center',
         boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
       }}>
-        {coaches.filter(Boolean).map((c, idx) => {
-          const total = coaches.filter(Boolean).length;
+        {uniqueList.map((c, idx) => {
+          const total = uniqueList.length;
           const offset = total > 1 ? (idx - (total - 1) / 2) * 54 : 0;
           const verticalOffset = total > 1 ? (idx % 2 === 0 ? -12 : 12) : 0;
           const labelAbove = total > 1 && idx % 2 === 0;
@@ -3915,7 +3943,7 @@ export function TeacherDashboard({
             ? Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // coaches
-          (activeTab === 'live' || activeTab === 'briefing')
+          (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'coaches')
             ? Promise.resolve(supabase.from('users').select('*').in('role', ['teacher', 'admin']).eq('school_id', tData.school_id)).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
           // submissions (user_song_skills pending approval)
@@ -4037,6 +4065,9 @@ export function TeacherDashboard({
         const activeCoaches = (allCoaches || []).filter(c => {
           if (!c) return false;
           if (c.is_observer) return false;
+          if (activeTab === 'coaches') {
+            return true;
+          }
           if (c.id === userId) {
             // Self: show when checked in, and always show if the board is visible (isUserCheckedIn is true)
             return isCurrentTeacher && (isUserCheckedIn || isSelfCheckedIn);
@@ -4045,15 +4076,35 @@ export function TeacherDashboard({
           return trulyActive.some(s => s && s.user_id === c.id);
         });
 
-        setCoaches(
-          activeCoaches
-            .filter(Boolean)
-            .map(c => ({
-              id: c.id,
-              users: c,
-              session: trulyActive.find(s => s && s.user_id === c.id)
-            }))
-        );
+        const mappedCoaches = activeCoaches
+          .filter(Boolean)
+          .map(c => ({
+            id: c.id,
+            users: c,
+            session: trulyActive.find(s => s && s.user_id === c.id)
+          }));
+
+        const sortedMapped = [...mappedCoaches].sort((a, b) => {
+          const aHasRole = a.users?.role === 'teacher' || a.users?.role === 'student';
+          const bHasRole = b.users?.role === 'teacher' || b.users?.role === 'student';
+          if (aHasRole && !bHasRole) return -1;
+          if (!aHasRole && bHasRole) return 1;
+          return 0;
+        });
+
+        const seenNames = new Set();
+        const uniqueMapped = [];
+        for (const coach of sortedMapped) {
+          if (coach && coach.users) {
+            const fullName = `${coach.users.first_name || ''} ${coach.users.last_name || ''}`.trim().toLowerCase();
+            if (!seenNames.has(fullName)) {
+              seenNames.add(fullName);
+              uniqueMapped.push(coach);
+            }
+          }
+        }
+
+        setCoaches(uniqueMapped);
 
         // 5. Challenges
         const filteredSubs = (subData || []).filter((s: any) => (Array.isArray(s.users) ? s.users[0] : s.users)?.school_id === tData.school_id);
@@ -5102,17 +5153,20 @@ export function TeacherDashboard({
     
     const studentId = crypto.randomUUID();
     const qrToken = crypto.randomUUID();
-    const lName = newStudent.lastName;
-    const formattedLastName = lName;
+    
+    const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
+    const hasCampus = activeSchool?.has_campus_subscription !== false;
+    const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
+    const finalBirthDate = hasCampus ? (newStudent.birthDate ? newStudent.birthDate : null) : null;
     
     const { data, error } = await supabase.from('users').insert({
       id: studentId,
       school_id: teacher.school_id, 
       role: 'student', 
       first_name: newStudent.firstName, 
-      last_name: formattedLastName,
+      last_name: finalLastName,
       email: `student.${studentId}@campus-groovelab.local`,
-      birth_date: newStudent.birthDate ? newStudent.birthDate : null,
+      birth_date: finalBirthDate,
       photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
       qr_token: qrToken,
       is_external_vocalist: newStudent.isExternalVocalist,
@@ -5152,12 +5206,15 @@ export function TeacherDashboard({
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
-    const lName = editingStudent.last_name || '';
-    const formattedLast = lName;
+    const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
+    const hasCampus = activeSchool?.has_campus_subscription !== false;
+    const finalLastName = hasCampus ? (editingStudent.last_name || '') : (editingStudent.last_name?.trim() ? editingStudent.last_name.trim().charAt(0).toUpperCase() + '.' : '');
+    const finalBirthDate = hasCampus ? (editingStudent.birth_date || null) : null;
+
     const { error } = await supabase.from('users').update({
       first_name: editingStudent.first_name,
-      last_name: formattedLast,
-      birth_date: editingStudent.birth_date || null,
+      last_name: finalLastName,
+      birth_date: finalBirthDate,
       status: editingStudent.status || 'active',
       is_trial: editingStudent.is_trial || false,
       trial_ends_at: editingStudent.is_trial && editingStudent.trial_ends_at ? editingStudent.trial_ends_at : null,
@@ -12820,10 +12877,12 @@ export function TeacherDashboard({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-            {coaches.map(coach => (
-              <div 
-                key={coach.id} 
-                className="google-card"
+            {coaches.map(c => {
+              const coach = c.users || c;
+              return (
+                <div 
+                  key={coach.id} 
+                  className="google-card"
                 style={{ 
                   padding: '24px', 
                   borderRadius: '24px', 
@@ -12861,7 +12920,8 @@ export function TeacherDashboard({
                   )}
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         </div>
       ) : activeTab === 'settings' ? (
@@ -13242,7 +13302,9 @@ export function TeacherDashboard({
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname *</label>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                    {schoolData?.has_campus_subscription !== false ? 'Nachname *' : 'Nachname (Initial) *'}
+                  </label>
                   <input 
                     type="text" 
                     required
@@ -13409,7 +13471,9 @@ export function TeacherDashboard({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                  {schoolData?.has_campus_subscription !== false ? 'Nachname' : 'Nachname (Initial)'}
+                </label>
                 <input 
                   type="text" 
                   required

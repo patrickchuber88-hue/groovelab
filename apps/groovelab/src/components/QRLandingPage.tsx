@@ -819,9 +819,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .order('updated_at', { ascending: false }),
         supabase
           .from('campus_direct_messages')
-          .select('occurrence_id')
-          .eq('recipient_id', profile.id)
-          .eq('is_read', false)
+          .select('occurrence_id, is_read, recipient_id')
+          .or(`sender_id.eq.${profile.id},recipient_id.eq.${profile.id}`)
       ]);
 
       const schData = schRes.data;
@@ -829,9 +828,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const statsData = statsRes.data;
       const avatarData = avatarRes.data;
       const matrixItems = matrixRes.data;
-      const unreadMsgsData = msgRes?.data || [];
-      const unreadIds = unreadMsgsData.map((m: any) => m.occurrence_id).filter(Boolean);
-      setUnreadMessageOccurrences(unreadIds);
+      const allMsgs = msgRes?.data || [];
+      const unreadIds = allMsgs
+        .filter((m: any) => m.recipient_id === profile.id && !m.is_read)
+        .map((m: any) => m.occurrence_id)
+        .filter(Boolean);
+      const withMsgIds = allMsgs
+        .map((m: any) => m.occurrence_id)
+        .filter(Boolean);
+
+      setUnreadMessageOccurrences(Array.from(new Set(unreadIds)));
+      setActiveChatOccIds(new Set(withMsgIds));
 
       // Deduplicate matrixItems by topic_name (latest wins)
       const uniqueMatrixItemsMap = new Map<string, any>();
@@ -952,6 +959,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       .on('broadcast', { event: 'homework-changed' }, () => {
         fetchDashboardData();
       })
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'campus_direct_messages'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
       .subscribe();
 
     const handleHomeworkUpdate = (e: Event) => {
@@ -2492,6 +2510,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
                 const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
                 const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
+                const hasMessages = activeChatOccIds.has(occ.id);
 
                 let rowBg = '#ffffff';
                 let rowBorder = '1px solid #e2e8f0';
@@ -2503,6 +2522,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   rowBorder = '1px solid #fee2e2';
                   textColor = '#991b1b';
                   subColor = '#ef4444';
+                } else if (hasMessages) {
+                  rowBg = '#fef9c3';
+                  rowBorder = '1px solid #fef08a';
+                  textColor = '#854d0e';
+                  subColor = '#ca8a04';
                 } else if (isRescheduled) {
                   rowBg = '#fffbeb';
                   rowBorder = '1px solid #fef3c7';
@@ -2544,7 +2568,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f1f5f9',
+                          background: isCanceled ? '#fee2e2' : hasMessages ? '#fef9c3' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f1f5f9',
                           borderRadius: '8px',
                           width: '36px',
                           height: '36px',
@@ -5799,244 +5823,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             , document.body)}
 
-          {activeChatOcc && createPortal(
-            (() => {
-              const teacherName = activeChatOcc.teacher ? `${activeChatOcc.teacher.first_name || 'Lehrer'} ${activeChatOcc.teacher.last_name || ''}` : 'Lehrkraft';
-              const titleText = `1:1 Shoutbox: ${teacherName}`;
-              
-              let isFrozen = false;
-              try {
-                const timePart = activeChatOcc.start_time.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time}:00`;
-                const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
-                isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
-              } catch (e) {}
-
-              const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
-
-              return (
-                <div
-                  onClick={() => setActiveChatOcc(null)}
-                  style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 11000,
-                    background: 'rgba(15,23,42,0.65)',
-                    backdropFilter: 'blur(8px)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '24px',
-                  }}
-                >
-                  <div
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      width: '100%',
-                      maxWidth: '480px',
-                      boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      position: 'relative',
-                      maxHeight: '85vh'
-                    }}
-                  >
-                    {/* Header */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
-                      padding: '24px',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>Rückfragen</span> {titleText}
-                        </h3>
-                        <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
-                          Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setActiveChatOcc(null)}
-                        style={{
-                          border: 'none',
-                          background: 'rgba(255, 255, 255, 0.2)',
-                          borderRadius: '50%',
-                          width: '32px',
-                          height: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          color: '#ffffff',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    {/* Messages Viewport */}
-                    <div style={{
-                      flex: 1,
-                      overflowY: 'auto',
-                      padding: '24px',
-                      background: '#fafbfc',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      minHeight: '280px',
-                      maxHeight: '400px'
-                    }}>
-                      {isFrozen && (
-                        <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                          Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
-                        </div>
-                      )}
-                      {chatMessages.length === 0 ? (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
-                          <MessageSquare size={32} style={{ opacity: 0.3 }} />
-                          <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
-                        </div>
-                      ) : (
-                        chatMessages.map((msg, idx) => {
-                          const isMe = msg.sender_id === profile.id;
-                          return (
-                            <div key={msg.id || idx} style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignSelf: isMe ? 'flex-end' : 'flex-start',
-                              maxWidth: '80%',
-                              alignItems: isMe ? 'flex-end' : 'flex-start',
-                              gap: '2px'
-                            }}>
-                              <div style={{
-                                background: isMe ? 'linear-gradient(135deg, #34a853, #34a853)' : '#ffffff',
-                                color: isMe ? '#ffffff' : '#1e293b',
-                                padding: '10px 14px',
-                                borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                                fontSize: '0.85rem',
-                                lineHeight: 1.4,
-                                wordBreak: 'break-word',
-                                border: isMe ? 'none' : '1px solid #e2e8f0',
-                                boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
-                              }}>
-                                {msg.content}
-                              </div>
-                              <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
-                                {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                      <div ref={chatMessagesEndRef} />
-                    </div>
-
-                    <form onSubmit={handleSendChatMessage} style={{
-                      padding: '16px 24px',
-                      borderTop: '1px solid #f1f5f9',
-                      background: '#f8fafc',
-                      display: 'flex',
-                      gap: '10px'
-                    }}>
-                      <input
-                        type="text"
-                        placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
-                        disabled={isFrozen}
-                        value={chatTypedMessage}
-                        onChange={e => setChatTypedMessage(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: '10px 14px',
-                          borderRadius: '12px',
-                          border: '1px solid #e2e8f0',
-                          background: isFrozen ? '#f1f5f9' : '#ffffff',
-                          fontSize: '0.85rem',
-                          outline: 'none',
-                          fontWeight: 650
-                        }}
-                      />
-                      {isCanceled ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleUndoCancel(activeChatOcc);
-                            setActiveChatOcc(null);
-                          }}
-                          style={{
-                            background: '#f1f5f9',
-                            color: '#475569',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '12px',
-                            padding: '10px 16px',
-                            fontSize: '0.85rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}
-                        >
-                          Reaktivieren
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleCancelOccurrence(activeChatOcc);
-                            setActiveChatOcc(null);
-                          }}
-                          style={{
-                            background: '#ef4444',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '10px 16px',
-                            fontSize: '0.85rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}
-                        >
-                          Absagen
-                        </button>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={isFrozen || !chatTypedMessage.trim()}
-                        style={{
-                          background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #248a3d)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '12px',
-                          padding: '10px 16px',
-                          fontSize: '0.85rem',
-                          fontWeight: 800,
-                          cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}
-                      >
-                        Senden
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              );
-            })(),
-            document.body
-          )}
           {/* 3. Anti-Cheat Checkpoint Overlay */}
             {showCheckpoint && createPortal(
               <div 
@@ -6104,6 +5890,246 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             , document.body)}
           </>
+        )}
+
+        {/* 4. Shoutbox (placed outside the Focus Timer condition so it works on appointments list) */}
+        {activeChatOcc && createPortal(
+          (() => {
+            const teacherName = activeChatOcc.teacher ? `${activeChatOcc.teacher.first_name || 'Lehrer'} ${activeChatOcc.teacher.last_name || ''}` : 'Lehrkraft';
+            const titleText = `1:1 Shoutbox: ${teacherName}`;
+            
+            let isFrozen = false;
+            try {
+              const timePart = activeChatOcc.start_time.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time}:00`;
+              const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
+              isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
+            } catch (e) {}
+
+            const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
+
+            return (
+              <div
+                onClick={() => setActiveChatOcc(null)}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 11000,
+                  background: 'rgba(15,23,42,0.65)',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '24px',
+                }}
+              >
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    width: '100%',
+                    maxWidth: '480px',
+                    boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    maxHeight: '85vh'
+                  }}
+                >
+                  {/* Header */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                    padding: '24px',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>Rückfragen</span> {titleText}
+                      </h3>
+                      <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                        Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setActiveChatOcc(null)}
+                      style={{
+                        border: 'none',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#ffffff',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Messages Viewport */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    padding: '24px',
+                    background: '#fafbfc',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    minHeight: '280px',
+                    maxHeight: '400px'
+                  }}>
+                    {isFrozen && (
+                      <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                        Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                      </div>
+                    )}
+                    {chatMessages.length === 0 ? (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
+                        <MessageSquare size={32} style={{ opacity: 0.3 }} />
+                        <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
+                      </div>
+                    ) : (
+                      chatMessages.map((msg, idx) => {
+                        const isMe = msg.sender_id === profile.id;
+                        return (
+                          <div key={msg.id || idx} style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            maxWidth: '80%',
+                            alignItems: isMe ? 'flex-end' : 'flex-start',
+                            gap: '2px'
+                          }}>
+                            <div style={{
+                              background: isMe ? 'linear-gradient(135deg, #34a853, #34a853)' : '#ffffff',
+                              color: isMe ? '#ffffff' : '#1e293b',
+                              padding: '10px 14px',
+                              borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                              fontSize: '0.85rem',
+                              lineHeight: 1.4,
+                              wordBreak: 'break-word',
+                              border: isMe ? 'none' : '1px solid #e2e8f0',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                            }}>
+                              {msg.content}
+                            </div>
+                            <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
+                              {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                    <div ref={chatMessagesEndRef} />
+                  </div>
+
+                  <form onSubmit={handleSendChatMessage} style={{
+                    padding: '16px 24px',
+                    borderTop: '1px solid #f1f5f9',
+                    background: '#f8fafc',
+                    display: 'flex',
+                    gap: '10px'
+                  }}>
+                    <input
+                      type="text"
+                      placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
+                      disabled={isFrozen}
+                      value={chatTypedMessage}
+                      onChange={e => setChatTypedMessage(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        background: isFrozen ? '#f1f5f9' : '#ffffff',
+                        fontSize: '0.85rem',
+                        outline: 'none',
+                        fontWeight: 650
+                      }}
+                    />
+                    {isCanceled ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleUndoCancel(activeChatOcc);
+                          setActiveChatOcc(null);
+                        }}
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '12px',
+                          padding: '10px 16px',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        Reaktivieren
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCancelOccurrence(activeChatOcc);
+                          setActiveChatOcc(null);
+                        }}
+                        style={{
+                          background: '#ef4444',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 16px',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        Absagen
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={isFrozen || !chatTypedMessage.trim()}
+                      style={{
+                        background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #248a3d)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '10px 16px',
+                        fontSize: '0.85rem',
+                        fontWeight: 800,
+                        cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                    >
+                      Senden
+                    </button>
+                  </form>
+                </div>
+              </div>
+            );
+          })(),
+          document.body
         )}
       </div>
     );

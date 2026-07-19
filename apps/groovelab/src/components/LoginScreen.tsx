@@ -2516,14 +2516,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           const qrToken = crypto.randomUUID();
           const avatarUrl = getInstrumentAvatarUrl(child.instrument);
 
+          const hasCampus = schoolData?.has_campus_subscription !== false;
+          const finalLastName = hasCampus ? child.last_name : (child.last_name?.trim() ? child.last_name.trim().charAt(0).toUpperCase() + '.' : '');
+          const finalBirthDate = hasCampus ? (child.birth_date || null) : null;
+
           const { data: newStud, error: insertError } = await supabase
             .from('users_raw')
             .insert({
               school_id: schoolId,
               role: 'student',
               first_name: child.first_name,
-              last_name: child.last_name,
-              birth_date: child.birth_date || null,
+              last_name: finalLastName,
+              birth_date: finalBirthDate,
               photo_url: '/avatar_ghost.jpg',
               avatar_url: avatarUrl,
               qr_token: qrToken,
