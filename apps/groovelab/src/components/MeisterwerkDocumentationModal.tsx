@@ -3262,7 +3262,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </>
                 ) : (
                   <>
-                    {/* Student order remains unchanged */}
+                    {/* Student order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
                     <button
                       type="button"
                       onClick={() => setActiveViewMode('document')}
@@ -3284,28 +3284,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     >
                       <BookOpen size={14} />
                       <span>Protokoll</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('recordings')}
-                      style={{
-                        background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Mic size={14} />
-                      <span>Aufnahmen</span>
                     </button>
                     {activePlat === 'campus' && (
                       <button
@@ -3352,6 +3330,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     >
                       <Music size={14} />
                       <span>Übe-Begleiter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveViewMode('recordings')}
+                      style={{
+                        background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                        border: 'none',
+                        color: '#ffffff',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Mic size={14} />
+                      <span>Aufnahmen</span>
                     </button>
                   </>
                 )}
@@ -3449,7 +3449,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </>
               ) : (
                 <>
-                  {/* Student mobile order remains unchanged */}
+                  {/* Student mobile order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
                   <button
                     type="button"
                     onClick={() => setActiveViewMode('document')}
@@ -3469,26 +3469,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   >
                     <BookOpen size={12} />
                     <span>Protokoll</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveViewMode('recordings')}
-                    style={{
-                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Mic size={12} />
-                    <span>Aufnahmen</span>
                   </button>
                   {activePlat === 'campus' && (
                     <button
@@ -3531,6 +3511,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   >
                     <Music size={12} />
                     <span>Übe-Begleiter</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('recordings')}
+                    style={{
+                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Mic size={12} />
+                    <span>Aufnahmen</span>
                   </button>
                 </>
               )}
@@ -7299,91 +7299,118 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 className="presets-scrollbar-container"
                               >
                                 {(() => {
+                                  const isPresetActive = (itemText: string, isBpm = false) => {
+                                    const currentNotes = homeworkNotes || '';
+                                    if (isBpm) {
+                                      return currentNotes.includes("Achte diese Woche besonders darauf, das Metronom bei");
+                                    }
+                                    return currentNotes.includes(itemText);
+                                  };
+
+                                  const togglePreset = (itemText: string, isBpm = false) => {
+                                    let currentNotes = homeworkNotes || '';
+                                    const active = isPresetActive(itemText, isBpm);
+
+                                    if (active) {
+                                      // Remove the text and clean trailing whitespace / extra linebreaks
+                                      if (isBpm) {
+                                        currentNotes = currentNotes.replace(/\n*Achte diese Woche besonders darauf, das Metronom bei .* zu halten\./g, '');
+                                      } else {
+                                        // Escape regex special chars to safely replace
+                                        const escapedText = itemText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                                        currentNotes = currentNotes.replace(new RegExp('\\n*' + escapedText, 'g'), '');
+                                      }
+                                      currentNotes = currentNotes.replace(/\n{3,}/g, '\n\n').trim();
+                                      setHomeworkNotes(currentNotes);
+                                    } else {
+                                      // Add the text
+                                      let textToAdd = itemText;
+                                      if (isBpm) {
+                                        const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
+                                        const bpmText = bpm ? `${bpm} BPM` : "120 BPM";
+                                        textToAdd = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
+                                      }
+                                      currentNotes = currentNotes ? `${currentNotes.trim()}\n\n${textToAdd}` : textToAdd;
+                                      setHomeworkNotes(currentNotes);
+                                      setIsCurrentHomework(true);
+                                    }
+                                    setHasChanges(true);
+                                  };
+
                                   const allPresets = [
                                     {
                                       label: '⏱️ Tempo halten',
                                       desc: 'Metronom BPM',
-                                      onClick: () => {
-                                        const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
-                                        const bpmText = bpm ? `${bpm} BPM` : "X BPM";
-                                        const text = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
-                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                        setIsCurrentHomework(true);
-                                        setHasChanges(true);
-                                      }
+                                      text: '',
+                                      isBpm: true,
+                                      onClick: () => togglePreset('', true)
                                     },
                                     {
                                       label: '✨ Sauber spielen',
                                       desc: 'Klarer Klang',
-                                      onClick: () => {
-                                        const text = "Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.";
-                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                        setIsCurrentHomework(true);
-                                        setHasChanges(true);
-                                      }
+                                      text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.', false)
                                     },
                                     {
                                       label: '🥁 Rhythmus-Metronom',
                                       desc: 'Timing & Takt',
-                                      onClick: () => {
-                                        const text = "Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.";
-                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                        setIsCurrentHomework(true);
-                                        setHasChanges(true);
-                                      }
+                                      text: 'Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.', false)
                                     },
                                     {
                                       label: '🖖 Fingersatz üben',
                                       desc: 'Fingersatz einhalten',
-                                      onClick: () => {
-                                        const text = "Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.";
-                                        setHomeworkNotes(prev => prev ? `${prev}\n\n${text}` : text);
-                                        setIsCurrentHomework(true);
-                                        setHasChanges(true);
-                                      }
+                                      text: 'Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.', false)
                                     },
                                     ...textbausteine
                                       .filter((tb: any) => tb.active)
                                       .map((tpl: any) => ({
                                         label: `📝 ${tpl.label}`,
                                         desc: 'Textbaustein',
-                                        onClick: () => {
-                                          setHomeworkNotes(prev => prev ? `${prev}\n\n${tpl.text}` : tpl.text);
-                                          setHasChanges(true);
-                                        }
+                                        text: tpl.text,
+                                        isBpm: false,
+                                        onClick: () => togglePreset(tpl.text, false)
                                       }))
                                   ];
 
-                                  return allPresets.map((item, idx) => (
-                                    <button
-                                      key={idx}
-                                      type="button"
-                                      onClick={item.onClick}
-                                      style={{
-                                        flexShrink: 0,
-                                        background: '#f8fafc',
-                                        color: '#1e293b',
-                                        border: '1px solid #cbd5e1',
-                                        padding: '6px 12px',
-                                        borderRadius: '12px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'flex-start',
-                                        gap: '1px',
-                                        textAlign: 'left',
-                                        outline: 'none'
-                                      }}
-                                      className="preset-chip-card preset-btn"
-                                    >
-                                      <span style={{ fontWeight: 800, fontSize: '0.70rem', color: '#0f172a', whiteSpace: 'nowrap' }}>
-                                        {item.label}
-                                      </span>
-                                      <span style={{ fontSize: '0.56rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                                        {item.desc}
-                                      </span>
-                                    </button>
-                                  ));
+                                  return allPresets.map((item, idx) => {
+                                    const active = isPresetActive(item.text, item.isBpm);
+                                    return (
+                                      <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={item.onClick}
+                                        style={{
+                                          flexShrink: 0,
+                                          background: active ? '#e6f4ea' : '#f8fafc',
+                                          color: active ? '#2e7d32' : '#1e293b',
+                                          border: active ? '1px solid #34a853' : '1px solid #cbd5e1',
+                                          padding: '6px 12px',
+                                          borderRadius: '12px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'flex-start',
+                                          gap: '1px',
+                                          textAlign: 'left',
+                                          outline: 'none',
+                                          boxShadow: active ? '0 2px 5px rgba(52, 168, 83, 0.12)' : 'none'
+                                        }}
+                                        className="preset-chip-card preset-btn"
+                                      >
+                                        <span style={{ fontWeight: 800, fontSize: '0.70rem', color: active ? '#2e7d32' : '#0f172a', whiteSpace: 'nowrap' }}>
+                                          {item.label}
+                                        </span>
+                                        <span style={{ fontSize: '0.56rem', color: active ? '#34a853' : '#64748b', whiteSpace: 'nowrap' }}>
+                                          {item.desc}
+                                        </span>
+                                      </button>
+                                    );
+                                  });
                                 })()}
                               </div>
                             </div>
