@@ -8425,184 +8425,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           )}
 
-          {/* INTERAKTIVE LATENZ-KALIBRIERUNG OVERLAY */}
-          {isCalibratingLatency && calibrationPhaseState !== 'idle' && (
-            <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(29, 29, 31, 0.4)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              zIndex: 99999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '20px'
-            }}>
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '24px',
-                padding: '30px',
-                width: '100%',
-                maxWidth: '400px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                gap: '20px'
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d1d1f' }}>
-                    Latenz-Diagnose
-                  </span>
-                  <span style={{ fontSize: '0.68rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Campus-Groovelab Audio Engine
-                  </span>
-                </div>
 
-                {calibrationPhaseState !== 'result' ? (
-                  <>
-                    <div style={{
-                      position: 'relative',
-                      width: '120px',
-                      height: '120px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <svg style={{ position: 'absolute', transform: 'rotate(-90deg)', width: '120px', height: '120px' }}>
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r="50"
-                          fill="transparent"
-                          stroke="#f5f5f7"
-                          strokeWidth="6"
-                        />
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r="50"
-                          fill="transparent"
-                          stroke="#34a853"
-                          strokeWidth="6"
-                          strokeDasharray={`${2 * Math.PI * 50}`}
-                          strokeDashoffset={`${2 * Math.PI * 50 * (1 - (calibrationPhaseState === 'ambient' ? 0.25 : 0.25 + 0.25 * calibrationClickCount))}`}
-                          style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                        />
-                      </svg>
-
-                      <div style={{
-                        width: '84px',
-                        height: '84px',
-                        borderRadius: '50%',
-                        background: '#f5f5f7',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: `${calibrationMicLevel}%`,
-                          background: 'rgba(52, 168, 83, 0.15)',
-                          transition: 'height 0.05s ease',
-                          width: '100%'
-                        }} />
-                        <Mic size={24} style={{ color: '#34a853', position: 'relative', zIndex: 2 }} />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1d1d1f' }}>
-                        {calibrationPhaseState === 'ambient' 
-                          ? 'Messe Raumgeräusche...' 
-                          : `Erfasse Test-Klicks: ${calibrationClickCount} von 3`}
-                      </span>
-                      <span style={{ fontSize: '0.64rem', color: '#86868b', maxWidth: '280px', lineHeight: 1.4 }}>
-                        {calibrationPhaseState === 'ambient' 
-                          ? 'Bitte halte dein Gerät ruhig. Lautsprecher sollten eingeschaltet sein.' 
-                          : 'Das System spielt kurze Klicks ab, um die Verzögerung zwischen Lautsprecher und Mikrofon zu messen.'}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {(() => {
-                      const isOptimal = syncOffsetMs < 50;
-                      const isMedium = syncOffsetMs >= 50 && syncOffsetMs <= 130;
-                      const color = isOptimal ? '#34a853' : isMedium ? '#eab308' : '#ea4335';
-                      const label = isOptimal ? 'Optimal' : isMedium ? 'Kopfhörer/Kabel' : 'Bluetooth-Verzögerung';
-                      const explanation = isOptimal 
-                        ? 'Hervorragende Latenz! Ideal für punktgenaue Loops über die Gerätekopfhörer oder Lautsprecher.'
-                        : isMedium
-                          ? 'Gute Latenz. Typisch für normale Audio-Ausgänge. Die Loopstation gleicht dies automatisch aus.'
-                          : 'Hohe Verzögerung erkannt. Das passiert meist bei Bluetooth-Lautsprechern. Die App gleicht die Spur automatisch um diese Millisekunden an!';
-
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', width: '100%' }}>
-                          <div style={{
-                            padding: '16px 24px',
-                            borderRadius: '16px',
-                            background: `${color}0b`,
-                            border: `1px solid ${color}30`,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            width: '100%'
-                          }}>
-                            <span style={{ fontSize: '1.8rem', fontWeight: 800, color, fontFamily: 'SF Mono, monospace' }}>
-                              {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
-                            </span>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              {label}
-                            </span>
-                          </div>
-
-                          <p style={{ fontSize: '0.68rem', color: '#86868b', lineHeight: 1.4, padding: '0 10px' }}>
-                            {explanation}
-                          </p>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsCalibratingLatency(false);
-                              setCalibrationPhaseState('idle');
-                            }}
-                            className="tactile-btn"
-                            style={{
-                              width: '100%',
-                              background: '#1d1d1f',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '12px',
-                              height: '42px',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              marginTop: '8px'
-                            }}
-                          >
-                            KALIBRIERUNG ÜBERNEHMEN
-                          </button>
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
@@ -13478,6 +13301,185 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
           </div>
         </div>
       </div>
+
+      {/* INTERAKTIVE LATENZ-KALIBRIERUNG OVERLAY */}
+      {isCalibratingLatency && calibrationPhaseState !== 'idle' && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(29, 29, 31, 0.4)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '30px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: '20px'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d1d1f' }}>
+                Latenz-Diagnose
+              </span>
+              <span style={{ fontSize: '0.68rem', color: '#86868b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Campus-Groovelab Audio Engine
+              </span>
+            </div>
+
+            {calibrationPhaseState !== 'result' ? (
+              <>
+                <div style={{
+                  position: 'relative',
+                  width: '120px',
+                  height: '120px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg style={{ position: 'absolute', transform: 'rotate(-90deg)', width: '120px', height: '120px' }}>
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="transparent"
+                      stroke="#f5f5f7"
+                      strokeWidth="6"
+                    />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="transparent"
+                      stroke="#34a853"
+                      strokeWidth="6"
+                      strokeDasharray={`${2 * Math.PI * 50}`}
+                      strokeDashoffset={`${2 * Math.PI * 50 * (1 - (calibrationPhaseState === 'ambient' ? 0.25 : 0.25 + 0.25 * calibrationClickCount))}`}
+                      style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                    />
+                  </svg>
+
+                  <div style={{
+                    width: '84px',
+                    height: '84px',
+                    borderRadius: '50%',
+                    background: '#f5f5f7',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: `${calibrationMicLevel}%`,
+                      background: 'rgba(52, 168, 83, 0.15)',
+                      transition: 'height 0.05s ease',
+                      width: '100%'
+                    }} />
+                    <Mic size={24} style={{ color: '#34a853', position: 'relative', zIndex: 2 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1d1d1f' }}>
+                    {calibrationPhaseState === 'ambient' 
+                      ? 'Messe Raumgeräusche...' 
+                      : `Erfasse Test-Klicks: ${calibrationClickCount} von 3`}
+                  </span>
+                  <span style={{ fontSize: '0.64rem', color: '#86868b', maxWidth: '280px', lineHeight: 1.4 }}>
+                    {calibrationPhaseState === 'ambient' 
+                      ? 'Bitte halte dein Gerät ruhig. Lautsprecher sollten eingeschaltet sein.' 
+                      : 'Das System spielt kurze Klicks ab, um die Verzögerung zwischen Lautsprecher und Mikrofon zu messen.'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                {(() => {
+                  const isOptimal = syncOffsetMs < 50;
+                  const isMedium = syncOffsetMs >= 50 && syncOffsetMs <= 130;
+                  const color = isOptimal ? '#34a853' : isMedium ? '#eab308' : '#ea4335';
+                  const label = isOptimal ? 'Optimal' : isMedium ? 'Kopfhörer/Kabel' : 'Bluetooth-Verzögerung';
+                  const explanation = isOptimal 
+                    ? 'Hervorragende Latenz! Ideal für punktgenaue Loops über die Gerätekopfhörer oder Lautsprecher.'
+                    : isMedium
+                      ? 'Gute Latenz. Typisch für normale Audio-Ausgänge. Die Loopstation gleicht dies automatisch aus.'
+                      : 'Hohe Verzögerung erkannt. Das passiert meist bei Bluetooth-Lautsprechern. Die App gleicht die Spur automatisch um diese Millisekunden an!';
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', width: '100%' }}>
+                      <div style={{
+                        padding: '16px 24px',
+                        borderRadius: '16px',
+                        background: `${color}0b`,
+                        border: `1px solid ${color}30`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        width: '100%'
+                      }}>
+                        <span style={{ fontSize: '1.8rem', fontWeight: 800, color, fontFamily: 'SF Mono, monospace' }}>
+                          {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
+                        </span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {label}
+                        </span>
+                      </div>
+
+                      <p style={{ fontSize: '0.68rem', color: '#86868b', lineHeight: 1.4, padding: '0 10px' }}>
+                        {explanation}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCalibratingLatency(false);
+                          setCalibrationPhaseState('idle');
+                        }}
+                        className="tactile-btn"
+                        style={{
+                          width: '100%',
+                          background: '#1d1d1f',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '12px',
+                          height: '42px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          marginTop: '8px'
+                        }}
+                      >
+                        KALIBRIERUNG ÜBERNEHMEN
+                      </button>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
