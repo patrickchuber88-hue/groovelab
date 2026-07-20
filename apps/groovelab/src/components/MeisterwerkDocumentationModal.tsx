@@ -10559,43 +10559,101 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
   };
 
-  // Synthesize clean wooden metronome click sound
-  const playClickSound = (isHigh = false, time?: number) => {
+  // Synthesize clean metronome click sounds (wood, cowbell, rimshot, synth)
+  const playClickSound = (isHigh = false, time?: number, overrideSound?: string) => {
     try {
       initAudio();
       const ctx = audioContextRef.current;
       if (!ctx) return;
       const playTime = time !== undefined ? time : ctx.currentTime;
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
+      const soundType = overrideSound || metronomeSoundRef.current || 'wood';
       
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass';
-      hp.frequency.setValueAtTime(450, playTime);
-
-      const gainNode = ctx.createGain();
-      gainNode.gain.value = 0; // Initialize to 0 to prevent any pop from default 1.0 gain
-      osc.connect(hp);
-      hp.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      
-      // Auto-Quiet Metronome: Completely mute (0%) after Spur 1 has been recorded to prevent click accumulation (bypassed for headphones)
       const hasTrack1 = !!tracksRef.current[0]?.url;
       const baseMetronomeGain = (loopstationMetronomeVolumeRef.current / 100) * 0.10;
-      const targetMetronomeGain = (hasTrack1 && !useHeadphonesRef.current) ? 0 : baseMetronomeGain;
-      
-      // Clear, short percussive click (800Hz / 600Hz) with 8ms decay to prevent low-frequency build-up and room feedback coloration
-      osc.frequency.setValueAtTime(isHigh ? 800 : 600, playTime);
-      
-      if (targetMetronomeGain > 0) {
+      // If previewing (time is undefined), ignore track 1 muting logic and play at full volume
+      const targetMetronomeGain = (time === undefined) 
+        ? 0.15 
+        : ((hasTrack1 && !useHeadphonesRef.current) ? 0 : baseMetronomeGain);
+
+      if (targetMetronomeGain === 0) return;
+
+      if (soundType === 'synth') {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(isHigh ? 1200 : 900, playTime);
+        gainNode.gain.setValueAtTime(targetMetronomeGain, playTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.05);
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start(playTime);
+        osc.stop(playTime + 0.06);
+      } else if (soundType === 'rimshot') {
+        const bufferSize = ctx.sampleRate * 0.02; // 20ms
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(isHigh ? 1800 : 1500, playTime);
+        filter.Q.setValueAtTime(3.0, playTime);
+        
+        const gainNode = ctx.createGain();
+        gainNode.gain.setValueAtTime(targetMetronomeGain * 1.5, playTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.015);
+        
+        noise.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        noise.start(playTime);
+        noise.stop(playTime + 0.02);
+      } else if (soundType === 'cowbell') {
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc1.type = 'square';
+        osc2.type = 'square';
+        const f = isHigh ? 800 : 540;
+        osc1.frequency.setValueAtTime(f, playTime);
+        osc2.frequency.setValueAtTime(f * 1.48, playTime);
+        
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(1000, playTime);
+        
+        gainNode.gain.setValueAtTime(targetMetronomeGain * 0.8, playTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.07);
+        
+        osc1.connect(bp);
+        osc2.connect(bp);
+        bp.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc1.start(playTime);
+        osc2.start(playTime);
+        osc1.stop(playTime + 0.08);
+        osc2.stop(playTime + 0.08);
+      } else {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(450, playTime);
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 0;
+        osc.connect(hp);
+        hp.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.frequency.setValueAtTime(isHigh ? 800 : 600, playTime);
         gainNode.gain.setValueAtTime(targetMetronomeGain, playTime);
         gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.008);
-      } else {
-        gainNode.gain.setValueAtTime(0, playTime);
+        osc.start(playTime);
+        osc.stop(playTime + 0.008);
       }
-      
-      osc.start(playTime);
-      osc.stop(playTime + 0.008);
     } catch (e) {
       console.warn(e);
     }
@@ -13506,10 +13564,33 @@ const targetVol = isActive ? vol : 0;
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 90px' }}>
-                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>METRONOM-SOUND</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                      <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>METRONOM-SOUND</span>
+                      <button
+                        type="button"
+                        onClick={() => playClickSound(true)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '0 2px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#86868b'
+                        }}
+                      >
+                        <Volume2 size={10} />
+                      </button>
+                    </div>
                     <select
                       value={metronomeSound}
-                      onChange={(e) => setMetronomeSound(e.target.value as any)}
+                      onChange={(e) => {
+                        const newSound = e.target.value as any;
+                        setMetronomeSound(newSound);
+                        // Trigger a short audio preview click
+                        setTimeout(() => playClickSound(true, undefined, newSound), 50);
+                      }}
                       style={{
                         background: '#ffffff',
                         border: '1.5px solid rgba(0, 0, 0, 0.08)',
