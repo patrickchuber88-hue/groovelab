@@ -14261,6 +14261,7 @@ const targetVol = isActive ? vol : 0;
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.62rem', color: '#1d1d1f', lineHeight: 1.4 }}>
                             <p style={{ margin: 0, fontWeight: 700 }}>1. Kurve ausrichten</p>
                             <p style={{ margin: 0, color: '#515154' }}>Bewege den Regler, bis der <b>grüne Punkt (Signal-Start)</b> der Kurve exakt auf der <b>roten Referenzlinie (Trigger Time)</b> liegt.</p>
+                            <p style={{ margin: 0, color: '#86868b', fontSize: '0.56rem', marginTop: '2px', fontStyle: 'italic' }}>Hinweis: Richte die Linien am Signalstart (wo die Kurve die Nulllinie verlässt) aus, nicht am Wellen-Peak.</p>
                             
                             <p style={{ margin: 0, fontWeight: 700, marginTop: '4px' }}>2. Speichern</p>
                             <p style={{ margin: 0, color: '#515154' }}>Klicke auf Speichern. Das System merkt sich den Wert und gleicht Latenzen bei zukünftigen Aufnahmen automatisch aus.</p>
