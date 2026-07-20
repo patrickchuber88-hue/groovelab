@@ -2772,8 +2772,8 @@ export function ScheduleCalendarView({
       setSwapConfirmState({
         sourceId: normalOcc.id,
         targetId: cancelledOcc.id,
-        sourceStudentName: `${normalOcc.student?.first_name || ''} ${normalOcc.student?.last_name || ''}`.trim() || 'Schüler',
-        targetStudentName: `${cancelledOcc.student?.first_name || ''} ${cancelledOcc.student?.last_name || ''}`.trim() || 'Schüler',
+        sourceStudentName: `${normalOcc.student?.first_name || ''} ${maskLastName(normalOcc.student?.last_name || '')}`.trim() || 'Schüler',
+        targetStudentName: `${cancelledOcc.student?.first_name || ''} ${maskLastName(cancelledOcc.student?.last_name || '')}`.trim() || 'Schüler',
         sourceDate: normalOcc.date,
         sourceStartTime: normalOcc.start_time,
         targetDate: cancelledOcc.date,
@@ -3561,6 +3561,18 @@ export function ScheduleCalendarView({
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Unified Segmented Control for View & Actions */}
             <div id="tour-calendar-actions" className="apple-btn-group">
+              {/* Namen zeigen Toggle */}
+              <button
+                type="button"
+                onClick={() => toggleRealNames()}
+                className={`apple-btn ${showRealNames ? 'active' : ''}`}
+                style={{ color: showRealNames ? '#ea4335' : undefined }}
+                title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+              >
+                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+              </button>
+
               {/* Group A: Ansicht & Filter */}
               <button
                 type="button"

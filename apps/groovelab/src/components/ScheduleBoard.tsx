@@ -388,7 +388,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           map[ob.dayOfWeek].push({
             start,
             end,
-            studentName: `${obs.first_name} ${obs.last_name}`,
+            studentName: `${obs.first_name} ${maskLastName(obs.last_name)}`,
             roomName: r ? r.name : 'Anderer Raum',
             boardId: ob.id
           });
@@ -413,7 +413,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           start,
           end,
           teacherName: os.teacher ? `${os.teacher.first_name} ${os.teacher.last_name}` : 'Anderer Lehrer',
-          studentName: os.student ? `${os.student.first_name} ${os.student.last_name}` : 'Schüler'
+          studentName: os.student ? `${os.student.first_name} ${maskLastName(os.student.last_name)}` : 'Schüler'
         });
       }
     });
@@ -2236,7 +2236,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 // Show warnings toast
                 setToast({
-                  message: `Zeitkonflikt: Der Schüler ${student.first_name} ${student.last_name} ist in diesem Zeitraum gesperrt!`,
+                  message: `Zeitkonflikt: Der Schüler ${student.first_name} ${maskLastName(student.last_name)} ist in diesem Zeitraum gesperrt!`,
                   type: 'warning'
                 });
 
@@ -2629,7 +2629,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           doc.text(`${s.assignedTime} - Pause (${s.duration} Min)`, 25, y);
         } else {
           doc.setTextColor(71, 85, 105);
-          doc.text(`${s.assignedTime} - ${s.first_name} ${s.last_name} (${s.instrument}, ${s.duration} Min)`, 25, y);
+          doc.text(`${s.assignedTime} - ${s.first_name} ${maskLastName(s.last_name)} (${s.instrument}, ${s.duration} Min)`, 25, y);
         }
         y += 6;
       });
@@ -2835,7 +2835,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         
         if (matchedBlocked) {
           hasBlockedConflict = true;
-          conflictStudentName = `${bs.first_name} ${bs.last_name}`;
+          conflictStudentName = `${bs.first_name} ${maskLastName(bs.last_name)}`;
           const r = rooms.find(room => room.id === board.roomId);
           conflictRoomName = r ? r.name : 'Raum';
           break;
@@ -2959,7 +2959,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               const conflict = (existingSchedules as any[]).find((es: any) => es.student_id === insert.student_id && es.instrument === insert.instrument);
               if (conflict) {
                 const studentObj = conflict.student;
-                const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : 'Schüler';
+                const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name)}` : 'Schüler';
                 alert(`Fehler: Für ${studentName} existiert bereits ein genehmigter Stundenplan für das Instrument "${insert.instrument}".`);
                 setSubmitting(false);
                 return;
@@ -5045,13 +5045,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           for (const b of boards) {
             const found = b.students.find(s => s.id === id);
             if (found) {
-              if (found.isGroup) return found.first_name + " " + found.last_name;
-              return `${found.first_name} ${found.last_name}`;
+              if (found.isGroup) return found.first_name + " " + maskLastName(found.last_name);
+              return `${found.first_name} ${maskLastName(found.last_name)}`;
             }
           }
           // Check sidebar list
           const found = students.find(s => s.id === id);
-          if (found) return `${found.first_name} ${found.last_name}`;
+          if (found) return `${found.first_name} ${maskLastName(found.last_name)}`;
           return 'Schüler';
         };
 
@@ -5372,7 +5372,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
         const primaryColor = isCampus ? '#34a853' : '#ea4335';
         const studentObj = students.find(s => s.id === instrumentSelectorState.sourceId);
-        const studentName = studentObj ? `${studentObj.first_name} ${studentObj.last_name}` : 'Schüler';
+        const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name)}` : 'Schüler';
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
