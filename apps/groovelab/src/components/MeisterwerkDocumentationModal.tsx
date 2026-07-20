@@ -9939,7 +9939,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const runAutoLatencyCalibration = async () => {
-    if (isCalibratingLatency) return;
+    // Only block if a measurement is actively running (ambient or clicks phases)
+    if (calibrationPhaseState === 'ambient' || calibrationPhaseState === 'clicks') return;
     setIsCalibratingLatency(true);
     setCalibrationPhaseState('ambient');
     setCalibrationClickCount(0);
