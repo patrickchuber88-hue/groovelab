@@ -852,6 +852,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const syncHomeworkNotes = async (notesList: string[]) => {
+    if (student.id === 'teacher-self') {
+      console.log("Teacher-self practice: skipping database homework notes synchronization.");
+      return;
+    }
     const currentWeek = getISOWeek();
     const allNotesJson = JSON.stringify(notesList);
     const cleanNotesJson = JSON.stringify(notesList.filter(n => !n.startsWith('AUDIO:')));
@@ -904,6 +908,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Fetch student's school's songs catalog
   useEffect(() => {
     async function loadSongs() {
+      if (student.id === 'teacher-self') {
+        setSongsLoading(false);
+        return;
+      }
       setSongsLoading(true);
       try {
         const { data: studentUser, error: studentError } = await supabase
@@ -942,6 +950,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   useEffect(() => {
     const loadLessonDay = async () => {
+      if (student.id === 'teacher-self') return;
       try {
         const { data } = await supabase
           .from('schedules')
@@ -1127,6 +1136,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   useEffect(() => {
     if (student.id) {
+      if (student.id === 'teacher-self') {
+        setLoading(false);
+        return;
+      }
       fetchProgress();
       loadLehrwerke();
       loadActiveSongSkills();
@@ -9722,8 +9735,44 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [countInBeats, setCountInBeats] = useState<number | string | null>(null); // null, 4.4, 1.1 etc.
   const [isAutoSequenceActive, setIsAutoSequenceActive] = useState(false);
   const [autoSequenceStatus, setAutoSequenceStatus] = useState<string>('');
-  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0);
+  const [syncOffsetMs, setSyncOffsetMs] = useState<number>(() => {
+    const saved = localStorage.getItem('groovelab_sync_offset_ms');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  useEffect(() => {
+    localStorage.setItem('groovelab_sync_offset_ms', syncOffsetMs.toString());
+  }, [syncOffsetMs]);
+
+  useEffect(() => {
+    if (homeworkNotesList) {
+      const latencyEntry = homeworkNotesList.find(note => note.startsWith('LATENCY:'));
+      if (latencyEntry) {
+        const val = parseInt(latencyEntry.replace('LATENCY:', ''), 10);
+        if (!isNaN(val)) {
+          setSyncOffsetMs(val);
+        }
+      }
+    }
+  }, [homeworkNotesList]);
+
+  const updateLatencyInDb = async (offsetVal: number) => {
+    const cleanList = homeworkNotesList.filter(note => !note.startsWith('LATENCY:'));
+    const updatedList = [...cleanList, `LATENCY:${offsetVal}`];
+    setHomeworkNotesList(updatedList);
+    await syncHomeworkNotes(updatedList);
+  };
+
+  const [calibrationWaveform, setCalibrationWaveform] = useState<number[] | null>(null);
   const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(50);
+  const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4'>('4/4');
+  const [barLength, setBarLength] = useState<1 | 2 | 4>(4);
+  const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth'>('wood');
+  const timeSignatureRef = useRef(timeSignature);
+  const barLengthRef = useRef(barLength);
+  const metronomeSoundRef = useRef(metronomeSound);
+  useEffect(() => { timeSignatureRef.current = timeSignature; }, [timeSignature]);
+  useEffect(() => { barLengthRef.current = barLength; }, [barLength]);
+  useEffect(() => { metronomeSoundRef.current = metronomeSound; }, [metronomeSound]);
   const loopstationMetronomeVolumeRef = useRef(loopstationMetronomeVolume);
   useEffect(() => {
     loopstationMetronomeVolumeRef.current = loopstationMetronomeVolume;
@@ -9732,7 +9781,11 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [calibrationPhaseState, setCalibrationPhaseState] = useState<'idle' | 'ambient' | 'clicks' | 'result'>('idle');
   const [calibrationClickCount, setCalibrationClickCount] = useState<number>(0);
   const [calibrationMicLevel, setCalibrationMicLevel] = useState<number>(0);
+  const [calibrationRunIndex, setCalibrationRunIndex] = useState<number>(1);
+  const [calibrationRunResults, setCalibrationRunResults] = useState<number[]>([]);
+  const [activeBeatPulse, setActiveBeatPulse] = useState<'downbeat' | 'upbeat' | null>(null);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [showCalibrationHelp, setShowCalibrationHelp] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'studio' | 'saved'>('studio');
   const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
   const [selectedSavedLoop, setSelectedSavedLoop] = useState<any>(null);
@@ -9890,10 +9943,12 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     setCalibrationPhaseState('ambient');
     setCalibrationClickCount(0);
     setCalibrationMicLevel(0);
+    setCalibrationRunIndex(1);
+    setCalibrationRunResults([]);
+    setCalibrationWaveform(null);
     
     let stream: MediaStream | null = null;
     let ctx: AudioContext | null = null;
-    let timeoutId: any;
     
     try {
       ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -9911,158 +9966,269 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       
       const filter = ctx.createBiquadFilter();
       filter.type = 'highpass';
-      filter.frequency.setValueAtTime(1000, ctx.currentTime);
+      filter.frequency.setValueAtTime(800, ctx.currentTime);
       
       const processor = ctx.createScriptProcessor(2048, 1, 1);
       
       sourceNode.connect(filter);
       filter.connect(processor);
-      filter.connect(ctx.destination); // For listening safely
+      // Remove filter.connect(ctx.destination) to prevent routing mic input back to speakers
       processor.connect(ctx.destination);
       
-      let ambientNoisePeak = 0.01;
-      let samplesChecked = 0;
-      let calibrationPhase: 'ambient' | 'waiting' | 'done' = 'ambient';
+      const runResults: number[] = [];
+      let finalWaveformCaptured: number[] | null = null;
       
-      const measurements: number[] = [];
-      let currentClickIndex = 0;
-      const totalClicksNeeded = 3;
-      let playTime = 0;
-      let detectionTime = 0;
-      
-      const cleanup = (keepOverlayVisible = false) => {
-        clearTimeout(timeoutId);
-        try {
-          processor.disconnect();
-          filter.disconnect();
-          sourceNode.disconnect();
-        } catch (e) {}
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop());
-        }
-        if (calibrationStreamRef.current === stream) {
-          calibrationStreamRef.current = null;
-        }
-        if (ctx && ctx.state !== 'closed') {
-          ctx.close().catch(e => console.warn(e));
-        }
-        if (!keepOverlayVisible) {
-          setIsCalibratingLatency(false);
-          setCalibrationPhaseState('idle');
-        }
-      };
-      
-      timeoutId = setTimeout(() => {
-        cleanup();
-        alert("Kalibrierung fehlgeschlagen: Kein akustisches Signal am Mikrofon erkannt. Bitte stelle sicher, dass deine Lautsprecher laut genug eingestellt sind und kein Kopfhörer angeschlossen ist.");
-      }, 5500);
-      
-      const playNextClick = () => {
-        if (!ctx || ctx.state === 'closed') return;
-        calibrationPhase = 'waiting';
-        setCalibrationPhaseState('clicks');
-        setCalibrationClickCount(prev => prev + 1);
-        
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1500, ctx.currentTime);
-        
-        gain.gain.setValueAtTime(1.0, ctx.currentTime);
-        gain.gain.setValueAtTime(1.0, ctx.currentTime + 0.005);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.015);
-        
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        
-        playTime = ctx.currentTime;
-        osc.start(playTime);
-        osc.stop(playTime + 0.03);
-      };
-      
-      processor.onaudioprocess = (e) => {
-        if (calibrationPhase === 'done') return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        
-        let peak = 0;
-        for (let i = 0; i < inputData.length; i++) {
-          const absVal = Math.abs(inputData[i]);
-          if (absVal > peak) peak = absVal;
-        }
-        setCalibrationMicLevel(Math.min(100, Math.round(peak * 400)));
-        
-        if (calibrationPhase === 'ambient') {
-          for (let i = 0; i < inputData.length; i++) {
-            const absVal = Math.abs(inputData[i]);
-            if (absVal > ambientNoisePeak) {
-              ambientNoisePeak = absVal;
-            }
-          }
-          samplesChecked += inputData.length;
-          
-          if (samplesChecked > 16384) {
-            playNextClick();
-          }
-        } else if (calibrationPhase === 'waiting') {
-          const sampleRate = ctx!.sampleRate;
-          const clickDurationSec = 0.015;
-          const clickSamples = Math.floor(clickDurationSec * sampleRate);
-          const refClick = new Float32Array(clickSamples);
-          for (let s = 0; s < clickSamples; s++) {
-            const t = s / sampleRate;
-            const amp = t < 0.002 ? (t / 0.002) : Math.exp(-(t - 0.002) / 0.004);
-            refClick[s] = Math.sin(2 * Math.PI * 1500 * t) * amp;
-          }
+      let calibrationVolume = 0.15; // adaptive playback volume
 
-          let maxCorrelation = 0;
-          let bestIndex = -1;
-          for (let offset = 0; offset <= inputData.length - clickSamples; offset++) {
-            let sum = 0;
-            for (let j = 0; j < clickSamples; j++) {
-              sum += inputData[offset + j] * refClick[j];
-            }
-            const absSum = Math.abs(sum);
-            if (absSum > maxCorrelation) {
-              maxCorrelation = absSum;
-              bestIndex = offset;
-            }
-          }
+      const executeProbePass = (freq: number): Promise<void> => {
+        return new Promise((resolve) => {
+          let observedPeak = 0.01;
+          let samplesChecked = 0;
+          let hasPlayed = false;
+          let playTime = 0;
 
-          const threshold = 0.03;
-          if (bestIndex !== -1 && maxCorrelation > threshold) {
-            detectionTime = ctx!.currentTime + (bestIndex / sampleRate);
-            const latencyMs = Math.round((detectionTime - playTime) * 1000);
+          const playProbeClick = () => {
+            if (!ctx || ctx.state === 'closed') return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
             
-            const estimatedLatency = Math.max(-150, Math.min(350, latencyMs - 15));
-            measurements.push(estimatedLatency);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.015);
             
-            currentClickIndex++;
-            if (currentClickIndex < totalClicksNeeded) {
-              calibrationPhase = 'ambient';
-              samplesChecked = 0;
-              setTimeout(playNextClick, 700);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            playTime = ctx.currentTime;
+            osc.start(playTime);
+            osc.stop(playTime + 0.03);
+            hasPlayed = true;
+          };
+
+          processor.onaudioprocess = (e) => {
+            const inputData = e.inputBuffer.getChannelData(0);
+            let peak = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              const absVal = Math.abs(inputData[i]);
+              if (absVal > peak) peak = absVal;
+              if (hasPlayed && absVal > observedPeak) {
+                observedPeak = absVal;
+              }
+            }
+            setCalibrationMicLevel(Math.min(100, Math.round(peak * 400)));
+
+            if (!hasPlayed) {
+              samplesChecked += inputData.length;
+              if (samplesChecked > 16384) {
+                playProbeClick();
+                samplesChecked = 0;
+              }
             } else {
-              calibrationPhase = 'done';
-              const avgLatency = Math.round(measurements.reduce((sum, val) => sum + val, 0) / measurements.length);
-              setSyncOffsetMs(avgLatency);
-              isManualLatencyAdjustmentRef.current = true;
-              setCalibrationPhaseState('result');
-              cleanup(true);
+              samplesChecked += inputData.length;
+              // Wait for 1 second (approx 44100/48000 samples) to decay
+              if (samplesChecked > 44100) {
+                processor.onaudioprocess = null;
+                if (observedPeak > 0.85) {
+                  calibrationVolume = 0.05; // Force low gain to prevent feedback
+                } else {
+                  calibrationVolume = Math.max(0.05, Math.min(1.0, 0.15 / Math.max(0.01, observedPeak)));
+                }
+                resolve();
+              }
             }
-          }
-        }
+          };
+        });
       };
+
+      const executePass = (passNum: number, freq: number): Promise<number> => {
+        return new Promise((resolve, reject) => {
+          setCalibrationRunIndex(passNum);
+          setCalibrationPhaseState('ambient');
+          setCalibrationClickCount(0);
+          
+          let ambientNoisePeak = 0.01;
+          let samplesChecked = 0;
+          let calibrationPhase: 'ambient' | 'waiting' | 'done' = 'ambient';
+          
+          const measurements: number[] = [];
+          let currentClickIndex = 0;
+          const totalClicksNeeded = 3;
+          let playTime = 0;
+          let detectionTime = 0;
+          let timeoutId: any;
+          
+          const cleanupPass = () => {
+            clearTimeout(timeoutId);
+            processor.onaudioprocess = null;
+          };
+          
+          timeoutId = setTimeout(() => {
+            cleanupPass();
+            reject(new Error(`Timeout in Durchgang ${passNum}`));
+          }, 6000);
+          
+          const playNextClick = () => {
+            if (!ctx || ctx.state === 'closed') return;
+            calibrationPhase = 'waiting';
+            setCalibrationPhaseState('clicks');
+            setCalibrationClickCount(prev => prev + 1);
+            
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            
+            gain.gain.setValueAtTime(calibrationVolume, ctx.currentTime);
+            gain.gain.setValueAtTime(calibrationVolume, ctx.currentTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.015);
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            playTime = ctx.currentTime;
+            osc.start(playTime);
+            osc.stop(playTime + 0.03);
+          };
+          
+          processor.onaudioprocess = (e) => {
+            if (calibrationPhase === 'done') return;
+            const inputData = e.inputBuffer.getChannelData(0);
+            
+            let peak = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              const absVal = Math.abs(inputData[i]);
+              if (absVal > peak) peak = absVal;
+            }
+            setCalibrationMicLevel(Math.min(100, Math.round(peak * 400)));
+            
+            if (calibrationPhase === 'ambient') {
+              for (let i = 0; i < inputData.length; i++) {
+                const absVal = Math.abs(inputData[i]);
+                if (absVal > ambientNoisePeak) {
+                  ambientNoisePeak = absVal;
+                }
+              }
+              samplesChecked += inputData.length;
+              
+              if (samplesChecked > 16384) {
+                playNextClick();
+              }
+            } else if (calibrationPhase === 'waiting') {
+              const sampleRate = ctx!.sampleRate;
+              const clickDurationSec = 0.015;
+              const clickSamples = Math.floor(clickDurationSec * sampleRate);
+              const refClick = new Float32Array(clickSamples);
+              for (let s = 0; s < clickSamples; s++) {
+                const t = s / sampleRate;
+                const amp = t < 0.002 ? (t / 0.002) : Math.exp(-(t - 0.002) / 0.004);
+                refClick[s] = Math.sin(2 * Math.PI * freq * t) * amp;
+              }
+              
+              let maxCorrelation = 0;
+              let bestIndex = -1;
+              for (let offset = 0; offset <= inputData.length - clickSamples; offset++) {
+                let sum = 0;
+                for (let j = 0; j < clickSamples; j++) {
+                  sum += inputData[offset + j] * refClick[j];
+                }
+                const absSum = Math.abs(sum);
+                if (absSum > maxCorrelation) {
+                  maxCorrelation = absSum;
+                  bestIndex = offset;
+                }
+              }
+              
+              const threshold = 0.03;
+              if (bestIndex !== -1 && maxCorrelation > threshold) {
+                detectionTime = ctx!.currentTime + (bestIndex / sampleRate);
+                const latencyMs = Math.round((detectionTime - playTime) * 1000);
+                
+                const estimatedLatency = Math.max(-150, Math.min(350, latencyMs - 15));
+                measurements.push(estimatedLatency);
+                
+                // Capture first transient buffer for visual waveform feedback
+                if (passNum === 1 && currentClickIndex === 0) {
+                  const startOffset = Math.max(0, bestIndex - 120);
+                  const endOffset = Math.min(inputData.length, bestIndex + 280);
+                  finalWaveformCaptured = Array.from(inputData.slice(startOffset, endOffset));
+                }
+                
+                currentClickIndex++;
+                if (currentClickIndex < totalClicksNeeded) {
+                  calibrationPhase = 'ambient';
+                  samplesChecked = 0;
+                  setTimeout(playNextClick, 600);
+                } else {
+                  calibrationPhase = 'done';
+                  cleanupPass();
+                  const avgPassLatency = Math.round(measurements.reduce((sum, val) => sum + val, 0) / measurements.length);
+                  resolve(avgPassLatency);
+                }
+              }
+            }
+          };
+        });
+      };
+      
+      await executeProbePass(1500);
+      await new Promise(r => setTimeout(r, 600));
+      
+      const pass1 = await executePass(1, 1500);
+      runResults.push(pass1);
+      setCalibrationRunResults([...runResults]);
+      await new Promise(r => setTimeout(r, 800));
+      
+      const pass2 = await executePass(2, 2200);
+      runResults.push(pass2);
+      setCalibrationRunResults([...runResults]);
+      await new Promise(r => setTimeout(r, 800));
+      
+      const pass3 = await executePass(3, 1000);
+      runResults.push(pass3);
+      setCalibrationRunResults([...runResults]);
+      
+      if (finalWaveformCaptured) {
+        setCalibrationWaveform(finalWaveformCaptured);
+      }
+      
+      // Calculate final offset
+      const sorted = [...runResults].sort((a, b) => a - b);
+      const median = sorted[1];
+      const validRuns = runResults.filter(val => Math.abs(val - median) <= 40);
+      const finalAvg = validRuns.length > 0 
+        ? Math.round(validRuns.reduce((sum, val) => sum + val, 0) / validRuns.length)
+        : median;
+      
+      setSyncOffsetMs(finalAvg);
+      isManualLatencyAdjustmentRef.current = true;
+      setCalibrationPhaseState('result');
+      
+      try {
+        processor.disconnect();
+        filter.disconnect();
+        sourceNode.disconnect();
+      } catch (e) {}
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+      calibrationStreamRef.current = null;
+      if (ctx && ctx.state !== 'closed') {
+        ctx.close().catch(e => console.warn(e));
+      }
       
     } catch (err: any) {
       console.error("Auto latency calibration failed:", err);
       alert(`Fehler bei der Latenz-Kalibrierung: ${err.message || err}`);
       setIsCalibratingLatency(false);
       setCalibrationPhaseState('idle');
-      if (ctx && ctx.state !== 'closed') {
-        ctx.close().catch(e => console.warn(e));
-      }
       if (stream) {
         stream.getTracks().forEach(t => t.stop());
+      }
+      calibrationStreamRef.current = null;
+      if (ctx && ctx.state !== 'closed') {
+        ctx.close().catch(e => console.warn(e));
       }
     }
   };
@@ -12345,6 +12511,26 @@ const targetVol = isActive ? vol : 0;
               justifyContent: 'center',
               background: 'transparent'
             }}>
+              {/* Dynamic latency-compensated visual beat pulse ring */}
+              {activeBeatPulse && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  left: '-8px',
+                  right: '-8px',
+                  bottom: '-8px',
+                  borderRadius: '50%',
+                  border: activeBeatPulse === 'downbeat' ? '3.5px solid #ea4335' : '2.5px solid #34a853',
+                  boxShadow: activeBeatPulse === 'downbeat'
+                    ? '0 0 16px #ea4335, inset 0 0 10px #ea4335'
+                    : '0 0 12px #34a853, inset 0 0 8px #34a853',
+                  opacity: 0.95,
+                  pointerEvents: 'none',
+                  zIndex: 25,
+                  transition: 'all 0.05s ease-out'
+                }} />
+              )}
+
               {/* Animated SVG Progress Sweep */}
               <svg 
                 viewBox="0 0 200 200"
@@ -13077,6 +13263,81 @@ const targetVol = isActive ? vol : 0;
               </div>
 
               {/* Vertical Divider */}
+              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} />
+
+              {/* Taktart Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 80px' }}>
+                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>TAKTART</span>
+                <select
+                  value={timeSignature}
+                  onChange={(e) => setTimeSignature(e.target.value as any)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '8px',
+                    height: '34px',
+                    padding: '0 4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="4/4">4/4 Takt</option>
+                  <option value="3/4">3/4 Takt</option>
+                </select>
+              </div>
+
+              {/* Loop-Länge Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 90px' }}>
+                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>LOOP-LÄNGE</span>
+                <select
+                  value={barLength}
+                  onChange={(e) => setBarLength(parseInt(e.target.value) as any)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '8px',
+                    height: '34px',
+                    padding: '0 4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value={1}>1 Takt</option>
+                  <option value={2}>2 Takte</option>
+                  <option value={4}>4 Takte</option>
+                </select>
+              </div>
+
+              {/* Click-Sound Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 100px' }}>
+                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>METRONOM</span>
+                <select
+                  value={metronomeSound}
+                  onChange={(e) => setMetronomeSound(e.target.value as any)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                    borderRadius: '8px',
+                    height: '34px',
+                    padding: '0 4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="wood">Holz-Klick</option>
+                  <option value="cowbell">Cowbell</option>
+                  <option value="synth">Synth-Beep</option>
+                  <option value="rimshot">Rimshot</option>
+                </select>
+              </div>
+
+              {/* Vertical Divider */}
               <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
 
               {/* Tempo BPM Adjuster */}
@@ -13142,6 +13403,12 @@ const targetVol = isActive ? vol : 0;
                       setSyncOffsetMs(parseInt(e.target.value));
                       isManualLatencyAdjustmentRef.current = true;
                     }} 
+                    onMouseUp={(e) => {
+                      updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
+                    }}
+                    onTouchEnd={(e) => {
+                      updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
+                    }}
                     style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
                   />
                 </div>
@@ -13625,7 +13892,349 @@ const targetVol = isActive ? vol : 0;
         )}
       </div>
       </div>
-    </div>
+
+        {/* Auto-Calibration Glassmorphism Overlay */}
+        {isCalibratingLatency && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(255, 255, 255, 0.45)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(40px)',
+              WebkitBackdropFilter: 'blur(40px)',
+              border: '1px solid rgba(255, 255, 255, 0.5)',
+              borderRadius: '24px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.6)',
+              padding: '32px',
+              width: '100%',
+              maxWidth: '460px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '20px',
+              animation: 'fadeInScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#34a853', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  System-Kalibrierung
+                </span>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>
+                  {calibrationPhaseState === 'ambient' && 'Hintergrundgeräusche...'}
+                  {calibrationPhaseState === 'clicks' && `Messung läuft...`}
+                  {calibrationPhaseState === 'result' && 'Kalibrierung abgeschlossen!'}
+                </h3>
+              </div>
+
+              {/* Display progress status */}
+              {calibrationPhaseState !== 'result' ? (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#86868b' }}>
+                    {calibrationPhaseState === 'ambient' 
+                      ? `Durchgang ${calibrationRunIndex} von 3: Messe Raumlautstärke...`
+                      : `Durchgang ${calibrationRunIndex} von 3: Click ${calibrationClickCount} von 3 gesendet`
+                    }
+                  </span>
+                  
+                  {/* Visual mic level bar */}
+                  <div style={{ width: '100%', height: '6px', background: 'rgba(0,0,0,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${calibrationMicLevel}%`,
+                      height: '100%',
+                      background: '#34a853',
+                      borderRadius: '3px',
+                      transition: 'width 0.05s ease-out'
+                    }} />
+                  </div>
+
+                  {/* Sub-results history */}
+                  {calibrationRunResults.length > 0 && (
+                    <div style={{
+                      width: '100%',
+                      background: '#f5f5f7',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      alignItems: 'flex-start'
+                    }}>
+                      <span style={{ fontSize: '0.52rem', fontWeight: 800, color: '#86868b' }}>BISHERIGE ERGEBNISSE:</span>
+                      {calibrationRunResults.map((res: number, idx: number) => (
+                        <div key={idx} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', fontFamily: 'SF Mono, monospace', color: '#1d1d1f' }}>
+                          <span>Durchgang {idx + 1}:</span>
+                          <span>{res} ms</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                  <div style={{
+                    width: '100%',
+                    background: '#f5f5f7',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    {calibrationRunResults.map((res: number, idx: number) => (
+                      <div key={idx} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', fontFamily: 'SF Mono, monospace', color: '#1d1d1f' }}>
+                        <span>Durchgang {idx + 1}:</span>
+                        <span style={{ fontWeight: 700 }}>{res} ms</span>
+                      </div>
+                    ))}
+                    <div style={{ width: '100%', height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '4px 0' }} />
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#34a853', fontWeight: 800 }}>
+                      <span>Automatische Latenz:</span>
+                      <span>{syncOffsetMs} ms</span>
+                    </div>
+                  </div>
+
+                  {/* --- ADVANCED TRANS-ALIGN WAVEFORM VISUALIZER --- */}
+                  {calibrationWaveform && (
+                    <div style={{
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#86868b', alignSelf: 'flex-start' }}>TRANSIENT ALIGNMENT (FEINJUSTIERUNG)</span>
+                      <div style={{
+                        width: '100%',
+                        height: '100px',
+                        background: '#18202c',
+                        borderRadius: '12px',
+                        border: '1.5px solid #0d1218',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {/* Grid Lines */}
+                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.1, backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '10px 10px' }} />
+                        
+                        {/* Zero/Target reference line */}
+                        <div style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: 0,
+                          width: '2px',
+                          height: '100%',
+                          background: '#ea4335',
+                          boxShadow: '0 0 8px #ea4335',
+                          zIndex: 10
+                        }}>
+                          <span style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '0.46rem', color: '#ea4335', fontWeight: 800, whiteSpace: 'nowrap' }}>TRIGGER TIME (0ms)</span>
+                        </div>
+
+                        {/* Waveform SVG */}
+                        <svg
+                          style={{
+                            width: '100%',
+                            height: '80%',
+                            position: 'relative',
+                            overflow: 'visible'
+                          }}
+                        >
+                          <g style={{
+                            // Shift the waveform path horizontally based on current offset vs finalAvg
+                            transform: `translateX(${(syncOffsetMs - (calibrationRunResults[0] || 0)) * 0.8}px)`,
+                            transition: 'transform 0.1s ease-out'
+                          }}>
+                            <path
+                              d={`M ${calibrationWaveform.map((val: number, idx: number) => {
+                                const x = (idx / calibrationWaveform.length) * 400; // Stretch across width
+                                const y = 40 + val * 120; // Center y axis and scale amplitude
+                                return `${x} ${y}`;
+                              }).join(' L ')}`}
+                              fill="none"
+                              stroke="#34a853"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ filter: 'drop-shadow(0 0 4px rgba(52, 168, 83, 0.6))' }}
+                            />
+                          </g>
+                        </svg>
+                      </div>
+
+                      {/* Fine-Tuning Slider */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800 }}>MANUELLE KORREKTUR</span>
+                          <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs} ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-150"
+                          max="350"
+                          value={syncOffsetMs}
+                          onChange={(e) => {
+                            setSyncOffsetMs(parseInt(e.target.value));
+                            isManualLatencyAdjustmentRef.current = true;
+                          }}
+                          style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
+                        />
+                      </div>
+
+                      {/* Accordion Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setShowCalibrationHelp(!showCalibrationHelp)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#86868b',
+                          fontSize: '0.62rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 0',
+                          alignSelf: 'flex-start',
+                          outline: 'none'
+                        }}
+                      >
+                        <span>Wie funktioniert die Feinjustierung? ℹ️</span>
+                        <span style={{
+                          transform: showCalibrationHelp ? 'rotate(90deg)' : 'none',
+                          transition: 'transform 0.2s ease',
+                          display: 'inline-block'
+                        }}>▶</span>
+                      </button>
+
+                      {/* Accordion Content */}
+                      {showCalibrationHelp && (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          width: '100%',
+                          background: '#f5f5f7',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          border: '1px solid rgba(0,0,0,0.06)',
+                          animation: 'slideDown 0.2s ease-out',
+                          textAlign: 'left'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.62rem', color: '#1d1d1f', lineHeight: 1.4 }}>
+                            <p style={{ margin: 0, fontWeight: 700 }}>1. Kurve ausrichten</p>
+                            <p style={{ margin: 0, color: '#515154' }}>Bewege den Regler, bis der <b>erste steile Ausschlag (Onset)</b> der grünen Kurve exakt auf der roten vertikalen Referenzlinie (Trigger Time) liegt.</p>
+                            
+                            <p style={{ margin: 0, fontWeight: 700, marginTop: '4px' }}>2. Speichern</p>
+                            <p style={{ margin: 0, color: '#515154' }}>Klicke auf Speichern. Das System merkt sich den Wert und gleicht Latenzen bei zukünftigen Aufnahmen automatisch aus.</p>
+                          </div>
+
+                          {/* High-Fidelity Comparison Schematic SVG */}
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            width: '100%',
+                            marginTop: '4px'
+                          }}>
+                            <span style={{ fontSize: '0.52rem', fontWeight: 800, color: '#86868b' }}>VERGLEICHS-SCHEMA:</span>
+                            <div style={{
+                              display: 'flex',
+                              gap: '8px',
+                              width: '100%'
+                            }}>
+                              {/* Left: Ideal */}
+                              <div style={{
+                                flex: 1,
+                                height: '54px',
+                                background: '#18202c',
+                                border: '1.5px solid #0d1218',
+                                borderRadius: '8px',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                padding: '4px'
+                              }}>
+                                <span style={{ fontSize: '0.46rem', color: '#34a853', fontWeight: 800 }}>✓ IDEAL (SYNCHRON)</span>
+                                <svg style={{ width: '100%', height: '24px', overflow: 'visible' }}>
+                                  {/* Red Ref Line */}
+                                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
+                                  {/* Green Wave aligned */}
+                                  <path d="M 0 12 L 35 12 L 40 12 Q 45 4, 50 20 T 55 4 T 60 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" />
+                                </svg>
+                              </div>
+
+                              {/* Right: Too Late */}
+                              <div style={{
+                                flex: 1,
+                                height: '54px',
+                                background: '#18202c',
+                                border: '1.5px solid #0d1218',
+                                borderRadius: '8px',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                padding: '4px'
+                              }}>
+                                <span style={{ fontSize: '0.46rem', color: '#ea4335', fontWeight: 800 }}>✗ ZU SPÄT (LATENZ)</span>
+                                <svg style={{ width: '100%', height: '24px', overflow: 'visible' }}>
+                                  {/* Red Ref Line */}
+                                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
+                                  {/* Green Wave shifted too far right */}
+                                  <path d="M 0 12 L 55 12 L 60 12 Q 65 4, 70 20 T 75 4 T 80 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" opacity="0.6" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCalibratingLatency(false);
+                      updateLatencyInDb(syncOffsetMs);
+                    }}
+                    className="tactile-btn"
+                    style={{
+                      background: '#34a853',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '8px 24px',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      width: '100%'
+                    }}
+                  >
+                    Kalibrierung abschließen & speichern
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
   );
 };
 
