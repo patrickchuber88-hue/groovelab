@@ -396,7 +396,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       });
     });
     return map;
-  }, [boards, rooms]);
+  }, [boards, rooms, showRealNames]);
 
   const otherTeachersRoomsIntervals = useMemo(() => {
     const map: Record<string, { start: number; end: number; teacherName: string; studentName: string }[]> = {};
@@ -418,7 +418,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
     });
     return map;
-  }, [otherTeachersSchedules]);
+  }, [otherTeachersSchedules, showRealNames]);
 
   useEffect(() => {
     if (toast) {
@@ -539,7 +539,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               groupStudents: uniqueMembers
             });
           } else if (uniqueMembers.length === 1) {
-            nextStudents.push(uniqueMembers[0]);
+            const _fm0 = allStudentsMap.get(uniqueMembers[0].id);
+            nextStudents.push(_fm0 ? { ...uniqueMembers[0], first_name: _fm0.first_name, last_name: _fm0.last_name } : uniqueMembers[0]);
           }
         } else {
           if (assignedStudentIds.has(s.id)) {
@@ -547,7 +548,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             return;
           }
           assignedStudentIds.add(s.id);
-          nextStudents.push(s);
+          const _fresh = allStudentsMap.get(s.id);
+          nextStudents.push(_fresh ? { ...s, first_name: _fresh.first_name, last_name: _fresh.last_name } : s);
         }
       });
       return { ...b, students: nextStudents };
@@ -651,7 +653,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               groupStudents: nonGroupMembers
             });
           } else if (nonGroupMembers.length === 1) {
-            nextStudents.push(nonGroupMembers[0]);
+            const _fm1 = allStudentsMap.get(nonGroupMembers[0].id);
+            nextStudents.push(_fm1 ? { ...nonGroupMembers[0], first_name: _fm1.first_name, last_name: _fm1.last_name } : nonGroupMembers[0]);
           }
 
           groupMembers.forEach(gs => {
@@ -673,7 +676,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               }
             }
           } else {
-            nextStudents.push(s);
+            const _freshS = allStudentsMap.get(s.id);
+            nextStudents.push(_freshS ? { ...s, first_name: _freshS.first_name, last_name: _freshS.last_name } : s);
           }
         }
       });
@@ -4606,7 +4610,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 {bs.first_name} {maskLastName(bs.last_name, showRealNames)}
                               </span>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name[0]}.`).join(', ')}
+                                {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name?.[0] ? s.last_name[0] + '.' : ''}`).join(', ')}
                               </span>
                             </div>
                           );
