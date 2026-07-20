@@ -12559,18 +12559,72 @@ const targetVol = isActive ? vol : 0;
                   btn.disabled = true;
                   try {
                     const response = await fetch(selectedSavedLoop.url);
-                    const blob = await response.blob();
-                    const blobUrl = URL.createObjectURL(blob);
+                    const arrayBuffer = await response.arrayBuffer();
+                    
+                    btn.innerText = "DECODIERE...";
+                    const ctx = audioContextRef.current || new AudioContext();
+                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                    
+                    const repsPrompt = prompt("Wie oft soll der Loop im exportierten Song hintereinander wiederholt werden?", "4");
+                    if (repsPrompt === null) {
+                      btn.innerText = originalText;
+                      btn.disabled = false;
+                      return;
+                    }
+                    const repetitions = Math.max(1, parseInt(repsPrompt, 10) || 4);
+                    
+                    btn.innerText = "RENDERE...";
+                    const totalDurationSec = audioBuffer.duration * repetitions;
+                    const offlineCtx = new OfflineAudioContext(
+                      2,
+                      Math.round(totalDurationSec * 44100),
+                      44100
+                    );
+                    
+                    const source = offlineCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.loop = true;
+                    
+                    source.connect(offlineCtx.destination);
+                    source.start(0);
+                    
+                    const renderedBuffer = await offlineCtx.startRendering();
+                    
+                    btn.innerText = "KONVERTIERE...";
+                    let mixBlob: Blob;
+                    let fileExt = 'mp3';
+                    try {
+                      mixBlob = bufferToMp3(renderedBuffer);
+                    } catch (mp3Err) {
+                      console.warn("MP3 conversion failed, falling back to WAV:", mp3Err);
+                      mixBlob = bufferToWav(renderedBuffer);
+                      fileExt = 'wav';
+                    }
+                    
+                    const downloadUrl = URL.createObjectURL(mixBlob);
                     const a = document.createElement('a');
-                    a.href = blobUrl;
-                    a.download = `${selectedSavedLoop.label || 'loop'}.mp3`;
+                    a.href = downloadUrl;
+                    a.download = `${(selectedSavedLoop.label || 'loop').toLowerCase().replace(/\s+/g, '_')}_x${repetitions}.${fileExt}`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    URL.revokeObjectURL(blobUrl);
+                    URL.revokeObjectURL(downloadUrl);
                   } catch (err) {
-                    console.error("Forced download failed, falling back to direct open:", err);
-                    window.open(selectedSavedLoop.url, '_blank');
+                    console.error("Archive export failed, falling back to direct download:", err);
+                    try {
+                      const response = await fetch(selectedSavedLoop.url);
+                      const blob = await response.blob();
+                      const blobUrl = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = blobUrl;
+                      a.download = `${selectedSavedLoop.label || 'loop'}.mp3`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(blobUrl);
+                    } catch (fallbackErr) {
+                      window.open(selectedSavedLoop.url, '_blank');
+                    }
                   } finally {
                     btn.innerText = originalText;
                     btn.disabled = false;
