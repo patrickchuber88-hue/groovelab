@@ -13980,19 +13980,19 @@ const targetVol = isActive ? vol : 0;
                 flexDirection: 'column',
                 gap: '2.5px',
                 padding: '5px 4px',
-                background: '#111112',
+                background: 'linear-gradient(180deg, #3a3a3c 0%, #2c2c2e 100%)',
                 borderRadius: '6px',
                 minWidth: '18px',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 height: '64px',
-                border: '1px solid rgba(255,255,255,0.05)',
-                boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.05)'
+                border: '1.5px solid rgba(0, 0, 0, 0.22)',
+                boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.5)'
               }}>
                 {Array.from({ length: 10 }).map((_, idx) => {
                   const level = 10 - idx;
                   const isActive = meterHeights[track.id] >= level;
-                  let targetColor = '#222225'; // Dark state
+                  let targetColor = 'rgba(0, 0, 0, 0.28)'; // Cohesive inset slot dark state
                   if (isActive) {
                     if (level >= 9) targetColor = '#ea4335'; // Red peak clip
                     else if (level >= 7) targetColor = '#facc15'; // Yellow warn
