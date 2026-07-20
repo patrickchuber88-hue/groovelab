@@ -8583,7 +8583,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         >
                           <option value="">Ohne Zuweisung</option>
                           {allUniqueTeachers.map((t: any) => (
-                            <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
+                            <option key={t.id} value={t.id}>{`${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim()}</option>
                           ))}
                         </select>
                       </div>
@@ -8672,8 +8672,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             fontSize: '0.75rem',
                             fontWeight: 800,
                             cursor: 'pointer',
-                            background: student.is_campus_active ? '#fce8e6' : '#f5f5f7',
-                            color: student.is_campus_active ? '#ea4335' : '#86868b',
+                            background: student.is_campus_active ? '#e6f4ea' : '#f5f5f7',
+                            color: student.is_campus_active ? '#34a853' : '#86868b',
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
