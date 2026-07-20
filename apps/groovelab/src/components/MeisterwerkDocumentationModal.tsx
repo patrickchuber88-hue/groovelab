@@ -13980,6 +13980,10 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       if (step === 4 || step === 12) {
         playRimClick(0.9);
       }
+      // Pedagogical Guide: quiet rim click on beat 1 for student orientation
+      if (step === 0) {
+        playRimClick(0.22);
+      }
       if (step % 2 === 0) {
         // Rocksteady hat feel: emphasize upbeat eighth notes
         const isUpbeat = step === 2 || step === 6 || step === 10 || step === 14;
