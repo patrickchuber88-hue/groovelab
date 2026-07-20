@@ -680,12 +680,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         };
 
         try {
-          const fileName = `${student.id}_feedback_${Date.now()}.mp3`;
+          const fileExt = blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : blob.type.includes('wav') ? 'wav' : 'mp3';
+          const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
           const filePath = `avatars/audio_feedback_${fileName}`;
           
           const { error: uploadErr } = await supabase.storage
             .from('campus-assets')
-            .upload(filePath, blob, { cacheControl: 'private, max-age=3600' });
+            .upload(filePath, blob, { 
+              contentType: blob.type || 'audio/webm',
+              cacheControl: 'private, max-age=3600' 
+            });
             
           if (uploadErr) throw uploadErr;
           
@@ -696,8 +700,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const uploadedUrl = publicUrlData.publicUrl;
           await saveAudioMetadata(uploadedUrl);
         } catch (err: any) {
-          console.error("Storage upload failed, audio fallback aborted due to GDPR/COPPA database limits:", err);
-          alert("Fehler beim Hochladen der Audio-Datei. Die Aufnahme konnte aus Datenschutzgründen (Verbot großer Base64-Speicherungen) nicht gespeichert werden. Bitte überprüfe deine Internetverbindung.");
+          console.error("Storage upload failed:", err);
+          alert(`Fehler beim Hochladen der Audio-Datei: ${err.message || err}. Bitte überprüfe deine Internetverbindung.`);
         } finally {
           setIsUploadingAudio(false);
         }
@@ -3433,7 +3437,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <h3 style={{
                   fontSize: '1rem',
                   fontWeight: 850,
-                  color: '#4f46e5',
+                  color: '#1d1d1f',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: '16px',
@@ -3463,8 +3467,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                   if (teacherAudios.length === 0) {
                     return (
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', padding: '40px 0' }}>
-                        Keine Aufnahmen vom Lehrer vorhanden.
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
+                        <Mic size={28} style={{ opacity: 0.4, color: '#64748b' }} />
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine Aufnahmen vom Lehrer</p>
+                          <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Dein Lehrer hat für diese Woche noch keine Audio-Beispiele hinterlassen.</p>
+                        </div>
                       </div>
                     );
                   }
@@ -3538,7 +3546,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <h3 style={{
                   fontSize: '1rem',
                   fontWeight: 850,
-                  color: '#4f46e5',
+                  color: '#1d1d1f',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: '16px',
@@ -3554,8 +3562,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <div style={{
                     margin: '0 0 24px 0',
                     padding: '16px',
-                    background: '#f8fafc',
-                    border: '1px solid #cbd5e1',
+                    background: '#fafafa',
                     borderRadius: '20px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -3602,7 +3609,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   onClick={startRecordingAudio}
                                   disabled={isUploadingAudio || isLimitReached}
                                   style={{
-                                    background: isLimitReached ? '#94a3b8' : '#4f46e5',
+                                    background: isLimitReached ? '#94a3b8' : '#34a853',
                                     color: '#fff',
                                     border: 'none',
                                     padding: '6px 12px',
@@ -3710,8 +3717,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                   if (studentAudios.length === 0) {
                     return (
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic', padding: '40px 0' }}>
-                        Keine eigenen Aufnahmen vorhanden.
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
+                        <Music size={28} style={{ opacity: 0.4, color: '#64748b' }} />
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine eigenen Aufnahmen</p>
+                          <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Nimm dein Spiel auf und zeige deine Fortschritte deinem Lehrer!</p>
+                        </div>
                       </div>
                     );
                   }
