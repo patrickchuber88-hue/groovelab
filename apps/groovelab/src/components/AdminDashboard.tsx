@@ -10201,27 +10201,36 @@ export function AdminDashboard({
                 type="button"
                 onClick={() => setShowTeacherToolsModal(true)}
                 style={{
-                  background: '#e6f4ea',
-                  color: '#34a853',
-                  border: '1px solid rgba(52,168,83,0.15)',
-                  padding: '8px 16px',
-                  borderRadius: '12px',
+                  background: 'rgba(52, 168, 83, 0.09)',
+                  color: '#2e7d32',
+                  border: 'none',
+                  padding: '7px 18px',
+                  borderRadius: '9999px',
                   fontSize: '0.82rem',
-                  fontWeight: 900,
+                  fontWeight: 800,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.08)',
-                  transition: 'all 0.2s ease',
-                  fontFamily: 'Inter, sans-serif'
+                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                  fontFamily: 'Inter, sans-serif',
+                  boxShadow: 'none'
                 }}
-                className="hover-scale-mini"
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = '#d1fae5';
+                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)';
+                  e.currentTarget.style.transform = 'scale(1.02)';
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = '#e6f4ea';
+                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.09)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                onMouseDown={e => {
+                  e.currentTarget.style.transform = 'scale(0.96)';
+                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.22)';
+                }}
+                onMouseUp={e => {
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)';
                 }}
               >
                 <Sliders size={15} />
