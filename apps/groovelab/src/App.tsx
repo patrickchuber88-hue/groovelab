@@ -3433,7 +3433,18 @@ function App() {
       if (typeof (window as any).stopAllCameras === 'function') {
         (window as any).stopAllCameras();
       }
-      fetchDashboardData(loggedInUserId, true);
+      // Safety timeout: if fetchDashboardData hangs (e.g. frozen auth lock),
+      // force-clear the loading spinner after 10 seconds.
+      const safetyTimer = setTimeout(() => {
+        setLoading(prev => {
+          if (prev) {
+            console.warn('[Dashboard] Safety timeout: loading was stuck for 10s. Force-clearing.');
+            return false;
+          }
+          return prev;
+        });
+      }, 10000);
+      fetchDashboardData(loggedInUserId, true).finally(() => clearTimeout(safetyTimer));
     }
   }, [loggedInUserId]);
 

@@ -121,9 +121,40 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   throw lastError;
 };
 
+// ─── Custom in-memory auth lock ─────────────────────────────────────────────
+// Replaces navigator.locks to avoid "lock was stolen by another request" errors
+// that occur when Vite HMR reloads the supabase module and creates a new client
+// while the old one still holds a Web Lock.
+// Storing the queue on `window` makes it survive HMR reloads just like nameHelper.
+declare global {
+  interface Window {
+    __sbAuthLock: Map<string, Promise<any>>;
+  }
+}
+if (typeof window !== 'undefined' && !window.__sbAuthLock) {
+  window.__sbAuthLock = new Map();
+}
+
+const customAuthLock = async (name: string, _acquireTimeout: number, fn: () => Promise<any>): Promise<any> => {
+  if (typeof window === 'undefined') return fn();
+  const lockMap = window.__sbAuthLock;
+  const prev = lockMap.get(name) ?? Promise.resolve();
+  // Serialize calls: wait for the previous one, then run fn()
+  const next = prev.then(() => fn());
+  // Keep the map entry until this call finishes (succces or error)
+  lockMap.set(name, next.catch(() => {}));
+  next.finally(() => {
+    if (lockMap.get(name) === next) lockMap.delete(name);
+  });
+  return next;
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: customFetch
+  },
+  auth: {
+    lock: customAuthLock
   }
 });
 
