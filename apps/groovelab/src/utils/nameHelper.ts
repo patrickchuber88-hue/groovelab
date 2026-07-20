@@ -1,51 +1,61 @@
 import { useState, useEffect } from 'react';
 
-// Global state: true = privacy mode ON (last names hidden), false = full names shown
-// Default: false → full names shown by default
+// ─── Module-level state ───────────────────────────────────────────────────────
+// privacyMode = true  → last names are masked (e.g. "M.")
+// privacyMode = false → full names shown (default)
 let globalPrivacyMode = false;
 
+// Direct subscriber list – avoids CustomEvent / DOM completely
+const subscribers: Array<(mode: boolean) => void> = [];
+
+function notifyAll() {
+  subscribers.forEach(fn => fn(globalPrivacyMode));
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 /**
- * maskLastName: Returns the lastName as-is when privacy mode is OFF,
- * or as "X." (first letter + dot) when privacy mode is ON.
- *
- * @param lastName       The last name to optionally mask
- * @param privacyMode    Pass the component's reactive privacyMode state so
- *                       React re-renders whenever the toggle changes.
+ * Mask a last name.
+ * Pass the reactive `privacyMode` value from the hook so React
+ * re-renders whenever the toggle changes.
+ *   privacyMode = false  → full last name returned
+ *   privacyMode = true   → "X." (first letter + dot)
  */
 export function maskLastName(
   lastName: string | undefined | null,
   privacyMode: boolean = globalPrivacyMode
 ): string {
   if (!lastName) return '';
-  // If privacy mode is OFF → show full last name
-  if (!privacyMode) return lastName;
-  // Privacy mode is ON → mask to first letter + dot
+  if (!privacyMode) return lastName;           // privacy OFF → show full name
   const trimmed = lastName.trim();
-  const firstLetter = trimmed.charAt(0);
-  if (!firstLetter) return '';
-  return `${firstLetter}.`;
+  const first = trimmed.charAt(0);
+  return first ? `${first}.` : '';
 }
 
-// React Hook — returns { privacyMode, togglePrivacy }
+/**
+ * React hook – subscribe to privacy-mode changes.
+ * Returns { visible: boolean, toggleVisibility: () => void }
+ * where `visible` = true means privacy mode is ON (names hidden).
+ */
 export function useRealNamesVisibility() {
   const [privacyMode, setPrivacyMode] = useState(globalPrivacyMode);
 
   useEffect(() => {
-    const handleToggle = () => {
-      setPrivacyMode(globalPrivacyMode);
-    };
-    window.addEventListener('gl-toggle-real-names', handleToggle);
+    // Register subscriber
+    subscribers.push(setPrivacyMode);
+    // Sync immediately in case state changed before mount
+    setPrivacyMode(globalPrivacyMode);
     return () => {
-      window.removeEventListener('gl-toggle-real-names', handleToggle);
+      const idx = subscribers.indexOf(setPrivacyMode);
+      if (idx !== -1) subscribers.splice(idx, 1);
     };
   }, []);
 
   const toggleVisibility = (forceValue?: boolean) => {
-    globalPrivacyMode = forceValue !== undefined ? forceValue : !globalPrivacyMode;
-    window.dispatchEvent(new CustomEvent('gl-toggle-real-names'));
+    globalPrivacyMode =
+      forceValue !== undefined ? forceValue : !globalPrivacyMode;
+    notifyAll();
   };
 
-  // Expose 'visible' as alias for backwards compatibility:
-  // visible = true means "privacy mode ON" (names hidden)
   return { visible: privacyMode, toggleVisibility };
 }

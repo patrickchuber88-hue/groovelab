@@ -1997,7 +1997,7 @@ export function TeacherDashboard({
                 const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
                 if (!existingNotifsSet.has(notifKey)) {
                   const student = sched.student || allStudents.find(s => s.id === sched.student_id);
-                  const studentName = student ? `${student.first_name} ${maskLastName(student.last_name)}`.trim() : null;
+                  const studentName = student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : null;
                   notificationsToInsert.push({
                     teacher_id: userId,
                     student_id: sched.student_id,
@@ -2034,7 +2034,7 @@ export function TeacherDashboard({
               const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
               if (!existingNotifsSet.has(notifKey)) {
                 const student = occ.student || allStudents.find(s => s.id === occ.student_id);
-                const studentName = student ? `${student.first_name} ${maskLastName(student.last_name)}`.trim() : null;
+                const studentName = student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : null;
                 const matchingSched = (schedules || []).find(s => s.id === occ.schedule_id);
                 const durationVal = occ.duration || matchingSched?.duration || 30;
                 notificationsToInsert.push({
@@ -2894,11 +2894,11 @@ export function TeacherDashboard({
             date: occ.date,
             startTime: startTimeStr,
             endTime: endTimeStr,
-            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name)}`.trim() : 'Unterricht',
+            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Unterricht',
             teacherId: userId,
             status: occ.status,
             isSchedule: true,
-            studentName: occ.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name)}`.trim() : null
+            studentName: occ.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : null
           };
         });
 
@@ -3590,7 +3590,7 @@ export function TeacherDashboard({
               original_date: null,
               student: student ? {
                 id: student.id,
-                name: `${student.first_name} ${maskLastName(student.last_name)}`.trim(),
+                name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
                 isAppUser: student.is_app_user ?? false,
                 isAnalogStickerUser,
                 birthDate: student.birth_date,
@@ -3630,7 +3630,7 @@ export function TeacherDashboard({
                   original_date: occ.original_date,
                   student: student ? {
                     id: student.id,
-                    name: `${student.first_name} ${maskLastName(student.last_name)}`.trim(),
+                    name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
                     isAppUser: student.is_app_user ?? false,
                     isAnalogStickerUser,
                     birthDate: student.birth_date,
@@ -3833,7 +3833,7 @@ export function TeacherDashboard({
 
                 return {
                   id: occ.id,
-                  studentName: `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name)}`.trim(),
+                  studentName: `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim(),
                   originalWeekday: originalWeekdayStr,
                   weekday: weekdayStr,
                   weekdayShort,
@@ -7464,7 +7464,7 @@ export function TeacherDashboard({
                             <button
                               type="button"
                               onClick={() => toggleRealNames()}
-                              title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen für 10 Sekunden einblenden"}
+                              title={showRealNames ? "Vollständige Namen anzeigen" : "Nachnamen schützen (kürzen)"}
                               style={{
                                 border: 'none',
                                 background: showRealNames ? '#fee2e2' : '#f1f5f9',
@@ -7479,7 +7479,7 @@ export function TeacherDashboard({
                                 transition: 'all 0.2s'
                               }}
                             >
-                              {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
+                              {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
                             </button>
                           </div>
                         </div>
@@ -10252,7 +10252,7 @@ export function TeacherDashboard({
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {coaches.filter(Boolean).map((c, idx) => {
                               const isSelf = userId && c.id === userId;
-                              const coachName = c.users ? `${c.users.first_name} ${maskLastName(c.users.last_name)}` : 'Coach';
+                              const coachName = c.users ? `${c.users.first_name} ${maskLastName(c.users.last_name, showRealNames)}` : 'Coach';
                               return (
                                 <div
                                   key={c.id || idx}
@@ -10321,7 +10321,7 @@ export function TeacherDashboard({
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
                           const hasHelp = helpRequests.some(r => r.station_id === station.id);
                           const isMe = sess?.user_id === userId;
-                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name)}` : '';
+                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
 
                           return (
                             <div
@@ -12868,7 +12868,7 @@ export function TeacherDashboard({
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {student.first_name} {maskLastName(student.last_name)}
+                              {student.first_name} {maskLastName(student.last_name, showRealNames)}
                             </div>
                           </div>
                         </div>
@@ -14134,7 +14134,7 @@ export function TeacherDashboard({
 
                   const studentName = n.student_name || (() => {
                     const student = allStudents.find(s => s.id === n.student_id);
-                    return student ? `${student.first_name} ${maskLastName(student.last_name)}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
+                    return student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
                   })();
 
                   return (

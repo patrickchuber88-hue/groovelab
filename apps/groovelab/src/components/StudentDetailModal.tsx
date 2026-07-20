@@ -1858,7 +1858,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </div>
                 ) : (
                   <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{firstName} {maskLastName(lastName)}</span>
+                    <span>{firstName} {maskLastName(lastName, showRealNames)}</span>
                     <button
                       type="button"
                       onClick={() => toggleRealNames()}
