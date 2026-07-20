@@ -12920,7 +12920,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
     const hVol = volHatRef.current / 100;
     const mVol = volMetronomeRef.current / 100;
 
-    const playKick = () => {
+    const playKick = (volMul = 1.0) => {
       if (kVol <= 0.001) return;
       // Main Body
       const osc = ctx.createOscillator();
@@ -12930,7 +12930,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       gain.connect(masterGain);
       osc.frequency.setValueAtTime(135, time);
       osc.frequency.exponentialRampToValueAtTime(45, time + 0.08);
-      gain.gain.setValueAtTime(kVol, time);
+      gain.gain.setValueAtTime(kVol * volMul, time);
       gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
       osc.start(time);
       osc.stop(time + 0.15);
@@ -12943,13 +12943,13 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       clickGain.connect(masterGain);
       clickOsc.frequency.setValueAtTime(450, time);
       clickOsc.frequency.exponentialRampToValueAtTime(90, time + 0.005);
-      clickGain.gain.setValueAtTime(kVol * 0.45, time);
+      clickGain.gain.setValueAtTime(kVol * volMul * 0.45, time);
       clickGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.006);
       clickOsc.start(time);
       clickOsc.stop(time + 0.01);
     };
 
-    const playSnare = () => {
+    const playSnare = (volMul = 1.0) => {
       if (sVol <= 0.001) return;
       if (!noiseBufferRef.current) return;
       
@@ -12962,7 +12962,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       bandpass.Q.value = 1.0;
       
       const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(sVol * 0.4, time);
+      noiseGain.gain.setValueAtTime(sVol * 0.4 * volMul, time);
       noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
       
       noise.connect(bandpass);
@@ -12976,7 +12976,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       const gain1 = ctx.createGain();
       osc1.frequency.setValueAtTime(210, time);
       osc1.frequency.exponentialRampToValueAtTime(140, time + 0.05);
-      gain1.gain.setValueAtTime(sVol * 0.45, time);
+      gain1.gain.setValueAtTime(sVol * 0.45 * volMul, time);
       gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.07);
       osc1.connect(gain1);
       gain1.connect(masterGain);
@@ -12988,12 +12988,27 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       const gain2 = ctx.createGain();
       osc2.type = 'triangle';
       osc2.frequency.setValueAtTime(380, time);
-      gain2.gain.setValueAtTime(sVol * 0.15, time);
+      gain2.gain.setValueAtTime(sVol * 0.15 * volMul, time);
       gain2.gain.exponentialRampToValueAtTime(0.0001, time + 0.035);
       osc2.connect(gain2);
       gain2.connect(masterGain);
       osc2.start(time);
       osc2.stop(time + 0.04);
+    };
+
+    const playRimClick = (volMul = 1.0) => {
+      if (sVol <= 0.001) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.frequency.setValueAtTime(850, time);
+      osc.frequency.exponentialRampToValueAtTime(450, time + 0.015);
+      gain.gain.setValueAtTime(sVol * 0.5 * volMul, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.02);
+      osc.start(time);
+      osc.stop(time + 0.025);
     };
 
     const playHat = (isOpen = false) => {
@@ -13084,8 +13099,9 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       if (step % 2 === 0) playHat(false);
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'hiphop') {
-      if (step === 0 || step === 2 || step === 8 || step === 11) playKick();
-      if (step === 4 || step === 12) playSnare();
+      if (step === 0) playKick(1.5);
+      else if (step === 3 || step === 10) playKick(1.0);
+      if (step === 4 || step === 12) playSnare(1.1);
       if (step % 2 === 0) playHat(step === 14);
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (isSwing) {
@@ -13108,8 +13124,10 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'reggae') {
-      if (step === 8) { playKick(); playSnare(); }
-      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 10 || step === 12 || step === 14) playHat(false);
+      if (step === 0 || step === 8) playKick(1.0);
+      if (step === 8) playSnare(1.1);
+      if (step === 2 || step === 6 || step === 10 || step === 14) playRimClick(1.0);
+      if (step % 2 === 0) playHat(false);
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'walzer') {
       if (step === 0) playKick();
