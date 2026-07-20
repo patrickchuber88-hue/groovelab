@@ -10463,6 +10463,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           if (trackId === 1) {
             setMasterLoopDuration(trackDurationMs);
             setIsPlaying(true);
+            isPlayingRef.current = true;
           }
           const loopStartOffset = sequenceStartTimeRef.current + (tStartTicks + 16) * beatSecs;
           const elapsed = ctx.currentTime - loopStartOffset;
@@ -10971,6 +10972,7 @@ const targetVol = isActive ? vol : 0;
 
   const playAll = () => {
     setIsPlaying(true);
+    isPlayingRef.current = true;
     startTimeRef.current = Date.now();
 
     const ctx = audioContextRef.current;
@@ -11010,6 +11012,7 @@ const targetVol = isActive ? vol : 0;
 
   const stopAll = () => {
     setIsPlaying(false);
+    isPlayingRef.current = false;
     setPlaybackProgress(0);
     isAutoSequenceActiveRef.current = false;
     if (progressIntervalRef.current) {
@@ -11139,6 +11142,7 @@ const targetVol = isActive ? vol : 0;
           const duration = Date.now() - recordStartTimesRef.current[1];
           setMasterLoopDuration(duration);
           setIsPlaying(true);
+          isPlayingRef.current = true;
           startTimeRef.current = Date.now();
           
           const ctx = audioContextRef.current;
