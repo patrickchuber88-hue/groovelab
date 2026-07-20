@@ -12658,8 +12658,8 @@ const targetVol = isActive ? vol : 0;
             {/* Screen Content */}
             <div style={{
               position: 'relative',
-              width: '136px',
-              height: '136px',
+              width: '156px',
+              height: '156px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -12728,8 +12728,8 @@ const targetVol = isActive ? vol : 0;
                 className={activeSubTab === 'saved' ? (isSavedLoopPlaying ? 'central-pulse-play' : '') : (isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : '')}
                 style={{
                   position: 'absolute',
-                  width: '106px',
-                  height: '106px',
+                  width: '124px',
+                  height: '124px',
                   borderRadius: '50%',
                   background: activeSubTab === 'saved'
                     ? (isSavedLoopPlaying ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)')
