@@ -13617,8 +13617,8 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
     }
     noiseBufferRef.current = noiseBuffer;
 
-    nextNoteTimeRef.current = audioCtx.currentTime;
-    barStartAudioTimeRef.current = audioCtx.currentTime;
+    nextNoteTimeRef.current = audioCtx.currentTime + 0.05;
+    barStartAudioTimeRef.current = audioCtx.currentTime + 0.05;
     current16thNoteRef.current = 0;
 
     const syncBarProgress = () => {
