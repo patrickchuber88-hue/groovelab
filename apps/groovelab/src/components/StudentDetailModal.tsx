@@ -4277,6 +4277,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           }}
           onClose={() => setShowTageskompassModal(false)}
           teacherId={currentTeacherId}
+          isTeacherTools={true}
         />
       )}
     </div>

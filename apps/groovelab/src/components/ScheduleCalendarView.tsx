@@ -6392,6 +6392,7 @@ export function ScheduleCalendarView({
                   }
                 }} 
                 teacherId={userId}
+                 isTeacherTools={true}
               />
             )}
           </div>
