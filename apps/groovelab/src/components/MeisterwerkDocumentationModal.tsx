@@ -11678,10 +11678,18 @@ const targetVol = isActive ? vol : 0;
         return; // user cancelled
       }
       const sanitizedLabel = label.replace(/\|/g, '-').trim() || 'Loop-Mix';
+
+      const repsPrompt = prompt("Wie oft soll der Loop im exportierten Song hintereinander wiederholt werden?", "4");
+      if (repsPrompt === null) {
+        setIsExporting(false);
+        return; // user cancelled
+      }
+      const repetitions = Math.max(1, parseInt(repsPrompt, 10) || 4);
+      const totalDurationSec = (masterLoopDuration / 1000) * repetitions;
       
       const offlineCtx = new OfflineAudioContext(
         2,
-        Math.round((masterLoopDuration / 1000) * 44100),
+        Math.round(totalDurationSec * 44100),
         44100
       );
       
@@ -11694,6 +11702,7 @@ const targetVol = isActive ? vol : 0;
 
           const source = offlineCtx.createBufferSource();
           source.buffer = buffer;
+          source.loop = true;
           
           const gainNode = offlineCtx.createGain();
           const vol = track.volume / 100;
@@ -11722,7 +11731,7 @@ const targetVol = isActive ? vol : 0;
       const downloadUrl = URL.createObjectURL(mixBlob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `${sanitizedLabel.toLowerCase().replace(/\s+/g, '_')}.${fileExt}`;
+      link.download = `${sanitizedLabel.toLowerCase().replace(/\s+/g, '_')}_x${repetitions}.${fileExt}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -12543,14 +12552,29 @@ const targetVol = isActive ? vol : 0;
             {selectedSavedLoop && (
               <button
                 type="button"
-                onClick={() => {
-                  const a = document.createElement('a');
-                  a.href = selectedSavedLoop.url;
-                  a.download = `${selectedSavedLoop.label || 'loop'}.mp3`;
-                  a.target = '_blank';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
+                onClick={async (e) => {
+                  const btn = e.currentTarget;
+                  const originalText = btn.innerText;
+                  btn.innerText = "LADE...";
+                  btn.disabled = true;
+                  try {
+                    const response = await fetch(selectedSavedLoop.url);
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = `${selectedSavedLoop.label || 'loop'}.mp3`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                  } catch (err) {
+                    console.error("Forced download failed, falling back to direct open:", err);
+                    window.open(selectedSavedLoop.url, '_blank');
+                  } finally {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                  }
                 }}
                 className="tactile-btn"
                 style={{
