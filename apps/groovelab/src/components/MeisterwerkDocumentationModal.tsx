@@ -10225,6 +10225,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const beatMs = (60 / bpm) * 1000;
       const barMs = beatMs * 4;
       const trackDurationMs = barMs * 4; // Exactly 4 bars per track (16 beats)
+      setMasterLoopDuration(trackDurationMs);
+      masterLoopDurationRef.current = trackDurationMs;
 
       // === DAW Continuous PCM Recording (Web Audio Worklet) ===
       const ctx = audioContextRef.current!;
@@ -10958,8 +10960,8 @@ const targetVol = isActive ? vol : 0;
     if (progressIntervalRef.current) {
       cancelAnimationFrame(progressIntervalRef.current);
     }
-    if (masterLoopDuration) {
-      const duration = masterLoopDuration;
+    const duration = masterLoopDurationRef.current || masterLoopDuration;
+    if (duration) {
       startTimeRef.current = customStartTime || Date.now();
       const loopProgressSync = () => {
         const elapsed = (Date.now() - startTimeRef.current) % duration;
@@ -10986,30 +10988,11 @@ const targetVol = isActive ? vol : 0;
     tracksRef.current.forEach((track) => {
       const hasAudio = !!audioBuffersRef.current[track.id];
       if (hasAudio && !track.isMuted) {
-        playTrackBuffer(track.id, 0, false, playTime);
+        playTrackBuffer(track.id, 0, true, playTime);
       }
     });
 
     startProgressLoop(Date.now() + 50);
-
-    if (schedulerTimeoutRef.current) clearTimeout(schedulerTimeoutRef.current);
-    const runScheduler = () => {
-      if (!isPlayingRef.current) return;
-      const lookAhead = 0.200;
-      const loopDurationSec = (masterLoopDurationRef.current || 4000) / 1000;
-      while (lastCycleScheduledTimeRef.current < ctx.currentTime + lookAhead) {
-        const nextTime = lastCycleScheduledTimeRef.current + loopDurationSec;
-        tracksRef.current.forEach((track) => {
-          const hasAudio = !!audioBuffersRef.current[track.id];
-          if (hasAudio && !track.isMuted) {
-            playTrackBuffer(track.id, 0, false, nextTime);
-          }
-        });
-        lastCycleScheduledTimeRef.current = nextTime;
-      }
-      schedulerTimeoutRef.current = setTimeout(runScheduler, 50);
-    };
-    runScheduler();
   };
 
   const stopAll = () => {
@@ -12719,8 +12702,22 @@ const targetVol = isActive ? vol : 0;
                   {Array.from({ length: 32 }).map((_, stepIdx) => {
                     const isBarStart = stepIdx % 8 === 0;
                     const isQuarterBeat = stepIdx % 2 === 0;
-                    const activeStep = Math.floor((playbackProgress / 100) * 32);
-                    const isCurrentStep = (isPlaying || track.isRecording) && activeStep === stepIdx;
+                    
+                    let isCurrentStep = false;
+                    if (isPlaying) {
+                      const activeStep = Math.floor((playbackProgress / 100) * 32);
+                      isCurrentStep = hasAudio && activeStep === stepIdx;
+                    } else if (isAutoSequenceActive) {
+                      const elapsedSecs = (audioContextRef.current ? audioContextRef.current.currentTime : 0) - sequenceStartTimeRef.current;
+                      const continuousTick = elapsedSecs / (60 / bpm);
+                      if (continuousTick >= 4) {
+                        const activeStep = Math.floor(((continuousTick % 16) / 16) * 32);
+                        const activeTrack = tracks.find(tr => tr.isRecording || tr.isWaiting);
+                        const isRecordingThis = track.isRecording;
+                        const isPlayingThis = hasAudio && (!activeTrack || track.id < activeTrack.id);
+                        isCurrentStep = (isRecordingThis || isPlayingThis) && activeStep === stepIdx;
+                      }
+                    }
                     
                     let blockColor = '#e5e5e7';
                     if (hasAudio || track.isRecording) {
