@@ -11610,24 +11610,33 @@ const targetVol = isActive ? vol : 0;
       const newMeters: { [key: number]: number } = {};
       
       tracks.forEach((track) => {
-        const hasAudio = !!track.url;
-        const isTrackPlaying = isPlaying && hasAudio && !track.isMuted && (!hasAnySolo || track.isSoloed);
+        const hasAudio = !!audioBuffersRef.current[track.id] || !!track.url;
+        const isTrackPlaying = (isPlaying || isAutoSequenceActive) && hasAudio && !track.isMuted && (!hasAnySolo || track.isSoloed);
         
+        let meterValue = 0;
         const analyser = analysersRef.current[track.id];
+        
         if (track.isRecording) {
-          newMeters[track.id] = Math.random() > 0.15 ? Math.floor(Math.random() * 8) + 1 : 1;
-        } else if (isTrackPlaying && analyser) {
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
+          meterValue = Math.random() > 0.15 ? Math.floor(Math.random() * 8) + 1 : 1;
+        } else if (isTrackPlaying) {
+          if (analyser) {
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sum += dataArray[i];
+            }
+            const avg = sum / dataArray.length;
+            meterValue = Math.max(0, Math.min(8, Math.round((avg / 160) * 8)));
           }
-          const avg = sum / dataArray.length;
-          newMeters[track.id] = Math.max(1, Math.min(8, Math.round((avg / 160) * 8))); // Scaled slightly lower for better visual height range representation
-        } else {
-          newMeters[track.id] = 0;
+          
+          if (meterValue <= 2) {
+            const currentTick = Math.floor((Date.now() % 4000) / 125);
+            const stepIntensity = [5, 2, 3, 1, 6, 2, 4, 1][(currentTick + track.id * 2) % 8];
+            meterValue = Math.max(meterValue, stepIntensity);
+          }
         }
+        newMeters[track.id] = meterValue;
       });
       
       setMeterHeights(newMeters);
@@ -11636,7 +11645,7 @@ const targetVol = isActive ? vol : 0;
     
     updateMeters();
     return () => clearTimeout(animId);
-  }, [isPlaying, tracks]);
+  }, [isPlaying, isAutoSequenceActive, tracks]);
 
   const isPause = isAutoSequenceActive && !autoSequenceStatus.includes("AUFNAHME") && !autoSequenceStatus.includes("FERTIG");
   const isAnyTrackRecording = tracks.some(t => t.isRecording);
@@ -11757,53 +11766,51 @@ const targetVol = isActive ? vol : 0;
           -webkit-appearance: none;
           appearance: none;
           width: 100%;
-          height: 20px;
+          height: 24px;
           background: transparent;
           outline: none;
           cursor: pointer;
         }
         .groovelab-fader::-webkit-slider-runnable-track {
           width: 100%;
-          height: 4px;
-          background: #e2e8f0;
-          border-radius: 2px;
-          box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+          height: 6px;
+          background: linear-gradient(to bottom, #a0aec0 0%, #1a202c 35%, #1a202c 65%, #a0aec0 100%);
+          border-radius: 3px;
+          box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.4);
         }
         .groovelab-fader::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 12px;
-          height: 20px;
+          width: 18px;
+          height: 26px;
           border-radius: 3px;
-          background: #34a853;
-          border: 1.5px solid #ffffff;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.2);
-          margin-top: -8px;
-          transition: transform 0.1s ease, background 0.15s ease;
+          background: linear-gradient(to bottom, #f1f5f9 0%, #ffffff 42%, #0f172a 43%, #0f172a 57%, #ffffff 58%, #cbd5e1 100%);
+          border: 1px solid #64748b;
+          box-shadow: 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
+          margin-top: -10px;
+          transition: transform 0.1s ease;
         }
         .groovelab-fader::-webkit-slider-thumb:hover {
-          transform: scale(1.08);
-          background: #23853e;
+          transform: scale(1.05);
         }
         .groovelab-fader::-moz-range-track {
           width: 100%;
-          height: 4px;
-          background: #e2e8f0;
-          border-radius: 2px;
-          box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+          height: 6px;
+          background: linear-gradient(to bottom, #a0aec0 0%, #1a202c 35%, #1a202c 65%, #a0aec0 100%);
+          border-radius: 3px;
+          box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.4);
         }
         .groovelab-fader::-moz-range-thumb {
-          width: 12px;
-          height: 20px;
+          width: 18px;
+          height: 26px;
           border-radius: 3px;
-          background: #34a853;
-          border: 1.5px solid #ffffff;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.2);
-          transition: transform 0.1s ease, background 0.15s ease;
+          background: linear-gradient(to bottom, #f1f5f9 0%, #ffffff 42%, #0f172a 43%, #0f172a 57%, #ffffff 58%, #cbd5e1 100%);
+          border: 1px solid #64748b;
+          box-shadow: 0 3px 6px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
+          transition: transform 0.1s ease;
         }
         .groovelab-fader::-moz-range-thumb:hover {
-          transform: scale(1.08);
-          background: #23853e;
+          transform: scale(1.05);
         }
         .daw-console-strip {
           transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -11927,6 +11934,18 @@ const targetVol = isActive ? vol : 0;
             position: 'relative',
             overflow: 'hidden'
           }}>
+            {/* Diagonal LCD Glass Reflection Sheen */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0) 41%, rgba(255,255,255,0) 100%)',
+              pointerEvents: 'none',
+              zIndex: 10
+            }} />
+
             {/* Screen Content */}
             <div style={{
               position: 'relative',
@@ -12042,136 +12061,83 @@ const targetVol = isActive ? vol : 0;
             width: '210px',
             height: '210px',
             borderRadius: '50%',
-            background: '#242426',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.05), inset 0 -1.5px 3px rgba(0,0,0,0.3)',
+            background: 'linear-gradient(135deg, #2d2d30 0%, #1e1e20 100%)',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.08), inset 0 -1.5px 3px rgba(0,0,0,0.4)',
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             userSelect: 'none'
           }}>
-            {/* Top Quadrant: MENU Button Pad */}
+            {/* Top Quadrant: MENU Printed text */}
             <div 
               onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-              className="tactile-btn"
               style={{
                 position: 'absolute',
-                top: '14px',
-                width: '70px',
-                height: '26px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
+                top: '18px',
                 fontSize: '0.62rem',
                 fontWeight: 900,
-                color: '#d1d1d6',
-                letterSpacing: '0.05em',
-                transition: 'all 0.2s ease'
+                color: '#a1a1a6',
+                letterSpacing: '0.08em',
+                transition: 'color 0.2s ease',
+                cursor: 'pointer'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                e.currentTarget.style.color = '#ffffff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                e.currentTarget.style.color = '#d1d1d6';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
             >
               MENU
             </div>
 
-            {/* Bottom Quadrant: PLAY / PAUSE Button Pad */}
+            {/* Bottom Quadrant: PLAY / PAUSE Printed text */}
             <div 
               onClick={handlePlayToggle}
-              className="tactile-btn"
               style={{
                 position: 'absolute',
-                bottom: '14px',
-                width: '100px',
-                height: '26px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                bottom: '18px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
                 gap: '4px',
-                cursor: 'pointer',
-                fontSize: '0.58rem',
+                fontSize: '0.56rem',
                 fontWeight: 900,
-                color: '#d1d1d6',
-                transition: 'all 0.2s ease'
+                color: '#a1a1a6',
+                transition: 'color 0.2s ease',
+                cursor: 'pointer'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                e.currentTarget.style.color = '#ffffff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                e.currentTarget.style.color = '#d1d1d6';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
             >
-              {isPlaying ? <Square size={7} fill="currentColor" /> : <Play size={7} fill="currentColor" />}
+              {isPlaying ? <Square size={6} fill="currentColor" /> : <Play size={6} fill="currentColor" />}
               <span>PLAY / PAUSE</span>
             </div>
 
-            {/* Left Quadrant: RESET Button Pad */}
+            {/* Left Quadrant: RESET Printed text */}
             <div 
               onClick={handleReset}
-              className="tactile-btn"
               style={{
                 position: 'absolute',
-                left: '14px',
-                width: '60px',
-                height: '26px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                left: '20px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                gap: '2px',
-                cursor: 'pointer',
-                fontSize: '0.58rem',
+                gap: '3px',
+                fontSize: '0.56rem',
                 fontWeight: 900,
-                color: '#d1d1d6',
-                transition: 'all 0.2s ease'
+                color: '#a1a1a6',
+                transition: 'color 0.2s ease',
+                cursor: 'pointer'
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                e.currentTarget.style.color = '#ffffff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                e.currentTarget.style.color = '#d1d1d6';
-              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
             >
-              <RotateCcw size={7} />
+              <RotateCcw size={6} />
               <span>RESET</span>
             </div>
 
-            {/* Right Quadrant: SELECT Button Pad */}
+            {/* Right Quadrant: SELECT Printed text */}
             <div 
-              className="tactile-btn"
               style={{
                 position: 'absolute',
-                right: '14px',
-                width: '60px',
-                height: '26px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.55rem',
+                right: '20px',
+                fontSize: '0.56rem',
                 fontWeight: 900,
                 color: '#555558',
                 letterSpacing: '0.04em'
@@ -12196,18 +12162,18 @@ const targetVol = isActive ? vol : 0;
                     ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
                     : isPlaying 
                       ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)'
-                      : 'linear-gradient(135deg, #3c3c3e 0%, #2c2c2e 100%)',
-                border: '1.5px solid rgba(0, 0, 0, 0.25)',
+                      : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)',
+                border: '1.5px solid rgba(0, 0, 0, 0.15)',
                 boxShadow: isAutoSequenceActive 
                   ? '0 0 15px rgba(239, 68, 68, 0.4)' 
-                  : 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(0,0,0,0.3)',
+                  : 'inset 0 1.5px 2px rgba(255,255,255,0.6), 0 4px 8px rgba(0,0,0,0.25)',
                 cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.7rem',
+                fontSize: '0.72rem',
                 fontWeight: 900,
-                color: isAutoSequenceActive || isPause || isPlaying ? '#ffffff' : '#a1a1a6',
+                color: isAutoSequenceActive || isPause || isPlaying ? '#ffffff' : '#3a3a3c',
                 textTransform: 'uppercase',
                 transition: 'all 0.25s ease'
               }}
@@ -12217,8 +12183,8 @@ const targetVol = isActive ? vol : 0;
           </div>
         </div>
 
-        {/* Master Mixdown Export Buttons */}
-        {masterLoopDuration && (
+        {/* Master Mixdown Export Buttons & Loop Onboarding Instruction Card */}
+        {masterLoopDuration ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '300px', marginTop: '4px' }}>
             <button
               type="button"
@@ -12266,6 +12232,32 @@ const targetVol = isActive ? vol : 0;
             >
               <span>{isExporting ? 'LADE HERUNTER...' : 'ALS MP3 HERUNTERLADEN'}</span>
             </button>
+          </div>
+        ) : (
+          <div style={{
+            width: '100%',
+            maxWidth: '300px',
+            background: 'rgba(255, 255, 255, 0.45)',
+            border: '1.5px dashed rgba(0, 0, 0, 0.08)',
+            borderRadius: '20px',
+            padding: '16px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            textAlign: 'center',
+            marginTop: '4px'
+          }}>
+            <Music size={16} style={{ color: '#86868b' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d1d1f' }}>
+                Bereit zum Recorden
+              </span>
+              <span style={{ fontSize: '0.54rem', color: '#86868b', lineHeight: 1.3 }}>
+                Klicke die mittlere Taste <strong>START</strong> am iPod, um den automatischen Aufnahmezyklus zu starten.
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -12435,7 +12427,7 @@ const targetVol = isActive ? vol : 0;
               flexWrap: 'wrap'
             }}>
               {/* Click Switch & Tap Tempo */}
-              <div style={{ flex: '1 1 200px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ flex: '1 1 210px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
                   type="button"
                   onClick={() => setIsMetronomeActive(!isMetronomeActive)}
@@ -12447,10 +12439,14 @@ const targetVol = isActive ? vol : 0;
                     fontSize: '0.62rem',
                     fontWeight: 800,
                     borderRadius: '8px',
-                    padding: '8px 12px',
+                    height: '34px',
+                    padding: '0 12px',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    letterSpacing: '0.04em'
+                    letterSpacing: '0.04em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                 >
                   {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
@@ -12465,17 +12461,23 @@ const targetVol = isActive ? vol : 0;
                     color: '#1d1d1f',
                     border: 'none',
                     borderRadius: '8px',
-                    height: '32px',
+                    height: '34px',
                     padding: '0 12px',
                     fontSize: '0.62rem',
                     fontWeight: 800,
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease'
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                 >
                   TAP TEMPO
                 </button>
               </div>
+
+              {/* Vertical Divider */}
+              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
 
               {/* Tempo BPM Adjuster */}
               <div style={{ flex: '0 1 120px', display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
@@ -12483,7 +12485,7 @@ const targetVol = isActive ? vol : 0;
                   type="button"
                   onClick={() => setBpm(prev => Math.max(40, prev - 1))}
                   className="tactile-btn"
-                  style={{ width: '28px', height: '30px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: '28px', height: '34px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   -
                 </button>
@@ -12494,14 +12496,17 @@ const targetVol = isActive ? vol : 0;
                   type="button"
                   onClick={() => setBpm(prev => Math.min(240, prev + 1))}
                   className="tactile-btn"
-                  style={{ width: '28px', height: '30px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: '28px', height: '34px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   +
                 </button>
               </div>
 
+              {/* Vertical Divider */}
+              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
+
               {/* Latency Sync Slider */}
-              <div style={{ flex: '1 1 240px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ flex: '1 1 250px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                     <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>SYNC LATENCY</span>
@@ -12530,13 +12535,17 @@ const targetVol = isActive ? vol : 0;
                     color: isCalibratingLatency ? '#86868b' : '#34a853',
                     border: 'none',
                     borderRadius: '8px',
-                    padding: '6px 10px',
+                    height: '34px',
+                    padding: '0 10px',
                     fontSize: '0.58rem',
                     fontWeight: 800,
                     cursor: isCalibratingLatency ? 'not-allowed' : 'pointer',
                     transition: 'all 0.15s ease',
                     textTransform: 'uppercase',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                 >
                   {isCalibratingLatency ? 'Kalibriere...' : 'Auto-Kalibrierung'}
@@ -12772,16 +12781,22 @@ const targetVol = isActive ? vol : 0;
                 flexDirection: 'column-reverse',
                 gap: '2px',
                 padding: '4px',
-                background: '#f5f5f7',
+                background: '#1e1e20',
                 borderRadius: '4px',
                 minWidth: '14px',
                 justifyContent: 'center',
                 alignItems: 'center',
-                height: '34px'
+                height: '34px',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)'
               }}>
                 {Array.from({ length: 8 }).map((_, idx) => {
                   const isActive = meterHeights[track.id] >= (8 - idx);
-                  const color = '#34a853'; // Monochrome green
+                  let targetColor = '#2e2e30'; // Dark state
+                  if (isActive) {
+                    if (idx < 2) targetColor = '#ea4335'; // Red peak clip
+                    else if (idx < 4) targetColor = '#facc15'; // Yellow warn
+                    else targetColor = '#34a853'; // Green safe
+                  }
                   return (
                     <div
                       key={idx}
@@ -12789,8 +12804,9 @@ const targetVol = isActive ? vol : 0;
                         width: '6px',
                         height: '2px',
                         borderRadius: '0.5px',
-                        background: isActive ? color : '#e5e5ea',
-                        transition: 'background 0.05s ease'
+                        background: targetColor,
+                        boxShadow: isActive ? `0 0 4px ${targetColor}` : 'none',
+                        transition: 'all 0.05s ease'
                       }}
                     />
                   );
