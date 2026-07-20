@@ -388,7 +388,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           map[ob.dayOfWeek].push({
             start,
             end,
-            studentName: `${obs.first_name} ${maskLastName(obs.last_name)}`,
+            studentName: `${obs.first_name} ${maskLastName(obs.last_name, showRealNames)}`,
             roomName: r ? r.name : 'Anderer Raum',
             boardId: ob.id
           });
@@ -413,7 +413,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           start,
           end,
           teacherName: os.teacher ? `${os.teacher.first_name} ${os.teacher.last_name}` : 'Anderer Lehrer',
-          studentName: os.student ? `${os.student.first_name} ${maskLastName(os.student.last_name)}` : 'Schüler'
+          studentName: os.student ? `${os.student.first_name} ${maskLastName(os.student.last_name, showRealNames)}` : 'Schüler'
         });
       }
     });
@@ -2236,7 +2236,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 // Show warnings toast
                 setToast({
-                  message: `Zeitkonflikt: Der Schüler ${student.first_name} ${maskLastName(student.last_name)} ist in diesem Zeitraum gesperrt!`,
+                  message: `Zeitkonflikt: Der Schüler ${student.first_name} ${maskLastName(student.last_name, showRealNames)} ist in diesem Zeitraum gesperrt!`,
                   type: 'warning'
                 });
 
@@ -2629,7 +2629,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           doc.text(`${s.assignedTime} - Pause (${s.duration} Min)`, 25, y);
         } else {
           doc.setTextColor(71, 85, 105);
-          doc.text(`${s.assignedTime} - ${s.first_name} ${maskLastName(s.last_name)} (${s.instrument}, ${s.duration} Min)`, 25, y);
+          doc.text(`${s.assignedTime} - ${s.first_name} ${maskLastName(s.last_name, showRealNames)} (${s.instrument}, ${s.duration} Min)`, 25, y);
         }
         y += 6;
       });
@@ -2835,7 +2835,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         
         if (matchedBlocked) {
           hasBlockedConflict = true;
-          conflictStudentName = `${bs.first_name} ${maskLastName(bs.last_name)}`;
+          conflictStudentName = `${bs.first_name} ${maskLastName(bs.last_name, showRealNames)}`;
           const r = rooms.find(room => room.id === board.roomId);
           conflictRoomName = r ? r.name : 'Raum';
           break;
@@ -2959,7 +2959,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               const conflict = (existingSchedules as any[]).find((es: any) => es.student_id === insert.student_id && es.instrument === insert.instrument);
               if (conflict) {
                 const studentObj = conflict.student;
-                const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name)}` : 'Schüler';
+                const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : 'Schüler';
                 alert(`Fehler: Für ${studentName} existiert bereits ein genehmigter Stundenplan für das Instrument "${insert.instrument}".`);
                 setSubmitting(false);
                 return;
@@ -4627,7 +4627,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 </div>
                               </div>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {bs.first_name} {maskLastName(bs.last_name)}
+                                {bs.first_name} {maskLastName(bs.last_name, showRealNames)}
                               </span>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name[0]}.`).join(', ')}
@@ -4724,7 +4724,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           </div>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <InstrumentBadge instrument={bs.instrument} color={textColor} />
-                            {bs.first_name} {maskLastName(bs.last_name)}
+                            {bs.first_name} {maskLastName(bs.last_name, showRealNames)}
                           </span>
                           {cardHeightPx > 52 && (
                             <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
@@ -4946,7 +4946,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>
-                          {s.first_name} {maskLastName(s.last_name)}
+                          {s.first_name} {maskLastName(s.last_name, showRealNames)}
                         </span>
                         {s.status === 'ausstehend' ? (
                           <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ausstehend</span>
@@ -5045,13 +5045,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           for (const b of boards) {
             const found = b.students.find(s => s.id === id);
             if (found) {
-              if (found.isGroup) return found.first_name + " " + maskLastName(found.last_name);
-              return `${found.first_name} ${maskLastName(found.last_name)}`;
+              if (found.isGroup) return found.first_name + " " + maskLastName(found.last_name, showRealNames);
+              return `${found.first_name} ${maskLastName(found.last_name, showRealNames)}`;
             }
           }
           // Check sidebar list
           const found = students.find(s => s.id === id);
-          if (found) return `${found.first_name} ${maskLastName(found.last_name)}`;
+          if (found) return `${found.first_name} ${maskLastName(found.last_name, showRealNames)}`;
           return 'Schüler';
         };
 
@@ -5372,7 +5372,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
         const primaryColor = isCampus ? '#34a853' : '#ea4335';
         const studentObj = students.find(s => s.id === instrumentSelectorState.sourceId);
-        const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name)}` : 'Schüler';
+        const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : 'Schüler';
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

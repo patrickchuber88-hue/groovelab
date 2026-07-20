@@ -96,6 +96,7 @@ export function ScheduleCalendarView({
   onStartTour
 }: ScheduleCalendarViewProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+  const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default grid snap to 15 mins
 
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
@@ -1243,7 +1244,7 @@ export function ScheduleCalendarView({
             const em = endMins % 60;
             const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
 
-            const studentName = `${change.student?.first_name || ''} ${maskLastName(change.student?.last_name)}`.trim() || 'Schüler';
+            const studentName = `${change.student?.first_name || ''} ${maskLastName(change.student?.last_name, showRealNames)}`.trim() || 'Schüler';
 
             await supabase.from('room_bookings').insert({
               school_id: schoolId,
@@ -2103,7 +2104,7 @@ export function ScheduleCalendarView({
                 const em = endMins % 60;
                 const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}:00`;
 
-                const studentName = `${evt.student_first_name || ''} ${maskLastName(evt.student_last_name)}`.trim() || 'Schüler';
+                const studentName = `${evt.student_first_name || ''} ${maskLastName(evt.student_last_name, showRealNames)}`.trim() || 'Schüler';
 
                 return supabase.from('room_bookings').insert({
                   school_id: schoolId,
@@ -2155,7 +2156,7 @@ export function ScheduleCalendarView({
     ];
 
     activeOccs.forEach(occ => {
-      const studentName = `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name)}`.trim() || 'Schüler';
+      const studentName = `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim() || 'Schüler';
       const instrument = occ.instrument || occ.student?.instrument || '';
       
       const startMins = timeToMinutes(occ.start_time);
@@ -2559,8 +2560,8 @@ export function ScheduleCalendarView({
     const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
     
-    // Snap to 15 mins
-    const snappedMinutes = Math.round(droppedMinutes / 15) * 15;
+    // Snap to grid
+    const snappedMinutes = Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes;
     
     // Clamp to valid values based on dragged occurrence duration
     const sourceOcc = draggedOccRef.current;
@@ -2628,7 +2629,7 @@ export function ScheduleCalendarView({
     ghost.style.border = ghostBorder;
     ghost.style.transform = 'scale(0.97)';
     
-    const studentName = sourceOcc.student ? `${sourceOcc.student.first_name} ${maskLastName(sourceOcc.student.last_name)}` : 'Pause';
+    const studentName = sourceOcc.student ? `${sourceOcc.student.first_name} ${maskLastName(sourceOcc.student.last_name, showRealNames)}` : 'Pause';
     const outsideHint = isDropOutsideSchedule 
       ? `<div style="font-size: 0.60rem; font-weight: 800; color: #7c3aed; background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.2); padding: 1px 5px; border-radius: 3px; display: inline-block; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em;">🔔 Raum buchen</div>`
       : '';
@@ -2688,7 +2689,7 @@ export function ScheduleCalendarView({
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
-    const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / 15) * 15));
+    const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes));
     const hours = Math.floor(snappedMinutes / 60) % 24;
     const mins = snappedMinutes % 60;
     const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
@@ -2724,7 +2725,7 @@ export function ScheduleCalendarView({
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = 0 + (relativeY / 2.5);
-    const snappedMinutes = Math.round(droppedMinutes / 15) * 15;
+    const snappedMinutes = Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes;
     const hours = Math.floor(snappedMinutes / 60) % 24;
     const mins = snappedMinutes % 60;
     const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
@@ -2772,8 +2773,8 @@ export function ScheduleCalendarView({
       setSwapConfirmState({
         sourceId: normalOcc.id,
         targetId: cancelledOcc.id,
-        sourceStudentName: `${normalOcc.student?.first_name || ''} ${maskLastName(normalOcc.student?.last_name || '')}`.trim() || 'Schüler',
-        targetStudentName: `${cancelledOcc.student?.first_name || ''} ${maskLastName(cancelledOcc.student?.last_name || '')}`.trim() || 'Schüler',
+        sourceStudentName: `${normalOcc.student?.first_name || ''} ${maskLastName(normalOcc.student?.last_name || '', showRealNames)}`.trim() || 'Schüler',
+        targetStudentName: `${cancelledOcc.student?.first_name || ''} ${maskLastName(cancelledOcc.student?.last_name || '', showRealNames)}`.trim() || 'Schüler',
         sourceDate: normalOcc.date,
         sourceStartTime: normalOcc.start_time,
         targetDate: cancelledOcc.date,
@@ -3559,6 +3560,29 @@ export function ScheduleCalendarView({
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Grid Snap Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
+              <select
+                value={gridSnapMinutes}
+                onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
+                style={{
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  background: 'transparent',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                <option value={30}>30 Min</option>
+                <option value={15}>15 Min</option>
+                <option value={5}>5 Min</option>
+              </select>
+            </div>
+
             {/* Unified Segmented Control for View & Actions */}
             <div id="tour-calendar-actions" className="apple-btn-group">
               {/* Namen zeigen Toggle */}
@@ -4583,9 +4607,9 @@ export function ScheduleCalendarView({
 
                   const displayNames = isGroup 
                     ? (isGruppenunterricht 
-                        ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join(' & ')
-                        : occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join(', '))
-                    : `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name)}`.trim();
+                        ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join(' & ')
+                        : occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join(', '))
+                    : `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim();
 
                   return (
                     <React.Fragment key={group.key}>
@@ -4598,7 +4622,7 @@ export function ScheduleCalendarView({
                         onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
                         onMouseEnter={(e) => {
                           const text = isGroup 
-                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join('\n')
+                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join('\n')
                             : (isBreak ? undefined : displayNames);
                           if (text) {
                             setHoveredTooltip({
@@ -4611,7 +4635,7 @@ export function ScheduleCalendarView({
                         }}
                         onMouseMove={(e) => {
                           const text = isGroup 
-                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim()).join('\n')
+                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join('\n')
                             : (isBreak ? undefined : displayNames);
                           if (text) {
                             setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
@@ -4973,7 +4997,7 @@ export function ScheduleCalendarView({
                                     ) : (
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
                                         <span style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name)}` : 'Ensemble'}
+                                          {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name, showRealNames)}` : 'Ensemble'}
                                         </span>
                                         <span style={{ 
                                           background: 'rgba(0, 0, 0, 0.05)', 
@@ -5150,7 +5174,7 @@ export function ScheduleCalendarView({
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                       <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name)}` : 'Ensemble'}
+                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name, showRealNames)}` : 'Ensemble'}
                                       </div>
                                       <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                         Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)
@@ -5166,7 +5190,7 @@ export function ScheduleCalendarView({
                                       scrollbarWidth: 'none'
                                     }}>
                                       {occurrencesInGroup.map(o => {
-                                        const name = `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name)}`.trim();
+                                        const name = `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim();
                                         const acknowledged = o.student_acknowledged;
                                         return (
                                           <span 
@@ -5396,11 +5420,11 @@ export function ScheduleCalendarView({
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status && ['cancelled', 'canceled_by_student'].includes(occ.status);
         const canDiscard = isMoved || isCancelled;
-        const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name)}`.trim() : 'Schüler';
+        const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim() : 'Schüler';
         
         const modalTitle = occ?.student_id 
           ? (isGruppenunterrichtOcc 
-              ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name)}`.trim()).join(' & ')
+              ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name, showRealNames)}`.trim()).join(' & ')
               : isEnsembleOcc 
                 ? 'Ensemble/Band Termin' 
                 : `Termin bearbeiten: ${studentName}`
@@ -6036,7 +6060,7 @@ export function ScheduleCalendarView({
                                       color: nameColor,
                                       textDecoration: isGoCancelled ? 'line-through' : 'none' 
                                     }}>
-                                      {go.student?.first_name} {maskLastName(go.student?.last_name)}
+                                      {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames)}
                                     </span>
                                     <span style={{ fontSize: '0.72rem', color: subtextColor, marginTop: '2px' }}>
                                       {go.student?.instrument || 'Kein Instrument'} • {go.duration || 30} Min
@@ -6048,7 +6072,7 @@ export function ScheduleCalendarView({
                                       {/* Absagen (Cancel) Button */}
                                       <button
                                         onClick={async () => {
-                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${maskLastName(go.student?.last_name)} für diesen Gruppentermin absagen?`)) {
+                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${maskLastName(go.student?.last_name, showRealNames)} für diesen Gruppentermin absagen?`)) {
                                             await persistOccurrenceDirectly(go.id, { status: 'cancelled' });
                                             setEditOccState(null);
                                           }
@@ -6088,7 +6112,7 @@ export function ScheduleCalendarView({
                                       {/* Entkoppeln (Decouple) Button */}
                                       <button
                                         onClick={async () => {
-                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${maskLastName(go.student?.last_name)} wirklich aus dieser Gruppe entkoppeln?`)) {
+                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${maskLastName(go.student?.last_name, showRealNames)} wirklich aus dieser Gruppe entkoppeln?`)) {
                                             const { error } = await supabase.from('schedule_occurrences').delete().eq('id', go.id);
                                             if (error) {
                                               await showAlert('Fehler beim Entkoppeln des Schülers: ' + error.message);
@@ -6337,7 +6361,7 @@ export function ScheduleCalendarView({
                               }
 
                               const senderStudent = uniqueGroupOccs.find(o => o.student_id === msg.sender_id)?.student;
-                              const senderName = senderStudent ? `${senderStudent.first_name} ${maskLastName(senderStudent.last_name)}` : 'Schüler';
+                              const senderName = senderStudent ? `${senderStudent.first_name} ${maskLastName(senderStudent.last_name, showRealNames)}` : 'Schüler';
     
                               return (
                                 <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
@@ -6488,8 +6512,8 @@ export function ScheduleCalendarView({
         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
         const primaryColor = isCampusTheme ? '#34a853' : '#007aff';
         
-        const srcName = `${sourceOcc.student?.first_name || ''} ${maskLastName(sourceOcc.student?.last_name)}`.trim() || 'Schüler';
-        const tgtName = `${targetOcc.student?.first_name || ''} ${maskLastName(targetOcc.student?.last_name)}`.trim() || 'Schüler';
+        const srcName = `${sourceOcc.student?.first_name || ''} ${maskLastName(sourceOcc.student?.last_name, showRealNames)}`.trim() || 'Schüler';
+        const tgtName = `${targetOcc.student?.first_name || ''} ${maskLastName(targetOcc.student?.last_name, showRealNames)}`.trim() || 'Schüler';
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
