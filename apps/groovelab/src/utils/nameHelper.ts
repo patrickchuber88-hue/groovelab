@@ -1,32 +1,47 @@
 import { useState, useEffect } from 'react';
 
-// ─── Module-level state ───────────────────────────────────────────────────────
-// privacyMode = true  → last names are masked (e.g. "M.")
+// ─── Stable storage on `window` – survives Vite HMR module reloads ─────────
+// privacyMode = true  → last names masked (e.g. "M.")
 // privacyMode = false → full names shown (default)
-let globalPrivacyMode = false;
 
-// Direct subscriber list – avoids CustomEvent / DOM completely
-const subscribers: Array<(mode: boolean) => void> = [];
+declare global {
+  interface Window {
+    __glPrivacyMode: boolean;
+    __glPrivacySubs: Set<(mode: boolean) => void>;
+  }
+}
 
-function notifyAll() {
-  subscribers.forEach(fn => fn(globalPrivacyMode));
+if (typeof window !== 'undefined') {
+  if (window.__glPrivacyMode === undefined) window.__glPrivacyMode = false;
+  if (!window.__glPrivacySubs) window.__glPrivacySubs = new Set();
+}
+
+function getMode(): boolean {
+  return typeof window !== 'undefined' ? window.__glPrivacyMode : false;
+}
+
+function setMode(value: boolean) {
+  if (typeof window === 'undefined') return;
+  window.__glPrivacyMode = value;
+  window.__glPrivacySubs.forEach(fn => fn(value));
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Mask a last name.
- * Pass the reactive `privacyMode` value from the hook so React
- * re-renders whenever the toggle changes.
- *   privacyMode = false  → full last name returned
- *   privacyMode = true   → "X." (first letter + dot)
+ * Mask a last name based on privacy mode.
+ *   privacyMode = false (default) → full last name returned
+ *   privacyMode = true            → "X." (first letter + dot)
+ *
+ * Always pass the reactive `privacyMode` from the hook as second arg
+ * so React re-renders whenever the toggle changes.
  */
 export function maskLastName(
   lastName: string | undefined | null,
-  privacyMode: boolean = globalPrivacyMode
+  privacyMode: boolean = getMode()
 ): string {
   if (!lastName) return '';
-  if (!privacyMode) return lastName;           // privacy OFF → show full name
+  if (!privacyMode) return lastName;
   const trimmed = lastName.trim();
   const first = trimmed.charAt(0);
   return first ? `${first}.` : '';
@@ -34,27 +49,26 @@ export function maskLastName(
 
 /**
  * React hook – subscribe to privacy-mode changes.
- * Returns { visible: boolean, toggleVisibility: () => void }
- * where `visible` = true means privacy mode is ON (names hidden).
+ * Returns { visible: boolean, toggleVisibility: fn }
+ * where `visible` = true means privacy is ON (names hidden).
  */
 export function useRealNamesVisibility() {
-  const [privacyMode, setPrivacyMode] = useState(globalPrivacyMode);
+  const [privacyMode, setPrivacyMode] = useState<boolean>(() => getMode());
 
   useEffect(() => {
-    // Register subscriber
-    subscribers.push(setPrivacyMode);
-    // Sync immediately in case state changed before mount
-    setPrivacyMode(globalPrivacyMode);
+    // Always add fresh reference; cleanup removes it
+    window.__glPrivacySubs.add(setPrivacyMode);
+    // Sync in case state changed before mount
+    setPrivacyMode(getMode());
+
     return () => {
-      const idx = subscribers.indexOf(setPrivacyMode);
-      if (idx !== -1) subscribers.splice(idx, 1);
+      window.__glPrivacySubs.delete(setPrivacyMode);
     };
-  }, []);
+  }, []); // empty deps: mount/unmount only, setState ref is stable
 
   const toggleVisibility = (forceValue?: boolean) => {
-    globalPrivacyMode =
-      forceValue !== undefined ? forceValue : !globalPrivacyMode;
-    notifyAll();
+    const next = forceValue !== undefined ? forceValue : !getMode();
+    setMode(next);
   };
 
   return { visible: privacyMode, toggleVisibility };
