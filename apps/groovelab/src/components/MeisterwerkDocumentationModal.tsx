@@ -9765,7 +9765,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [calibrationWaveform, setCalibrationWaveform] = useState<number[] | null>(null);
   const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(50);
   const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4'>('4/4');
-  const [barLength, setBarLength] = useState<1 | 2 | 4>(4);
+  const [barLength, setBarLength] = useState<1 | 2 | 4 | 8>(4);
   const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth'>('wood');
   const timeSignatureRef = useRef(timeSignature);
   const barLengthRef = useRef(barLength);
@@ -13245,171 +13245,197 @@ const targetVol = isActive ? vol : 0;
               width: '100%',
               display: 'flex',
               flexDirection: 'row',
-              gap: '16px',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap'
+              flexWrap: 'wrap',
+              gap: '16px'
             }}>
-              {/* Click Switch & Tap Tempo */}
-              <div style={{ flex: '1 1 210px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsMetronomeActive(!isMetronomeActive)}
-                  className="tactile-btn"
-                  style={{
-                    background: isMetronomeActive ? '#34a853' : '#e5e5ea',
-                    border: 'none',
-                    color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
-                    fontSize: '0.62rem',
-                    fontWeight: 800,
-                    borderRadius: '8px',
-                    height: '34px',
-                    padding: '0 12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    letterSpacing: '0.04em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={handleTapTempo}
-                  className="tactile-btn"
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.04)',
-                    color: '#1d1d1f',
-                    border: 'none',
-                    borderRadius: '8px',
-                    height: '34px',
-                    padding: '0 12px',
-                    fontSize: '0.62rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  TAP TEMPO
-                </button>
-              </div>
+              {/* Left Column: Metronome & Tempo Controls */}
+              <div style={{
+                flex: '1.3 1 360px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                {/* Row 1: Click Active Toggle, Tap Tempo, BPM controls */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsMetronomeActive(!isMetronomeActive)}
+                    className="tactile-btn"
+                    style={{
+                      background: isMetronomeActive ? '#eab308' : '#e5e5ea',
+                      border: 'none',
+                      color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      borderRadius: '8px',
+                      height: '32px',
+                      padding: '0 12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      letterSpacing: '0.04em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={handleTapTempo}
+                    className="tactile-btn"
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.04)',
+                      color: '#1d1d1f',
+                      border: 'none',
+                      borderRadius: '8px',
+                      height: '32px',
+                      padding: '0 12px',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    TAP TEMPO
+                  </button>
 
-              {/* Vertical Divider */}
-              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} />
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                      className="tactile-btn"
+                      style={{ width: '28px', height: '32px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={bpm}
+                      onChange={(e) => {
+                        const cleanVal = e.target.value.replace(/[^0-9]/g, '');
+                        if (cleanVal === '') {
+                          setBpm(0 as any);
+                        } else {
+                          const num = parseInt(cleanVal);
+                          if (!isNaN(num)) {
+                            setBpm(Math.min(240, num));
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        if (bpm < 40) setBpm(40);
+                        if (bpm > 240) setBpm(240);
+                      }}
+                      style={{
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        fontFamily: 'SF Mono, monospace',
+                        width: '36px',
+                        textAlign: 'center',
+                        color: '#1d1d1f',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '6px',
+                        background: '#ffffff',
+                        padding: '2px 0',
+                        outline: 'none'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                      className="tactile-btn"
+                      style={{ width: '28px', height: '32px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
 
-              {/* Taktart Selector */}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 80px' }}>
-                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>TAKTART</span>
-                <select
-                  value={timeSignature}
-                  onChange={(e) => setTimeSignature(e.target.value as any)}
-                  style={{
-                    background: '#ffffff',
-                    border: '1.5px solid rgba(0, 0, 0, 0.08)',
-                    borderRadius: '8px',
-                    height: '34px',
-                    padding: '0 4px',
-                    fontSize: '0.62rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="4/4">4/4 Takt</option>
-                  <option value="3/4">3/4 Takt</option>
-                </select>
-              </div>
+                {/* Row 2: Selectors */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 70px' }}>
+                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>TAKTART</span>
+                    <select
+                      value={timeSignature}
+                      onChange={(e) => setTimeSignature(e.target.value as any)}
+                      style={{
+                        background: '#ffffff',
+                        border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '8px',
+                        height: '32px',
+                        padding: '0 4px',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="4/4">4/4 Takt</option>
+                      <option value="3/4">3/4 Takt</option>
+                    </select>
+                  </div>
 
-              {/* Loop-Länge Selector */}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 90px' }}>
-                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>LOOP-LÄNGE</span>
-                <select
-                  value={barLength}
-                  onChange={(e) => setBarLength(parseInt(e.target.value) as any)}
-                  style={{
-                    background: '#ffffff',
-                    border: '1.5px solid rgba(0, 0, 0, 0.08)',
-                    borderRadius: '8px',
-                    height: '34px',
-                    padding: '0 4px',
-                    fontSize: '0.62rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value={1}>1 Takt</option>
-                  <option value={2}>2 Takte</option>
-                  <option value={4}>4 Takte</option>
-                </select>
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 80px' }}>
+                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>LOOP-LÄNGE</span>
+                    <select
+                      value={barLength}
+                      onChange={(e) => setBarLength(parseInt(e.target.value) as any)}
+                      style={{
+                        background: '#ffffff',
+                        border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '8px',
+                        height: '32px',
+                        padding: '0 4px',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={1}>1 Takt</option>
+                      <option value={2}>2 Takte</option>
+                      <option value={4}>4 Takte</option>
+                      <option value={8}>8 Takte</option>
+                    </select>
+                  </div>
 
-              {/* Click-Sound Selector */}
-              <div style={{ display: 'flex', flexDirection: 'column', flex: '0 1 100px' }}>
-                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>METRONOM</span>
-                <select
-                  value={metronomeSound}
-                  onChange={(e) => setMetronomeSound(e.target.value as any)}
-                  style={{
-                    background: '#ffffff',
-                    border: '1.5px solid rgba(0, 0, 0, 0.08)',
-                    borderRadius: '8px',
-                    height: '34px',
-                    padding: '0 4px',
-                    fontSize: '0.62rem',
-                    fontWeight: 700,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="wood">Holz-Klick</option>
-                  <option value="cowbell">Cowbell</option>
-                  <option value="synth">Synth-Beep</option>
-                  <option value="rimshot">Rimshot</option>
-                </select>
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: '1 1 90px' }}>
+                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, marginBottom: '2px', letterSpacing: '0.04em' }}>METRONOM-SOUND</span>
+                    <select
+                      value={metronomeSound}
+                      onChange={(e) => setMetronomeSound(e.target.value as any)}
+                      style={{
+                        background: '#ffffff',
+                        border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                        borderRadius: '8px',
+                        height: '32px',
+                        padding: '0 4px',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="wood">Holz-Klick</option>
+                      <option value="cowbell">Cowbell</option>
+                      <option value="synth">Synth-Beep</option>
+                      <option value="rimshot">Rimshot</option>
+                    </select>
+                  </div>
+                </div>
 
-              {/* Vertical Divider */}
-              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
-
-              {/* Tempo BPM Adjuster */}
-              <div style={{ flex: '0 1 120px', display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-                  className="tactile-btn"
-                  style={{ width: '28px', height: '34px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  -
-                </button>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, fontFamily: 'SF Mono, monospace', minWidth: '32px', textAlign: 'center', color: '#1d1d1f' }}>
-                  {bpm}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-                  className="tactile-btn"
-                  style={{ width: '28px', height: '34px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  +
-                </button>
-              </div>
-
-              {/* Vertical Divider */}
-              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
-
-              {/* Metronome Volume Slider */}
-              <div style={{ flex: '1 1 160px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                {/* Row 3: Click Volume Slider */}
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                     <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>CLICK LAUTSTÄRKE</span>
-                    <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{loopstationMetronomeVolume}%</span>
+                    <span style={{ fontSize: '0.58rem', color: '#eab308', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{loopstationMetronomeVolume}%</span>
                   </div>
                   <input 
                     type="range" 
@@ -13417,20 +13443,29 @@ const targetVol = isActive ? vol : 0;
                     max="100" 
                     value={loopstationMetronomeVolume} 
                     onChange={(e) => setLoopstationMetronomeVolume(parseInt(e.target.value))} 
-                    style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
+                    style={{ width: '100%', accentColor: '#eab308', height: '4px', cursor: 'pointer' }}
                   />
                 </div>
               </div>
 
-              {/* Vertical Divider */}
-              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
+              {/* Vertical Divider (Desktop only) */}
+              <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(0, 0, 0, 0.06)' }} className="hidden md:block" />
 
-              {/* Latency Sync Slider */}
-              <div style={{ flex: '1 1 250px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              {/* Right Column: Latency Sync Card */}
+              <div style={{
+                flex: '1 1 240px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                background: '#fefce8',
+                borderRadius: '12px',
+                padding: '12px',
+                border: '1.5px solid rgba(234, 179, 8, 0.15)'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>SYNC LATENCY</span>
-                    <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
+                    <span style={{ fontSize: '0.52rem', color: '#854d0e', fontWeight: 800, letterSpacing: '0.04em' }}>SYNC LATENCY</span>
+                    <span style={{ fontSize: '0.58rem', color: '#eab308', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
                   </div>
                   <input 
                     type="range" 
@@ -13447,7 +13482,7 @@ const targetVol = isActive ? vol : 0;
                     onTouchEnd={(e) => {
                       updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
                     }}
-                    style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
+                    style={{ width: '100%', accentColor: '#eab308', height: '4px', cursor: 'pointer' }}
                   />
                 </div>
                 
@@ -13460,11 +13495,11 @@ const targetVol = isActive ? vol : 0;
                   disabled={isCalibratingLatency}
                   className="tactile-btn"
                   style={{
-                    background: isCalibratingLatency ? '#e5e5ea' : 'rgba(52, 168, 83, 0.08)',
-                    color: isCalibratingLatency ? '#86868b' : '#34a853',
+                    background: isCalibratingLatency ? '#e5e5ea' : 'rgba(234, 179, 8, 0.1)',
+                    color: isCalibratingLatency ? '#86868b' : '#ca8a04',
                     border: 'none',
                     borderRadius: '8px',
-                    height: '34px',
+                    height: '32px',
                     padding: '0 10px',
                     fontSize: '0.58rem',
                     fontWeight: 800,
@@ -13474,10 +13509,11 @@ const targetVol = isActive ? vol : 0;
                     whiteSpace: 'nowrap',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    width: '100%'
                   }}
                 >
-                  {isCalibratingLatency ? 'Kalibriere...' : 'Auto-Kalibrierung'}
+                  {isCalibratingLatency ? 'Kalibriere...' : 'Latenz-Kalibrierung'}
                 </button>
               </div>
             </div>
