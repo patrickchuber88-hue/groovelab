@@ -9501,6 +9501,79 @@ interface GrooveLoopstationProps {
   useNotebookLayout: boolean;
 }
 
+interface VolumeKnobProps {
+  value: number;
+  onChange: (val: number) => void;
+  disabled?: boolean;
+}
+
+const VolumeKnob: React.FC<VolumeKnobProps> = ({ value, onChange, disabled }) => {
+  const startYRef = useRef(0);
+  const startValRef = useRef(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (disabled) return;
+    startYRef.current = e.clientY;
+    startValRef.current = value;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = startYRef.current - moveEvent.clientY;
+      const newVal = Math.max(0, Math.min(100, startValRef.current + deltaY * 0.8));
+      onChange(newVal);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const rotation = -135 + (value / 100) * 270;
+
+  return (
+    <div 
+      onMouseDown={handleMouseDown}
+      style={{
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
+        border: '1.5px solid #475569',
+        boxShadow: '0 3px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4)',
+        position: 'relative',
+        cursor: disabled ? 'not-allowed' : 'ns-resize',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        touchAction: 'none'
+      }}
+      title="Ziehen zum Einstellen der Lautstärke"
+    >
+      <div style={{
+        position: 'absolute',
+        width: '2.5px',
+        height: '10px',
+        background: '#0f172a',
+        borderRadius: '1px',
+        top: '4px',
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: '50% 12px',
+        transition: 'transform 0.05s ease-out'
+      }} />
+      <div style={{
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, #f1f5f9 0%, #cbd5e1 100%)',
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+      }} />
+    </div>
+  );
+};
+
 const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   student,
   homeworkNotesList,
@@ -9529,6 +9602,11 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [isAutoSequenceActive, setIsAutoSequenceActive] = useState(false);
   const [autoSequenceStatus, setAutoSequenceStatus] = useState<string>('');
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(0);
+  const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(50);
+  const loopstationMetronomeVolumeRef = useRef(loopstationMetronomeVolume);
+  useEffect(() => {
+    loopstationMetronomeVolumeRef.current = loopstationMetronomeVolume;
+  }, [loopstationMetronomeVolume]);
   const [isCalibratingLatency, setIsCalibratingLatency] = useState(false);
   const [calibrationPhaseState, setCalibrationPhaseState] = useState<'idle' | 'ambient' | 'clicks' | 'result'>('idle');
   const [calibrationClickCount, setCalibrationClickCount] = useState<number>(0);
@@ -9536,8 +9614,26 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'studio' | 'saved'>('studio');
   const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
+  const [selectedSavedLoop, setSelectedSavedLoop] = useState<any>(null);
   const savedLoopAudioRef = useRef<HTMLAudioElement | null>(null);
   const calibrationStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (activeSubTab === 'saved' && homeworkNotesList) {
+      const filtered = homeworkNotesList.filter((note: string) => note.startsWith('LOOP:'));
+      if (filtered.length > 0 && !selectedSavedLoop) {
+        const parts = filtered[0].replace('LOOP:', '').split('|');
+        setSelectedSavedLoop({
+          url: parts[0],
+          duration: parts[1],
+          date: parts[2],
+          label: parts[3] || 'Loop-Mix',
+          creatorRole: parts[4] || 'student',
+          originalStr: filtered[0]
+        });
+      }
+    }
+  }, [activeSubTab, homeworkNotesList, selectedSavedLoop]);
 
   useEffect(() => {
     return () => {
@@ -9560,6 +9656,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         savedLoopAudioRef.current.pause();
       }
       setPlayingSavedLoopUrl(null);
+      setPlaybackProgress(0);
     } else {
       if (savedLoopAudioRef.current) {
         savedLoopAudioRef.current.pause();
@@ -9568,12 +9665,27 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       audio.loop = true;
       savedLoopAudioRef.current = audio;
       setPlayingSavedLoopUrl(url);
+
+      const matched = savedLoops.find(l => l.url === url);
+      if (matched) {
+        setSelectedSavedLoop(matched);
+      }
+
+      audio.ontimeupdate = () => {
+        if (audio.duration) {
+          setPlaybackProgress((audio.currentTime / audio.duration) * 100);
+        }
+      };
+
       audio.play().catch(e => {
         console.error("Failed to play audio:", e);
         setPlayingSavedLoopUrl(null);
+        setPlaybackProgress(0);
       });
+      
       audio.onended = () => {
         setPlayingSavedLoopUrl(null);
+        setPlaybackProgress(0);
       };
     }
   };
@@ -9587,6 +9699,11 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         savedLoopAudioRef.current.pause();
       }
       setPlayingSavedLoopUrl(null);
+      setPlaybackProgress(0);
+    }
+
+    if (selectedSavedLoop?.originalStr === originalStr) {
+      setSelectedSavedLoop(null);
     }
 
     try {
@@ -10100,7 +10217,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       
       // Auto-Quiet Metronome: Completely mute (0%) after Spur 1 has been recorded to prevent click accumulation (bypassed for headphones)
       const hasTrack1 = !!tracksRef.current[0]?.url;
-      const baseMetronomeGain = 0.05;
+      const baseMetronomeGain = (loopstationMetronomeVolumeRef.current / 100) * 0.10;
       const targetMetronomeGain = (hasTrack1 && !useHeadphonesRef.current) ? 0 : baseMetronomeGain;
       
       // Clear, short percussive click (800Hz / 600Hz) with 8ms decay to prevent low-frequency build-up and room feedback coloration
@@ -10562,13 +10679,13 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       }
       const totalTicks = trackBoundaries[trackBoundaries.length - 1].end;
 
-      // Set sequence start time exactly when tick 0 will execute (at currentTime + 0.35)
-      sequenceStartTimeRef.current = audioContextRef.current!.currentTime + 0.35;
+      // Set sequence start time exactly when tick 0 will execute (at currentTime + 0.6)
+      sequenceStartTimeRef.current = audioContextRef.current!.currentTime + 0.6;
 
       // === WEB AUDIO SCHEDULER ===
       const beatSecs = 60.0 / bpm;
-      // Start scheduling 350ms in the future to allow audio hardware warmup during mic activation
-      nextNoteTimeRef.current = audioContextRef.current!.currentTime + 0.35; 
+      // Start scheduling 600ms in the future to allow audio hardware warmup during mic activation
+      nextNoteTimeRef.current = audioContextRef.current!.currentTime + 0.6; 
       currentTickRef.current = 0;
       uiEventsQueueRef.current = [];
       audioEventsQueueRef.current = [];
@@ -10838,9 +10955,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
         if (currentTick < 4) {
           // Count-in (4 beats count up: TAKT 1/4 to 4/4)
-          const beatInBar = Math.floor(currentTick) + 1;
+          const beatInBar = Math.max(1, Math.floor(currentTick) + 1);
           setCountInBeats(beatInBar + "/4");
-          setPlaybackProgress((currentTick / 4) * 100);
+          setPlaybackProgress(Math.max(0, (currentTick / 4) * 100));
           setCurrentBar(1);
         } else {
           setCountInBeats(null);
@@ -11649,13 +11766,16 @@ const targetVol = isActive ? vol : 0;
 
   const isPause = isAutoSequenceActive && !autoSequenceStatus.includes("AUFNAHME") && !autoSequenceStatus.includes("FERTIG");
   const isAnyTrackRecording = tracks.some(t => t.isRecording);
-  const ringColor = isPause
-    ? '#eab308' // Yellow during the intermission pause
-    : (isAutoSequenceActive || isAnyTrackRecording)
-      ? '#ea4335' // Red during active recording
-      : isPlaying 
-        ? '#34a853' // Green during playback
-        : '#e5e5e7'; // default/ready
+  const isSavedLoopPlaying = !!playingSavedLoopUrl;
+  const ringColor = activeSubTab === 'saved'
+    ? (isSavedLoopPlaying ? '#34a853' : '#e5e5e7')
+    : (isPause
+      ? '#eab308' // Yellow during the intermission pause
+      : (isAutoSequenceActive || isAnyTrackRecording)
+        ? '#ea4335' // Red during active recording
+        : isPlaying 
+          ? '#34a853' // Green during playback
+          : '#e5e5e7'); // default/ready
 
   const savedLoops = homeworkNotesList
     .filter(note => note.startsWith('LOOP:'))
@@ -11881,8 +12001,7 @@ const targetVol = isActive ? vol : 0;
         </button>
       </div>
 
-      {activeSubTab === 'studio' ? (
-        <div style={{ display: 'flex', gap: '24px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
+      <div style={{ display: 'flex', gap: '24px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
       
       {/* Left Column: Loop Progress, Metronom & Controls */}
       <div style={{
@@ -11959,7 +12078,7 @@ const targetVol = isActive ? vol : 0;
               {/* Animated SVG Progress Sweep */}
               <svg 
                 viewBox="0 0 200 200"
-                className={isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : ''}
+                className={activeSubTab === 'saved' ? (isSavedLoopPlaying ? 'glow-play' : '') : (isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : '')}
                 style={{
                   position: 'absolute',
                   width: '100%',
@@ -11988,7 +12107,7 @@ const targetVol = isActive ? vol : 0;
                   strokeDashoffset={527.8 - (527.8 * playbackProgress) / 100}
                   strokeLinecap="round"
                   style={{
-                    transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
+                    transition: (isPlaying || isAutoSequenceActive || isSavedLoopPlaying) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
                     willChange: 'stroke-dashoffset'
                   }}
                 />
@@ -11996,17 +12115,19 @@ const targetVol = isActive ? vol : 0;
 
               {/* Central readout area */}
               <div 
-                className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
+                className={activeSubTab === 'saved' ? (isSavedLoopPlaying ? 'central-pulse-play' : '') : (isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : '')}
                 style={{
                   position: 'absolute',
                   width: '106px',
                   height: '106px',
                   borderRadius: '50%',
-                  background: isAutoSequenceActive 
-                    ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
-                    : isPlaying 
-                      ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
-                      : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)',
+                  background: activeSubTab === 'saved'
+                    ? (isSavedLoopPlaying ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)')
+                    : (isAutoSequenceActive 
+                      ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
+                      : isPlaying 
+                        ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
+                        : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)'),
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -12024,7 +12145,11 @@ const targetVol = isActive ? vol : 0;
                   textShadow: ringColor !== '#e5e5e7' ? `0 2px 10px ${ringColor}35` : 'none',
                   transition: 'all 0.3s ease'
                 }}>
-                  {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
+                  {activeSubTab === 'saved'
+                    ? (isSavedLoopPlaying && savedLoopAudioRef.current
+                      ? `${Math.floor(savedLoopAudioRef.current.currentTime)}s`
+                      : '0s')
+                    : (countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0')}
                 </span>
                 <span style={{ 
                   fontSize: '0.48rem', 
@@ -12034,13 +12159,15 @@ const targetVol = isActive ? vol : 0;
                   marginTop: '-2px', 
                   textTransform: 'uppercase' 
                 }}>
-                  {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
+                  {activeSubTab === 'saved'
+                    ? (isSavedLoopPlaying ? 'PLAYBACK' : 'ARCHIVE')
+                    : (countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE')}
                 </span>
               </div>
             </div>
 
-            {/* Micro Auto Sequence Label */}
-            {isAutoSequenceActive && (
+            {/* Bottom Screen Label */}
+            {activeSubTab === 'studio' && isAutoSequenceActive && (
               <span style={{
                 position: 'absolute',
                 bottom: '6px',
@@ -12052,6 +12179,23 @@ const targetVol = isActive ? vol : 0;
                 animation: 'pulse 1s infinite alternate'
               }}>
                 {autoSequenceStatus}
+              </span>
+            )}
+            {activeSubTab === 'saved' && selectedSavedLoop && (
+              <span style={{
+                position: 'absolute',
+                bottom: '8px',
+                fontSize: '0.52rem',
+                fontWeight: 800,
+                color: '#e2e8f0',
+                width: '90%',
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                letterSpacing: '0.02em'
+              }}>
+                {selectedSavedLoop.label}
               </span>
             )}
           </div>
@@ -12071,26 +12215,36 @@ const targetVol = isActive ? vol : 0;
           }}>
             {/* Top Quadrant: MENU Printed text */}
             <div 
-              onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+              onClick={() => {
+                if (activeSubTab === 'studio') {
+                  setShowAdvancedSettings(!showAdvancedSettings);
+                }
+              }}
               style={{
                 position: 'absolute',
                 top: '18px',
                 fontSize: '0.62rem',
                 fontWeight: 900,
-                color: '#a1a1a6',
+                color: activeSubTab === 'saved' ? '#555558' : '#a1a1a6',
                 letterSpacing: '0.08em',
                 transition: 'color 0.2s ease',
-                cursor: 'pointer'
+                cursor: activeSubTab === 'saved' ? 'default' : 'pointer'
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
+              onMouseEnter={(e) => { if (activeSubTab === 'studio') e.currentTarget.style.color = '#ffffff'; }}
+              onMouseLeave={(e) => { if (activeSubTab === 'studio') e.currentTarget.style.color = '#a1a1a6'; }}
             >
               MENU
             </div>
 
             {/* Bottom Quadrant: PLAY / PAUSE Printed text */}
             <div 
-              onClick={handlePlayToggle}
+              onClick={() => {
+                if (activeSubTab === 'saved') {
+                  if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url);
+                } else {
+                  handlePlayToggle();
+                }
+              }}
               style={{
                 position: 'absolute',
                 bottom: '18px',
@@ -12106,13 +12260,24 @@ const targetVol = isActive ? vol : 0;
               onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
             >
-              {isPlaying ? <Square size={6} fill="currentColor" /> : <Play size={6} fill="currentColor" />}
+              {activeSubTab === 'saved'
+                ? (isSavedLoopPlaying ? <Square size={6} fill="currentColor" /> : <Play size={6} fill="currentColor" />)
+                : (isPlaying ? <Square size={6} fill="currentColor" /> : <Play size={6} fill="currentColor" />)}
               <span>PLAY / PAUSE</span>
             </div>
 
             {/* Left Quadrant: RESET Printed text */}
             <div 
-              onClick={handleReset}
+              onClick={() => {
+                if (activeSubTab === 'saved') {
+                  if (savedLoopAudioRef.current) {
+                    savedLoopAudioRef.current.currentTime = 0;
+                    setPlaybackProgress(0);
+                  }
+                } else {
+                  handleReset();
+                }
+              }}
               style={{
                 position: 'absolute',
                 left: '20px',
@@ -12149,90 +12314,104 @@ const targetVol = isActive ? vol : 0;
             {/* Center Action Button (Record Action) */}
             <button
               type="button"
-              onClick={startAutoSequence}
-              disabled={isAutoSequenceActive}
+              onClick={() => {
+                if (activeSubTab === 'saved') {
+                  if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url);
+                } else {
+                  startAutoSequence();
+                }
+              }}
+              disabled={activeSubTab === 'studio' && isAutoSequenceActive}
               className="tactile-btn"
               style={{
                 width: '74px',
                 height: '74px',
                 borderRadius: '50%',
-                background: isPause 
-                  ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
-                  : isAutoSequenceActive 
-                    ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
-                    : isPlaying 
-                      ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)'
-                      : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)',
+                background: activeSubTab === 'saved'
+                  ? (isSavedLoopPlaying ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)' : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)')
+                  : (isPause 
+                    ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
+                    : isAutoSequenceActive 
+                      ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
+                      : isPlaying 
+                        ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)'
+                        : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)'),
                 border: '1.5px solid rgba(0, 0, 0, 0.15)',
-                boxShadow: isAutoSequenceActive 
+                boxShadow: (activeSubTab === 'studio' && isAutoSequenceActive)
                   ? '0 0 15px rgba(239, 68, 68, 0.4)' 
                   : 'inset 0 1.5px 2px rgba(255,255,255,0.6), 0 4px 8px rgba(0,0,0,0.25)',
-                cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
+                cursor: (activeSubTab === 'studio' && isAutoSequenceActive) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '0.72rem',
                 fontWeight: 900,
-                color: isAutoSequenceActive || isPause || isPlaying ? '#ffffff' : '#3a3a3c',
+                color: (activeSubTab === 'saved' ? isSavedLoopPlaying : (isAutoSequenceActive || isPause || isPlaying)) ? '#ffffff' : '#3a3a3c',
                 textTransform: 'uppercase',
                 transition: 'all 0.25s ease'
               }}
             >
-              {isAutoSequenceActive ? 'REC' : 'START'}
+              {activeSubTab === 'saved'
+                ? (isSavedLoopPlaying ? 'PLAY' : 'START')
+                : (isAutoSequenceActive ? 'REC' : 'START')}
             </button>
           </div>
         </div>
 
         {/* Master Mixdown Export Buttons & Loop Onboarding Instruction Card */}
-        {masterLoopDuration ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '300px', marginTop: '4px' }}>
-            <button
-              type="button"
-              onClick={handleExportMix}
-              disabled={isExporting}
-              className="tactile-btn"
-              style={{
-                background: '#34a853',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px 20px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <span>{isExporting ? 'SPEICHERE...' : 'LOOP SPEICHERN'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadMix}
-              disabled={isExporting}
-              className="tactile-btn"
-              style={{
-                background: '#f5f5f7',
-                color: '#1d1d1f',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px 20px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <span>{isExporting ? 'LADE HERUNTER...' : 'ALS MP3 HERUNTERLADEN'}</span>
-            </button>
-          </div>
+        {activeSubTab === 'studio' ? (
+          masterLoopDuration ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '300px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={handleExportMix}
+                disabled={isExporting}
+                className="tactile-btn"
+                style={{
+                  background: '#34a853',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 20px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  width: '100%',
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
+                  transition: 'all 0.2s ease',
+                  letterSpacing: '0.02em'
+                }}
+              >
+                <span>{isExporting ? 'LADE HERUNTER...' : 'ALS MP3 HERUNTERLADEN'}</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              width: '100%',
+              maxWidth: '300px',
+              background: 'rgba(255, 255, 255, 0.45)',
+              border: '1.5px dashed rgba(0, 0, 0, 0.08)',
+              borderRadius: '20px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              textAlign: 'center',
+              marginTop: '4px'
+            }}>
+              <Music size={16} style={{ color: '#86868b' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d1d1f' }}>
+                  Bereit zum Recorden
+                </span>
+                <span style={{ fontSize: '0.54rem', color: '#86868b', lineHeight: 1.3 }}>
+                  Klicke die mittlere Taste <strong>START</strong> am iPod, um den automatischen Aufnahmezyklus zu starten.
+                </span>
+              </div>
+            </div>
+          )
         ) : (
           <div style={{
             width: '100%',
@@ -12252,10 +12431,10 @@ const targetVol = isActive ? vol : 0;
             <Music size={16} style={{ color: '#86868b' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d1d1f' }}>
-                Bereit zum Recorden
+                Archiv-Modus
               </span>
               <span style={{ fontSize: '0.54rem', color: '#86868b', lineHeight: 1.3 }}>
-                Klicke die mittlere Taste <strong>START</strong> am iPod, um den automatischen Aufnahmezyklus zu starten.
+                Wähle einen Loop aus der Liste. Steuere die Wiedergabe über das <strong>Click Wheel</strong> am iPod.
               </span>
             </div>
           </div>
@@ -12270,7 +12449,9 @@ const targetVol = isActive ? vol : 0;
         padding: '2px 0',
         justifyContent: 'flex-start'
       }}>
-        {/* Master Control Parameter Tray (Horizontal layout at the top of right column) */}
+        {activeSubTab === 'studio' ? (
+          <>
+            {/* Master Control Parameter Tray (Horizontal layout at the top of right column) */}
         <div style={{
           width: '100%',
           background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
@@ -12505,6 +12686,27 @@ const targetVol = isActive ? vol : 0;
               {/* Vertical Divider */}
               <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
 
+              {/* Metronome Volume Slider */}
+              <div style={{ flex: '1 1 160px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>CLICK LAUTSTÄRKE</span>
+                    <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{loopstationMetronomeVolume}%</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    value={loopstationMetronomeVolume} 
+                    onChange={(e) => setLoopstationMetronomeVolume(parseInt(e.target.value))} 
+                    style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+
+              {/* Vertical Divider */}
+              <div style={{ width: '1px', height: '24px', background: 'rgba(0, 0, 0, 0.08)' }} className="hidden md:block" />
+
               {/* Latency Sync Slider */}
               <div style={{ flex: '1 1 250px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -12694,6 +12896,7 @@ const targetVol = isActive ? vol : 0;
                     value={track.volume}
                     onChange={(e) => handleVolumeChange(track.id, Number(e.target.value))}
                     className="groovelab-fader"
+                    disabled={!hasAudio}
                   />
                   <span style={{ fontSize: '0.54rem', color: '#86868b', fontFamily: 'SF Mono, monospace', width: '28px', textAlign: 'right' }}>
                     {track.volume === 0 ? 'Mute' : `${Math.round(track.volume / 100 * 6)}dB`}
@@ -12720,44 +12923,35 @@ const targetVol = isActive ? vol : 0;
                       const elapsedSecs = (audioContextRef.current ? audioContextRef.current.currentTime : 0) - sequenceStartTimeRef.current;
                       const continuousTick = elapsedSecs / (60 / bpm);
                       if (continuousTick >= 4) {
-                        const activeStep = Math.floor(((continuousTick % 16) / 16) * 32);
-                        const activeTrack = tracks.find(tr => tr.isRecording || tr.isWaiting);
-                        const isRecordingThis = track.isRecording;
-                        const isPlayingThis = hasAudio && (!activeTrack || track.id < activeTrack.id);
-                        isCurrentStep = (isRecordingThis || isPlayingThis) && activeStep === stepIdx;
-                      }
-                    }
-                    
-                    let blockColor = '#e5e5e7';
-                    if (hasAudio || track.isRecording) {
-                      if (isCurrentStep) {
-                        blockColor = track.isRecording ? '#ea4335' : '#34a853';
-                      } else if (isBarStart) {
-                        blockColor = '#a8aec4';
-                      } else if (isQuarterBeat) {
-                        blockColor = '#cbd5e0';
-                      } else {
-                        blockColor = '#e2e8f0';
-                      }
-                    } else {
-                      if (isBarStart) {
-                        blockColor = '#cbd5e0';
-                      } else if (isQuarterBeat) {
-                        blockColor = '#e2e8f0';
-                      } else {
-                        blockColor = '#f1f3f5';
+                        const sequenceOffset = Math.floor(continuousTick - 4);
+                        const activeStep = sequenceOffset % 32;
+                        isCurrentStep = track.isRecording && activeStep === stepIdx;
                       }
                     }
 
-                    // High-end DAW simulated transient waveform height pattern
+                    // Taller, premium waveform transient envelope heights
                     const wavePattern = [
-                      15, 6, 4, 2, 8, 4, 3, 2,
-                      11, 5, 3, 2, 7, 4, 3, 5,
-                      13, 6, 4, 2, 9, 4, 3, 2,
-                      11, 5, 3, 2, 8, 4, 6, 12
+                      16, 7, 5, 3, 9, 5, 4, 3,
+                      12, 6, 4, 3, 8, 5, 4, 6,
+                      14, 7, 5, 3, 10, 5, 4, 3,
+                      12, 6, 4, 3, 9, 5, 7, 13
                     ];
                     const baseHeight = wavePattern[stepIdx];
+                    const isPassed = isPlaying && (Math.floor((playbackProgress / 100) * 32) > stepIdx);
                     
+                    let blockColor = '#e5e5ea';
+                    if (track.isRecording) {
+                      blockColor = isCurrentStep ? '#ef4444' : 'rgba(239, 68, 68, 0.25)';
+                    } else if (hasAudio) {
+                      if (isCurrentStep) {
+                        blockColor = '#34a853';
+                      } else if (isPassed) {
+                        blockColor = 'rgba(52, 168, 83, 0.4)';
+                      } else {
+                        blockColor = 'rgba(52, 168, 83, 0.15)';
+                      }
+                    }
+
                     return (
                       <div
                         key={stepIdx}
@@ -12778,23 +12972,25 @@ const targetVol = isActive ? vol : 0;
               {/* Clean LED Level Meter */}
               <div style={{
                 display: 'flex',
-                flexDirection: 'column-reverse',
-                gap: '2px',
-                padding: '4px',
-                background: '#1e1e20',
-                borderRadius: '4px',
-                minWidth: '14px',
-                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: '2.5px',
+                padding: '5px 4px',
+                background: '#111112',
+                borderRadius: '6px',
+                minWidth: '18px',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                height: '34px',
-                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)'
+                height: '64px',
+                border: '1px solid rgba(255,255,255,0.05)',
+                boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.05)'
               }}>
-                {Array.from({ length: 8 }).map((_, idx) => {
-                  const isActive = meterHeights[track.id] >= (8 - idx);
-                  let targetColor = '#2e2e30'; // Dark state
+                {Array.from({ length: 10 }).map((_, idx) => {
+                  const level = 10 - idx;
+                  const isActive = meterHeights[track.id] >= level;
+                  let targetColor = '#222225'; // Dark state
                   if (isActive) {
-                    if (idx < 2) targetColor = '#ea4335'; // Red peak clip
-                    else if (idx < 4) targetColor = '#facc15'; // Yellow warn
+                    if (level >= 9) targetColor = '#ea4335'; // Red peak clip
+                    else if (level >= 7) targetColor = '#facc15'; // Yellow warn
                     else targetColor = '#34a853'; // Green safe
                   }
                   return (
@@ -12879,113 +13075,131 @@ const targetVol = isActive ? vol : 0;
             </div>
           );
         })}
-      </div>
-      </div>
+      </>
       ) : (
-        /* Saved Loops List View */
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          background: '#ffffff',
-          borderRadius: '20px',
-          border: '1px solid #f1f3f5',
-          padding: '24px',
-          flex: 1
-        }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f', marginBottom: '8px' }}>Gespeicherte Loop-Aufnahmen</h3>
-          {savedLoops.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '8px', color: '#86868b' }}>
-              <Music size={24} />
-              <span style={{ fontSize: '0.74rem' }}>Noch keine gespeicherten Loops vorhanden.</span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {savedLoops.map((loop, idx) => (
-                <div key={idx} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: '#f5f5f7',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(0,0,0,0.02)'
-                }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5px', flex: 1 }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f' }}>{loop.label}</span>
-                    <span style={{ fontSize: '0.58rem', color: '#86868b' }}>
-                      {new Date(loop.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr • {loop.duration}s
-                    </span>
-                    {/* Visualizer for Loop Duration / Length */}
-                    <div style={{
-                      width: '140px',
-                      height: '4px',
-                      background: '#e5e5ea',
-                      borderRadius: '2px',
-                      marginTop: '6px',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}>
-                      <div
-                        className={playingSavedLoopUrl === loop.url ? 'shimmer-active' : ''}
-                        style={{
-                          width: `${Math.min(100, (Number(loop.duration) / 16) * 100)}%`,
-                          height: '100%',
-                          background: playingSavedLoopUrl === loop.url ? '#34a853' : '#a8aec4',
+          /* Saved Loops List View */
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            background: '#ffffff',
+            borderRadius: '20px',
+            border: '1.5px solid rgba(0, 0, 0, 0.08)',
+            padding: '24px',
+            width: '100%',
+            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.03)'
+          }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1d1d1f', marginBottom: '8px' }}>
+              Deine Aufnahmen
+            </h3>
+            {savedLoops.length === 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '120px', color: '#86868b', background: 'rgba(0,0,0,0.02)', borderRadius: '12px', border: '1px dashed rgba(0,0,0,0.08)' }}>
+                <span style={{ fontSize: '0.74rem' }}>Noch keine gespeicherten Loops vorhanden.</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {savedLoops.map((loop, idx) => {
+                  const isSelected = selectedSavedLoop?.url === loop.url;
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        setSelectedSavedLoop(loop);
+                        if (playingSavedLoopUrl && playingSavedLoopUrl !== loop.url) {
+                          if (savedLoopAudioRef.current) savedLoopAudioRef.current.pause();
+                          setPlayingSavedLoopUrl(null);
+                          setPlaybackProgress(0);
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        background: isSelected ? 'rgba(52, 168, 83, 0.05)' : '#f5f5f7',
+                        borderRadius: '12px',
+                        border: isSelected ? '1.5px solid #34a853' : '1.5px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5px', flex: 1 }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f' }}>{loop.label}</span>
+                        <span style={{ fontSize: '0.58rem', color: '#86868b' }}>
+                          {new Date(loop.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr • {loop.duration}s
+                        </span>
+                        <div style={{
+                          width: '140px',
+                          height: '4px',
+                          background: isSelected ? 'rgba(52, 168, 83, 0.15)' : '#e5e5ea',
                           borderRadius: '2px',
-                          transition: 'all 0.3s ease'
-                        }}
-                      />
+                          marginTop: '6px',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          <div
+                            className={playingSavedLoopUrl === loop.url ? 'shimmer-active' : ''}
+                            style={{
+                              width: `${Math.min(100, (Number(loop.duration) / 16) * 100)}%`,
+                              height: '100%',
+                              background: playingSavedLoopUrl === loop.url ? '#34a853' : '#a8aec4',
+                              borderRadius: '2px',
+                              transition: 'all 0.3s ease'
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => handlePlaySavedLoop(loop.url)}
+                          className="tactile-btn"
+                          style={{
+                            background: '#34a853',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {playingSavedLoopUrl === loop.url ? <Square size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSavedLoop(loop.originalStr)}
+                          className="tactile-btn"
+                          style={{
+                            background: 'transparent',
+                            color: '#86868b',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = '#ea4335'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b'; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => handlePlaySavedLoop(loop.url)}
-                      className="tactile-btn"
-                      style={{
-                        background: '#34a853',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {playingSavedLoopUrl === loop.url ? <Square size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSavedLoop(loop.originalStr)}
-                      className="tactile-btn"
-                      style={{
-                        background: 'transparent',
-                        color: '#86868b',
-                        border: 'none',
-                        borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ea4335'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b'; }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      </div>
     </div>
   );
 };
