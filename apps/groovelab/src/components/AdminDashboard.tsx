@@ -18028,7 +18028,7 @@ function DeviceSetupScreen({
               }} />
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', lineHeight: 1.2 }}>
-                  {activeSession.profiles?.first_name} {maskLastName(activeSession.profiles?.last_name, showRealNames)}
+                  {activeSession.profiles?.first_name} {maskLastName(activeSession.profiles?.last_name)}
                 </div>
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600 }}>
                   am Üben...
