@@ -1811,6 +1811,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (noteToDelete && noteToDelete.startsWith("AUDIO:")) {
         const parts = noteToDelete.substring(6).split('|');
         const audioUrlString = parts[0];
+        const audioLabelString = parts[3] || 'Aufnahme';
+
+        const confirmDelete = window.confirm(`Möchtest du die Aufnahme "${audioLabelString}" wirklich unwiderruflich löschen?`);
+        if (!confirmDelete) return;
+
         if (audioUrlString && audioUrlString.startsWith("http")) {
           const marker = '/storage/v1/object/public/campus-assets/';
           const markerIndex = audioUrlString.indexOf(marker);
