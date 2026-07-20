@@ -9565,6 +9565,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         savedLoopAudioRef.current.pause();
       }
       const audio = new Audio(url);
+      audio.loop = true;
       savedLoopAudioRef.current = audio;
       setPlayingSavedLoopUrl(url);
       audio.play().catch(e => {
@@ -9589,8 +9590,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
 
     try {
-      if (originalStr.startsWith("AUDIO:")) {
-        const parts = originalStr.substring(6).split('|');
+      if (originalStr.startsWith("AUDIO:") || originalStr.startsWith("LOOP:")) {
+        const prefixLen = originalStr.startsWith("AUDIO:") ? 6 : 5;
+        const parts = originalStr.substring(prefixLen).split('|');
         const audioUrlString = parts[0];
         if (audioUrlString && audioUrlString.startsWith("http")) {
           const marker = '/storage/v1/object/public/campus-assets/';
@@ -11489,15 +11491,15 @@ const targetVol = isActive ? vol : 0;
       
       const publicUrl = supabase.storage.from('campus-assets').getPublicUrl(filePath).data.publicUrl;
       const creatorRole = readOnly ? 'student' : 'teacher';
-      const audioMetaStr = `AUDIO:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}`;
+      const audioMetaStr = `LOOP:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}`;
       
       setHomeworkNotesList(prev => [...prev, audioMetaStr]);
       const updatedList = [...homeworkNotesList, audioMetaStr];
       await syncHomeworkNotes(updatedList);
       await fetchProgress();
       notifyHomeworkChange();
-      alert("Loop-Mix erfolgreich im Campus-Groovelab Hausaufgabenheft gespeichert!");
-      setActiveViewMode('recordings');
+      alert("Loop-Mix erfolgreich gespeichert!");
+      setActiveSubTab('saved');
     } catch (err: any) {
       console.error("Export mix failed:", err);
       alert(`Cloud-Speicherung im Campus-Groovelab Hausaufgabenheft fehlgeschlagen: ${err.message || err}`);
@@ -11664,9 +11666,9 @@ const targetVol = isActive ? vol : 0;
         : '#e5e5e7'; // default/ready
 
   const savedLoops = homeworkNotesList
-    .filter(note => note.startsWith('AUDIO:'))
+    .filter(note => note.startsWith('LOOP:'))
     .map(note => {
-      const parts = note.replace('AUDIO:', '').split('|');
+      const parts = note.replace('LOOP:', '').split('|');
       return {
         url: parts[0],
         duration: parts[1],
@@ -11749,8 +11751,16 @@ const targetVol = isActive ? vol : 0;
         .central-pulse-pause {
           animation: central-pulse-pause 2s infinite ease-in-out;
         }
-        .tactile-btn {
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .shimmer-active {
+          background: linear-gradient(90deg, #34a853 30%, #a7f3d0 50%, #34a853 70%) !important;
+          background-size: 200% 100% !important;
+          animation: shimmer 1.5s infinite linear !important;
         }
         .tactile-btn:hover:not(:disabled) {
           transform: translateY(-1.5px);
@@ -12712,11 +12722,32 @@ const targetVol = isActive ? vol : 0;
                   borderRadius: '12px',
                   border: '1px solid rgba(0,0,0,0.02)'
                 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5px', flex: 1 }}>
                     <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f' }}>{loop.label}</span>
                     <span style={{ fontSize: '0.58rem', color: '#86868b' }}>
                       {new Date(loop.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })} Uhr • {loop.duration}s
                     </span>
+                    {/* Visualizer for Loop Duration / Length */}
+                    <div style={{
+                      width: '140px',
+                      height: '4px',
+                      background: '#e5e5ea',
+                      borderRadius: '2px',
+                      marginTop: '6px',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}>
+                      <div
+                        className={playingSavedLoopUrl === loop.url ? 'shimmer-active' : ''}
+                        style={{
+                          width: `${Math.min(100, (Number(loop.duration) / 16) * 100)}%`,
+                          height: '100%',
+                          background: playingSavedLoopUrl === loop.url ? '#34a853' : '#a8aec4',
+                          borderRadius: '2px',
+                          transition: 'all 0.3s ease'
+                        }}
+                      />
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button
