@@ -11174,6 +11174,15 @@ const targetVol = isActive ? vol : 0;
             };
             runScheduler();
           }
+        } else {
+          const ctx = audioContextRef.current;
+          if (ctx && isPlayingRef.current && masterLoopDuration) {
+            const loopDurationSec = masterLoopDuration / 1000;
+            const elapsedSecs = (Date.now() - startTimeRef.current) / 1000;
+            const offset = elapsedSecs % loopDurationSec;
+            // Play newly recorded track immediately, aligned to the current playhead phase
+            playTrackBuffer(trackId, offset, false, ctx.currentTime);
+          }
         }
       };
 
