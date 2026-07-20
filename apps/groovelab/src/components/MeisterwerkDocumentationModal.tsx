@@ -14146,6 +14146,33 @@ const targetVol = isActive ? vol : 0;
                               strokeLinejoin="round"
                               style={{ filter: 'drop-shadow(0 0 4px rgba(52, 168, 83, 0.6))' }}
                             />
+                            
+                            {/* Green Onset Marker Line and Dot */}
+                            <line
+                              x1={120}
+                              y1={0}
+                              x2={120}
+                              y2={80}
+                              stroke="#34a853"
+                              strokeWidth="1.5"
+                              strokeDasharray="3,3"
+                              opacity="0.8"
+                            />
+                            <circle
+                              cx={120}
+                              cy={40}
+                              r="5"
+                              fill="#34a853"
+                              style={{ filter: 'drop-shadow(0 0 5px #34a853)' }}
+                            />
+                            <text
+                              x={128}
+                              y={44}
+                              fill="#34a853"
+                              style={{ fontSize: '0.45rem', fontWeight: 900, letterSpacing: '0.05em' }}
+                            >
+                              SIGNAL-START
+                            </text>
                           </g>
                         </svg>
                       </div>
@@ -14232,7 +14259,7 @@ const targetVol = isActive ? vol : 0;
                         }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.62rem', color: '#1d1d1f', lineHeight: 1.4 }}>
                             <p style={{ margin: 0, fontWeight: 700 }}>1. Kurve ausrichten</p>
-                            <p style={{ margin: 0, color: '#515154' }}>Bewege den Regler, bis der <b>erste steile Ausschlag (Onset)</b> der grünen Kurve exakt auf der roten vertikalen Referenzlinie (Trigger Time) liegt.</p>
+                            <p style={{ margin: 0, color: '#515154' }}>Bewege den Regler, bis der <b>grüne Punkt (Signal-Start)</b> der Kurve exakt auf der <b>roten Referenzlinie (Trigger Time)</b> liegt.</p>
                             
                             <p style={{ margin: 0, fontWeight: 700, marginTop: '4px' }}>2. Speichern</p>
                             <p style={{ margin: 0, color: '#515154' }}>Klicke auf Speichern. Das System merkt sich den Wert und gleicht Latenzen bei zukünftigen Aufnahmen automatisch aus.</p>
