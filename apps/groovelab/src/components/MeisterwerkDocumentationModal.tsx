@@ -11774,35 +11774,35 @@ const targetVol = isActive ? vol : 0;
           -webkit-appearance: none;
           appearance: none;
           width: 100%;
-          height: 6px;
-          border-radius: 3px;
-          background: #edf2f7;
+          height: 4px;
+          border-radius: 2px;
+          background: #e2e8f0;
+          box-shadow: inset 0 1px 2.5px rgba(0,0,0,0.08);
           outline: none;
-          transition: background 0.15s ease;
         }
         .groovelab-fader::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
+          width: 12px;
+          height: 20px;
+          border-radius: 3px;
           background: #34a853;
-          border: 2.5px solid #ffffff;
+          border: 1px solid #23853e;
           cursor: pointer;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.18);
-          transition: transform 0.15s ease, background 0.15s ease;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25);
+          transition: transform 0.1s ease, background 0.15s ease;
         }
         .groovelab-fader::-webkit-slider-thumb:hover {
-          transform: scale(1.15);
-          background: #0f5c29;
+          transform: scale(1.08);
+          background: #23853e;
         }
         .daw-console-strip {
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         .daw-console-strip:hover {
-          transform: translateY(-1.5px);
-          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03) !important;
-          border-color: rgba(0, 0, 0, 0.08) !important;
+          transform: translateY(-2px);
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05) !important;
+          border-color: rgba(52, 168, 83, 0.15) !important;
         }
       `}} />
 
@@ -12420,12 +12420,15 @@ const targetVol = isActive ? vol : 0;
               key={track.id}
               className={`daw-console-strip ${track.isRecording ? 'recording-card-pulse' : ''}`}
               style={{
-                background: '#ffffff',
+                background: 'rgba(255, 255, 255, 0.72)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
                 border: track.isRecording 
                   ? '1.5px solid #ea4335' 
                   : track.isWaiting 
                     ? '1.5px solid #d97706'
-                    : '1px solid #f1f3f5',
+                    : '1px solid rgba(255, 255, 255, 0.6)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
                 borderRadius: '16px',
                 padding: '14px 18px',
                 display: 'flex',
@@ -12571,20 +12574,32 @@ const targetVol = isActive ? vol : 0;
                       if (isCurrentStep) {
                         blockColor = track.isRecording ? '#ea4335' : '#34a853';
                       } else if (isBarStart) {
-                        blockColor = '#cbd5e0';
+                        blockColor = '#a8aec4';
                       } else if (isQuarterBeat) {
+                        blockColor = '#cbd5e0';
+                      } else {
                         blockColor = '#e2e8f0';
                       }
+
+                      // High-end DAW simulated transient waveform height pattern
+                      const wavePattern = [
+                        15, 6, 4, 2, 8, 4, 3, 2,
+                        11, 5, 3, 2, 7, 4, 3, 5,
+                        13, 6, 4, 2, 9, 4, 3, 2,
+                        11, 5, 3, 2, 8, 4, 6, 12
+                      ];
+                      const baseHeight = wavePattern[stepIdx];
                       
                       return (
                         <div
                           key={stepIdx}
                           style={{
                             flex: 1,
-                            height: isCurrentStep ? '5px' : isBarStart ? '4px' : isQuarterBeat ? '3px' : '2px',
-                            borderRadius: '0.5px',
+                            height: `${isCurrentStep ? baseHeight + 3 : baseHeight}px`,
+                            borderRadius: '1px',
                             background: blockColor,
-                            transition: 'all 0.05s ease'
+                            transition: 'all 0.08s ease',
+                            opacity: isCurrentStep ? 1 : 0.75
                           }}
                         />
                       );
