@@ -3386,45 +3386,91 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-          {/* Header Panel */}
+          {/* Header Panel — same 2-row layout as ScheduleCalendarView */}
           <div style={{ 
-            background: 'rgba(255, 255, 255, 0.55)', 
-            backdropFilter: 'blur(20px) saturate(190%)', 
-            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-            borderRadius: '20px', 
-            padding: '16px 20px', 
-            border: '1px solid rgba(255, 255, 255, 0.5)', 
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.03)', 
-            display: 'grid', 
-            gridTemplateColumns: '1fr auto 540px', 
-            alignItems: 'center', 
-            gap: '16px'
+            background: 'rgba(255, 255, 255, 0.65)', 
+            backdropFilter: 'blur(30px) saturate(210%)', 
+            WebkitBackdropFilter: 'blur(30px) saturate(210%)',
+            borderRadius: '16px', 
+            padding: '12px 16px', 
+            border: '1px solid rgba(255, 255, 255, 0.6)', 
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)', 
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px'
           }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ height: '40px', width: '40px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Calendar size={20} />
+
+            {/* ── ROW 1: Title | Tabs+Tour+Raster | Spacer ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', width: '100%', gap: '10px' }}>
+              {/* Left: Titel */}
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Calendar size={16} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                    Stundenplan-Designer
+                  </h2>
+                </div>
               </div>
-              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                  Stundenplan-Designer
-                </h2>
-                {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
+
+              {/* Center: Tab-Switcher + Tour + Raster */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => setActiveTab('calendar')}
+                    className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+                    style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                  >
+                    Stundenplan
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('designer')}
+                    className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+                    style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                  >
+                    Stundenplan-Designer
+                  </button>
+                </div>
+                {currentUserRole === 'teacher' && (
+                  <TourStartButton onClick={startDesignerTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
+                )}
+                {/* Grid Snap Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
+                  <select
+                    value={gridSnapMinutes}
+                    onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
+                    style={{ border: 'none', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', background: 'transparent', outline: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <option value={30}>30 Min</option>
+                    <option value={15}>15 Min</option>
+                    <option value={5}>5 Min</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Right: Spacer (for centering) */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }} />
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
+
+            {/* ── ROW 2: Teacher-Filter | Apple-Btn-Group | Status + Senden ── */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
+
+              {/* Left: Lehrkraft-Filter */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px' }}>
+                {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers.length > 0 ? (
+                  <>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Users size={11} style={{ strokeWidth: 3 }} /> Lehrkraft:
+                    </span>
                     <select
                       value={selectedTeacherId}
                       onChange={(e) => setSelectedTeacherId(e.target.value)}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.75)',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                        borderRadius: '6px',
-                        padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#1d1d1f',
-                        outline: 'none',
-                        cursor: 'pointer'
-                      }}
+                      style={{ background: 'transparent', border: 'none', fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f', outline: 'none', cursor: 'pointer', padding: 0 }}
                     >
                       {teachers.map(t => (
                         <option key={t.id} value={t.id}>
@@ -3432,58 +3478,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                    {currentUserRole === 'teacher' ? 'Dein Designer' : 'Stundenplan-Designer'}
+                  </span>
                 )}
               </div>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
-                <button 
-                  onClick={() => setActiveTab('calendar')}
-                  className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-                >
-                  Stundenplan
-                </button>
-                <button 
-                  onClick={() => setActiveTab('designer')}
-                  className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-                >
-                  Stundenplan-Designer
-                </button>
-              </div>
-              {currentUserRole === 'teacher' && (
-                <TourStartButton onClick={startDesignerTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
-              )}
-              
-              {/* Grid Snap Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
-                <select
-                  value={gridSnapMinutes}
-                  onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
-                  style={{
-                    border: 'none',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    color: '#1e293b',
-                    background: 'transparent',
-                    outline: 'none',
-                    cursor: 'pointer',
-                    padding: 0
-                  }}
-                >
-                  <option value={30}>30 Min</option>
-                  <option value={15}>15 Min</option>
-                  <option value={5}>5 Min</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {/* Unified Apple-Button-Group for Options & Setup */}
+              {/* Center: Apple-Button-Group */}
               <div className="apple-btn-group">
                 {/* Namen zeigen Toggle */}
                 <button
@@ -3491,7 +3494,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   onClick={() => toggleRealNames()}
                   className={`apple-btn ${showRealNames ? 'active' : ''}`}
                   style={{ color: showRealNames ? '#ea4335' : undefined }}
-                  title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+                  title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden"}
                 >
                   {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
                   <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
@@ -3499,14 +3502,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
 
-                {/* Zeiten ändern / Tag anlegen */}
                 {currentUserRole === 'teacher' && selectedTeacherId === userId ? (
-                  <button
-                    type="button"
-                    onClick={handleEditTeacherAvailability}
-                    className="apple-btn"
-                    title="Unterrichtszeiten & Wunschtage ändern"
-                  >
+                  <button type="button" onClick={handleEditTeacherAvailability} className="apple-btn" title="Unterrichtszeiten & Wunschtage ändern">
                     <Clock size={13} />
                     <span>Zeiten ändern</span>
                   </button>
@@ -3515,22 +3512,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     type="button"
                     onClick={() => {
                       const availableDays = DAYS_OF_WEEK.filter(d => !boards.some(b => b.dayOfWeek === d.value));
-                      if (availableDays.length === 0) {
-                        showAlert("Alle Wochentage wurden bereits hinzugefügt.");
-                        return;
-                      }
+                      if (availableDays.length === 0) { showAlert("Alle Wochentage wurden bereits hinzugefügt."); return; }
                       setNewBoardDay(availableDays[0].value);
                       setShowAddBoardForm(true);
                     }}
-                    className="apple-btn"
-                    title="Tag anlegen"
+                    className="apple-btn" title="Tag anlegen"
                   >
                     <Plus size={13} />
                     <span>Tag anlegen</span>
                   </button>
                 )}
 
-                {/* Onboarding-Link */}
                 <button
                   type="button"
                   onClick={async () => {
@@ -3538,80 +3530,59 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     await navigator.clipboard.writeText(inviteLink);
                     await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
                   }}
-                  className="apple-btn"
-                  title="Onboarding-Link kopieren"
+                  className="apple-btn" title="Onboarding-Link kopieren"
                 >
                   <Send size={13} />
                   <span>Onboarding-Link</span>
                 </button>
 
-                {/* Backup */}
-                <label 
-                  htmlFor="pdf-upload"
-                  className="apple-btn"
-                  style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                  title="Backup aus PDF wiederherstellen"
-                >
+                <label htmlFor="pdf-upload" className="apple-btn" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} title="Backup aus PDF wiederherstellen">
                   <Upload size={13} />
                   <span>Backup</span>
                 </label>
-                <input 
-                  id="pdf-upload" 
-                  type="file" 
-                  accept="application/pdf" 
-                  style={{ display: 'none' }} 
-                  onChange={handleRestoreFromPDF} 
-                />
+                <input id="pdf-upload" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleRestoreFromPDF} />
               </div>
 
-              {/* Status information */}
-              {hasSubmittedSchedule && scheduleStatus === 'approved' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.65)', border: '1px solid rgba(52, 168, 83, 0.25)', color: '#34a853', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                  <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span> 
-                  <span>Freigegeben</span>
-                </div>
-              )}
-              {hasSubmittedSchedule && scheduleStatus === 'pending' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(254, 243, 199, 0.65)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#92400e', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                  <span style={{ color: '#d97706', fontSize: '0.8rem' }}>⏳</span> 
-                  <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
-                </div>
-              )}
-
-              {/* Group C: Submit Action */}
-              <button
-                id="tour-submit-section"
-                type="button"
-                onClick={handleLockAndSend}
-                disabled={submitting || boards.length === 0}
-                style={{
-                  background: isCampus 
-                    ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
-                    : (isGroovelab 
-                      ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
-                      : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
-                  color: 'white',
-                  border: 'none',
-                  fontWeight: 800,
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  opacity: (submitting || boards.length === 0) ? 0.5 : 1,
-                  pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto',
-                  boxShadow: `0 4px 12px ${brandColor}30`,
-                  transition: 'all 0.2s',
-                  outline: 'none'
-                }}
-                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                onMouseOut={e => e.currentTarget.style.transform = 'none'}
-              >
-                <Send size={13} />
-                <span>{submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}</span>
-              </button>
+              {/* Right: Status + Senden */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {hasSubmittedSchedule && scheduleStatus === 'approved' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.65)', border: '1px solid rgba(52, 168, 83, 0.25)', color: '#34a853', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span>
+                    <span>Freigegeben</span>
+                  </div>
+                )}
+                {hasSubmittedSchedule && scheduleStatus === 'pending' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(254, 243, 199, 0.65)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#92400e', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    <span style={{ color: '#d97706', fontSize: '0.8rem' }}>⏳</span>
+                    <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
+                  </div>
+                )}
+                <button
+                  id="tour-submit-section"
+                  type="button"
+                  onClick={handleLockAndSend}
+                  disabled={submitting || boards.length === 0}
+                  style={{
+                    background: isCampus 
+                      ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                      : (isGroovelab 
+                        ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
+                        : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
+                    color: 'white', border: 'none', fontWeight: 800, padding: '8px 16px',
+                    borderRadius: '10px', fontSize: '0.78rem', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    opacity: (submitting || boards.length === 0) ? 0.5 : 1,
+                    pointerEvents: (submitting || boards.length === 0) ? 'none' : 'auto',
+                    boxShadow: `0 4px 12px ${brandColor}30`,
+                    transition: 'all 0.2s', outline: 'none'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'none'}
+                >
+                  <Send size={13} />
+                  <span>{submitting ? 'Wird gesendet...' : 'Einloggen & Senden'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
