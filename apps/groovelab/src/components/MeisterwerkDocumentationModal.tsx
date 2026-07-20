@@ -12766,9 +12766,15 @@ interface GroovePracticeCompanionProps {
 }
 
 const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
+  const getBeatsPerBar = (style: string) => {
+    if (style === 'walzer') return 3;
+    if (style === 'ballad68') return 6;
+    return 4;
+  };
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
-  const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin'>('metronome');
+  const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco'>('metronome');
   const [volKick, setVolKick] = useState(80);
   const [volSnare, setVolSnare] = useState(80);
   const [volHat, setVolHat] = useState(80);
@@ -12859,7 +12865,9 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       if (!audioCtxRef.current || !isPlayingRef.current) return;
       const ctx = audioCtxRef.current;
       const secondsPerBeat = 60.0 / bpmRef.current;
-      const secondsPerBar = secondsPerBeat * 4;
+      const style = selectedStyleRef.current;
+      const beats = style === 'walzer' ? 3 : (style === 'ballad68' ? 6 : 4);
+      const secondsPerBar = secondsPerBeat * beats;
       
       const elapsed = ctx.currentTime - barStartAudioTimeRef.current;
       const progressPercent = Math.min(100, Math.max(0, (elapsed / secondsPerBar) * 100));
@@ -12877,9 +12885,19 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
 
     const advanceNote = () => {
       const secondsPerBeat = 60.0 / bpmRef.current;
-      const isSwing = selectedStyleRef.current === 'swing';
-      const stepsInBar = isSwing ? 12 : 16;
-      const stepDuration = secondsPerBeat / (isSwing ? 3 : 4);
+      const style = selectedStyleRef.current;
+      let stepsInBar = 16;
+      let stepDuration = secondsPerBeat / 4;
+      if (style === 'swing') {
+        stepsInBar = 12;
+        stepDuration = secondsPerBeat / 3;
+      } else if (style === 'walzer') {
+        stepsInBar = 12;
+        stepDuration = secondsPerBeat / 4;
+      } else if (style === 'ballad68') {
+        stepsInBar = 12;
+        stepDuration = secondsPerBeat / 2;
+      }
       nextNoteTimeRef.current += stepDuration;
       current16thNoteRef.current = (current16thNoteRef.current + 1) % stepsInBar;
       
@@ -13016,6 +13034,34 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playSnare();
       if (step % 2 === 0) playHat(false);
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (selectedStyleRef.current === 'funk') {
+      if (step === 0 || step === 6 || step === 10 || step === 14) playKick();
+      if (step === 4 || step === 12 || step === 15) playSnare();
+      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 13 || step === 14) {
+        playHat(step === 6 || step === 13);
+      }
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (selectedStyleRef.current === 'reggae') {
+      if (step === 8) { playKick(); playSnare(); }
+      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 10 || step === 12 || step === 14) playHat(false);
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (selectedStyleRef.current === 'walzer') {
+      if (step === 0) playKick();
+      if (step === 4 || step === 8) playSnare();
+      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10) playHat(false);
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (selectedStyleRef.current === 'ballad68') {
+      if (step === 0) playKick();
+      if (step === 6) playSnare();
+      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10) playHat(false);
+      if (step % 2 === 0) triggerVisualBeat(Math.floor(step / 2));
+    } else if (selectedStyleRef.current === 'disco') {
+      if (step === 0 || step === 4 || step === 8 || step === 12) playKick();
+      if (step === 4 || step === 12) playSnare();
+      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 14) {
+        playHat(step === 2 || step === 6 || step === 10 || step === 14);
+      }
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     }
   };
 
@@ -13057,7 +13103,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
 
           {/* Visual Beat Indicator Dots */}
           <div style={{ display: 'flex', gap: '14px', margin: '10px 0' }}>
-            {Array.from({ length: 4 }).map((_, idx) => {
+            {Array.from({ length: getBeatsPerBar(selectedStyle) }).map((_, idx) => {
               const isActive = activeBeatIndex === idx;
               return (
                 <div
@@ -13287,8 +13333,13 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
               { id: 'metronome', label: 'Metronom Klick' },
               { id: 'rock', label: 'Rock & Pop Groove' },
               { id: 'hiphop', label: 'Hip-Hop Pocket' },
-              { id: 'swing', label: 'Swing Triplets' },
-              { id: 'latin', label: 'Son Clave Latin' }
+              { id: 'swing', label: 'Jazz Swing' },
+              { id: 'latin', label: 'Latin Bossa' },
+              { id: 'funk', label: 'Funk Break' },
+              { id: 'reggae', label: 'Reggae One-Drop' },
+              { id: 'walzer', label: 'Walzer (3/4 Takt)' },
+              { id: 'ballad68', label: '6/8 Ballade' },
+              { id: 'disco', label: 'Disco (4-on-the-Floor)' }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
