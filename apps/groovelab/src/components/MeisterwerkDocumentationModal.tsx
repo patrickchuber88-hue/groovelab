@@ -14107,14 +14107,14 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                 </filter>
               </defs>
 
-              {/* Side Winding Key (behind the metronome shadow/body) */}
+              {/* Side Winding Key (Connected cleanly to right casing edge) */}
               <g style={{
-                transformOrigin: '154px 145px',
+                transformOrigin: '144px 145px',
                 animation: isPlaying ? 'rotate-key 4s linear infinite' : 'none'
               }}>
-                <rect x="146" y="142" width="10" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
-                <circle cx="160" cy="145" r="7" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
-                <circle cx="160" cy="145" r="2.5" fill="url(#brassGold)" />
+                <rect x="144" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
+                <path d="M 152 145 C 152 138, 166 138, 166 145 C 166 152, 152 152, 152 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
+                <circle cx="152" cy="145" r="1.8" fill="#5a3d00" />
               </g>
 
               {/* 3D Pyramid Casing (Walnut Wood) */}
@@ -14140,40 +14140,75 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                 opacity="0.32"
               />
 
-              {/* Hollow Interior Chamber (Depth Chamber) */}
+              {/* Hollow Interior Chamber (Trapezoid for wider text space at top) */}
               <path 
-                d="M 90 28 L 44 190 L 136 190 Z" 
+                d="M 78 35 L 102 35 L 138 188 L 42 188 Z" 
                 fill="url(#interiorChamber)" 
                 stroke="#19110d" 
                 strokeWidth="1.5"
               />
 
-              {/* Ivory scale Plate */}
+              {/* Ivory scale Plate (Trapezoid fitting scale markings perfectly) */}
               <path 
-                d="M 90 34 L 50 184 L 130 184 Z" 
+                d="M 80 40 L 100 40 L 134 184 L 46 184 Z" 
                 fill="url(#ivoryPlate)" 
                 stroke="#b5ad9e"
                 strokeWidth="0.5"
               />
 
-              {/* Detailed scale lines and tempo markings */}
-              <g fill="#1d1d1f" opacity="0.48" fontFamily="monospace" fontSize="6.5" fontWeight="900" textAnchor="middle">
-                <text x="90" y="54">- 40 Largo -</text>
-                <line x1="68" y1="58" x2="112" y2="58" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
-                
-                <text x="90" y="76">- 80 Adagio -</text>
-                <line x1="64" y1="80" x2="116" y2="80" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
-                
-                <text x="90" y="98">- 120 Andante -</text>
-                <line x1="60" y1="102" x2="120" y2="102" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
-                
-                <text x="90" y="120">- 160 Allegro -</text>
-                <line x1="56" y1="124" x2="124" y2="124" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
-                
-                <text x="90" y="142">- 200 Presto -</text>
-                <line x1="52" y1="146" x2="128" y2="146" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
-                
-                <text x="90" y="164">- 240 Prestiss -</text>
+              {/* Detailed Scale Lines and Tempo Markings (Left Column: BPM, Right Column: Term) */}
+              <g fill="#1d1d1f" opacity="0.65" fontFamily="Georgia, serif" fontSize="5.5" fontWeight="bold">
+                {/* Center axis line */}
+                <line x1="90" y1="45" x2="90" y2="175" stroke="#1d1d1f" strokeWidth="0.8" opacity="0.25" />
+
+                {/* 40 Largo */}
+                <line x1="82" y1="55" x2="98" y2="55" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="76" y="57" textAnchor="end">40</text>
+                <text x="104" y="57" textAnchor="start">Largo</text>
+
+                {/* 80 Adagio */}
+                <line x1="80" y1="77" x2="100" y2="77" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="74" y="79" textAnchor="end">80</text>
+                <text x="106" y="79" textAnchor="start">Adagio</text>
+
+                {/* 120 Andante */}
+                <line x1="78" y1="99" x2="102" y2="99" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="72" y="101" textAnchor="end">120</text>
+                <text x="108" y="101" textAnchor="start">Andante</text>
+
+                {/* 160 Allegro */}
+                <line x1="76" y1="121" x2="104" y2="121" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="70" y="123" textAnchor="end">160</text>
+                <text x="110" y="123" textAnchor="start">Allegro</text>
+
+                {/* 200 Presto */}
+                <line x1="74" y1="143" x2="106" y2="143" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="68" y="145" textAnchor="end">200</text>
+                <text x="112" y="145" textAnchor="start">Presto</text>
+
+                {/* 240 Prestissimo */}
+                <line x1="72" y1="165" x2="108" y2="165" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="66" y="167" textAnchor="end">240</text>
+                <text x="114" y="167" textAnchor="start">Prestiss</text>
+              </g>
+
+              {/* Pendulum Shadow Group (Swings behind the rod for massive 3D depth) */}
+              <g style={{
+                transformOrigin: '87px 182px',
+                transform: isPlaying ? 'none' : 'rotate(0deg)',
+                animation: isPlaying ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate` : 'none',
+                transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
+                opacity: 0.25
+              }}>
+                <line x1="87" y1="182" x2="87" y2="42" stroke="#000000" strokeWidth="3.5" strokeLinecap="round" />
+                <rect 
+                  x="77" 
+                  y={42 + ((240 - bpm) / (240 - 40)) * 115} 
+                  width="20" 
+                  height="15" 
+                  rx="2"
+                  fill="#000000" 
+                />
               </g>
 
               {/* Pendulum Group (rotating from pivot point) */}
