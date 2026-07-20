@@ -13997,131 +13997,185 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
           </div>
 
           {/* Mechanical Metronome Container */}
-          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '5px 0' }}>
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
             <style>{`
               @keyframes swing-anim {
                 0% { transform: rotate(-24deg); }
                 100% { transform: rotate(24deg); }
               }
+              @keyframes rotate-key {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
             `}</style>
-            
-            {/* Pyramid Casing */}
-            <div style={{
-              position: 'relative',
-              width: '150px',
-              height: '170px',
-              background: 'linear-gradient(180deg, #6c472b 0%, #462c19 100%)', // walnut wood gradient
-              clipPath: 'polygon(50% 0%, 15% 100%, 85% 100%)',
-              boxShadow: 'inset 0 0 15px rgba(0,0,0,0.6), 0 8px 16px rgba(0,0,0,0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'flex-end',
-              alignItems: 'center',
-              paddingBottom: '8px',
-              border: '2px solid #2f1d10',
-              borderRadius: '6px'
-            }}>
-              {/* Front Plate / Faceplate */}
+
+            {/* Metronome Wrapper (to keep winding key outside clipped pyramid) */}
+            <div style={{ position: 'relative', width: '170px', height: '185px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              
+              {/* Golden Winding Key (mechanical handle rotating when playing) */}
               <div style={{
                 position: 'absolute',
-                top: '32px',
-                bottom: '8px',
-                left: '26%',
-                right: '26%',
-                background: '#fcf8f2',
-                borderRadius: '3px',
-                boxShadow: 'inset 0 0 5px rgba(0,0,0,0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                paddingTop: '6px',
-                zIndex: 1
+                right: '2px',
+                bottom: '36px',
+                width: '14px',
+                height: '8px',
+                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                border: '1.2px solid #b45309',
+                borderRadius: '2px',
+                transformOrigin: 'left center',
+                animation: isPlaying ? 'rotate-key 4s linear infinite' : 'none',
+                zIndex: 0,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}>
-                {/* Scale markings */}
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '6px', 
-                  opacity: 0.18, 
-                  fontSize: '5.5px', 
-                  fontFamily: 'monospace', 
-                  fontWeight: 700,
-                  color: '#1d1d1f',
-                  textAlign: 'center',
-                  lineHeight: 1
-                }}>
-                  <span>- 40 -</span>
-                  <span>- 80 -</span>
-                  <span>- 120 -</span>
-                  <span>- 160 -</span>
-                  <span>- 200 -</span>
-                  <span>- 240 -</span>
-                </div>
-              </div>
-
-              {/* Pendulum Rod Container (pivot at bottom center) */}
-              <div style={{
-                position: 'absolute',
-                bottom: '16px',
-                width: '100%',
-                height: '120px',
-                transformOrigin: '50% 95%',
-                transform: 'rotate(0deg)',
-                animation: isPlaying 
-                  ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate`
-                  : 'none',
-                zIndex: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
-              }}>
-                {/* Metal Pendulum Rod */}
-                <div style={{
-                  width: '3.5px',
-                  height: '100px',
-                  background: 'linear-gradient(90deg, #e5e7eb, #9ca3af, #e5e7eb)',
-                  borderRadius: '2px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                }} />
-
-                {/* Sliding brass weight */}
+                {/* Winding loop detail */}
                 <div style={{
                   position: 'absolute',
-                  width: '15px',
-                  height: '13px',
-                  background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', // golden brass
-                  border: '1.2px solid #b45309',
-                  borderRadius: '2px',
-                  boxShadow: '0 1.5px 3px rgba(0,0,0,0.35)',
-                  // Height on rod mapping: bpm=40 (bottom: 82px), bpm=240 (bottom: 12px)
-                  bottom: `${((240 - bpm) / (240 - 40)) * 70 + 12}px`,
-                  left: 'calc(50% - 7.5px)',
-                  transition: 'bottom 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)'
-                }}>
-                  {/* Weight knob dot */}
-                  <div style={{
-                    width: '3.5px',
-                    height: '3.5px',
-                    background: '#78350f',
-                    borderRadius: '50%',
-                    margin: '4px auto 0 auto'
-                  }} />
-                </div>
+                  top: '-4px',
+                  left: '10px',
+                  width: '10px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  border: '1.5px solid #d97706',
+                  background: 'transparent'
+                }} />
               </div>
 
-              {/* Pivot Cap cover */}
+              {/* Pyramid Walnut Casing (clipped triangle) */}
               <div style={{
-                position: 'absolute',
-                bottom: '10px',
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #9ca3af, #4b5563)',
-                border: '1.2px solid #1f2937',
-                zIndex: 3,
-                boxShadow: '0 1.5px 3px rgba(0,0,0,0.3)'
-              }} />
+                position: 'relative',
+                width: '150px',
+                height: '180px',
+                background: 'linear-gradient(180deg, #5c3b22 0%, #301d0f 100%)', // premium walnut wood grain
+                boxShadow: '0 8px 22px rgba(0,0,0,0.35), inset 0 1px 3px rgba(255,255,255,0.12)',
+                clipPath: 'polygon(50% 0%, 15% 100%, 85% 100%)',
+                border: '2px solid #28180c',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'flex-end',
+                paddingBottom: '8px',
+                zIndex: 1
+              }}>
+                {/* Hollow Inner Chamber (Depth Effect) */}
+                <div style={{
+                  position: 'absolute',
+                  top: '26px',
+                  bottom: '8px',
+                  left: '22%',
+                  right: '22%',
+                  background: 'linear-gradient(180deg, #160e0a 0%, #0a0604 100%)',
+                  borderRadius: '4px',
+                  boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.85)',
+                  zIndex: 1,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  {/* Ivory Scale Plate */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '6px',
+                    bottom: '6px',
+                    left: '6px',
+                    right: '6px',
+                    background: 'linear-gradient(180deg, #f7f3eb 0%, #e6dfd2 100%)',
+                    borderRadius: '2px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    paddingTop: '6px',
+                    zIndex: 1
+                  }}>
+                    {/* Detailed Tempo Scales */}
+                    <div style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '5.5px', 
+                      opacity: 0.22, 
+                      fontSize: '5.5px', 
+                      fontFamily: 'monospace', 
+                      fontWeight: 800,
+                      color: '#1d1d1f',
+                      textAlign: 'center',
+                      lineHeight: 1
+                    }}>
+                      <span>- 40 Largo -</span>
+                      <span>- 80 Adagio -</span>
+                      <span>- 120 Andante -</span>
+                      <span>- 160 Allegro -</span>
+                      <span>- 200 Presto -</span>
+                      <span>- 240 Prestiss -</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pendulum Rod Container (pivot at bottom center) */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '16px',
+                  width: '100%',
+                  height: '128px',
+                  transformOrigin: '50% 95%',
+                  transform: 'rotate(0deg)',
+                  animation: isPlaying 
+                    ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate`
+                    : 'none',
+                  zIndex: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
+                }}>
+                  {/* Metal Pendulum Rod (Polished Steel) */}
+                  <div style={{
+                    width: '3.5px',
+                    height: '110px',
+                    background: 'linear-gradient(90deg, #f3f4f6, #9ca3af 50%, #d1d5db)',
+                    borderRadius: '2px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                  }} />
+
+                  {/* 3D Trapezoidal Brass Weight */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '18px',
+                    height: '14px',
+                    background: 'linear-gradient(135deg, #ffe066 0%, #d4af37 40%, #aa8010 100%)', // metal gloss
+                    border: '1.2px solid #856404',
+                    borderRadius: '2px 2px 3px 3px',
+                    boxShadow: '0 3px 6px rgba(0,0,0,0.45)',
+                    // Height mapping
+                    bottom: `${((240 - bpm) / (240 - 40)) * 74 + 14}px`,
+                    left: 'calc(50% - 9px)',
+                    transition: 'bottom 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    {/* Inner brass screw detail */}
+                    <div style={{
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle, #ffe066, #78350f)',
+                      border: '0.8px solid #5a3d00'
+                    }} />
+                  </div>
+                </div>
+
+                {/* Brass Pivot Cap cover */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '10px',
+                  width: '13px',
+                  height: '13px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #d4af37, #aa8010)',
+                  border: '1.2px solid #5a3d00',
+                  zIndex: 3,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.35)'
+                }} />
+              </div>
             </div>
           </div>
 
