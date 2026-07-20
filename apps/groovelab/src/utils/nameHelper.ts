@@ -12,7 +12,12 @@ declare global {
 }
 
 if (typeof window !== 'undefined') {
-  if (window.__glPrivacyMode === undefined) window.__glPrivacyMode = false;
+  if (window.__glPrivacyMode === undefined) {
+    // Default: privacy ON (names masked like "Olivia W.").
+    // Persist user preference in localStorage.
+    const stored = localStorage.getItem('groovelab_name_privacy');
+    window.__glPrivacyMode = stored !== null ? stored === 'true' : true;
+  }
   if (!window.__glPrivacySubs) window.__glPrivacySubs = new Set();
 }
 
@@ -23,6 +28,7 @@ function getMode(): boolean {
 function setMode(value: boolean) {
   if (typeof window === 'undefined') return;
   window.__glPrivacyMode = value;
+  localStorage.setItem('groovelab_name_privacy', String(value));
   window.__glPrivacySubs.forEach(fn => fn(value));
 }
 

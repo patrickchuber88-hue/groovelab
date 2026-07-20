@@ -3591,10 +3591,10 @@ export function ScheduleCalendarView({
                 onClick={() => toggleRealNames()}
                 className={`apple-btn ${showRealNames ? 'active' : ''}`}
                 style={{ color: showRealNames ? '#ea4335' : undefined }}
-                title={showRealNames ? "Vollständige Namen anzeigen" : "Nachnamen schützen (kürzen)"}
+                title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
               >
-                {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
-                <span>{showRealNames ? "Namen zeigen" : "Namen schützen"}</span>
+                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
               </button>
 
               {/* Group A: Ansicht & Filter */}
