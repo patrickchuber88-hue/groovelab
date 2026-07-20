@@ -208,7 +208,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   
-   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default snap to 15 mins
+  // Create Board form state
+  const [newBoardDay, setNewBoardDay] = useState(1);
+  const [newBoardStart, setNewBoardStart] = useState('14:00');
+  const [newBoardRoom, setNewBoardRoom] = useState('');
+  const [showAddBoardForm, setShowAddBoardForm] = useState(false);
+
+  const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default snap to 15 mins
 
    const snapTimeToGrid = (timeStr: string, snapMinutes: number): string => {
      if (!timeStr) return timeStr;
