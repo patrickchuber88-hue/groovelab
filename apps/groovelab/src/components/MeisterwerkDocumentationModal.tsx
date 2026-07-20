@@ -14202,7 +14202,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
               <g style={{
                 transformOrigin: '87px 180px',
                 transform: isPlaying ? 'none' : 'rotate(0deg)',
-                animation: isPlaying ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate` : 'none',
+                animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
                 transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
                 opacity: 0.22
               }}>
@@ -14221,7 +14221,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
               <g style={{
                 transformOrigin: '90px 180px',
                 transform: isPlaying ? 'none' : 'rotate(0deg)',
-                animation: isPlaying ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate` : 'none',
+                animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
                 transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
               }}>
                 {/* Steel Pendulum Rod */}
