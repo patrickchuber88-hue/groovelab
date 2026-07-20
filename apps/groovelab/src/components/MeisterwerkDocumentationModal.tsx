@@ -9786,6 +9786,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [activeBeatPulse, setActiveBeatPulse] = useState<'downbeat' | 'upbeat' | null>(null);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [showCalibrationHelp, setShowCalibrationHelp] = useState(false);
+  const [autoLatencyResult, setAutoLatencyResult] = useState<number | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'studio' | 'saved'>('studio');
   const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
   const [selectedSavedLoop, setSelectedSavedLoop] = useState<any>(null);
@@ -10222,6 +10223,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         : median;
       
       setSyncOffsetMs(finalAvg);
+      setAutoLatencyResult(finalAvg);
       isManualLatencyAdjustmentRef.current = true;
       setCalibrationPhaseState('result');
       
@@ -14152,7 +14154,27 @@ const targetVol = isActive ? vol : 0;
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800 }}>MANUELLE KORREKTUR</span>
-                          <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs} ms</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {autoLatencyResult !== null && syncOffsetMs !== autoLatencyResult && (
+                              <button
+                                type="button"
+                                onClick={() => setSyncOffsetMs(autoLatencyResult)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#34a853',
+                                  fontSize: '0.52rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  padding: 0,
+                                  textDecoration: 'underline'
+                                }}
+                              >
+                                Zurück auf Auto ({autoLatencyResult} ms)
+                              </button>
+                            )}
+                            <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs} ms</span>
+                          </div>
                         </div>
                         <input
                           type="range"
