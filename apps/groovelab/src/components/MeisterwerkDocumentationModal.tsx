@@ -13843,45 +13843,50 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
     const playClick = (isAccent = false) => {
       if (mVol <= 0.001) return;
       
-      // Resonant woodblock body
+      // Resonant woodblock body with physical decay and pitch bend
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(isAccent ? 1350 : 920, time);
       
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass';
-      hp.frequency.setValueAtTime(380, time);
+      // Pitch drop simulating physical strike impact bending
+      osc.frequency.setValueAtTime(isAccent ? 1550 : 1050, time);
+      osc.frequency.exponentialRampToValueAtTime(isAccent ? 650 : 450, time + 0.012);
+      
+      // Bandpass filter to simulate wood block hollow enclosure resonance
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(isAccent ? 1200 : 850, time);
+      bp.Q.setValueAtTime(3.8, time);
 
-      osc.connect(hp);
-      hp.connect(gain);
+      osc.connect(bp);
+      bp.connect(gain);
       gain.connect(masterGain);
 
-      gain.gain.setValueAtTime(mVol * 0.68, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.038);
+      gain.gain.setValueAtTime(mVol * 0.75, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.028);
       osc.start(time);
-      osc.stop(time + 0.055);
+      osc.stop(time + 0.045);
 
-      // Mallet click transient
+      // Mallet click transient (wood strike sound)
       if (noiseBufferRef.current) {
         const noise = ctx.createBufferSource();
         noise.buffer = noiseBufferRef.current;
         
         const noiseFilter = ctx.createBiquadFilter();
         noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.setValueAtTime(2800, time);
-        noiseFilter.Q.setValueAtTime(2.8, time);
+        noiseFilter.frequency.setValueAtTime(3200, time);
+        noiseFilter.Q.setValueAtTime(4.0, time);
 
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(mVol * 0.35, time);
-        noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.007);
+        noiseGain.gain.setValueAtTime(mVol * 0.42, time);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.006);
 
         noise.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
         noiseGain.connect(masterGain);
 
         noise.start(time);
-        noise.stop(time + 0.012);
+        noise.stop(time + 0.01);
       }
     };
 
@@ -14107,10 +14112,11 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                 </filter>
               </defs>
 
-              {/* Side Winding Key (Connected cleanly to right casing edge at x=138) */}
+              {/* Side Winding Key (Connected cleanly to right casing edge at x=138, static 3D angle) */}
               <g style={{
                 transformOrigin: '138px 145px',
-                animation: isPlaying ? 'rotate-key 4s linear infinite' : 'none'
+                transform: 'rotate(25deg)',
+                transition: 'transform 0.2s ease-out'
               }}>
                 <rect x="136" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
                 <path d="M 144 145 C 144 138, 158 138, 158 145 C 158 152, 144 152, 144 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
