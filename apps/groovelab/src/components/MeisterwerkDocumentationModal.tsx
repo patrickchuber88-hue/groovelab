@@ -11774,11 +11774,17 @@ const targetVol = isActive ? vol : 0;
           -webkit-appearance: none;
           appearance: none;
           width: 100%;
-          height: 4px;
-          border-radius: 2px;
-          background: #e2e8f0;
-          box-shadow: inset 0 1px 2.5px rgba(0,0,0,0.08);
+          height: 20px;
+          background: transparent;
           outline: none;
+          cursor: pointer;
+        }
+        .groovelab-fader::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 4px;
+          background: #e2e8f0;
+          border-radius: 2px;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
         }
         .groovelab-fader::-webkit-slider-thumb {
           -webkit-appearance: none;
@@ -11787,12 +11793,32 @@ const targetVol = isActive ? vol : 0;
           height: 20px;
           border-radius: 3px;
           background: #34a853;
-          border: 1px solid #23853e;
-          cursor: pointer;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.25);
+          border: 1.5px solid #ffffff;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.2);
+          margin-top: -8px;
           transition: transform 0.1s ease, background 0.15s ease;
         }
         .groovelab-fader::-webkit-slider-thumb:hover {
+          transform: scale(1.08);
+          background: #23853e;
+        }
+        .groovelab-fader::-moz-range-track {
+          width: 100%;
+          height: 4px;
+          background: #e2e8f0;
+          border-radius: 2px;
+          box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .groovelab-fader::-moz-range-thumb {
+          width: 12px;
+          height: 20px;
+          border-radius: 3px;
+          background: #34a853;
+          border: 1.5px solid #ffffff;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.2);
+          transition: transform 0.1s ease, background 0.15s ease;
+        }
+        .groovelab-fader::-moz-range-thumb:hover {
           transform: scale(1.08);
           background: #23853e;
         }
@@ -12556,21 +12582,21 @@ const targetVol = isActive ? vol : 0;
                 </div>
 
                 {/* Visuelle 8tel-Noten Timeline */}
-                {(hasAudio || track.isRecording) && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2.5px',
-                    marginTop: '8px',
-                    width: '100%'
-                  }}>
-                    {Array.from({ length: 32 }).map((_, stepIdx) => {
-                      const isBarStart = stepIdx % 8 === 0;
-                      const isQuarterBeat = stepIdx % 2 === 0;
-                      const activeStep = Math.floor((playbackProgress / 100) * 32);
-                      const isCurrentStep = (isPlaying || track.isRecording) && activeStep === stepIdx;
-                      
-                      let blockColor = '#e5e5e7';
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2.5px',
+                  marginTop: '8px',
+                  width: '100%'
+                }}>
+                  {Array.from({ length: 32 }).map((_, stepIdx) => {
+                    const isBarStart = stepIdx % 8 === 0;
+                    const isQuarterBeat = stepIdx % 2 === 0;
+                    const activeStep = Math.floor((playbackProgress / 100) * 32);
+                    const isCurrentStep = (isPlaying || track.isRecording) && activeStep === stepIdx;
+                    
+                    let blockColor = '#e5e5e7';
+                    if (hasAudio || track.isRecording) {
                       if (isCurrentStep) {
                         blockColor = track.isRecording ? '#ea4335' : '#34a853';
                       } else if (isBarStart) {
@@ -12580,32 +12606,40 @@ const targetVol = isActive ? vol : 0;
                       } else {
                         blockColor = '#e2e8f0';
                       }
+                    } else {
+                      if (isBarStart) {
+                        blockColor = '#cbd5e0';
+                      } else if (isQuarterBeat) {
+                        blockColor = '#e2e8f0';
+                      } else {
+                        blockColor = '#f1f3f5';
+                      }
+                    }
 
-                      // High-end DAW simulated transient waveform height pattern
-                      const wavePattern = [
-                        15, 6, 4, 2, 8, 4, 3, 2,
-                        11, 5, 3, 2, 7, 4, 3, 5,
-                        13, 6, 4, 2, 9, 4, 3, 2,
-                        11, 5, 3, 2, 8, 4, 6, 12
-                      ];
-                      const baseHeight = wavePattern[stepIdx];
-                      
-                      return (
-                        <div
-                          key={stepIdx}
-                          style={{
-                            flex: 1,
-                            height: `${isCurrentStep ? baseHeight + 3 : baseHeight}px`,
-                            borderRadius: '1px',
-                            background: blockColor,
-                            transition: 'all 0.08s ease',
-                            opacity: isCurrentStep ? 1 : 0.75
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+                    // High-end DAW simulated transient waveform height pattern
+                    const wavePattern = [
+                      15, 6, 4, 2, 8, 4, 3, 2,
+                      11, 5, 3, 2, 7, 4, 3, 5,
+                      13, 6, 4, 2, 9, 4, 3, 2,
+                      11, 5, 3, 2, 8, 4, 6, 12
+                    ];
+                    const baseHeight = wavePattern[stepIdx];
+                    
+                    return (
+                      <div
+                        key={stepIdx}
+                        style={{
+                          flex: 1,
+                          height: `${isCurrentStep ? baseHeight + 3 : baseHeight}px`,
+                          borderRadius: '1px',
+                          background: blockColor,
+                          transition: 'all 0.08s ease',
+                          opacity: (hasAudio || track.isRecording) ? (isCurrentStep ? 1 : 0.8) : 0.4
+                        }}
+                      />
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Clean LED Level Meter */}
