@@ -10007,6 +10007,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             osc.start(playTime);
             osc.stop(playTime + 0.03);
             hasPlayed = true;
+            
+            // Blink LED during probe click
+            setActiveBeatPulse('downbeat');
+            setTimeout(() => setActiveBeatPulse(null), 150);
           };
 
           processor.onaudioprocess = (e) => {
@@ -10092,6 +10096,11 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             playTime = ctx.currentTime;
             osc.start(playTime);
             osc.stop(playTime + 0.03);
+            
+            // Blink LED during calibration clicks
+            const pulseType = currentClickIndex === 0 ? 'downbeat' : 'upbeat';
+            setActiveBeatPulse(pulseType);
+            setTimeout(() => setActiveBeatPulse(null), 150);
           };
           
           processor.onaudioprocess = (e) => {
@@ -13960,9 +13969,23 @@ const targetVol = isActive ? vol : 0;
               animation: 'fadeInScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#34a853', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                  System-Kalibrierung
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#34a853', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    System-Kalibrierung
+                  </span>
+                  {/* Blinking Calibration LED */}
+                  {isCalibratingLatency && calibrationPhaseState !== 'idle' && calibrationPhaseState !== 'result' && (
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: activeBeatPulse === 'downbeat' ? '#ea4335' : activeBeatPulse === 'upbeat' ? '#34a853' : '#e5e5ea',
+                      boxShadow: activeBeatPulse ? `0 0 8px ${activeBeatPulse === 'downbeat' ? '#ea4335' : '#34a853'}` : 'none',
+                      transition: 'all 0.1s ease',
+                      border: '1px solid rgba(0,0,0,0.1)'
+                    }} />
+                  )}
+                </div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>
                   {calibrationPhaseState === 'idle' && 'Latenz einrichten'}
                   {calibrationPhaseState === 'ambient' && 'Hintergrundgeräusche...'}
@@ -14129,6 +14152,17 @@ const targetVol = isActive ? vol : 0;
                             overflow: 'visible'
                           }}
                         >
+                          {/* Horizontal Yellow Baseline (0-amplitude level) */}
+                          <line
+                            x1="0"
+                            y1="40"
+                            x2="100%"
+                            y2="40"
+                            stroke="#eab308"
+                            strokeWidth="1"
+                            strokeDasharray="2,3"
+                            opacity="0.45"
+                          />
                           <g style={{
                             // Shift the waveform path horizontally based on current offset vs finalAvg
                             transform: `translateX(${(syncOffsetMs - (calibrationRunResults[0] || 0)) * 0.8}px)`,
@@ -14168,7 +14202,7 @@ const targetVol = isActive ? vol : 0;
                             />
                             <text
                               x={128}
-                              y={44}
+                              y={15} // Moved to top to prevent wave overlap
                               fill="#34a853"
                               style={{ fontSize: '0.45rem', fontWeight: 900, letterSpacing: '0.05em' }}
                             >
