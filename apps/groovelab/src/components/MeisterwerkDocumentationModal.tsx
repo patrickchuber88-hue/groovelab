@@ -12918,7 +12918,7 @@ const targetVol = isActive ? vol : 0;
                     let isCurrentStep = false;
                     if (isPlaying) {
                       const activeStep = Math.floor((playbackProgress / 100) * 32);
-                      isCurrentStep = hasAudio && activeStep === stepIdx;
+                      isCurrentStep = activeStep === stepIdx;
                     } else if (isAutoSequenceActive) {
                       const elapsedSecs = (audioContextRef.current ? audioContextRef.current.currentTime : 0) - sequenceStartTimeRef.current;
                       const continuousTick = elapsedSecs / (60 / bpm);
@@ -12926,7 +12926,7 @@ const targetVol = isActive ? vol : 0;
                         const sequenceOffsetBeats = continuousTick - 4;
                         const sequenceOffsetSteps = Math.floor(sequenceOffsetBeats * 2);
                         const activeStep = sequenceOffsetSteps % 32;
-                        isCurrentStep = track.isRecording && activeStep === stepIdx;
+                        isCurrentStep = activeStep === stepIdx;
                       }
                     }
 
@@ -12951,6 +12951,11 @@ const targetVol = isActive ? vol : 0;
                       } else {
                         blockColor = 'rgba(52, 168, 83, 0.15)';
                       }
+                    } else {
+                      // Highlight current step even on empty/waiting tracks for visual synchronization
+                      if (isCurrentStep) {
+                        blockColor = 'rgba(0, 0, 0, 0.18)';
+                      }
                     }
 
                     return (
@@ -12962,7 +12967,7 @@ const targetVol = isActive ? vol : 0;
                           borderRadius: '1px',
                           background: blockColor,
                           transition: 'all 0.08s ease',
-                          opacity: (hasAudio || track.isRecording) ? (isCurrentStep ? 1 : 0.8) : 0.4
+                          opacity: isCurrentStep ? 1 : ((hasAudio || track.isRecording) ? 0.8 : 0.25)
                         }}
                       />
                     );
