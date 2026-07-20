@@ -688,7 +688,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         try {
           const fileExt = blob.type.includes('webm') ? 'webm' : blob.type.includes('ogg') ? 'ogg' : blob.type.includes('wav') ? 'wav' : 'mp3';
           const fileName = `${student.id}_feedback_${Date.now()}.${fileExt}`;
-          const filePath = `avatars/audio_feedback_${fileName}`;
+          const filePath = `recordings/${fileName}`;
           
           const { error: uploadErr } = await supabase.storage
             .from('campus-assets')
@@ -12310,7 +12310,7 @@ const targetVol = isActive ? vol : 0;
       }
       
       const fileName = `${student.id}_loopmix_${Date.now()}.${fileExt}`;
-      const filePath = `avatars/audio_feedback_${fileName}`;
+      const filePath = `loops/${fileName}`;
       
       const { error } = await supabase.storage
         .from('campus-assets')
