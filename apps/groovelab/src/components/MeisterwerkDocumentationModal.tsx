@@ -13509,21 +13509,21 @@ const targetVol = isActive ? vol : 0;
               {/* Vertical Divider (Desktop only) */}
               <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(0, 0, 0, 0.06)' }} className="hidden md:block" />
 
-              {/* Right Column: Latency Sync Card */}
+              {/* Right Column: Latency Sync Card (Neutral Apple grey design) */}
               <div style={{
                 flex: '1 1 240px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '10px',
-                background: '#fefce8',
+                background: '#f5f5f7',
                 borderRadius: '12px',
                 padding: '12px',
-                border: '1.5px solid rgba(234, 179, 8, 0.15)'
+                border: '1.5px solid rgba(0, 0, 0, 0.04)'
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '0.52rem', color: '#854d0e', fontWeight: 800, letterSpacing: '0.04em' }}>SYNC LATENCY</span>
-                    <span style={{ fontSize: '0.58rem', color: '#eab308', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
+                    <span style={{ fontSize: '0.52rem', color: '#1d1d1f', fontWeight: 800, letterSpacing: '0.04em' }}>LATENZ-AUSGLEICH</span>
+                    <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
                   </div>
                   <input 
                     type="range" 
@@ -13559,8 +13559,8 @@ const targetVol = isActive ? vol : 0;
                   disabled={isCalibratingLatency}
                   className="tactile-btn"
                   style={{
-                    background: isCalibratingLatency ? '#e5e5ea' : 'rgba(234, 179, 8, 0.1)',
-                    color: isCalibratingLatency ? '#86868b' : '#ca8a04',
+                    background: isCalibratingLatency ? '#e5e5ea' : 'rgba(0, 0, 0, 0.04)',
+                    color: isCalibratingLatency ? '#86868b' : '#1d1d1f',
                     border: 'none',
                     borderRadius: '8px',
                     height: '32px',
