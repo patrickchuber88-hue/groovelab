@@ -13256,6 +13256,20 @@ const targetVol = isActive ? vol : 0;
                 gap: '10px'
               }}>
                 {/* Row 1: Click Active Toggle, Tap Tempo, BPM controls */}
+                {isMetronomeActive && !useHeadphones && (
+                  <div style={{
+                    fontSize: '0.54rem',
+                    color: '#ea4335',
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    background: '#fce8e6',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(234, 67, 53, 0.15)',
+                    width: 'fit-content'
+                  }}>
+                    ⚠️ Tipp: Metronom stummschalten oder Kopfhörer nutzen, damit das Klicken nicht mit aufgenommen wird!
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
