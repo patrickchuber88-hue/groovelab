@@ -11901,378 +11901,417 @@ const targetVol = isActive ? vol : 0;
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        gap: '16px',
-        padding: '24px 20px',
-        background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-        border: '1.5px solid rgba(52, 168, 83, 0.15)',
-        borderRadius: '36px',
-        boxShadow: '0 20px 45px rgba(52, 168, 83, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 4px rgba(0, 0, 0, 0.02)',
-        position: 'relative',
-        overflow: 'hidden',
+        gap: '20px',
         width: '100%',
         maxWidth: '280px'
       }}>
-        {/* Decorative Top Accent Light */}
+        {/* The iPod Classic Hardware Controller */}
         <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '5px',
-          background: ringColor,
-          opacity: 0.9,
-          transition: 'background 0.3s ease'
-        }} />
-
-        {/* iPod Display Glass Screen (Blue-gray LCD retro glow) */}
-        <div style={{
-          width: '240px',
-          height: '186px',
-          background: 'linear-gradient(180deg, #242f41 0%, #171e29 100%)',
-          borderRadius: '20px',
+          width: '260px',
+          height: '410px',
+          background: 'linear-gradient(135deg, #3c3c3e 0%, #1c1c1e 100%)',
+          borderRadius: '32px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.15), inset 0 -2px 5px rgba(0,0,0,0.5)',
+          padding: '16px 14px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(255, 255, 255, 0.2)',
-          border: '1px solid rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden'
+          justifyContent: 'space-between',
+          position: 'relative',
+          boxSizing: 'border-box'
         }}>
-          {/* Central Jog Wheel / Status Ring */}
+          {/* Edge Chrome Bezel Glare Effect */}
           <div style={{
-            position: 'relative',
-            width: '144px',
-            height: '144px',
+            position: 'absolute',
+            inset: '1px',
+            borderRadius: '31px',
+            border: '1px solid rgba(255, 255, 255, 0.04)',
+            pointerEvents: 'none'
+          }} />
+
+          {/* LCD Display Screen Bezel */}
+          <div style={{
+            width: '230px',
+            height: '160px',
+            background: 'linear-gradient(180deg, #18202c 0%, #0d1218 100%)',
+            borderRadius: '16px',
+            border: '2px solid #111112',
+            boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'transparent'
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            {/* Animated SVG Progress Sweep */}
-            <svg 
-              viewBox="0 0 200 200"
-              className={isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : ''}
-              style={{
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
-                transform: 'rotate(-90deg) translate3d(0,0,0)',
-                willChange: 'transform',
-                transition: 'filter 0.3s ease'
-              }}
-            >
-              <circle
-                cx="100"
-                cy="100"
-                r="84"
-                stroke="#2e3b4e"
-                strokeWidth="6"
-                fill="none"
-              />
-              <circle
-                cx="100"
-                cy="100"
-                r="84"
-                stroke={ringColor}
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray="527.8 527.8"
-                strokeDashoffset={527.8 - (527.8 * playbackProgress) / 100}
-                strokeLinecap="round"
-                style={{
-                  transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
-                  willChange: 'stroke-dashoffset'
-                }}
-              />
-            </svg>
-
-            {/* Central Plate inside display bezel */}
-            <div 
-              className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
-              style={{
-                position: 'absolute',
-                width: '114px',
-                height: '114px',
-                borderRadius: '50%',
-                background: isAutoSequenceActive 
-                  ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(23,30,41,0.98) 100%)' 
-                  : isPlaying 
-                    ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(23,30,41,0.98) 100%)' 
-                    : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(23,30,41,0.98) 100%)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.1)',
-                transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
-              }}
-            >
-              <span style={{ 
-                fontSize: '2.1rem', 
-                fontWeight: 800, 
-                fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                letterSpacing: '-0.04em', 
-                color: ringColor === '#e5e5e7' ? '#e2e8f0' : ringColor,
-                textShadow: ringColor !== '#e5e5e7' ? `0 2px 12px ${ringColor}40` : 'none',
-                transition: 'all 0.3s ease'
-              }}>
-                {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
-              </span>
-              <span style={{ 
-                fontSize: '0.52rem', 
-                color: '#8a99ad', 
-                fontWeight: 800, 
-                letterSpacing: '0.12em', 
-                marginTop: '-1px', 
-                textTransform: 'uppercase' 
-              }}>
-                {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Auto-Sequence Action Center */}
-        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={startAutoSequence}
-            disabled={isAutoSequenceActive}
-            className="tactile-btn"
-            style={{
-              width: '100%',
-              background: isPause 
-                ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
-                : isAutoSequenceActive 
-                  ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
-                  : 'linear-gradient(135deg, #34a853 0%, #10b981 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '99px',
-              height: '48px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              letterSpacing: '0.04em',
-              cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
+            {/* Screen Content */}
+            <div style={{
+              position: 'relative',
+              width: '124px',
+              height: '124px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              boxShadow: isAutoSequenceActive 
-                ? '0 6px 20px rgba(239, 68, 68, 0.25)' 
-                : '0 8px 24px rgba(52, 168, 83, 0.22)',
-              textTransform: 'uppercase'
-            }}
-          >
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: '#ffffff',
-              boxShadow: '0 0 8px #ffffff',
-              animation: isAutoSequenceActive ? 'pulse 1s infinite alternate' : 'none',
-              opacity: isAutoSequenceActive ? 1 : 0.8
-            }} />
-            <span>{isAutoSequenceActive ? autoSequenceStatus : '✨ AUTO-SEQUENCE START'}</span>
-          </button>
-          {isAutoSequenceActive && (
-            <span style={{ 
-              fontSize: '0.54rem', 
-              color: '#ea4335', 
-              letterSpacing: '0.04em', 
-              fontWeight: 800, 
-              textAlign: 'center', 
-              textTransform: 'uppercase',
-              animation: 'pulse 1.5s infinite alternate'
+              background: 'transparent'
             }}>
-              Aufnahme läuft - bitte weiterspielen!
-            </span>
-          )}
+              {/* Animated SVG Progress Sweep */}
+              <svg 
+                viewBox="0 0 200 200"
+                className={isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : ''}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  transform: 'rotate(-90deg) translate3d(0,0,0)',
+                  willChange: 'transform',
+                  transition: 'filter 0.3s ease'
+                }}
+              >
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="84"
+                  stroke="#222b39"
+                  strokeWidth="5"
+                  fill="none"
+                />
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="84"
+                  stroke={ringColor}
+                  strokeWidth="7"
+                  fill="none"
+                  strokeDasharray="527.8 527.8"
+                  strokeDashoffset={527.8 - (527.8 * playbackProgress) / 100}
+                  strokeLinecap="round"
+                  style={{
+                    transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
+                    willChange: 'stroke-dashoffset'
+                  }}
+                />
+              </svg>
 
-          {/* Master Control Parameter Panel (Clean Glass design) */}
+              {/* Central readout area */}
+              <div 
+                className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
+                style={{
+                  position: 'absolute',
+                  width: '98px',
+                  height: '98px',
+                  borderRadius: '50%',
+                  background: isAutoSequenceActive 
+                    ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
+                    : isPlaying 
+                      ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
+                      : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.08)',
+                  transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
+                }}
+              >
+                <span style={{ 
+                  fontSize: '1.8rem', 
+                  fontWeight: 800, 
+                  fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  letterSpacing: '-0.04em', 
+                  color: ringColor === '#e5e5e7' ? '#e2e8f0' : ringColor,
+                  textShadow: ringColor !== '#e5e5e7' ? `0 2px 10px ${ringColor}35` : 'none',
+                  transition: 'all 0.3s ease'
+                }}>
+                  {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
+                </span>
+                <span style={{ 
+                  fontSize: '0.48rem', 
+                  color: '#7b8a9e', 
+                  fontWeight: 800, 
+                  letterSpacing: '0.12em', 
+                  marginTop: '-2px', 
+                  textTransform: 'uppercase' 
+                }}>
+                  {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
+                </span>
+              </div>
+            </div>
+
+            {/* Micro Auto Sequence Label */}
+            {isAutoSequenceActive && (
+              <span style={{
+                position: 'absolute',
+                bottom: '6px',
+                fontSize: '0.44rem',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                color: isPause ? '#eab308' : '#ef4444',
+                textTransform: 'uppercase',
+                animation: 'pulse 1s infinite alternate'
+              }}>
+                {autoSequenceStatus}
+              </span>
+            )}
+          </div>
+
+          {/* Click Wheel Controller */}
           <div style={{
-            width: '100%',
-            background: 'rgba(255, 255, 255, 0.45)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.5)',
-            borderRadius: '24px',
-            padding: '12px',
+            width: '180px',
+            height: '180px',
+            borderRadius: '50%',
+            background: '#242426',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.05), inset 0 -1.5px 3px rgba(0,0,0,0.3)',
+            position: 'relative',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.015)'
+            alignItems: 'center',
+            justifyContent: 'center',
+            userSelect: 'none'
           }}>
-            {/* Kopfhörer Modus Toggle Card */}
+            {/* Top Quadrant: MENU (Toggle Advanced Settings) */}
             <div 
-              onClick={() => {
-                if (!isAutoSequenceActive) {
-                  isManualHeadphonesRef.current = true;
-                  setUseHeadphones(!useHeadphones);
-                }
-              }}
+              onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
               style={{
-                width: '100%',
-                background: useHeadphones ? 'rgba(52, 168, 83, 0.08)' : 'rgba(255, 255, 255, 0.6)',
-                border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(255, 255, 255, 0.7)',
-                borderRadius: '16px',
-                padding: '10px 12px',
+                position: 'absolute',
+                top: '12px',
+                width: '60px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                color: '#8e8e93',
+                letterSpacing: '0.05em',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#8e8e93'}
+            >
+              MENU
+            </div>
+
+            {/* Bottom Quadrant: PLAY / PAUSE */}
+            <div 
+              onClick={handlePlayToggle}
+              style={{
+                position: 'absolute',
+                bottom: '12px',
+                width: '80px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                fontSize: '0.58rem',
+                fontWeight: 900,
+                color: '#8e8e93',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#8e8e93'}
+            >
+              {isPlaying ? <Square size={8} fill="currentColor" style={{ marginRight: '1px' }} /> : <Play size={8} fill="currentColor" />}
+              <span>PLAY / PAUSE</span>
+            </div>
+
+            {/* Left Quadrant: RESET */}
+            <div 
+              onClick={handleReset}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                width: '50px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '2px',
+                fontSize: '0.56rem',
+                fontWeight: 900,
+                color: '#8e8e93',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#8e8e93'}
+            >
+              <RotateCcw size={8} />
+              <span>RESET</span>
+            </div>
+
+            {/* Right Quadrant: Indicator (Passive or Label) */}
+            <div 
+              style={{
+                position: 'absolute',
+                right: '14px',
+                width: '45px',
+                textAlign: 'center',
+                fontSize: '0.52rem',
+                fontWeight: 900,
+                color: '#444446',
+                letterSpacing: '0.04em'
+              }}
+            >
+              SELECT
+            </div>
+
+            {/* Center Action Button (Record Action) */}
+            <button
+              type="button"
+              onClick={startAutoSequence}
+              disabled={isAutoSequenceActive}
+              className="tactile-btn"
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: isPause 
+                  ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
+                  : isAutoSequenceActive 
+                    ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
+                    : isPlaying 
+                      ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)'
+                      : 'linear-gradient(135deg, #3c3c3e 0%, #2c2c2e 100%)',
+                border: '1.5px solid rgba(0, 0, 0, 0.25)',
+                boxShadow: isAutoSequenceActive 
+                  ? '0 0 15px rgba(239, 68, 68, 0.4)' 
+                  : 'inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 6px rgba(0,0,0,0.3)',
                 cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                transition: 'all 0.25s ease',
-                opacity: isAutoSequenceActive ? 0.6 : 1,
-                boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
+                justifyContent: 'center',
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                color: isAutoSequenceActive || isPause || isPlaying ? '#ffffff' : '#a1a1a6',
+                textTransform: 'uppercase',
+                transition: 'all 0.25s ease'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '50%',
-                  background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.04)',
-                  color: useHeadphones ? '#ffffff' : '#86868b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.25s ease'
-                }}>
-                  <Headphones size={13} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
-                    Kopfhörer-Modus
-                  </span>
-                  <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 500 }}>
-                    Studio & Mehrspur aktiv
-                  </span>
-                </div>
-              </div>
-              
-              <div style={{
-                width: '34px',
-                height: '20px',
-                borderRadius: '99px',
-                background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.08)',
-                position: 'relative',
-                transition: 'all 0.25s ease',
-                padding: '2px'
-              }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: '#ffffff',
-                  position: 'absolute',
-                  left: useHeadphones ? '16px' : '2px',
-                  top: '2px',
-                  transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }} />
-              </div>
-            </div>
-
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              width: '100%',
-              padding: '0 4px'
-            }}>
-              <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#55555d', letterSpacing: '0.01em' }}>
-                Spuren:
-              </span>
-              <select
-                value={desiredTrackCount}
-                onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
-                disabled={isAutoSequenceActive || !useHeadphones}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  border: '1px solid rgba(0, 0, 0, 0.04)',
-                  borderRadius: '99px',
-                  padding: '5px 12px',
-                  fontSize: '0.66rem',
-                  fontWeight: 800,
-                  color: useHeadphones ? '#1d1d1f' : '#86868b',
-                  cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
-                  outline: 'none',
-                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
-                }}
-              >
-                <option value={2}>2 Spuren (Boxen-Limit)</option>
-                <option value={3}>3 Spuren</option>
-                <option value={4}>4 Spuren</option>
-                <option value={5}>5 Spuren (Max)</option>
-              </select>
-            </div>
+              {isAutoSequenceActive ? 'REC' : 'START'}
+            </button>
           </div>
         </div>
 
-        {/* Global Controls */}
-        <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
-          <button
-            type="button"
-            onClick={handlePlayToggle}
-            disabled={!masterLoopDuration}
-            className="tactile-btn"
+        {/* Master Control Parameter Tray (Glass look, sits right below the iPod Classic hardware) */}
+        <div style={{
+          width: '100%',
+          background: 'rgba(255, 255, 255, 0.45)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.5)',
+          borderRadius: '24px',
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.015)'
+        }}>
+          {/* Kopfhörer Modus Toggle Card */}
+          <div 
+            onClick={() => {
+              if (!isAutoSequenceActive) {
+                isManualHeadphonesRef.current = true;
+                setUseHeadphones(!useHeadphones);
+              }
+            }}
             style={{
-              flex: 2,
-              background: isPlaying 
-                ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
-                : 'linear-gradient(135deg, #34a853 0%, #10b981 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '99px',
-              height: '44px',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              cursor: masterLoopDuration ? 'pointer' : 'not-allowed',
-              opacity: masterLoopDuration ? 1 : 0.45,
+              width: '100%',
+              background: useHeadphones ? 'rgba(52, 168, 83, 0.08)' : 'rgba(255, 255, 255, 0.6)',
+              border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(255, 255, 255, 0.7)',
+              borderRadius: '16px',
+              padding: '10px 12px',
+              cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: masterLoopDuration 
-                ? isPlaying 
-                  ? '0 6px 16px rgba(239, 68, 68, 0.2)' 
-                  : '0 6px 16px rgba(52, 168, 83, 0.2)'
-                : 'none',
-              transition: 'all 0.25s ease'
+              justifyContent: 'space-between',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              opacity: isAutoSequenceActive ? 0.6 : 1,
+              boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
             }}
           >
-            {isPlaying ? <Square size={9} fill="currentColor" /> : <Play size={9} fill="currentColor" />}
-            <span>{isPlaying ? 'STOP' : 'PLAY'}</span>
-          </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.04)',
+                color: useHeadphones ? '#ffffff' : '#86868b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.25s ease'
+              }}>
+                <Headphones size={13} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                  Kopfhörer-Modus
+                </span>
+                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 500 }}>
+                  Studio & Mehrspur aktiv
+                </span>
+              </div>
+            </div>
+            
+            <div style={{
+              width: '34px',
+              height: '20px',
+              borderRadius: '99px',
+              background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.08)',
+              position: 'relative',
+              transition: 'all 0.25s ease',
+              padding: '2px'
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: '#ffffff',
+                position: 'absolute',
+                left: useHeadphones ? '16px' : '2px',
+                top: '2px',
+                transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }} />
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleReset}
-            className="tactile-btn"
-            style={{
-              flex: 1,
-              background: 'rgba(0, 0, 0, 0.04)',
-              color: '#1d1d1f',
-              border: 'none',
-              borderRadius: '99px',
-              height: '44px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              boxShadow: '0 4px 10px rgba(0, 0, 0, 0.01)',
-              transition: 'all 0.25s ease'
-            }}
-          >
-            <RotateCcw size={11} />
-            <span style={{ fontSize: '0.68rem', fontWeight: 800 }}>RESET</span>
-          </button>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: '0 4px'
+          }}>
+            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#55555d', letterSpacing: '0.01em' }}>
+              Spuren:
+            </span>
+            <select
+              value={desiredTrackCount}
+              onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
+              disabled={isAutoSequenceActive || !useHeadphones}
+              style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+                borderRadius: '99px',
+                padding: '5px 12px',
+                fontSize: '0.66rem',
+                fontWeight: 800,
+                color: useHeadphones ? '#1d1d1f' : '#86868b',
+                cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
+              }}
+            >
+              <option value={2}>2 Spuren (Boxen-Limit)</option>
+              <option value={3}>3 Spuren</option>
+              <option value={4}>4 Spuren</option>
+              <option value={5}>5 Spuren (Max)</option>
+            </select>
+          </div>
         </div>
 
-        {/* Collapsible Advanced Settings (Tempo, Metronom, Latenz) */}
+        {/* Collapsible Advanced Settings Toggle (tempo adjust etc) */}
         <button
           type="button"
           onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
@@ -12289,7 +12328,7 @@ const targetVol = isActive ? vol : 0;
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            marginTop: '4px',
+            marginTop: '2px',
             textDecoration: 'none'
           }}
         >
