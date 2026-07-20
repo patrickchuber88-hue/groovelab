@@ -11903,10 +11903,12 @@ const targetVol = isActive ? vol : 0;
         justifyContent: 'flex-start',
         gap: '16px',
         padding: '24px 20px',
-        background: '#ffffff',
-        border: '1px solid #f1f3f5',
+        background: 'rgba(255, 255, 255, 0.72)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.6)',
         borderRadius: '20px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -11990,12 +11992,13 @@ const targetVol = isActive ? vol : 0;
             }}
           >
             <span style={{ 
-              fontSize: '2.0rem', 
+              fontSize: '2.2rem', 
               fontWeight: 800, 
-              fontFamily: 'SF Pro Display, -apple-system, BlinkMacSystemFont, sans-serif', 
-              letterSpacing: '-0.05em', 
+              fontFamily: '"Courier New", Courier, monospace',
+              letterSpacing: '-0.02em', 
               color: ringColor === '#e5e5e7' ? '#1d1d1f' : ringColor,
-              transition: 'color 0.3s ease'
+              textShadow: ringColor !== '#e5e5e7' ? `0 0 12px ${ringColor}60` : 'none',
+              transition: 'all 0.3s ease'
             }}>
               {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
             </span>
@@ -12061,109 +12064,123 @@ const targetVol = isActive ? vol : 0;
               Aufnahme läuft - bitte weiterspielen!
             </span>
           )}
-          
-          {/* Kopfhörer Modus Toggle Card */}
-          <div 
-            onClick={() => {
-              if (!isAutoSequenceActive) {
-                isManualHeadphonesRef.current = true;
-                setUseHeadphones(!useHeadphones);
-              }
-            }}
-            style={{
-              width: '100%',
-              background: useHeadphones ? 'rgba(230, 244, 234, 0.6)' : '#ffffff',
-              border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid #f1f3f5',
-              borderRadius: '12px',
-              padding: '10px 12px',
-              cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px',
-              transition: 'all 0.2s ease',
-              opacity: isAutoSequenceActive ? 0.6 : 1,
-              boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: useHeadphones ? '#34a853' : '#f5f5f7',
-                color: useHeadphones ? '#ffffff' : '#86868b',
+
+          {/* Master Control Parameter Panel (console look) */}
+          <div style={{
+            width: '100%',
+            background: 'rgba(0, 0, 0, 0.02)',
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            borderRadius: '16px',
+            padding: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+          }}>
+            {/* Kopfhörer Modus Toggle Card */}
+            <div 
+              onClick={() => {
+                if (!isAutoSequenceActive) {
+                  isManualHeadphonesRef.current = true;
+                  setUseHeadphones(!useHeadphones);
+                }
+              }}
+              style={{
+                width: '100%',
+                background: useHeadphones ? 'rgba(230, 244, 234, 0.6)' : '#ffffff',
+                border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)',
+                borderRadius: '10px',
+                padding: '8px 10px',
+                cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s ease'
-              }}>
-                <Headphones size={15} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
-                  Kopfhörer-Modus
-                </span>
-                <span style={{ fontSize: '0.54rem', color: '#86868b', fontWeight: 500 }}>
-                  Studio & Mehrspur aktiv
-                </span>
-              </div>
-            </div>
-            
-            <div style={{
-              width: '34px',
-              height: '20px',
-              borderRadius: '10px',
-              background: useHeadphones ? '#34a853' : '#e5e5ea',
-              position: 'relative',
-              transition: 'all 0.2s ease',
-              padding: '2px'
-            }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: '#ffffff',
-                position: 'absolute',
-                left: useHeadphones ? '16px' : '2px',
-                top: '2px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
-              }} />
-            </div>
-          </div>
-
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            width: '100%',
-            padding: '2px 0'
-          }}>
-            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>
-              Spur-Anzahl:
-            </span>
-            <select
-              value={desiredTrackCount}
-              onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
-              disabled={isAutoSequenceActive || !useHeadphones}
-              style={{
-                background: '#ffffff',
-                border: '1px solid #e5e5ea',
-                borderRadius: '8px',
-                padding: '4px 8px',
-                fontSize: '0.68rem',
-                fontWeight: 600,
-                color: useHeadphones ? '#1d1d1f' : '#86868b',
-                cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
-                outline: 'none'
+                justifyContent: 'space-between',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                opacity: isAutoSequenceActive ? 0.6 : 1,
+                boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
               }}
             >
-              <option value={2}>2 Spuren (Boxen-Limit)</option>
-              <option value={3}>3 Spuren</option>
-              <option value={4}>4 Spuren</option>
-              <option value={5}>5 Spuren (Max)</option>
-            </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: useHeadphones ? '#34a853' : '#edf2f7',
+                  color: useHeadphones ? '#ffffff' : '#86868b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <Headphones size={13} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                    Kopfhörer-Modus
+                  </span>
+                  <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 500 }}>
+                    Studio & Mehrspur
+                  </span>
+                </div>
+              </div>
+              
+              <div style={{
+                width: '32px',
+                height: '18px',
+                borderRadius: '9px',
+                background: useHeadphones ? '#34a853' : '#e5e5ea',
+                position: 'relative',
+                transition: 'all 0.2s ease',
+                padding: '2px'
+              }}>
+                <div style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  position: 'absolute',
+                  left: useHeadphones ? '16px' : '2px',
+                  top: '2px',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                }} />
+              </div>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              width: '100%',
+              padding: '0 2px'
+            }}>
+              <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#55555d' }}>
+                Spur-Anzahl:
+              </span>
+              <select
+                value={desiredTrackCount}
+                onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
+                disabled={isAutoSequenceActive || !useHeadphones}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  borderRadius: '6px',
+                  padding: '4px 6px',
+                  fontSize: '0.66rem',
+                  fontWeight: 700,
+                  color: useHeadphones ? '#1d1d1f' : '#86868b',
+                  cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
+                  outline: 'none',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                }}
+              >
+                <option value={2}>2 Spuren (Boxen-Limit)</option>
+                <option value={3}>3 Spuren</option>
+                <option value={4}>4 Spuren</option>
+                <option value={5}>5 Spuren (Max)</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -12226,13 +12243,14 @@ const targetVol = isActive ? vol : 0;
           onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
           className="tactile-btn"
           style={{
-            background: 'transparent',
-            color: '#86868b',
-            border: 'none',
+            background: 'rgba(0, 0, 0, 0.03)',
+            color: '#55555d',
+            border: '1px solid rgba(0, 0, 0, 0.02)',
+            borderRadius: '20px',
             fontSize: '0.64rem',
             fontWeight: 700,
             cursor: 'pointer',
-            padding: '4px 8px',
+            padding: '6px 12px',
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
@@ -12246,7 +12264,7 @@ const targetVol = isActive ? vol : 0;
         {showAdvancedSettings && (
           /* Metronome Panel */
           <div style={{
-            border: '1px solid #f1f3f5',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
             borderRadius: '16px',
             padding: '14px',
             width: '100%',
@@ -12255,7 +12273,9 @@ const targetVol = isActive ? vol : 0;
             flexDirection: 'column',
             gap: '10px',
             marginTop: '2px',
-            background: '#ffffff'
+            background: 'rgba(255, 255, 255, 0.6)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 15px rgba(0, 0, 0, 0.02)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.04em' }}>TEMPO / UTILITY</span>
