@@ -3585,16 +3585,16 @@ export function ScheduleCalendarView({
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Unified Segmented Control for View & Actions */}
             <div id="tour-calendar-actions" className="apple-btn-group">
-              {/* Namen zeigen Toggle */}
+              {/* Namen / Datenschutz Toggle */}
               <button
                 type="button"
                 onClick={() => toggleRealNames()}
                 className={`apple-btn ${showRealNames ? 'active' : ''}`}
                 style={{ color: showRealNames ? '#ea4335' : undefined }}
-                title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+                title={showRealNames ? "Vollständige Namen anzeigen" : "Nachnamen schützen (kürzen)"}
               >
-                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+                {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
+                <span>{showRealNames ? "Namen zeigen" : "Namen schützen"}</span>
               </button>
 
               {/* Group A: Ansicht & Filter */}

@@ -3488,16 +3488,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
               {/* Center: Apple-Button-Group */}
               <div className="apple-btn-group">
-                {/* Namen zeigen Toggle */}
+                {/* Namen / Datenschutz Toggle */}
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
                   className={`apple-btn ${showRealNames ? 'active' : ''}`}
                   style={{ color: showRealNames ? '#ea4335' : undefined }}
-                  title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden"}
+                  title={showRealNames ? "Vollständige Namen anzeigen" : "Nachnamen schützen (kürzen)"}
                 >
-                  {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                  <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+                  {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
+                  <span>{showRealNames ? "Namen zeigen" : "Namen schützen"}</span>
                 </button>
 
                 <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />

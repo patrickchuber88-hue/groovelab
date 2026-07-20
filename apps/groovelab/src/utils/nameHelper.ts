@@ -1,27 +1,38 @@
 import { useState, useEffect } from 'react';
 
-// Global state variable to sync across different components
-let globalShowRealNames = false;
-let globalTimeoutId: any = null;
+// Global state: true = privacy mode ON (last names hidden), false = full names shown
+// Default: false → full names shown by default
+let globalPrivacyMode = false;
 
-// Mask function: formats a last name as 'Lxxxxx' unless forceShow or global toggle is active
-export function maskLastName(lastName: string | undefined | null, forceShow: boolean = false): string {
+/**
+ * maskLastName: Returns the lastName as-is when privacy mode is OFF,
+ * or as "X." (first letter + dot) when privacy mode is ON.
+ *
+ * @param lastName       The last name to optionally mask
+ * @param privacyMode    Pass the component's reactive privacyMode state so
+ *                       React re-renders whenever the toggle changes.
+ */
+export function maskLastName(
+  lastName: string | undefined | null,
+  privacyMode: boolean = globalPrivacyMode
+): string {
   if (!lastName) return '';
-  if (forceShow || globalShowRealNames) return lastName;
+  // If privacy mode is OFF → show full last name
+  if (!privacyMode) return lastName;
+  // Privacy mode is ON → mask to first letter + dot
   const trimmed = lastName.trim();
   const firstLetter = trimmed.charAt(0);
   if (!firstLetter) return '';
-  // Fixed masking format as requested
   return `${firstLetter}.`;
 }
 
-// React Hook to use and toggle the visibility reactively
+// React Hook — returns { privacyMode, togglePrivacy }
 export function useRealNamesVisibility() {
-  const [visible, setVisible] = useState(globalShowRealNames);
+  const [privacyMode, setPrivacyMode] = useState(globalPrivacyMode);
 
   useEffect(() => {
     const handleToggle = () => {
-      setVisible(globalShowRealNames);
+      setPrivacyMode(globalPrivacyMode);
     };
     window.addEventListener('gl-toggle-real-names', handleToggle);
     return () => {
@@ -29,27 +40,12 @@ export function useRealNamesVisibility() {
     };
   }, []);
 
-  const toggleVisibility = (show?: boolean) => {
-    const target = show !== undefined ? show : !globalShowRealNames;
-    globalShowRealNames = target;
-
-    // Reset any running timeout
-    if (globalTimeoutId) {
-      clearTimeout(globalTimeoutId);
-      globalTimeoutId = null;
-    }
-
-    if (globalShowRealNames) {
-      // Auto-hide after 10 seconds (as requested)
-      globalTimeoutId = setTimeout(() => {
-        globalShowRealNames = false;
-        globalTimeoutId = null;
-        window.dispatchEvent(new CustomEvent('gl-toggle-real-names'));
-      }, 10000);
-    }
-
+  const toggleVisibility = (forceValue?: boolean) => {
+    globalPrivacyMode = forceValue !== undefined ? forceValue : !globalPrivacyMode;
     window.dispatchEvent(new CustomEvent('gl-toggle-real-names'));
   };
 
-  return { visible, toggleVisibility };
+  // Expose 'visible' as alias for backwards compatibility:
+  // visible = true means "privacy mode ON" (names hidden)
+  return { visible: privacyMode, toggleVisibility };
 }
