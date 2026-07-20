@@ -13387,35 +13387,120 @@ const targetVol = isActive ? vol : 0;
               </select>
             </div>
 
-            {/* Tempo & Metronom Action Card */}
+            {/* Tempo & Metronom Action Card with Quick Access BPM */}
             <div 
               onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
               style={{
-                flex: 1.3,
+                flex: 1.5,
                 background: showAdvancedSettings ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : '#ffffff',
                 border: showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '12px',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '8px',
+                gap: '6px',
                 transition: 'all 0.25s ease'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Sliders size={13} style={{ color: showAdvancedSettings ? '#1565c0' : '#86868b' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: showAdvancedSettings ? '#1565c0' : '#1d1d1f' }}>
-                    Tempo & Metronom
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, color: showAdvancedSettings ? '#1565c0' : '#1d1d1f' }}>
+                    Metronom
                   </span>
-                  <span style={{ fontSize: '0.50rem', color: '#616161', fontWeight: 500 }}>
-                    {bpm} BPM | Click {isMetronomeActive ? 'AN' : 'AUS'}
+                  <span style={{ fontSize: '0.48rem', color: '#616161', fontWeight: 500 }}>
+                    Click {isMetronomeActive ? 'AN' : 'AUS'}
                   </span>
                 </div>
               </div>
-              <ChevronRight size={12} style={{
+
+              {/* Quick Access BPM Numeric Input */}
+              <div 
+                style={{ display: 'flex', alignItems: 'center', gap: '2.5px' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                  className="tactile-btn"
+                  style={{
+                    width: '18px',
+                    height: '20px',
+                    background: 'rgba(0, 0, 0, 0.04)',
+                    border: 'none',
+                    color: '#1d1d1f',
+                    borderRadius: '4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  -
+                </button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={bpm}
+                  onChange={(e) => {
+                    const cleanVal = e.target.value.replace(/[^0-9]/g, '');
+                    if (cleanVal === '') {
+                      setBpm(0 as any);
+                    } else {
+                      const num = parseInt(cleanVal);
+                      if (!isNaN(num)) {
+                        setBpm(Math.min(240, num));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (bpm < 40) setBpm(40);
+                    if (bpm > 240) setBpm(240);
+                  }}
+                  style={{
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    fontFamily: 'SF Mono, monospace',
+                    width: '28px',
+                    height: '20px',
+                    textAlign: 'center',
+                    color: '#1d1d1f',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    borderRadius: '4px',
+                    background: '#ffffff',
+                    padding: 0,
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                  className="tactile-btn"
+                  style={{
+                    width: '18px',
+                    height: '20px',
+                    background: 'rgba(0, 0, 0, 0.04)',
+                    border: 'none',
+                    color: '#1d1d1f',
+                    borderRadius: '4px',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  +
+                </button>
+              </div>
+
+              <ChevronRight size={10} style={{
                 color: showAdvancedSettings ? '#1565c0' : '#86868b',
                 transition: 'transform 0.2s',
                 transform: showAdvancedSettings ? 'rotate(90deg)' : 'none'
@@ -13505,58 +13590,7 @@ const targetVol = isActive ? vol : 0;
                     TAP TEMPO
                   </button>
 
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-                      className="tactile-btn"
-                      style={{ width: '28px', height: '32px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      -
-                    </button>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={bpm}
-                      onChange={(e) => {
-                        const cleanVal = e.target.value.replace(/[^0-9]/g, '');
-                        if (cleanVal === '') {
-                          setBpm(0 as any);
-                        } else {
-                          const num = parseInt(cleanVal);
-                          if (!isNaN(num)) {
-                            setBpm(Math.min(240, num));
-                          }
-                        }
-                      }}
-                      onBlur={() => {
-                        if (bpm < 40) setBpm(40);
-                        if (bpm > 240) setBpm(240);
-                      }}
-                      style={{
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        fontFamily: 'SF Mono, monospace',
-                        width: '36px',
-                        textAlign: 'center',
-                        color: '#1d1d1f',
-                        border: '1px solid rgba(0, 0, 0, 0.1)',
-                        borderRadius: '6px',
-                        background: '#ffffff',
-                        padding: '2px 0',
-                        outline: 'none'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-                      className="tactile-btn"
-                      style={{ width: '28px', height: '32px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      +
-                    </button>
-                  </div>
+
                 </div>
 
                 {/* Row 2: Selectors */}
