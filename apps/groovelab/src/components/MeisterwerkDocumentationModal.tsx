@@ -10559,7 +10559,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
   };
 
-  // Synthesize clean metronome click sounds (wood, cowbell, rimshot, synth)
+  // Synthesize clean metronome click sounds (wood, cowbell, rimshot, synth) with premium organic modeling and loudness matching
   const playClickSound = (isHigh = false, time?: number, overrideSound?: string) => {
     try {
       initAudio();
@@ -10578,55 +10578,92 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       if (targetMetronomeGain === 0) return;
 
       if (soundType === 'synth') {
+        // Soft synth beep with 1.5ms attack to prevent clicking, clean decay
         const osc = ctx.createOscillator();
         const gainNode = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(isHigh ? 1200 : 900, playTime);
-        gainNode.gain.setValueAtTime(targetMetronomeGain, playTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.05);
+        osc.frequency.setValueAtTime(isHigh ? 1000 : 800, playTime);
+        
+        // Loudness match multiplier: 0.65
+        const volume = targetMetronomeGain * 0.65;
+        gainNode.gain.setValueAtTime(0, playTime);
+        gainNode.gain.linearRampToValueAtTime(volume, playTime + 0.0015);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.035);
+        
         osc.connect(gainNode);
         gainNode.connect(ctx.destination);
         osc.start(playTime);
-        osc.stop(playTime + 0.06);
+        osc.stop(playTime + 0.045);
       } else if (soundType === 'rimshot') {
-        const bufferSize = ctx.sampleRate * 0.02; // 20ms
+        // Organic rimshot/sidestick: resonant body sine wave mixed with bandpassed high-Q white noise click
+        const bodyOsc = ctx.createOscillator();
+        const bodyGain = ctx.createGain();
+        bodyOsc.type = 'sine';
+        bodyOsc.frequency.setValueAtTime(isHigh ? 380 : 310, playTime);
+        
+        const stickOsc = ctx.createOscillator();
+        const stickGain = ctx.createGain();
+        stickOsc.type = 'sine';
+        stickOsc.frequency.setValueAtTime(isHigh ? 1500 : 1200, playTime);
+        stickOsc.frequency.exponentialRampToValueAtTime(isHigh ? 500 : 400, playTime + 0.004);
+
+        // Loudness match multipliers: body=0.35, stick=0.45
+        bodyGain.gain.setValueAtTime(targetMetronomeGain * 0.35, playTime);
+        bodyGain.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.015);
+        
+        stickGain.gain.setValueAtTime(targetMetronomeGain * 0.45, playTime);
+        stickGain.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.008);
+
+        bodyOsc.connect(bodyGain);
+        bodyGain.connect(ctx.destination);
+        stickOsc.connect(stickGain);
+        stickGain.connect(ctx.destination);
+
+        bodyOsc.start(playTime);
+        bodyOsc.stop(playTime + 0.02);
+        stickOsc.start(playTime);
+        stickOsc.stop(playTime + 0.015);
+
+        // Transient noise burst
+        const bufferSize = ctx.sampleRate * 0.008; // 8ms
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
+          data[i] = (Math.random() * 2 - 1) * 0.15;
         }
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(isHigh ? 1800 : 1500, playTime);
-        filter.Q.setValueAtTime(3.0, playTime);
-        
-        const gainNode = ctx.createGain();
-        gainNode.gain.setValueAtTime(targetMetronomeGain * 1.5, playTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.015);
-        
-        noise.connect(filter);
-        filter.connect(gainNode);
-        gainNode.connect(ctx.destination);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(2200, playTime);
+        bp.Q.setValueAtTime(5.0, playTime);
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(targetMetronomeGain * 0.3, playTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.006);
+        noise.connect(bp);
+        bp.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
         noise.start(playTime);
-        noise.stop(playTime + 0.02);
+        noise.stop(playTime + 0.01);
       } else if (soundType === 'cowbell') {
+        // High-end dual oscillator TR-808 style cowbell with bandpass filter & balanced amplitude
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
         const gainNode = ctx.createGain();
         osc1.type = 'square';
         osc2.type = 'square';
-        const f = isHigh ? 800 : 540;
+        const f = isHigh ? 840 : 540;
         osc1.frequency.setValueAtTime(f, playTime);
         osc2.frequency.setValueAtTime(f * 1.48, playTime);
         
         const bp = ctx.createBiquadFilter();
         bp.type = 'bandpass';
-        bp.frequency.setValueAtTime(1000, playTime);
+        bp.frequency.setValueAtTime(950, playTime);
+        bp.Q.setValueAtTime(6.0, playTime);
         
-        gainNode.gain.setValueAtTime(targetMetronomeGain * 0.8, playTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.07);
+        // Loudness match multiplier: 0.24 (square wave normalization)
+        gainNode.gain.setValueAtTime(targetMetronomeGain * 0.24, playTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.065);
         
         osc1.connect(bp);
         osc2.connect(bp);
@@ -10638,21 +10675,24 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         osc1.stop(playTime + 0.08);
         osc2.stop(playTime + 0.08);
       } else {
+        // Wood click: fast pitch chirp (sticks hitting) for organic modeling, fast decay
         const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass';
-        hp.frequency.setValueAtTime(450, playTime);
         const gainNode = ctx.createGain();
-        gainNode.gain.value = 0;
-        osc.connect(hp);
-        hp.connect(gainNode);
+        osc.type = 'sine';
+        
+        const startFreq = isHigh ? 1600 : 1200;
+        const endFreq = isHigh ? 900 : 700;
+        osc.frequency.setValueAtTime(startFreq, playTime);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, playTime + 0.003);
+        
+        // Loudness match multiplier: 0.9
+        gainNode.gain.setValueAtTime(targetMetronomeGain * 0.9, playTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.012);
+        
+        osc.connect(gainNode);
         gainNode.connect(ctx.destination);
-        osc.frequency.setValueAtTime(isHigh ? 800 : 600, playTime);
-        gainNode.gain.setValueAtTime(targetMetronomeGain, playTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.00001, playTime + 0.008);
         osc.start(playTime);
-        osc.stop(playTime + 0.008);
+        osc.stop(playTime + 0.015);
       }
     } catch (e) {
       console.warn(e);
