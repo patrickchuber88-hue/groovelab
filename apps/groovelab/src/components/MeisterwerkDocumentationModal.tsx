@@ -9729,6 +9729,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [masterLoopDuration, setMasterLoopDuration] = useState<number | null>(null); // in ms
   const [playbackProgress, setPlaybackProgress] = useState(0); // 0 to 100
   const [currentBar, setCurrentBar] = useState<number>(1); // 1, 2, 3, or 4
+  const [currentBeat, setCurrentBeat] = useState<number>(1); // 1, 2, 3, or 4
   const [isMetronomeActive, setIsMetronomeActive] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [isExporting, setIsExporting] = useState(false);
@@ -11322,6 +11323,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           setCountInBeats(beatInBar + "/4");
           setPlaybackProgress(Math.max(0, (currentTick / 4) * 100));
           setCurrentBar(1);
+          setCurrentBeat(beatInBar);
         } else {
           setCountInBeats(null);
           
@@ -11343,11 +11345,13 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             }
           }
           
+          const beatsPerBar = timeSignatureRef.current === '3/4' ? 3 : 4;
           if (currentBoundaryIndex !== -1) {
             const boundary = trackBoundaries[currentBoundaryIndex];
             const elapsed = currentTick - boundary.start;
             setPlaybackProgress((elapsed / 16) * 100);
-            setCurrentBar(Math.floor(elapsed / 4) + 1);
+            setCurrentBar(Math.floor(elapsed / beatsPerBar) + 1);
+            setCurrentBeat(Math.floor(elapsed) % beatsPerBar + 1);
             setAutoSequenceStatus(`AUFNAHME SPUR ${currentBoundaryIndex + 1}...`);
           } else if (isInPauseIndex !== -1) {
             const boundary = trackBoundaries[isInPauseIndex];
@@ -11355,7 +11359,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             const elapsed = currentTick - boundary.end;
             const pauseLengthTicks = nextBoundary.start - boundary.end;
             setPlaybackProgress((elapsed / pauseLengthTicks) * 100);
-            setCurrentBar(Math.floor(elapsed / 4) + 1);
+            setCurrentBar(Math.floor(elapsed / beatsPerBar) + 1);
+            setCurrentBeat(Math.floor(elapsed) % beatsPerBar + 1);
             setAutoSequenceStatus("ZWISCHENPAUSE...");
           }
         }
@@ -11446,8 +11451,17 @@ const targetVol = isActive ? vol : 0;
       const loopProgressSync = () => {
         const elapsed = (Date.now() - startTimeRef.current) % duration;
         setPlaybackProgress((elapsed / duration) * 100);
-        const bar = Math.floor((elapsed / duration) * 4) + 1;
+        
+        const totalBars = barLengthRef.current || barLength;
+        const beatsPerBar = timeSignatureRef.current === '3/4' ? 3 : 4;
+        const totalBeats = totalBars * beatsPerBar;
+        const currentTotalBeat = Math.floor((elapsed / duration) * totalBeats);
+        
+        const bar = Math.max(1, Math.min(totalBars, Math.floor(currentTotalBeat / beatsPerBar) + 1));
+        const beat = Math.max(1, Math.min(beatsPerBar, (currentTotalBeat % beatsPerBar) + 1));
+        
         setCurrentBar(bar);
+        setCurrentBeat(beat);
         progressIntervalRef.current = requestAnimationFrame(loopProgressSync);
       };
       progressIntervalRef.current = requestAnimationFrame(loopProgressSync);
@@ -12631,10 +12645,10 @@ const targetVol = isActive ? vol : 0;
                 }}
               >
                 <span style={{ 
-                  fontSize: '2.0rem', 
+                  fontSize: '1.9rem', 
                   fontWeight: 800, 
                   fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '-0.04em', 
+                  letterSpacing: '0.02em', 
                   color: ringColor === '#e5e5e7' ? '#e2e8f0' : ringColor,
                   textShadow: ringColor !== '#e5e5e7' ? `0 2px 10px ${ringColor}35` : 'none',
                   transition: 'all 0.3s ease'
@@ -12643,19 +12657,52 @@ const targetVol = isActive ? vol : 0;
                     ? (isSavedLoopPlaying
                       ? `${Math.floor((playbackProgress / 100) * (selectedSavedLoop ? Number(selectedSavedLoop.duration) : 8))}s`
                       : '0s')
-                    : (countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0')}
+                    : (countInBeats !== null
+                      ? `00 | 0${countInBeats.toString().charAt(0)}`
+                      : (isPlaying || isAutoSequenceActive)
+                        ? `${currentBar.toString().padStart(2, '0')} | ${currentBeat.toString().padStart(2, '0')}`
+                        : '01 | 01')}
                 </span>
+                
+                {/* Horizontal Apple-style beat segments */}
+                {activeSubTab !== 'saved' && (
+                  <div style={{ display: 'flex', gap: '3px', marginTop: '3px', marginBottom: '2px', alignItems: 'center' }}>
+                    {[1, 2, 3, 4].map((b) => {
+                      const maxBeats = timeSignature === '3/4' ? 3 : 4;
+                      if (b > maxBeats) return null;
+                      const isActive = (isPlaying || isAutoSequenceActive) && currentBeat === b;
+                      return (
+                        <div
+                          key={b}
+                          style={{
+                            width: '6px',
+                            height: '2px',
+                            borderRadius: '1px',
+                            background: isActive
+                              ? (ringColor === '#e5e5e7' ? '#ef4444' : ringColor)
+                              : 'rgba(255, 255, 255, 0.12)',
+                            boxShadow: isActive
+                              ? `0 0 5px ${ringColor === '#e5e5e7' ? '#ef4444' : ringColor}`
+                              : 'none',
+                            transition: 'all 0.1s ease'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+
                 <span style={{ 
-                  fontSize: '0.48rem', 
+                  fontSize: '0.45rem', 
                   color: '#7b8a9e', 
                   fontWeight: 800, 
                   letterSpacing: '0.12em', 
-                  marginTop: '-2px', 
+                  marginTop: '1px', 
                   textTransform: 'uppercase' 
                 }}>
                   {activeSubTab === 'saved'
                     ? (isSavedLoopPlaying ? 'PLAYBACK' : 'ARCHIVE')
-                    : (countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE')}
+                    : (countInBeats !== null ? (isPause ? 'WAIT' : (isAutoSequenceActive ? 'CALIBRATION' : 'COUNT')) : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE')}
                 </span>
               </div>
             </div>
