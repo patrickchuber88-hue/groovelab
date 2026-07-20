@@ -12922,63 +12922,129 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
 
     const playKick = () => {
       if (kVol <= 0.001) return;
+      // Main Body
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+      osc.type = 'sine';
       osc.connect(gain);
       gain.connect(masterGain);
-      osc.frequency.setValueAtTime(120, time);
-      osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.08);
+      osc.frequency.setValueAtTime(135, time);
+      osc.frequency.exponentialRampToValueAtTime(45, time + 0.08);
       gain.gain.setValueAtTime(kVol, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
       osc.start(time);
-      osc.stop(time + 0.12);
+      osc.stop(time + 0.15);
+
+      // Wooden skin contact click
+      const clickOsc = ctx.createOscillator();
+      const clickGain = ctx.createGain();
+      clickOsc.type = 'triangle';
+      clickOsc.connect(clickGain);
+      clickGain.connect(masterGain);
+      clickOsc.frequency.setValueAtTime(450, time);
+      clickOsc.frequency.exponentialRampToValueAtTime(90, time + 0.005);
+      clickGain.gain.setValueAtTime(kVol * 0.45, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.006);
+      clickOsc.start(time);
+      clickOsc.stop(time + 0.01);
     };
 
     const playSnare = () => {
       if (sVol <= 0.001) return;
       if (!noiseBufferRef.current) return;
+      
+      // Snappy Snare Wires (Tight sizzle)
       const noise = ctx.createBufferSource();
       noise.buffer = noiseBufferRef.current;
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 1200;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(sVol * 0.5, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
+      const bandpass = ctx.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.frequency.value = 1800;
+      bandpass.Q.value = 1.0;
+      
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(sVol * 0.4, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+      
+      noise.connect(bandpass);
+      bandpass.connect(noiseGain);
+      noiseGain.connect(masterGain);
       noise.start(time);
-      noise.stop(time + 0.16);
+      noise.stop(time + 0.11);
 
-      const osc = ctx.createOscillator();
-      const oscGain = ctx.createGain();
-      osc.frequency.value = 180;
-      oscGain.gain.setValueAtTime(sVol * 0.35, time);
-      oscGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.08);
-      osc.connect(oscGain);
-      oscGain.connect(masterGain);
-      osc.start(time);
-      osc.stop(time + 0.09);
+      // Snare Rimshot Body Resonance 1
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.frequency.setValueAtTime(210, time);
+      osc1.frequency.exponentialRampToValueAtTime(140, time + 0.05);
+      gain1.gain.setValueAtTime(sVol * 0.45, time);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.07);
+      osc1.connect(gain1);
+      gain1.connect(masterGain);
+      osc1.start(time);
+      osc1.stop(time + 0.08);
+
+      // Snare Shell Ring 2
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(380, time);
+      gain2.gain.setValueAtTime(sVol * 0.15, time);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, time + 0.035);
+      osc2.connect(gain2);
+      gain2.connect(masterGain);
+      osc2.start(time);
+      osc2.stop(time + 0.04);
     };
 
     const playHat = (isOpen = false) => {
       if (hVol <= 0.001) return;
       if (!noiseBufferRef.current) return;
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBufferRef.current;
+      
+      // Metallic resonant bank (6 oscillators)
+      const freqs = [365, 452, 630, 815, 1200, 3200];
+      const oscs = freqs.map(f => {
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.value = f;
+        return osc;
+      });
+      
+      const metalGain = ctx.createGain();
+      metalGain.gain.setValueAtTime(hVol * 0.05, time);
+      metalGain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.18 : 0.038));
+      
       const filter = ctx.createBiquadFilter();
       filter.type = 'highpass';
-      filter.frequency.value = 8000;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(hVol * 0.2, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.18 : 0.03));
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(masterGain);
+      filter.frequency.value = 9500;
+      
+      oscs.forEach(osc => {
+        osc.connect(filter);
+        osc.start(time);
+        osc.stop(time + (isOpen ? 0.20 : 0.05));
+      });
+      
+      filter.connect(metalGain);
+      metalGain.connect(masterGain);
+
+      // Soft highpass sizzle component
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBufferRef.current;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'highpass';
+      noiseFilter.frequency.value = 9000;
+      
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(hVol * 0.1, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.16 : 0.025));
+      
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+      
       noise.start(time);
-      noise.stop(time + (isOpen ? 0.2 : 0.05));
+      noise.stop(time + (isOpen ? 0.18 : 0.04));
     };
+
 
     const playClick = (isAccent = false) => {
       if (mVol <= 0.001) return;
