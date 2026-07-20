@@ -9812,6 +9812,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const audioBuffersRef = useRef<{ [key: number]: AudioBuffer }>({});
   const activeSourcesRef = useRef<{ [key: number]: AudioBufferSourceNode }>({});
   const gainNodesRef = useRef<{ [key: number]: GainNode }>({});
+  const analysersRef = useRef<{ [key: number]: AnalyserNode }>({});
   const highClickTemplateRef = useRef<Float32Array | null>(null);
   const lowClickTemplateRef = useRef<Float32Array | null>(null);
   const masterCompressorRef = useRef<DynamicsCompressorNode | null>(null);
@@ -9842,6 +9843,19 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   useEffect(() => {
     tracksRef.current = tracks;
   }, [tracks]);
+
+  const connectTrackNode = (trackId: number, gainNode: GainNode, ctx: AudioContext) => {
+    let analyser = analysersRef.current[trackId];
+    if (!analyser) {
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 32;
+      analysersRef.current[trackId] = analyser;
+    }
+    try { gainNode.disconnect(); } catch (e) {}
+    gainNode.connect(analyser);
+    try { analyser.disconnect(); } catch (e) {}
+    analyser.connect(masterGainRef.current || ctx.destination);
+  };
 
   // Dynamic Real-Time Ducking based on Track Age to prevent feedback build-up
   useEffect(() => {
@@ -10375,7 +10389,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     const targetVolume = (volume / 100) * multiplier;
                     gainNode.gain.setValueAtTime(targetVolume, playTime);
                     newSource.connect(gainNode);
-                    gainNode.connect(masterGainRef.current || ctx.destination);
+                    connectTrackNode(trackId, gainNode, ctx);
                     
                     // Crossfade out old source to prevent clicks (5ms fade)
                     const oldGain = gainNodesRef.current[trackId];
@@ -10442,7 +10456,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             const targetVolume = (volume / 100) * multiplier;
             gainNode.gain.setValueAtTime(targetVolume, playTime);
             source.connect(gainNode);
-            gainNode.connect(masterGainRef.current || ctx.destination);
+            connectTrackNode(trackId, gainNode, ctx);
             activeSourcesRef.current[trackId] = source;
             gainNodesRef.current[trackId] = gainNode;
             source.start(playTime, playOffset);
@@ -10556,7 +10570,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         gainNode.gain.setValueAtTime(targetVolume, time);
 
         source.connect(gainNode);
-        gainNode.connect(masterGainRef.current || ctx.destination);
+        connectTrackNode(trackId, gainNode, ctx);
 
         source.loop = true;
         activeSourcesRef.current[trackId] = source;
@@ -10867,7 +10881,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     let gainNode = gainNodesRef.current[trackId];
     if (!gainNode) {
       gainNode = ctx.createGain();
-      gainNode.connect(masterGainRef.current || ctx.destination);
+      connectTrackNode(trackId, gainNode, ctx);
       gainNodesRef.current[trackId] = gainNode;
     }
 
@@ -11001,6 +11015,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     audioBuffersRef.current = {};
     activeSourcesRef.current = {};
     gainNodesRef.current = {};
+    Object.values(analysersRef.current).forEach((a) => {
+      try { a.disconnect(); } catch (e) {}
+    });
+    analysersRef.current = {};
     mediaRecordersRef.current = {};
     recordStartTimesRef.current = {};
     setCountInBeats(null);
@@ -11519,17 +11537,25 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const hasAudio = !!track.url;
         const isTrackPlaying = isPlaying && hasAudio && !track.isMuted && (!hasAnySolo || track.isSoloed);
         
+        const analyser = analysersRef.current[track.id];
         if (track.isRecording) {
           newMeters[track.id] = Math.random() > 0.15 ? Math.floor(Math.random() * 8) + 1 : 1;
-        } else if (isTrackPlaying) {
-          newMeters[track.id] = Math.random() > 0.15 ? Math.floor(Math.random() * 8) + 1 : 1;
+        } else if (isTrackPlaying && analyser) {
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          newMeters[track.id] = Math.max(1, Math.min(8, Math.round((avg / 160) * 8))); // Scaled slightly lower for better visual height range representation
         } else {
           newMeters[track.id] = 0;
         }
       });
       
       setMeterHeights(newMeters);
-      animId = setTimeout(updateMeters, 100);
+      animId = setTimeout(updateMeters, 50);
     };
     
     updateMeters();
