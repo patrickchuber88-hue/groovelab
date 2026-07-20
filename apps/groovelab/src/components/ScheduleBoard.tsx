@@ -3483,8 +3483,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {/* Group A: Onboarding & Setup */}
+              {/* Unified Apple-Button-Group for Options & Setup */}
               <div className="apple-btn-group">
+                {/* Namen zeigen Toggle */}
+                <button
+                  type="button"
+                  onClick={() => toggleRealNames()}
+                  className={`apple-btn ${showRealNames ? 'active' : ''}`}
+                  style={{ color: showRealNames ? '#ea4335' : undefined }}
+                  title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+                >
+                  {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+                  <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+                </button>
+
+                <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
+
+                {/* Zeiten ändern / Tag anlegen */}
                 {currentUserRole === 'teacher' && selectedTeacherId === userId ? (
                   <button
                     type="button"
@@ -3514,6 +3529,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     <span>Tag anlegen</span>
                   </button>
                 )}
+
+                {/* Onboarding-Link */}
                 <button
                   type="button"
                   onClick={async () => {
@@ -3527,6 +3544,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <Send size={13} />
                   <span>Onboarding-Link</span>
                 </button>
+
+                {/* Backup */}
                 <label 
                   htmlFor="pdf-upload"
                   className="apple-btn"
@@ -3543,20 +3562,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   style={{ display: 'none' }} 
                   onChange={handleRestoreFromPDF} 
                 />
-              </div>
-
-              {/* Group B: Options */}
-              <div className="apple-btn-group">
-                <button
-                  type="button"
-                  onClick={() => toggleRealNames()}
-                  className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                  style={{ color: showRealNames ? '#ea4335' : undefined }}
-                  title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
-                >
-                  {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                  <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
-                </button>
               </div>
 
               {/* Status information */}
