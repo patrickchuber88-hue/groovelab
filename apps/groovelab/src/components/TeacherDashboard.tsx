@@ -871,6 +871,117 @@ export function TeacherDashboard({
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
+  const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatTypedMessage, setChatTypedMessage] = useState('');
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch active conversations (occurrence_ids that have messages)
+  const fetchActiveChatOccs = async () => {
+    try {
+      const { data: activeChats } = await supabase
+        .from('campus_direct_messages')
+        .select('occurrence_id');
+
+      if (activeChats) {
+        const occIds = new Set<string>(activeChats.map((c: any) => c.occurrence_id).filter(Boolean));
+        setActiveChatOccIds(occIds);
+      }
+    } catch (err) {
+      console.error('Error fetching active chat occurrences:', err);
+    }
+  };
+
+  const fetchChatMessages = async (occurrenceId: string) => {
+    if (!userId || !occurrenceId) return;
+    try {
+      const { data, error } = await supabase
+        .from('campus_direct_messages')
+        .select('*')
+        .eq('occurrence_id', occurrenceId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      if (data) {
+        setChatMessages(data);
+        setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      }
+    } catch (err) {
+      console.error('Error fetching chat messages for occurrence:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveChatOccs();
+
+    const channel = supabase
+      .channel('realtime_tagesplan_shouts')
+      .on('postgres_changes', {
+        schema: 'public',
+        event: '*',
+        table: 'campus_direct_messages'
+      }, () => {
+        fetchActiveChatOccs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeChatOcc) {
+      setChatMessages([]);
+      return;
+    }
+
+    fetchChatMessages(activeChatOcc.id);
+
+    const channel = supabase
+      .channel(`chat_occ_dashboard_${activeChatOcc.id}`)
+      .on('postgres_changes', { 
+        schema: 'public', 
+        event: '*', 
+        table: 'campus_direct_messages', 
+        filter: `occurrence_id=eq.${activeChatOcc.id}` 
+      }, () => {
+        fetchChatMessages(activeChatOcc.id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeChatOcc, userId]);
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatTypedMessage.trim() || !activeChatOcc) return;
+    
+    const recipientId = activeChatOcc.student_id;
+    if (!recipientId) return;
+
+    try {
+      const { error } = await supabase
+        .from('campus_direct_messages')
+        .insert({
+          sender_id: userId,
+          recipient_id: recipientId,
+          content: chatTypedMessage.trim(),
+          occurrence_id: activeChatOcc.id,
+          read_by: [userId]
+        });
+
+      if (error) throw error;
+      setChatTypedMessage('');
+      fetchChatMessages(activeChatOcc.id);
+      fetchActiveChatOccs();
+    } catch (err) {
+      console.error('Error sending chat message:', err);
+    }
+  };
+
   // Auto-dismiss toast message after 5 seconds
   useEffect(() => {
     if (toastMessage) {
@@ -2305,28 +2416,66 @@ export function TeacherDashboard({
     if (!newPostTitle.trim() || !newPostContent.trim()) return;
     setSubmittingClassPost(true);
     try {
-      const { error } = await supabase
-        .from('class_feed_posts')
-        .insert({
-          teacher_id: userId,
-          title: newPostTitle.trim(),
-          content: newPostContent.trim(),
-          post_type: newPostType,
-          quiz_data: null,
-          attachment_url: null
-        });
-      if (error) throw error;
+      if (editingPostId) {
+        const { error } = await supabase
+          .from('class_feed_posts')
+          .update({
+            title: newPostTitle.trim(),
+            content: newPostContent.trim(),
+            post_type: newPostType
+          })
+          .eq('id', editingPostId)
+          .eq('teacher_id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('class_feed_posts')
+          .insert({
+            teacher_id: userId,
+            title: newPostTitle.trim(),
+            content: newPostContent.trim(),
+            post_type: newPostType,
+            quiz_data: null,
+            attachment_url: null
+          });
+        if (error) throw error;
+      }
       
       setNewPostTitle('');
       setNewPostContent('');
       setNewPostType('announcement');
       setShowClassPostForm(false);
+      setEditingPostId(null);
       await fetchData();
     } catch (err) {
       console.error(err);
-      alert('Fehler beim Erstellen des Beitrags.');
+      alert(editingPostId ? 'Fehler beim Bearbeiten des Beitrags.' : 'Fehler beim Erstellen des Beitrags.');
     } finally {
       setSubmittingClassPost(false);
+    }
+  };
+
+  const handleDeleteClassPost = async (postId: string) => {
+    if (!window.confirm('Möchtest du diesen Beitrag wirklich löschen?')) return;
+    try {
+      // Delete interactions first since they depend on post_id (clean separation)
+      await supabase
+        .from('feed_interactions')
+        .delete()
+        .eq('post_type', 'class')
+        .eq('post_id', postId);
+
+      const { error } = await supabase
+        .from('class_feed_posts')
+        .delete()
+        .eq('id', postId)
+        .eq('teacher_id', userId);
+      if (error) throw error;
+
+      await fetchData();
+    } catch (err) {
+      console.error('Error deleting class feed post:', err);
+      alert('Fehler beim Löschen des Beitrags.');
     }
   };
   
@@ -2611,6 +2760,7 @@ export function TeacherDashboard({
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostType, setNewPostType] = useState<'announcement' | 'homework'>('announcement');
   const [submittingClassPost, setSubmittingClassPost] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [respondingToRequestId, setRespondingToRequestId] = useState<string | null>(null);
   const [responseTextInput, setResponseTextInput] = useState<string>('');
   const [questionnaireAnswers, setQuestionnaireAnswers] = useState<Record<string, string>>({});
@@ -3214,7 +3364,7 @@ export function TeacherDashboard({
         const [avatarRes, progressRes, matrixRes] = await Promise.all([
           supabase
             .from('avatars')
-            .select('evolution_level, xp, avatar_style')
+            .select('evolution_level, xp, avatar_style, streak_flame')
             .eq('user_id', studentId)
             .maybeSingle(),
           supabase
@@ -3310,7 +3460,7 @@ export function TeacherDashboard({
           studentId,
           studentName: activeStudent.name,
           timeSlot: briefingData.timeline.find((s: any) => s.student?.id === studentId)?.timeSlot || '',
-          streakCount: studentAvatar?.avatar_style === 'Premium_Hero' ? 6 : 0,
+          streakCount: studentAvatar?.streak_flame || 0,
           evolutionLevel: studentAvatar?.evolution_level || 1,
           verifiedSongs,
           currentWeekNum: currentWeekStr.split('-W')[1] || '',
@@ -3427,7 +3577,9 @@ export function TeacherDashboard({
             const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
 
             return {
+              id: `virtual-${slot.id}-${todayStr}`,
               scheduleId: slot.id,
+              date: todayStr,
               timeSlot: slot.time_slot,
               duration: slot.duration,
               status: slot.status,
@@ -3465,7 +3617,9 @@ export function TeacherDashboard({
                 // Rescheduled TO today or updated today -> update or insert into today's timeline
                 const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
                 const mappedItem = {
+                  id: occ.id,
                   scheduleId: occ.schedule_id || occ.id,
+                  date: occ.date,
                   timeSlot: formattedTime,
                   duration: occ.schedules?.duration || 30,
                   status: occ.status,
@@ -3510,7 +3664,7 @@ export function TeacherDashboard({
             const [avatarRes, progressRes, matrixRes] = await Promise.all([
               supabase
                 .from('avatars')
-                .select('evolution_level, xp, avatar_style')
+                .select('evolution_level, xp, avatar_style, streak_flame')
                 .eq('user_id', studentId)
                 .maybeSingle(),
               supabase
@@ -3606,7 +3760,7 @@ export function TeacherDashboard({
               studentId,
               studentName: nextSlot.student.name,
               timeSlot: nextSlot.timeSlot,
-              streakCount: studentAvatar?.avatar_style === 'Premium_Hero' ? 6 : 0,
+              streakCount: studentAvatar?.streak_flame || 0,
               evolutionLevel: studentAvatar?.evolution_level || 1,
               verifiedSongs,
               currentWeekNum: currentWeekStr.split('-W')[1] || '',
@@ -6732,21 +6886,50 @@ export function TeacherDashboard({
                                                 </div>
                                               );
                                             })}
-                                            {prep.prevWeekNotes && prep.prevWeekNotes.map((note: string, idx: number) => (
-                                              <div key={`prev-note-${idx}`} style={{ 
-                                                fontSize: '0.75rem', 
-                                                color: '#64748b', 
-                                                fontWeight: 500, 
-                                                fontStyle: 'italic', 
-                                                borderLeft: '2.5px solid #cbd5e1', 
-                                                paddingLeft: '8px', 
-                                                margin: '2px 4px',
-                                                lineHeight: 1.3,
-                                                opacity: 0.85
-                                              }}>
-                                                {note}
-                                              </div>
-                                            ))}
+                                            {prep.prevWeekNotes && prep.prevWeekNotes.map((note: string, idx: number) => {
+                                              const isLoop = note.startsWith("LOOP:");
+                                              const isAudio = note.startsWith("AUDIO:");
+                                              if (isLoop) {
+                                                const parts = note.substring(5).split('|');
+                                                const label = parts[3] || 'Loop-Mix';
+                                                const duration = parts[1] || '8';
+                                                return (
+                                                  <div key={`prev-note-${idx}`} style={{ margin: '2px 4px' }}>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                                                      🎵 Loop-Mix: "{label}" ({duration}s)
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+                                              if (isAudio) {
+                                                const parts = note.substring(6).split('|');
+                                                const label = parts[3] || 'Aufnahme';
+                                                const duration = parts[1] || '60';
+                                                const role = parts[4] || 'teacher';
+                                                return (
+                                                  <div key={`prev-note-${idx}`} style={{ margin: '2px 4px' }}>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                                                      🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+                                              return (
+                                                <div key={`prev-note-${idx}`} style={{ 
+                                                  fontSize: '0.75rem', 
+                                                  color: '#64748b', 
+                                                  fontWeight: 500, 
+                                                  fontStyle: 'italic', 
+                                                  borderLeft: '2.5px solid #cbd5e1', 
+                                                  paddingLeft: '8px', 
+                                                  margin: '2px 4px',
+                                                  lineHeight: 1.3,
+                                                  opacity: 0.85
+                                                }}>
+                                                  {note}
+                                                </div>
+                                              );
+                                            })}
                                           </>
                                         ) : (
                                           <div style={{ 
@@ -6813,20 +6996,49 @@ export function TeacherDashboard({
                                                 </div>
                                               );
                                             })}
-                                            {prep.currentWeekNotes && prep.currentWeekNotes.map((note: string, idx: number) => (
-                                              <div key={`curr-note-${idx}`} style={{ 
-                                                fontSize: '0.75rem', 
-                                                color: '#475569', 
-                                                fontWeight: 500, 
-                                                fontStyle: 'italic', 
-                                                borderLeft: '2.5px solid #34a853', 
-                                                paddingLeft: '8px', 
-                                                margin: '2px 4px',
-                                                lineHeight: 1.3
-                                              }}>
-                                                {note}
-                                              </div>
-                                            ))}
+                                            {prep.currentWeekNotes && prep.currentWeekNotes.map((note: string, idx: number) => {
+                                              const isLoop = note.startsWith("LOOP:");
+                                              const isAudio = note.startsWith("AUDIO:");
+                                              if (isLoop) {
+                                                const parts = note.substring(5).split('|');
+                                                const label = parts[3] || 'Loop-Mix';
+                                                const duration = parts[1] || '8';
+                                                return (
+                                                  <div key={`curr-note-${idx}`} style={{ margin: '2px 4px' }}>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fefce8', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#854d0e', fontStyle: 'normal', fontWeight: 700 }}>
+                                                      🎵 Loop-Mix: "{label}" ({duration}s)
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+                                              if (isAudio) {
+                                                const parts = note.substring(6).split('|');
+                                                const label = parts[3] || 'Aufnahme';
+                                                const duration = parts[1] || '60';
+                                                const role = parts[4] || 'teacher';
+                                                return (
+                                                  <div key={`curr-note-${idx}`} style={{ margin: '2px 4px' }}>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e6f4ea', border: '1px solid rgba(52, 168, 83, 0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '0.68rem', color: '#166534', fontStyle: 'normal', fontWeight: 700 }}>
+                                                      🎙️ {role === 'teacher' ? 'Lehrer-Aufnahme' : 'Schüler-Aufnahme'}: "{label}" ({duration}s)
+                                                    </span>
+                                                  </div>
+                                                );
+                                              }
+                                              return (
+                                                <div key={`curr-note-${idx}`} style={{ 
+                                                  fontSize: '0.75rem', 
+                                                  color: '#475569', 
+                                                  fontWeight: 500, 
+                                                  fontStyle: 'italic', 
+                                                  borderLeft: '2.5px solid #34a853', 
+                                                  paddingLeft: '8px', 
+                                                  margin: '2px 4px',
+                                                  lineHeight: 1.3
+                                                }}>
+                                                  {note}
+                                                </div>
+                                              );
+                                            })}
                                           </>
                                         ) : (
                                           <div style={{ 
@@ -7237,17 +7449,39 @@ export function TeacherDashboard({
                             <Clock size={20} color="#0b57d0" />
                             <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {new Date().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
                           </div>
-                          <span style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            padding: '4px 12px',
-                            borderRadius: '100px',
-                            background: '#e8f0fe',
-                            color: '#0b57d0',
-                            fontFamily: 'Inter'
-                          }}>
-                            LIVE
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              padding: '4px 12px',
+                              borderRadius: '100px',
+                              background: '#e8f0fe',
+                              color: '#0b57d0',
+                              fontFamily: 'Inter'
+                            }}>
+                              LIVE
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleRealNames()}
+                              title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen für 10 Sekunden einblenden"}
+                              style={{
+                                border: 'none',
+                                background: showRealNames ? '#fee2e2' : '#f1f5f9',
+                                color: showRealNames ? '#ef4444' : '#64748b',
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
                         </div>
   
 <div style={{ 
@@ -7752,14 +7986,16 @@ export function TeacherDashboard({
                                           fontWeight: 900, 
                                           color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
                                           fontSize: '0.9rem', 
-                                          width: (isCanceled || isRescheduledAway) ? 'auto' : '140px',
-                                          maxWidth: (isCanceled || isRescheduledAway) ? '120px' : '140px',
-                                          flexShrink: (isCanceled || isRescheduledAway) ? 1 : 0, 
-                                          overflow: 'hidden', 
-                                          textOverflow: 'ellipsis', 
+                                          flexShrink: 0, 
                                           whiteSpace: 'nowrap'
                                         }}>
-                                          {isBirthday ? '🎂 ' : ''}{slot.student.name}
+                                          {isBirthday ? '🎂 ' : ''}{(() => {
+                                            if (showRealNames) {
+                                              const found = allStudents.find(s => s.id === slot.student.id);
+                                              if (found) return `${found.first_name} ${found.last_name}`;
+                                            }
+                                            return slot.student.name;
+                                          })()}
                                         </span>
                                       ) : (
                                         <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
@@ -7806,7 +8042,13 @@ export function TeacherDashboard({
                                                   whiteSpace: 'nowrap'
                                                 }}
                                               >
-                                                {isBirthday ? '🎂 ' : ''}{stud.name.split(' ')[0]} {stud.name.split(' ').slice(1).map((n: string) => n[0] + '.').join(' ')}
+                                                {isBirthday ? '🎂 ' : ''}{(() => {
+                                                  if (showRealNames) {
+                                                    const found = allStudents.find(s => s.id === stud.id);
+                                                    if (found) return `${found.first_name} ${found.last_name}`;
+                                                  }
+                                                  return `${stud.name.split(' ')[0]} ${stud.name.split(' ').slice(1).map((n: string) => n[0] + '.').join(' ')}`;
+                                                })()}
                                                 <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>
                                                   {ack ? '✓' : '🕒'}
                                                 </span>
@@ -7860,10 +8102,7 @@ export function TeacherDashboard({
                                                 color: '#64748b', 
                                                 fontWeight: 500, 
                                                 fontSize: '0.78rem', 
-                                                width: '80px', 
                                                 flexShrink: 0, 
-                                                overflow: 'hidden', 
-                                                textOverflow: 'ellipsis', 
                                                 whiteSpace: 'nowrap' 
                                               }}>
                                                 {slot.instrument || 'Musiker'}
@@ -7875,10 +8114,7 @@ export function TeacherDashboard({
                                                 color: '#64748b', 
                                                 fontWeight: 500, 
                                                 fontSize: '0.78rem', 
-                                                flex: 1, 
-                                                minWidth: 0, 
-                                                overflow: 'hidden', 
-                                                textOverflow: 'ellipsis', 
+                                                flexShrink: 0, 
                                                 whiteSpace: 'nowrap' 
                                               }}>
                                                 {slot.room || 'Groovelab'}
@@ -7931,6 +8167,53 @@ export function TeacherDashboard({
                                         <polyline points="20 6 9 17 4 12" />
                                       </svg>
                                     </span>
+                                  )}
+
+                                  {/* 1:1 Shoutbox Icon Button */}
+                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const targetSlot = slot.isGroup ? slot.slots[0] : slot;
+                                        if (targetSlot) {
+                                          setActiveChatOcc({
+                                            id: targetSlot.id,
+                                            student_id: slot.isGroup ? slot.students[0]?.id : slot.student?.id,
+                                            teacher_id: targetSlot.teacher_id || userId,
+                                            date: targetSlot.date,
+                                            start_time: targetSlot.startTime || targetSlot.timeSlot,
+                                            student: slot.isGroup ? slot.students[0] : slot.student,
+                                            teacher: teacher
+                                          });
+                                        }
+                                      }}
+                                      style={{
+                                        border: 'none',
+                                        background: 'none',
+                                        padding: '6px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? '#eab308' : '#94a3b8',
+                                        marginLeft: 'auto',
+                                        transition: 'all 0.2s',
+                                        borderRadius: '50%',
+                                        flexShrink: 0
+                                      }}
+                                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+                                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                      title="1:1 Shoutbox öffnen"
+                                    >
+                                      <MessageSquare 
+                                        size={16} 
+                                        fill={activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? '#eab308' : 'none'} 
+                                        style={{
+                                          animation: activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? 'pulse 2s infinite' : 'none'
+                                        }}
+                                      />
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -9534,7 +9817,9 @@ export function TeacherDashboard({
                           gap: '8px'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>Neuer Beitrag</span>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
+                              {editingPostId ? 'Beitrag bearbeiten' : 'Neuer Beitrag'}
+                            </span>
                             <div style={{ display: 'flex', gap: '4px' }}>
                               <button
                                 onClick={() => setNewPostType('announcement')}
@@ -9610,6 +9895,7 @@ export function TeacherDashboard({
                                 setShowClassPostForm(false);
                                 setNewPostTitle('');
                                 setNewPostContent('');
+                                setEditingPostId(null);
                               }}
                               style={{
                                 background: 'transparent',
@@ -9637,7 +9923,7 @@ export function TeacherDashboard({
                                 cursor: 'pointer'
                               }}
                             >
-                              Veröffentlichen
+                              {editingPostId ? 'Speichern' : 'Veröffentlichen'}
                             </button>
                           </div>
                         </div>
@@ -9679,9 +9965,57 @@ export function TeacherDashboard({
                                 <span style={{ fontSize: '9px', fontWeight: 800, color: badgeColor, background: badgeBg, padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>
                                   {badgeLabel}
                                 </span>
-                                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                                  {new Date(item.created_at).toLocaleDateString('de-DE')}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
+                                    {new Date(item.created_at).toLocaleDateString('de-DE')}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      setEditingPostId(item.id);
+                                      setNewPostTitle(item.title);
+                                      setNewPostContent(item.content);
+                                      setNewPostType(item.post_type);
+                                      setShowClassPostForm(true);
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#94a3b8',
+                                      cursor: 'pointer',
+                                      padding: '2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.color = '#34a853'}
+                                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                                    title="Beitrag bearbeiten"
+                                  >
+                                    <Edit3 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteClassPost(item.id)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#94a3b8',
+                                      cursor: 'pointer',
+                                      padding: '2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '4px',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.color = '#ea4335'}
+                                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                                    title="Beitrag löschen"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
                               </div>
                               
                               <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
@@ -13874,6 +14208,196 @@ export function TeacherDashboard({
           </div>
         </div>
       )}
+
+      {/* 1:1 Shoutbox Overlay Modal */}
+      {activeChatOcc && (() => {
+        const studentName = activeChatOcc.student?.first_name || activeChatOcc.student?.name || 'Schüler';
+        const titleText = `1:1 Shoutbox: ${studentName}`;
+        
+        let isFrozen = false;
+        try {
+          const timePart = activeChatOcc.start_time.includes(':') ? activeChatOcc.start_time : `${activeChatOcc.start_time}:00`;
+          const lessonDateTime = new Date(`${activeChatOcc.date}T${timePart}`);
+          isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
+        } catch (e) {}
+
+        return (
+          <div
+            onClick={() => setActiveChatOcc(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1100,
+              background: 'rgba(15,23,42,0.65)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              animation: 'fadeIn 0.15s ease'
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '480px',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                maxHeight: '85vh',
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                padding: '24px',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    <span>Rückfragen</span> {titleText}
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                    Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveChatOcc(null)}
+                  style={{
+                    border: 'none',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Messages Viewport */}
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '24px',
+                background: '#fafbfc',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                minHeight: '280px',
+                maxHeight: '400px'
+              }} className="custom-scrollbar">
+                {isFrozen && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                    Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                  </div>
+                )}
+                {chatMessages.length === 0 ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
+                    <MessageSquare size={32} style={{ opacity: 0.3 }} />
+                    <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
+                  </div>
+                ) : (
+                  chatMessages.map((msg, idx) => {
+                    const isMe = msg.sender_id === userId;
+                    return (
+                      <div key={msg.id || idx} style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        maxWidth: '80%',
+                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                        gap: '2px'
+                      }}>
+                        <div style={{
+                          background: isMe ? 'linear-gradient(135deg, #34a853, #137333)' : '#ffffff',
+                          color: isMe ? '#ffffff' : '#1e293b',
+                          padding: '10px 14px',
+                          borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          fontSize: '0.85rem',
+                          lineHeight: 1.4,
+                          wordBreak: 'break-word',
+                          border: isMe ? 'none' : '1px solid #e2e8f0',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                        }}>
+                          {msg.content}
+                        </div>
+                        <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
+                          {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatMessagesEndRef} />
+              </div>
+
+              {/* Message Input Form */}
+              <form onSubmit={handleSendChatMessage} style={{
+                padding: '16px 24px',
+                borderTop: '1px solid #f1f5f9',
+                background: '#f8fafc',
+                display: 'flex',
+                gap: '10px'
+              }}>
+                <input
+                  type="text"
+                  placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
+                  disabled={isFrozen}
+                  value={chatTypedMessage}
+                  onChange={e => setChatTypedMessage(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    background: isFrozen ? '#f1f5f9' : '#ffffff',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    fontWeight: 600
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={isFrozen || !chatTypedMessage.trim()}
+                  style={{
+                    background: '#34a853',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '10px 16px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    cursor: (isFrozen || !chatTypedMessage.trim()) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0
+                  }}
+                >
+                  Senden
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Realtime Toast Message Overlay */}
       {toastMessage && (

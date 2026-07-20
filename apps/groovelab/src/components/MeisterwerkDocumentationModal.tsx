@@ -56,6 +56,7 @@ interface MeisterwerkDocumentationModalProps {
   onProfileClick?: (student: Student) => void;
   readOnly?: boolean;
   isEmbed?: boolean;
+  isTeacherTools?: boolean;
 }
 
 interface ProgressItem {
@@ -205,7 +206,7 @@ const SKILL_TAGS = [
   { key: 'selbststaendigkeit', label: 'Selbst geübt', icon: '💪' },
 ];
 
-export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false }) => {
+export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -524,7 +525,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>('document');
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>(isTeacherTools ? 'recordings' : 'document');
 
   // Speech Recognition & Audio play-along state
   const [isListening, setIsListening] = useState(false);
@@ -2919,6 +2920,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       : null;
 
   const renderArchivButton = (isMobile: boolean = false) => {
+    if (isTeacherTools) return null;
     const isHistoryActive = activeSubView === 'history' && activeViewMode === 'document';
     return (
       <button
@@ -2974,6 +2976,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const renderSkillRadarButton = (isMobile: boolean = false) => {
+    if (isTeacherTools) return null;
     return (
       <button
         type="button"
@@ -3164,7 +3167,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   fontWeight: 500,
                   letterSpacing: '0.01em'
                 }}>
-                  Schüler-Protokoll
+                  {isTeacherTools ? 'Aufgabenheft / Tools' : 'Schüler-Protokoll'}
                 </span>
               </div>
             </div>
@@ -3172,28 +3175,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             {/* Desktop Tabs */}
             {isCampusActive && (
               <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
-                <button
-                  type="button"
-                  onClick={() => setActiveViewMode('document')}
-                  style={{
-                    background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 14px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
-                  }}
-                  className="hover-scale"
-                >
-                  <BookOpen size={14} />
-                  <span>Protokoll</span>
-                </button>
+                {!isTeacherTools && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('document')}
+                    style={{
+                      background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <BookOpen size={14} />
+                    <span>Protokoll</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setActiveViewMode('recordings')}
@@ -3288,26 +3293,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               justifyContent: 'center',
               alignItems: 'center'
             }}>
-              <button
-                type="button"
-                onClick={() => setActiveViewMode('document')}
-                style={{
-                  background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
-                  border: 'none',
-                  color: '#ffffff',
-                  padding: '6px 12px',
-                  borderRadius: '20px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <BookOpen size={12} />
-                <span>Protokoll</span>
-              </button>
+              {!isTeacherTools && (
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('document')}
+                  style={{
+                    background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <BookOpen size={12} />
+                  <span>Protokoll</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setActiveViewMode('recordings')}
@@ -3410,18 +3417,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <>
               {/* LEFT PAGE: Lehrer Aufnahmen */}
               <div style={{
-                flex: '1 1 0%',
+                flex: isTeacherTools ? '1 1 100%' : '1 1 0%',
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
                 background: useNotebookLayout ? '#faf8f2' : 'white',
-                borderRadius: useNotebookLayout ? '0 0 0 20px' : '0',
+                borderRadius: isTeacherTools ? '0 0 20px 20px' : (useNotebookLayout ? '0 0 0 20px' : '0'),
                 boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-                borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
+                borderRight: isTeacherTools ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
                 position: 'relative',
                 padding: '28px'
               }}>
-                {useNotebookLayout && (
+                {useNotebookLayout && !isTeacherTools && (
                   <div style={{
                     position: 'absolute',
                     top: '20px',
@@ -3457,6 +3464,104 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 }}>
                   <Mic size={16} /> Aufnahmen vom Lehrer
                 </h3>
+
+                {isTeacherTools && (
+                  <div style={{
+                    margin: '0 0 24px 0',
+                    padding: '16px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    {(() => {
+                      return (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>Neue Aufnahme erstellen (max. 60s)</span>
+                              </span>
+                              {!isRecordingAudio ? (
+                                <button
+                                  type="button"
+                                  onClick={startRecordingAudio}
+                                  disabled={isUploadingAudio}
+                                  style={{
+                                    background: '#34a853',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                                  <span>Aufnahme starten</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => stopRecordingAudio()}
+                                  style={{
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
+                                  <span>Stopp ({audioDuration}s / 60s)</span>
+                                </button>
+                              )}
+                            </div>
+                            
+                            {!isRecordingAudio && (
+                              <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Kassetten-Beschriftung (z.B. Play-Along Tempo 120)"
+                                  value={audioLabel}
+                                  onChange={(e) => setAudioLabel(e.target.value)}
+                                  style={{
+                                    flex: 1,
+                                    fontSize: '0.74rem',
+                                    padding: '6px 12px',
+                                    borderRadius: '10px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    outline: 'none',
+                                    fontFamily: 'monospace'
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {isUploadingAudio && (
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>⏳</span> Lade Audio-Feedback hoch...
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {(() => {
                   const teacherAudios = homeworkNotesList
@@ -3505,255 +3610,257 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 })()}
               </div>
 
-              {/* RIGHT PAGE: Schüler Aufnahmen */}
-              <div style={{
-                flex: '1 1 0%',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                background: useNotebookLayout ? 'white' : '#f8fafc',
-                backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-                borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
-                borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
-                boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
-                position: 'relative',
-                padding: '28px'
-              }}>
-                {useNotebookLayout && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: '42px',
-                    width: '2px',
-                    background: '#fca5a5',
-                    zIndex: 10
-                  }} />
-                )}
-                {useNotebookLayout && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '20px',
-                    bottom: '20px',
-                    left: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-around',
-                    zIndex: 25
-                  }}>
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#121214',
-                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
-                      }} />
-                    ))}
-                  </div>
-                )}
-
-                <h3 style={{
-                  fontSize: '1rem',
-                  fontWeight: 850,
-                  color: '#1d1d1f',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  marginBottom: '16px',
+              {!isTeacherTools && (
+                /* RIGHT PAGE: Schüler Aufnahmen */
+                <div style={{
+                  flex: '1 1 0%',
+                  overflowY: 'auto',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
+                  flexDirection: 'column',
+                  background: useNotebookLayout ? 'white' : '#f8fafc',
+                  backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
+                  borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+                  borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
+                  boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+                  position: 'relative',
+                  padding: '28px'
                 }}>
-                  <Music size={16} /> Eigene Aufnahmen (Schüler)
-                </h3>
-
-                {/* For student: render the recording widget on their page inside the gallery */}
-                {readOnly && (
-                  <div style={{
-                    margin: '0 0 24px 0',
-                    padding: '16px',
-                    background: '#fafafa',
-                    borderRadius: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    {(() => {
-                      const audios = homeworkNotesList
-                        .map((note, originalIdx) => ({ note, originalIdx }))
-                        .filter(item => item.note.startsWith("AUDIO:"))
-                        .map(item => {
-                          const parts = item.note.substring(6).split('|');
-                          return {
-                            url: parts[0],
-                            duration: parseInt(parts[1] || '0', 10),
-                            date: parts[2],
-                            label: parts[3] || 'Play-Along',
-                            role: parts[4] || 'teacher',
-                            originalIdx: item.originalIdx
-                          };
-                        });
-                      
-                      const now = new Date();
-                      const currentMonth = now.getMonth();
-                      const currentYear = now.getFullYear();
-                      const currentMonthAudios = audios.filter(aud => {
-                        if (!aud.date) return false;
-                        const d = new Date(aud.date);
-                        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-                      });
-                      const totalUsedSeconds = currentMonthAudios.reduce((sum, aud) => sum + aud.duration, 0);
-                      const monthlyLimitSeconds = 240;
-                      const isLimitReached = totalUsedSeconds >= monthlyLimitSeconds;
-
-                      return (
-                        <>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>Neue Aufnahme erstellen (max. 60s)</span>
-                              </span>
-                              {!isRecordingAudio ? (
-                                <button
-                                  type="button"
-                                  onClick={startRecordingAudio}
-                                  disabled={isUploadingAudio || isLimitReached}
-                                  style={{
-                                    background: isLimitReached ? '#94a3b8' : '#34a853',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
-                                  <span>Aufnahme starten</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => stopRecordingAudio()}
-                                  style={{
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 12px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
-                                >
-                                  <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
-                                  <span>Stopp ({audioDuration}s / 60s)</span>
-                                </button>
-                              )}
-                            </div>
-                            
-                            {!isRecordingAudio && !isLimitReached && (
-                              <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                                <input
-                                  type="text"
-                                  placeholder="Kassetten-Beschriftung (z.B. Mein Übe-Versuch)"
-                                  value={audioLabel}
-                                  onChange={(e) => setAudioLabel(e.target.value)}
-                                  style={{
-                                    flex: 1,
-                                    fontSize: '0.74rem',
-                                    padding: '6px 12px',
-                                    borderRadius: '10px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#fff',
-                                    outline: 'none',
-                                    fontFamily: 'monospace'
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          <div style={{ 
-                            fontSize: '0.72rem', 
-                            color: isLimitReached ? '#ef4444' : '#475569', 
-                            fontWeight: 700, 
-                            marginTop: '2px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}>
-                            <span>
-                              {isLimitReached 
-                                ? '⚠️ Monatliches Aufnahme-Limit (240 Sek.) erreicht.'
-                                : `Aufnahmezeit diesen Monat: ${totalUsedSeconds}s / ${monthlyLimitSeconds}s verbraucht.`}
-                            </span>
-                          </div>
-
-                          {isUploadingAudio && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>⏳</span> Lade Audio-Feedback hoch...
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {(() => {
-                  const studentAudios = homeworkNotesList
-                    .map((note, originalIdx) => ({ note, originalIdx }))
-                    .filter(item => item.note.startsWith("AUDIO:"))
-                    .map(item => {
-                      const parts = item.note.substring(6).split('|');
-                      return {
-                        url: parts[0],
-                        duration: parseInt(parts[1] || '0', 10),
-                        date: parts[2],
-                        label: parts[3] || 'Play-Along',
-                        role: parts[4] || 'teacher',
-                        originalIdx: item.originalIdx
-                      };
-                    })
-                    .filter(aud => aud.role === 'student');
-
-                  if (studentAudios.length === 0) {
-                    return (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
-                        <Music size={28} style={{ opacity: 0.4, color: '#64748b' }} />
-                        <div>
-                          <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine eigenen Aufnahmen</p>
-                          <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Nimm dein Spiel auf und zeige deine Fortschritte deinem Lehrer!</p>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-                      {studentAudios.map((aud, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
-                          <RetroCassettePlayer
-                            url={aud.url}
-                            duration={aud.duration}
-                            index={idx}
-                            label={aud.label}
-                            onDelete={readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
-                          />
-                        </div>
+                  {useNotebookLayout && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: '42px',
+                      width: '2px',
+                      background: '#fca5a5',
+                      zIndex: 10
+                    }} />
+                  )}
+                  {useNotebookLayout && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '20px',
+                      bottom: '20px',
+                      left: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-around',
+                      zIndex: 25
+                    }}>
+                      {Array.from({ length: 6 }).map((_, idx) => (
+                        <div key={idx} style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#121214',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)'
+                        }} />
                       ))}
                     </div>
-                  );
-                })()}
-              </div>
+                  )}
+
+                  <h3 style={{
+                    fontSize: '1rem',
+                    fontWeight: 850,
+                    color: '#1d1d1f',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <Music size={16} /> Eigene Aufnahmen (Schüler)
+                  </h3>
+
+                  {/* For student: render the recording widget on their page inside the gallery */}
+                  {readOnly && (
+                    <div style={{
+                      margin: '0 0 24px 0',
+                      padding: '16px',
+                      background: '#fafafa',
+                      borderRadius: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      {(() => {
+                        const audios = homeworkNotesList
+                          .map((note, originalIdx) => ({ note, originalIdx }))
+                          .filter(item => item.note.startsWith("AUDIO:"))
+                          .map(item => {
+                            const parts = item.note.substring(6).split('|');
+                            return {
+                              url: parts[0],
+                              duration: parseInt(parts[1] || '0', 10),
+                              date: parts[2],
+                              label: parts[3] || 'Play-Along',
+                              role: parts[4] || 'teacher',
+                              originalIdx: item.originalIdx
+                            };
+                          });
+                        
+                        const now = new Date();
+                        const currentMonth = now.getMonth();
+                        const currentYear = now.getFullYear();
+                        const currentMonthAudios = audios.filter(aud => {
+                          if (!aud.date) return false;
+                          const d = new Date(aud.date);
+                          return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                        });
+                        const totalUsedSeconds = currentMonthAudios.reduce((sum, aud) => sum + aud.duration, 0);
+                        const monthlyLimitSeconds = 240;
+                        const isLimitReached = totalUsedSeconds >= monthlyLimitSeconds;
+
+                        return (
+                          <>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>Neue Aufnahme erstellen (max. 60s)</span>
+                                </span>
+                                {!isRecordingAudio ? (
+                                  <button
+                                    type="button"
+                                    onClick={startRecordingAudio}
+                                    disabled={isUploadingAudio || isLimitReached}
+                                    style={{
+                                      background: isLimitReached ? '#94a3b8' : '#34a853',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '6px 12px',
+                                      borderRadius: '12px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />
+                                    <span>Aufnahme starten</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => stopRecordingAudio()}
+                                    style={{
+                                      background: '#ef4444',
+                                      color: '#fff',
+                                      border: 'none',
+                                      padding: '6px 12px',
+                                      borderRadius: '12px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <span style={{ width: '8px', height: '8px', background: 'currentColor', display: 'inline-block' }} />
+                                    <span>Stopp ({audioDuration}s / 60s)</span>
+                                  </button>
+                                )}
+                              </div>
+                              
+                              {!isRecordingAudio && !isLimitReached && (
+                                <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="Kassetten-Beschriftung (z.B. Mein Übe-Versuch)"
+                                    value={audioLabel}
+                                    onChange={(e) => setAudioLabel(e.target.value)}
+                                    style={{
+                                      flex: 1,
+                                      fontSize: '0.74rem',
+                                      padding: '6px 12px',
+                                      borderRadius: '10px',
+                                      border: '1px solid #cbd5e1',
+                                      background: '#fff',
+                                      outline: 'none',
+                                      fontFamily: 'monospace'
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ 
+                              fontSize: '0.72rem', 
+                              color: isLimitReached ? '#ef4444' : '#475569', 
+                              fontWeight: 700, 
+                              marginTop: '2px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <span>
+                                {isLimitReached 
+                                  ? '⚠️ Monatliches Aufnahme-Limit (240 Sek.) erreicht.'
+                                  : `Aufnahmezeit diesen Monat: ${totalUsedSeconds}s / ${monthlyLimitSeconds}s verbraucht.`}
+                              </span>
+                            </div>
+
+                            {isUploadingAudio && (
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>⏳</span> Lade Audio-Feedback hoch...
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const studentAudios = homeworkNotesList
+                      .map((note, originalIdx) => ({ note, originalIdx }))
+                      .filter(item => item.note.startsWith("AUDIO:"))
+                      .map(item => {
+                        const parts = item.note.substring(6).split('|');
+                        return {
+                          url: parts[0],
+                          duration: parseInt(parts[1] || '0', 10),
+                          date: parts[2],
+                          label: parts[3] || 'Play-Along',
+                          role: parts[4] || 'teacher',
+                          originalIdx: item.originalIdx
+                        };
+                      })
+                      .filter(aud => aud.role === 'student');
+
+                    if (studentAudios.length === 0) {
+                      return (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', padding: '60px 20px', gap: '12px', textAlign: 'center' }}>
+                          <Music size={28} style={{ opacity: 0.4, color: '#64748b' }} />
+                          <div>
+                            <p style={{ fontWeight: 700, fontSize: '0.86rem', color: '#64748b', margin: '0 0 2px' }}>Keine eigenen Aufnahmen</p>
+                            <p style={{ fontSize: '0.74rem', margin: 0, opacity: 0.8 }}>Nimm dein Spiel auf und zeige deine Fortschritte deinem Lehrer!</p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                        {studentAudios.map((aud, idx) => (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
+                            <RetroCassettePlayer
+                              url={aud.url}
+                              duration={aud.duration}
+                              index={idx}
+                              label={aud.label}
+                              onDelete={readOnly ? () => handleDeleteNote(aud.originalIdx) : undefined}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </>
           ) : activeModalTab === 'document' ? (
             <>
@@ -6791,50 +6898,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       {/* Text Notes stacked vertically */}
                                       {textNotes.length > 0 && (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                          {textNotes.map((item) => (
-                                            <div key={item.idx} style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              background: '#ffffff',
-                                              border: '1px solid rgba(251, 191, 36, 0.15)',
-                                              padding: '8px 12px',
-                                              borderRadius: '12px',
-                                              fontSize: '0.76rem',
-                                              fontWeight: 650,
-                                              color: '#1e293b',
-                                              lineHeight: '1.4',
-                                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                                            }}>
-                                              <div style={{ flex: 1, paddingRight: '8px' }}>
-                                                {item.note.startsWith("LOOP:") ? (() => {
-                                                  const parts = item.note.substring(5).split('|');
-                                                  const label = parts[3] || 'Mein Loop-Mix';
-                                                  const duration = parts[1] || '8';
-                                                  return `🎵 Loop-Mix gespeichert: "${label}" (${duration}s)`;
-                                                })() : item.note}
+                                          {textNotes.map((item) => {
+                                            const isLoop = item.note.startsWith("LOOP:");
+                                            return (
+                                              <div key={item.idx} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                background: isLoop ? '#fefce8' : '#ffffff',
+                                                border: isLoop ? '1px solid rgba(234, 179, 8, 0.2)' : '1px solid rgba(251, 191, 36, 0.15)',
+                                                padding: isLoop ? '4px 10px' : '8px 12px',
+                                                borderRadius: isLoop ? '10px' : '12px',
+                                                fontSize: isLoop ? '0.7rem' : '0.76rem',
+                                                fontWeight: 650,
+                                                color: '#1e293b',
+                                                lineHeight: '1.4',
+                                                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+                                                marginTop: isLoop ? '4px' : '0'
+                                              }}>
+                                                <div style={{ flex: 1, paddingRight: '8px' }}>
+                                                  {isLoop ? (() => {
+                                                    const parts = item.note.substring(5).split('|');
+                                                    const label = parts[3] || 'Mein Loop-Mix';
+                                                    const duration = parts[1] || '8';
+                                                    return `🎵 Loop-Mix: "${label}" (${duration}s)`;
+                                                  })() : item.note}
+                                                </div>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleDeleteNote(item.idx)}
+                                                  style={{
+                                                    border: 'none',
+                                                    background: 'none',
+                                                    color: '#ef4444',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.74rem',
+                                                    fontWeight: 800,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '2px',
+                                                    alignSelf: 'center'
+                                                  }}
+                                                >
+                                                  ✕
+                                                </button>
                                               </div>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleDeleteNote(item.idx)}
-                                                style={{
-                                                  border: 'none',
-                                                  background: 'none',
-                                                  color: '#ef4444',
-                                                  cursor: 'pointer',
-                                                  fontSize: '0.74rem',
-                                                  fontWeight: 800,
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  padding: '2px',
-                                                  alignSelf: 'center'
-                                                }}
-                                              >
-                                                ✕
-                                              </button>
-                                            </div>
-                                          ))}
+                                            );
+                                          })}
                                         </div>
                                       )}
                                     </div>

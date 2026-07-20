@@ -747,6 +747,8 @@ export function AdminDashboard({
   const [tbSearch, setTbSearch] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'all' | 'rhythm' | 'technique' | 'performance'>('all');
   const [showTextbausteinModal, setShowTextbausteinModal] = useState<boolean>(false);
+  const [showTeacherToolsModal, setShowTeacherToolsModal] = useState<boolean>(false);
+  const [previewingTextbaustein, setPreviewingTextbaustein] = useState<any | null>(null);
   const [selectedIcon, setSelectedIcon] = useState('🎵');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [copiedTbId, setCopiedTbId] = useState<string | null>(null);
@@ -10194,6 +10196,38 @@ export function AdminDashboard({
                   : 'Verwalte deine Songs und deren Instrumentierungen für GrooveLab.'}
               </p>
             </div>
+            {activePlatform === 'campus' && (
+              <button
+                type="button"
+                onClick={() => setShowTeacherToolsModal(true)}
+                style={{
+                  background: '#e6f4ea',
+                  color: '#34a853',
+                  border: '1px solid rgba(52,168,83,0.15)',
+                  padding: '8px 16px',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.08)',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'Inter, sans-serif'
+                }}
+                className="hover-scale-mini"
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = '#d1fae5';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = '#e6f4ea';
+                }}
+              >
+                <Sliders size={15} />
+                <span>Aufgabenheft / Tools</span>
+              </button>
+            )}
           </div>
 
           {/* Unified Smart Search Field */}
@@ -10738,16 +10772,18 @@ export function AdminDashboard({
                         setShowAddSong(false);
                       }}
                       style={{ 
-                        padding: '14px 18px', 
+                        padding: '16px 20px', 
                         display: 'flex', 
-                        gap: '12px',
+                        gap: '16px',
                         alignItems: 'center', 
                         background: 'white', 
-                        borderRadius: '24px', 
-                        border: editingSong?.id === song.id ? `2px solid ${brandColor}` : '1px solid #cbd5e1', 
+                        borderRadius: '20px', 
+                        border: editingSong?.id === song.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
                         borderLeft: `5px solid ${lwColor.from}`,
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)', 
-                        transition: 'all 0.2s ease',
+                        boxShadow: editingSong?.id === song.id 
+                          ? `0 10px 25px -5px ${brandColor}20` 
+                          : '0 8px 30px -10px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.01)', 
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                         minHeight: '92px',
                         boxSizing: 'border-box',
                         cursor: 'pointer'
@@ -10942,17 +10978,19 @@ export function AdminDashboard({
                           setStudentDetailSearch('');
                         }}
                         style={{ 
-                          padding: '14px 18px', 
+                          padding: '16px 20px', 
                           background: 'white', 
                           display: 'flex', 
                           gap: '16px', 
                           alignItems: 'center', 
-                          borderRadius: '24px', 
-                          border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid #cbd5e1', 
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                          borderRadius: '20px', 
+                          border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
+                          boxShadow: editingLehrwerk?.id === item.id 
+                            ? `0 10px 25px -5px ${brandColor}20` 
+                            : '0 8px 30px -10px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.01)',
                           position: 'relative',
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                           minHeight: '92px',
                           boxSizing: 'border-box'
                         }}
@@ -11092,9 +11130,7 @@ export function AdminDashboard({
                     setCopiedTbId(tb.id);
                     setTimeout(() => setCopiedTbId(null), 850);
                   } else {
-                    navigator.clipboard.writeText(tb.text);
-                    setCopiedTbId(tb.id);
-                    setTimeout(() => setCopiedTbId(null), 1000);
+                    setPreviewingTextbaustein(tb);
                   }
                 };
 
@@ -16714,6 +16750,129 @@ export function AdminDashboard({
             setSelectedStudent(student);
           }}
         />
+      )}
+
+      {showTeacherToolsModal && (
+        <MeisterwerkDocumentationModal
+          student={{
+            id: 'teacher-self',
+            first_name: admin?.first_name || 'Lehrer',
+            last_name: admin?.last_name || '',
+            photo_url: admin?.photo_url || '/campus_login_hero.png',
+            is_campus_active: true
+          }}
+          onClose={() => setShowTeacherToolsModal(false)}
+          teacherId={userId}
+          isTeacherTools={true}
+        />
+      )}
+
+      {previewingTextbaustein && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '450px',
+            padding: '28px',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            fontFamily: 'Inter, sans-serif'
+          }}>
+            <button
+              type="button"
+              onClick={() => setPreviewingTextbaustein(null)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#94a3b8'
+              }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.8rem' }}>
+                {previewingTextbaustein.label.split(' ')[0] && /\p{Emoji}/u.test(previewingTextbaustein.label.split(' ')[0])
+                  ? previewingTextbaustein.label.split(' ')[0]
+                  : '📝'}
+              </span>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#1e293b', fontWeight: 900 }}>
+                  {previewingTextbaustein.label.split(' ')[0] && /\p{Emoji}/u.test(previewingTextbaustein.label.split(' ')[0])
+                    ? previewingTextbaustein.label.split(' ').slice(1).join(' ')
+                    : previewingTextbaustein.label}
+                </h3>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Schnell-Text Vorlage</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px',
+              fontSize: '0.86rem',
+              color: '#334155',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              fontFamily: 'monospace'
+            }}>
+              {previewingTextbaustein.text}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(previewingTextbaustein.text);
+                  setCopiedTbId(previewingTextbaustein.id);
+                  alert('Vorlage in die Zwischenablage kopiert!');
+                  setPreviewingTextbaustein(null);
+                  setTimeout(() => setCopiedTbId(null), 1000);
+                }}
+                style={{
+                  flex: 1,
+                  background: '#34a853',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Copy size={16} />
+                <span>In die Zwischenablage kopieren</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modals for Band Editing (Teacher Sonderrecht) */}

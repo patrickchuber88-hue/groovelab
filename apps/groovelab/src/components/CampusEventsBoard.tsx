@@ -4293,11 +4293,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       rowBorder = '1px solid #fee2e2';
                                       textColor = '#991b1b';
                                       subColor = '#ef4444';
-                                    } else if (hasMessages) {
-                                      rowBg = '#fef9c3';
-                                      rowBorder = '1px solid #fef08a';
-                                      textColor = '#854d0e';
-                                      subColor = '#ca8a04';
                                     } else if (isRescheduled) {
                                       rowBg = '#fffbeb';
                                       rowBorder = '1px solid #fef3c7';
@@ -4340,7 +4335,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             flexDirection: 'column',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            background: isCanceled ? '#fee2e2' : hasMessages ? '#fef08a' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f8fafc',
+                                            background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f8fafc',
                                             borderRadius: '6px',
                                             padding: '2px',
                                             width: '34px',
@@ -4424,6 +4419,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         {/* Right Status */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                           <button
+                                            type="button"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               setActiveChatOcc(occ);
@@ -4431,17 +4427,27 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             title="1:1 Shoutbox öffnen"
                                             style={{
                                               border: 'none',
-                                              background: activeChatOcc?.id === occ.id ? '#e6f4ea' : '#f1f5f9',
-                                              color: activeChatOcc?.id === occ.id ? '#34a853' : '#475569',
-                                              padding: '5px',
-                                              borderRadius: '6px',
+                                              background: 'none',
+                                              padding: '6px',
                                               cursor: 'pointer',
-                                              display: 'inline-flex',
+                                              display: 'flex',
                                               alignItems: 'center',
-                                              justifyContent: 'center'
+                                              justifyContent: 'center',
+                                              color: hasMessages ? '#eab308' : '#94a3b8',
+                                              transition: 'all 0.2s',
+                                              borderRadius: '50%',
+                                              flexShrink: 0
                                             }}
+                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.06)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
                                           >
-                                            <MessageSquare size={13} />
+                                            <MessageSquare 
+                                              size={16} 
+                                              fill={hasMessages ? '#eab308' : 'none'} 
+                                              style={{
+                                                animation: hasMessages ? 'pulse 2s infinite' : 'none'
+                                              }}
+                                            />
                                           </button>
                                         </div>
                                       </div>

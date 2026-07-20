@@ -3135,34 +3135,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     onboardingOverlayContent = (
       <div style={{
         background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
-        borderRadius: '24px',
-        padding: '40px',
+        borderRadius: '20px',
+        padding: '24px 32px',
         maxWidth: '750px',
-        margin: '40px auto',
+        margin: '24px auto',
         border: '1px solid #e2e8f0',
         boxShadow: '0 20px 50px rgba(0,0,0,0.05)',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ height: '64px', width: '64px', background: '#e6f4ea', color: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
-            <Calendar size={32} />
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <div style={{ height: '48px', width: '48px', background: '#e6f4ea', color: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+            <Calendar size={24} />
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px 0', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
             Persönliches Onboarding
           </h2>
-          <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: '1.5', maxWidth: '580px', margin: '0 auto' }}>
+          <p style={{ color: '#475569', fontSize: '0.82rem', lineHeight: '1.4', maxWidth: '620px', margin: '0 auto' }}>
             Bevor du den Stundenplan-Designer nutzen kannst, richte bitte deine Wunschtage und Unterrichtszeiten ein. Deine Schüler sehen beim Onboarding nur die hier ausgewählten Wochentage und können Wunschzeiten nur innerhalb der von dir festgelegten Zeitfenster angeben.
           </p>
         </div>
 
         {onboardingError && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={16} />
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '10px 14px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={14} />
             <span>{onboardingError}</span>
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
           {DAYS_OF_WEEK.map(day => {
             const cfg = onboardingAvailability[day.value];
             return (
@@ -3170,14 +3170,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px 20px',
-                borderRadius: '16px',
+                padding: '10px 16px',
+                borderRadius: '12px',
                 background: cfg.checked ? '#ffffff' : '#f8fafc',
                 border: cfg.checked ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
                 transition: 'all 0.2s',
                 boxShadow: cfg.checked ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
               }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 700, color: '#1e293b', fontSize: '0.9rem' }}>
                   <input
                     type="checkbox"
                     checked={cfg.checked}
@@ -3189,8 +3189,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     }}
                     style={{
                       accentColor: '#34a853',
-                      width: '18px',
-                      height: '18px',
+                      width: '16px',
+                      height: '16px',
                       cursor: 'pointer'
                     }}
                   />
@@ -3198,9 +3198,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </label>
 
                 {cfg.checked && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
                       <select
                         value={cfg.start}
                         onChange={(e) => {
@@ -3210,10 +3210,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.85rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
                           color: '#1e293b',
                           background: '#ffffff',
@@ -3228,8 +3228,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       </select>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
                       <select
                         value={cfg.end}
                         onChange={(e) => {
@@ -3239,10 +3239,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.85rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
                           color: '#1e293b',
                           background: '#ffffff',
