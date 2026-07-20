@@ -11903,12 +11903,14 @@ const targetVol = isActive ? vol : 0;
         justifyContent: 'flex-start',
         gap: '16px',
         padding: '24px 20px',
-        background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
-        border: '1.5px solid rgba(0, 0, 0, 0.08)',
+        background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+        border: '1.5px solid rgba(52, 168, 83, 0.15)',
         borderRadius: '36px',
-        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 4px rgba(0, 0, 0, 0.02)',
+        boxShadow: '0 20px 45px rgba(52, 168, 83, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 4px rgba(0, 0, 0, 0.02)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        width: '100%',
+        maxWidth: '280px'
       }}>
         {/* Decorative Top Accent Light */}
         <div style={{
@@ -11922,24 +11924,25 @@ const targetVol = isActive ? vol : 0;
           transition: 'background 0.3s ease'
         }} />
 
-        {/* iPod Display Glass Screen */}
+        {/* iPod Display Glass Screen (Blue-gray LCD retro glow) */}
         <div style={{
-          width: '100%',
-          background: '#1a1a1c',
-          borderRadius: '24px',
-          padding: '16px',
+          width: '240px',
+          height: '186px',
+          background: 'linear-gradient(180deg, #242f41 0%, #171e29 100%)',
+          borderRadius: '20px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: 'inset 0 8px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(255, 255, 255, 0.15)',
-          border: '1px solid rgba(0, 0, 0, 0.2)'
+          boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(255, 255, 255, 0.2)',
+          border: '1px solid rgba(0, 0, 0, 0.25)',
+          overflow: 'hidden'
         }}>
           {/* Central Jog Wheel / Status Ring */}
           <div style={{
             position: 'relative',
-            width: '150px',
-            height: '150px',
+            width: '144px',
+            height: '144px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -11962,7 +11965,7 @@ const targetVol = isActive ? vol : 0;
                 cx="100"
                 cy="100"
                 r="84"
-                stroke="#2c2c2e"
+                stroke="#2e3b4e"
                 strokeWidth="6"
                 fill="none"
               />
@@ -11988,28 +11991,28 @@ const targetVol = isActive ? vol : 0;
               className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
               style={{
                 position: 'absolute',
-                width: '118px',
-                height: '118px',
+                width: '114px',
+                height: '114px',
                 borderRadius: '50%',
                 background: isAutoSequenceActive 
-                  ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(26,26,28,0.98) 100%)' 
+                  ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(23,30,41,0.98) 100%)' 
                   : isPlaying 
-                    ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(26,26,28,0.98) 100%)' 
-                    : 'radial-gradient(circle, rgba(40,40,42,0.9) 0%, rgba(26,26,28,0.98) 100%)',
+                    ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(23,30,41,0.98) 100%)' 
+                    : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(23,30,41,0.98) 100%)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.15)',
+                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.1)',
                 transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
               }}
             >
               <span style={{ 
-                fontSize: '2.2rem', 
+                fontSize: '2.1rem', 
                 fontWeight: 800, 
                 fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 letterSpacing: '-0.04em', 
-                color: ringColor === '#e5e5e7' ? '#ffffff' : ringColor,
+                color: ringColor === '#e5e5e7' ? '#e2e8f0' : ringColor,
                 textShadow: ringColor !== '#e5e5e7' ? `0 2px 12px ${ringColor}40` : 'none',
                 transition: 'all 0.3s ease'
               }}>
@@ -12017,7 +12020,7 @@ const targetVol = isActive ? vol : 0;
               </span>
               <span style={{ 
                 fontSize: '0.52rem', 
-                color: '#8e8e93', 
+                color: '#8a99ad', 
                 fontWeight: 800, 
                 letterSpacing: '0.12em', 
                 marginTop: '-1px', 
