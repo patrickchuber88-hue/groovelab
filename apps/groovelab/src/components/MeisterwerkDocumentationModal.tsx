@@ -9751,6 +9751,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const val = parseInt(latencyEntry.replace('LATENCY:', ''), 10);
         if (!isNaN(val)) {
           setSyncOffsetMs(val);
+          isManualLatencyAdjustmentRef.current = true;
         }
       }
     }
@@ -10268,7 +10269,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const syncOffsetMsRef = useRef<number>(0);
-  const isManualLatencyAdjustmentRef = useRef<boolean>(false);
+  const isManualLatencyAdjustmentRef = useRef<boolean>(
+    localStorage.getItem('groovelab_latency_calibrated') === 'true' || 
+    localStorage.getItem('groovelab_sync_offset_ms') !== null
+  );
   useEffect(() => { syncOffsetMsRef.current = syncOffsetMs; }, [syncOffsetMs]);
   const [useHeadphones, setUseHeadphones] = useState(false);
   const useHeadphonesRef = useRef(false);
