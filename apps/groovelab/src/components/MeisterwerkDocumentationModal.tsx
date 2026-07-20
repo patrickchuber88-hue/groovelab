@@ -11538,11 +11538,13 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const isPause = isAutoSequenceActive && autoSequenceStatus.startsWith("PAUSE");
   const isAnyTrackRecording = tracks.some(t => t.isRecording);
-  const ringColor = (isAutoSequenceActive || isAnyTrackRecording)
-    ? '#ea4335' // Red during the entire auto-sequence or individual track recording
-    : isPlaying 
-      ? '#34a853' // Green during playback
-      : '#e5e5e7'; // default/ready
+  const ringColor = isPause
+    ? '#eab308' // Yellow during the intermission pause
+    : (isAutoSequenceActive || isAnyTrackRecording)
+      ? '#ea4335' // Red during active recording
+      : isPlaying 
+        ? '#34a853' // Green during playback
+        : '#e5e5e7'; // default/ready
 
   const savedLoops = homeworkNotesList
     .filter(note => note.startsWith('AUDIO:'))
@@ -11592,11 +11594,19 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           50% { filter: drop-shadow(0 0 10px rgba(52, 168, 83, 0.65)); }
           100% { filter: drop-shadow(0 0 3px rgba(52, 168, 83, 0.25)); }
         }
+        @keyframes glow-pause {
+          0% { filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.3)); }
+          50% { filter: drop-shadow(0 0 12px rgba(234, 179, 8, 0.8)); }
+          100% { filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.3)); }
+        }
         .glow-record {
           animation: glow-record 2s infinite ease-in-out;
         }
         .glow-play {
           animation: glow-play 2s infinite ease-in-out;
+        }
+        .glow-pause {
+          animation: glow-pause 2s infinite ease-in-out;
         }
         @keyframes central-pulse-play {
           0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
@@ -11608,11 +11618,19 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(234,67,53,0.35); }
           100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
         }
+        @keyframes central-pulse-pause {
+          0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
+          50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(234,179,8,0.35); }
+          100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
+        }
         .central-pulse-play {
           animation: central-pulse-play 2s infinite ease-in-out;
         }
         .central-pulse-rec {
           animation: central-pulse-rec 2s infinite ease-in-out;
+        }
+        .central-pulse-pause {
+          animation: central-pulse-pause 2s infinite ease-in-out;
         }
         .tactile-btn {
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -11765,7 +11783,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           {/* Animated SVG Progress Sweep */}
           <svg 
             viewBox="0 0 200 200"
-            className={isAnyTrackRecording || isAutoSequenceActive ? 'glow-record' : isPlaying ? 'glow-play' : ''}
+            className={isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : ''}
             style={{
               position: 'absolute',
               width: '100%',
@@ -11802,7 +11820,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
           {/* Central Plate */}
           <div 
-            className={(isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
+            className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
             style={{
               position: 'absolute',
               width: '124px',
@@ -11850,7 +11868,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             className="tactile-btn"
             style={{
               width: '100%',
-              background: isAutoSequenceActive ? '#ea4335' : '#34a853',
+              background: isPause ? '#eab308' : isAutoSequenceActive ? '#ea4335' : '#34a853',
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
