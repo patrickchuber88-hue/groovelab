@@ -10140,7 +10140,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 }
               }
               
-              const threshold = 0.03;
+              // Dynamic threshold: at least 0.08, or 3.5 times the ambient noise level
+              const threshold = Math.max(0.08, ambientNoisePeak * 3.5);
               if (bestIndex !== -1 && maxCorrelation > threshold) {
                 detectionTime = ctx!.currentTime + (bestIndex / sampleRate);
                 const latencyMs = Math.round((detectionTime - playTime) * 1000);
@@ -10153,13 +10154,25 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   const startOffset = Math.max(0, bestIndex - 120);
                   const endOffset = Math.min(inputData.length, bestIndex + 280);
                   const rawSlice = Array.from(inputData.slice(startOffset, endOffset));
+                  
+                  // Apply exponential decay window starting at onset to suppress room reflection/echo tails
+                  const decayFactor = 0.991;
+                  let currentDecay = 1.0;
+                  const processed = rawSlice.map((v, idx) => {
+                    if (idx >= 120) {
+                      currentDecay *= decayFactor;
+                      return v * currentDecay;
+                    }
+                    return v;
+                  });
+
                   // Normalize waveform so the wave is clearly visible regardless of microphone volume
                   let maxVal = 0.001;
-                  for (let i = 0; i < rawSlice.length; i++) {
-                    const absVal = Math.abs(rawSlice[i]);
+                  for (let i = 0; i < processed.length; i++) {
+                    const absVal = Math.abs(processed[i]);
                     if (absVal > maxVal) maxVal = absVal;
                   }
-                  finalWaveformCaptured = rawSlice.map(v => v / maxVal);
+                  finalWaveformCaptured = processed.map(v => v / maxVal);
                 }
                 
                 currentClickIndex++;
@@ -14177,7 +14190,7 @@ const targetVol = isActive ? vol : 0;
                                 justifyContent: 'space-between',
                                 padding: '4px'
                               }}>
-                                <span style={{ fontSize: '0.46rem', color: '#34a853', fontWeight: 800 }}>✓ IDEAL (SYNCHRON)</span>
+                                <span style={{ fontSize: '0.46rem', color: '#34a853', fontWeight: 800 }}>✓ OPTIMAL (SYNCHRON)</span>
                                 <svg viewBox="0 0 100 32" style={{ width: '100%', height: '32px' }}>
                                   {/* Red Ref Line at x=30 */}
                                   <line x1="30" y1="0" x2="30" y2="32" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
@@ -14200,7 +14213,7 @@ const targetVol = isActive ? vol : 0;
                                 justifyContent: 'space-between',
                                 padding: '4px'
                               }}>
-                                <span style={{ fontSize: '0.46rem', color: '#ea4335', fontWeight: 800 }}>✗ ZU SPÄT (LATENZ)</span>
+                                <span style={{ fontSize: '0.46rem', color: '#ea4335', fontWeight: 800 }}>✗ ASYNCHRON (ABWEICHUNG)</span>
                                 <svg viewBox="0 0 100 32" style={{ width: '100%', height: '32px' }}>
                                   {/* Red Ref Line at x=30 */}
                                   <line x1="30" y1="0" x2="30" y2="32" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
