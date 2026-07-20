@@ -11903,119 +11903,129 @@ const targetVol = isActive ? vol : 0;
         justifyContent: 'flex-start',
         gap: '16px',
         padding: '24px 20px',
-        background: 'rgba(255, 255, 255, 0.72)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255, 255, 255, 0.6)',
-        borderRadius: '20px',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
+        background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
+        border: '1.5px solid rgba(0, 0, 0, 0.08)',
+        borderRadius: '36px',
+        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 4px rgba(0, 0, 0, 0.02)',
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Subtle decorative top line matching state */}
+        {/* Decorative Top Accent Light */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          height: '4px',
+          height: '5px',
           background: ringColor,
-          opacity: 0.8,
+          opacity: 0.9,
           transition: 'background 0.3s ease'
         }} />
 
-        {/* Central Jog Wheel / Status Ring */}
+        {/* iPod Display Glass Screen */}
         <div style={{
-          position: 'relative',
-          width: '160px',
-          height: '160px',
+          width: '100%',
+          background: '#1a1a1c',
+          borderRadius: '24px',
+          padding: '16px',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'transparent',
-          margin: '2px 0'
+          boxShadow: 'inset 0 8px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(255, 255, 255, 0.15)',
+          border: '1px solid rgba(0, 0, 0, 0.2)'
         }}>
-          {/* Animated SVG Progress Sweep */}
-          <svg 
-            viewBox="0 0 200 200"
-            className={isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : ''}
-            style={{
-              position: 'absolute',
-              width: '100%',
-              height: '100%',
-              transform: 'rotate(-90deg) translate3d(0,0,0)',
-              willChange: 'transform',
-              transition: 'filter 0.3s ease'
-            }}
-          >
-            <circle
-              cx="100"
-              cy="100"
-              r="84"
-              stroke="#edf2f7"
-              strokeWidth="6"
-              fill="none"
-            />
-            <circle
-              cx="100"
-              cy="100"
-              r="84"
-              stroke={ringColor}
-              strokeWidth="8"
-              fill="none"
-              strokeDasharray="527.8 527.8"
-              strokeDashoffset={527.8 - (527.8 * playbackProgress) / 100}
-              strokeLinecap="round"
+          {/* Central Jog Wheel / Status Ring */}
+          <div style={{
+            position: 'relative',
+            width: '150px',
+            height: '150px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'transparent'
+          }}>
+            {/* Animated SVG Progress Sweep */}
+            <svg 
+              viewBox="0 0 200 200"
+              className={isPause ? 'glow-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'glow-record' : isPlaying ? 'glow-play' : ''}
               style={{
-                transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
-                willChange: 'stroke-dashoffset'
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                transform: 'rotate(-90deg) translate3d(0,0,0)',
+                willChange: 'transform',
+                transition: 'filter 0.3s ease'
               }}
-            />
-          </svg>
+            >
+              <circle
+                cx="100"
+                cy="100"
+                r="84"
+                stroke="#2c2c2e"
+                strokeWidth="6"
+                fill="none"
+              />
+              <circle
+                cx="100"
+                cy="100"
+                r="84"
+                stroke={ringColor}
+                strokeWidth="8"
+                fill="none"
+                strokeDasharray="527.8 527.8"
+                strokeDashoffset={527.8 - (527.8 * playbackProgress) / 100}
+                strokeLinecap="round"
+                style={{
+                  transition: (isPlaying || isAutoSequenceActive) ? 'none' : 'stroke-dashoffset 0.2s ease-out',
+                  willChange: 'stroke-dashoffset'
+                }}
+              />
+            </svg>
 
-          {/* Central Plate (Creative, organic rounded styling) */}
-          <div 
-            className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
-            style={{
-              position: 'absolute',
-              width: '128px',
-              height: '128px',
-              borderRadius: '50%',
-              background: isAutoSequenceActive 
-                ? 'radial-gradient(circle, rgba(253,230,230,0.95) 0%, rgba(255,255,255,0.98) 100%)' 
-                : isPlaying 
-                  ? 'radial-gradient(circle, rgba(230,244,234,0.95) 0%, rgba(255,255,255,0.98) 100%)' 
-                  : 'radial-gradient(circle, rgba(244,245,247,0.9) 0%, rgba(255,255,255,0.98) 100%)',
-              backdropFilter: 'blur(12px)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.9), 0 10px 24px rgba(0,0,0,0.04)',
-              transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
-            }}
-          >
-            <span style={{ 
-              fontSize: '2.3rem', 
-              fontWeight: 800, 
-              fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              letterSpacing: '-0.04em', 
-              color: ringColor === '#e5e5e7' ? '#1d1d1f' : ringColor,
-              textShadow: ringColor !== '#e5e5e7' ? `0 2px 10px ${ringColor}25` : 'none',
-              transition: 'all 0.3s ease'
-            }}>
-              {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
-            </span>
-            <span style={{ 
-              fontSize: '0.52rem', 
-              color: '#86868b', 
-              fontWeight: 800, 
-              letterSpacing: '0.12em', 
-              marginTop: '-1px', 
-              textTransform: 'uppercase' 
-            }}>
-              {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
-            </span>
+            {/* Central Plate inside display bezel */}
+            <div 
+              className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
+              style={{
+                position: 'absolute',
+                width: '118px',
+                height: '118px',
+                borderRadius: '50%',
+                background: isAutoSequenceActive 
+                  ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(26,26,28,0.98) 100%)' 
+                  : isPlaying 
+                    ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(26,26,28,0.98) 100%)' 
+                    : 'radial-gradient(circle, rgba(40,40,42,0.9) 0%, rgba(26,26,28,0.98) 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.15)',
+                transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
+              }}
+            >
+              <span style={{ 
+                fontSize: '2.2rem', 
+                fontWeight: 800, 
+                fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                letterSpacing: '-0.04em', 
+                color: ringColor === '#e5e5e7' ? '#ffffff' : ringColor,
+                textShadow: ringColor !== '#e5e5e7' ? `0 2px 12px ${ringColor}40` : 'none',
+                transition: 'all 0.3s ease'
+              }}>
+                {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
+              </span>
+              <span style={{ 
+                fontSize: '0.52rem', 
+                color: '#8e8e93', 
+                fontWeight: 800, 
+                letterSpacing: '0.12em', 
+                marginTop: '-1px', 
+                textTransform: 'uppercase' 
+              }}>
+                {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
+              </span>
+            </div>
           </div>
         </div>
         
