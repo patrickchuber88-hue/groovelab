@@ -14055,8 +14055,8 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
           <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '4px 0' }}>
             <style>{`
               @keyframes swing-anim {
-                0% { transform: rotate(-24deg); }
-                100% { transform: rotate(24deg); }
+                0% { transform: rotate(-12deg); }
+                100% { transform: rotate(12deg); }
               }
               @keyframes rotate-key {
                 0% { transform: rotate(0deg); }
@@ -14107,14 +14107,14 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                 </filter>
               </defs>
 
-              {/* Side Winding Key (Connected cleanly to right casing edge) */}
+              {/* Side Winding Key (Connected cleanly to right casing edge at x=138) */}
               <g style={{
-                transformOrigin: '144px 145px',
+                transformOrigin: '138px 145px',
                 animation: isPlaying ? 'rotate-key 4s linear infinite' : 'none'
               }}>
-                <rect x="144" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
-                <path d="M 152 145 C 152 138, 166 138, 166 145 C 166 152, 152 152, 152 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
-                <circle cx="152" cy="145" r="1.8" fill="#5a3d00" />
+                <rect x="136" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
+                <path d="M 144 145 C 144 138, 158 138, 158 145 C 158 152, 144 152, 144 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
+                <circle cx="144" cy="145" r="1.8" fill="#5a3d00" />
               </g>
 
               {/* 3D Pyramid Casing (Walnut Wood) */}
@@ -14162,48 +14162,48 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                 <line x1="90" y1="45" x2="90" y2="175" stroke="#1d1d1f" strokeWidth="0.8" opacity="0.25" />
 
                 {/* 40 Largo */}
-                <line x1="82" y1="55" x2="98" y2="55" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="76" y="57" textAnchor="end">40</text>
-                <text x="104" y="57" textAnchor="start">Largo</text>
+                <line x1="82" y1="65" x2="98" y2="65" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="76" y="67" textAnchor="end">40</text>
+                <text x="104" y="67" textAnchor="start">Largo</text>
 
                 {/* 80 Adagio */}
-                <line x1="80" y1="77" x2="100" y2="77" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="74" y="79" textAnchor="end">80</text>
-                <text x="106" y="79" textAnchor="start">Adagio</text>
+                <line x1="80" y1="83" x2="100" y2="83" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="74" y="85" textAnchor="end">80</text>
+                <text x="106" y="85" textAnchor="start">Adagio</text>
 
                 {/* 120 Andante */}
-                <line x1="78" y1="99" x2="102" y2="99" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="72" y="101" textAnchor="end">120</text>
-                <text x="108" y="101" textAnchor="start">Andante</text>
+                <line x1="78" y1="101" x2="102" y2="101" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="72" y="103" textAnchor="end">120</text>
+                <text x="108" y="103" textAnchor="start">Andante</text>
 
                 {/* 160 Allegro */}
-                <line x1="76" y1="121" x2="104" y2="121" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="70" y="123" textAnchor="end">160</text>
-                <text x="110" y="123" textAnchor="start">Allegro</text>
+                <line x1="76" y1="119" x2="104" y2="119" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="70" y="121" textAnchor="end">160</text>
+                <text x="110" y="121" textAnchor="start">Allegro</text>
 
                 {/* 200 Presto */}
-                <line x1="74" y1="143" x2="106" y2="143" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="68" y="145" textAnchor="end">200</text>
-                <text x="112" y="145" textAnchor="start">Presto</text>
+                <line x1="74" y1="137" x2="106" y2="137" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="68" y="139" textAnchor="end">200</text>
+                <text x="112" y="139" textAnchor="start">Presto</text>
 
                 {/* 240 Prestissimo */}
-                <line x1="72" y1="165" x2="108" y2="165" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="66" y="167" textAnchor="end">240</text>
-                <text x="114" y="167" textAnchor="start">Prestiss</text>
+                <line x1="72" y1="155" x2="108" y2="155" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                <text x="66" y="157" textAnchor="end">240</text>
+                <text x="114" y="157" textAnchor="start">Prestiss</text>
               </g>
 
               {/* Pendulum Shadow Group (Swings behind the rod for massive 3D depth) */}
               <g style={{
-                transformOrigin: '87px 182px',
+                transformOrigin: '87px 180px',
                 transform: isPlaying ? 'none' : 'rotate(0deg)',
                 animation: isPlaying ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate` : 'none',
                 transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
-                opacity: 0.25
+                opacity: 0.22
               }}>
-                <line x1="87" y1="182" x2="87" y2="42" stroke="#000000" strokeWidth="3.5" strokeLinecap="round" />
+                <line x1="87" y1="180" x2="87" y2="40" stroke="#000000" strokeWidth="3.5" strokeLinecap="round" />
                 <rect 
                   x="77" 
-                  y={42 + ((240 - bpm) / (240 - 40)) * 115} 
+                  y={40 + ((240 - bpm) / (240 - 40)) * 115} 
                   width="20" 
                   height="15" 
                   rx="2"
