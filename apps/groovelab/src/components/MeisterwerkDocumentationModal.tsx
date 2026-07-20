@@ -10387,9 +10387,8 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             prev.map((t) => (t.id === trackId ? { ...t, isWaiting: false } : t))
           );
 
-          // Defer the heavy WAV encoding and perform a second slice to catch late-arriving samples
           setTimeout(() => {
-            if (!isComponentMountedRef.current || !isAutoSequenceActiveRef.current) return;
+            if (!isComponentMountedRef.current) return;
             try {
               const freshFull = getFullPCMBuffer();
               if (freshFull) {
