@@ -10152,7 +10152,14 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 if (passNum === 1 && currentClickIndex === 0) {
                   const startOffset = Math.max(0, bestIndex - 120);
                   const endOffset = Math.min(inputData.length, bestIndex + 280);
-                  finalWaveformCaptured = Array.from(inputData.slice(startOffset, endOffset));
+                  const rawSlice = Array.from(inputData.slice(startOffset, endOffset));
+                  // Normalize waveform so the wave is clearly visible regardless of microphone volume
+                  let maxVal = 0.001;
+                  for (let i = 0; i < rawSlice.length; i++) {
+                    const absVal = Math.abs(rawSlice[i]);
+                    if (absVal > maxVal) maxVal = absVal;
+                  }
+                  finalWaveformCaptured = rawSlice.map(v => v / maxVal);
                 }
                 
                 currentClickIndex++;
@@ -14032,7 +14039,7 @@ const targetVol = isActive ? vol : 0;
                         {/* Zero/Target reference line */}
                         <div style={{
                           position: 'absolute',
-                          left: '50%',
+                          left: '30%', // Align with the onset (sample index 120 of 400 is 30%)
                           top: 0,
                           width: '2px',
                           height: '100%',
@@ -14173,9 +14180,9 @@ const targetVol = isActive ? vol : 0;
                                 <span style={{ fontSize: '0.46rem', color: '#34a853', fontWeight: 800 }}>✓ IDEAL (SYNCHRON)</span>
                                 <svg style={{ width: '100%', height: '24px', overflow: 'visible' }}>
                                   {/* Red Ref Line */}
-                                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
-                                  {/* Green Wave aligned */}
-                                  <path d="M 0 12 L 35 12 L 40 12 Q 45 4, 50 20 T 55 4 T 60 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" />
+                                  <line x1="30%" y1="0" x2="30%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
+                                  {/* Green Wave aligned to onset at 30% */}
+                                  <path d="M 0 12 L 25 12 L 30 12 Q 35 4, 40 20 T 45 4 T 50 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" />
                                 </svg>
                               </div>
 
@@ -14196,9 +14203,9 @@ const targetVol = isActive ? vol : 0;
                                 <span style={{ fontSize: '0.46rem', color: '#ea4335', fontWeight: 800 }}>✗ ZU SPÄT (LATENZ)</span>
                                 <svg style={{ width: '100%', height: '24px', overflow: 'visible' }}>
                                   {/* Red Ref Line */}
-                                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
+                                  <line x1="30%" y1="0" x2="30%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
                                   {/* Green Wave shifted too far right */}
-                                  <path d="M 0 12 L 55 12 L 60 12 Q 65 4, 70 20 T 75 4 T 80 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" opacity="0.6" />
+                                  <path d="M 0 12 L 50 12 L 55 12 Q 60 4, 65 20 T 70 4 T 75 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" opacity="0.6" />
                                 </svg>
                               </div>
                             </div>
