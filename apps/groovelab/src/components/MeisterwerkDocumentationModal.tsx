@@ -9716,34 +9716,50 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             playNextClick();
           }
         } else if (calibrationPhase === 'waiting') {
-          const threshold = Math.max(0.15, ambientNoisePeak * 4);
-          for (let i = 0; i < inputData.length; i++) {
-            if (Math.abs(inputData[i]) > threshold) {
-              detectionTime = ctx!.currentTime + (i / ctx!.sampleRate);
-              const latencyMs = Math.round((detectionTime - playTime) * 1000);
-              
-              // Standard compensation block correction
-              const estimatedLatency = Math.max(-150, Math.min(350, latencyMs - 15));
-              measurements.push(estimatedLatency);
-              
-              currentClickIndex++;
-              if (currentClickIndex < totalClicksNeeded) {
-                // Pause 700ms before playing the next click to let echoes die out
-                calibrationPhase = 'ambient'; // Reset to wait state
-                samplesChecked = 0; // Quick reset
-                setTimeout(playNextClick, 700);
-              } else {
-                calibrationPhase = 'done';
-                // Average of the 3 measurements
-                const avgLatency = Math.round(measurements.reduce((sum, val) => sum + val, 0) / measurements.length);
-                
-                setSyncOffsetMs(avgLatency);
-                isManualLatencyAdjustmentRef.current = true;
-                
-                cleanup();
-                alert(`Auto-Kalibrierung erfolgreich!\nGemittelte Latenz aus 3 Klicks: ${avgLatency}ms`);
-              }
-              break;
+          const sampleRate = ctx!.sampleRate;
+          const clickDurationSec = 0.015;
+          const clickSamples = Math.floor(clickDurationSec * sampleRate);
+          const refClick = new Float32Array(clickSamples);
+          for (let s = 0; s < clickSamples; s++) {
+            const t = s / sampleRate;
+            const amp = t < 0.002 ? (t / 0.002) : Math.exp(-(t - 0.002) / 0.004);
+            refClick[s] = Math.sin(2 * Math.PI * 1500 * t) * amp;
+          }
+
+          let maxCorrelation = 0;
+          let bestIndex = -1;
+          for (let offset = 0; offset <= inputData.length - clickSamples; offset++) {
+            let sum = 0;
+            for (let j = 0; j < clickSamples; j++) {
+              sum += inputData[offset + j] * refClick[j];
+            }
+            const absSum = Math.abs(sum);
+            if (absSum > maxCorrelation) {
+              maxCorrelation = absSum;
+              bestIndex = offset;
+            }
+          }
+
+          const threshold = 0.03;
+          if (bestIndex !== -1 && maxCorrelation > threshold) {
+            detectionTime = ctx!.currentTime + (bestIndex / sampleRate);
+            const latencyMs = Math.round((detectionTime - playTime) * 1000);
+            
+            const estimatedLatency = Math.max(-150, Math.min(350, latencyMs - 15));
+            measurements.push(estimatedLatency);
+            
+            currentClickIndex++;
+            if (currentClickIndex < totalClicksNeeded) {
+              calibrationPhase = 'ambient';
+              samplesChecked = 0;
+              setTimeout(playNextClick, 700);
+            } else {
+              calibrationPhase = 'done';
+              const avgLatency = Math.round(measurements.reduce((sum, val) => sum + val, 0) / measurements.length);
+              setSyncOffsetMs(avgLatency);
+              isManualLatencyAdjustmentRef.current = true;
+              cleanup();
+              alert(`Auto-Kalibrierung erfolgreich!\nKreuzkorrelierte Latenz aus 3 Klicks: ${avgLatency}ms`);
             }
           }
         }
@@ -12450,6 +12466,46 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                     {track.volume === 0 ? 'Mute' : `${Math.round(track.volume / 100 * 6)}dB`}
                   </span>
                 </div>
+
+                {/* Visuelle 8tel-Noten Timeline */}
+                {(hasAudio || track.isRecording) && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2.5px',
+                    marginTop: '8px',
+                    width: '100%'
+                  }}>
+                    {Array.from({ length: 32 }).map((_, stepIdx) => {
+                      const isBarStart = stepIdx % 8 === 0;
+                      const isQuarterBeat = stepIdx % 2 === 0;
+                      const activeStep = Math.floor((playbackProgress / 100) * 32);
+                      const isCurrentStep = (isPlaying || track.isRecording) && activeStep === stepIdx;
+                      
+                      let blockColor = '#e5e5e7';
+                      if (isCurrentStep) {
+                        blockColor = track.isRecording ? '#ea4335' : '#34a853';
+                      } else if (isBarStart) {
+                        blockColor = '#cbd5e0';
+                      } else if (isQuarterBeat) {
+                        blockColor = '#e2e8f0';
+                      }
+                      
+                      return (
+                        <div
+                          key={stepIdx}
+                          style={{
+                            flex: 1,
+                            height: isCurrentStep ? '5px' : isBarStart ? '4px' : isQuarterBeat ? '3px' : '2px',
+                            borderRadius: '0.5px',
+                            background: blockColor,
+                            transition: 'all 0.05s ease'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Clean LED Level Meter */}
