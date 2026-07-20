@@ -6392,7 +6392,7 @@ export function ScheduleCalendarView({
                   }
                 }} 
                 teacherId={userId}
-                 isTeacherTools={true}
+                readOnly={true}
               />
             )}
           </div>

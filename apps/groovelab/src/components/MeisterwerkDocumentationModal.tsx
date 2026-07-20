@@ -3831,7 +3831,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </h3>
 
                   {/* For student: render the recording widget on their page inside the gallery */}
-                  {!isTeacherTools && (
+                  {/* readOnly=true means a teacher is viewing → hide to prevent recording in student's name */}
+                  {!isTeacherTools && !readOnly && (
                     <div style={{
                       margin: '0 0 24px 0',
                       padding: '16px',
