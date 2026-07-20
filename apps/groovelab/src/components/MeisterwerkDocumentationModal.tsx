@@ -11973,50 +11973,54 @@ const targetVol = isActive ? vol : 0;
             />
           </svg>
 
-          {/* Central Plate */}
+          {/* Central Plate (Creative, organic rounded styling) */}
           <div 
             className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
             style={{
               position: 'absolute',
-              width: '124px',
-              height: '124px',
+              width: '128px',
+              height: '128px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(16px)',
+              background: isAutoSequenceActive 
+                ? 'radial-gradient(circle, rgba(253,230,230,0.95) 0%, rgba(255,255,255,0.98) 100%)' 
+                : isPlaying 
+                  ? 'radial-gradient(circle, rgba(230,244,234,0.95) 0%, rgba(255,255,255,0.98) 100%)' 
+                  : 'radial-gradient(circle, rgba(244,245,247,0.9) 0%, rgba(255,255,255,0.98) 100%)',
+              backdropFilter: 'blur(12px)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: 'inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03)',
-              transition: 'all 0.3s ease'
+              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.9), 0 10px 24px rgba(0,0,0,0.04)',
+              transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
             }}
           >
             <span style={{ 
-              fontSize: '2.2rem', 
+              fontSize: '2.3rem', 
               fontWeight: 800, 
-              fontFamily: '"Courier New", Courier, monospace',
-              letterSpacing: '-0.02em', 
+              fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              letterSpacing: '-0.04em', 
               color: ringColor === '#e5e5e7' ? '#1d1d1f' : ringColor,
-              textShadow: ringColor !== '#e5e5e7' ? `0 0 12px ${ringColor}60` : 'none',
+              textShadow: ringColor !== '#e5e5e7' ? `0 2px 10px ${ringColor}25` : 'none',
               transition: 'all 0.3s ease'
             }}>
               {countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0'}
             </span>
             <span style={{ 
-              fontSize: '0.54rem', 
+              fontSize: '0.52rem', 
               color: '#86868b', 
-              fontWeight: 700, 
+              fontWeight: 800, 
               letterSpacing: '0.12em', 
-              marginTop: '2px', 
+              marginTop: '-1px', 
               textTransform: 'uppercase' 
             }}>
               {countInBeats !== null ? (isPause ? 'WAIT' : 'COUNT') : isPlaying ? 'PLAYBACK' : isAutoSequenceActive ? 'RECORD' : 'OFFLINE'}
             </span>
           </div>
         </div>
-
+        
         {/* Auto-Sequence Action Center */}
-        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
           <button
             type="button"
             onClick={startAutoSequence}
@@ -12024,20 +12028,27 @@ const targetVol = isActive ? vol : 0;
             className="tactile-btn"
             style={{
               width: '100%',
-              background: isPause ? '#eab308' : isAutoSequenceActive ? '#ea4335' : '#34a853',
+              background: isPause 
+                ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
+                : isAutoSequenceActive 
+                  ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
+                  : 'linear-gradient(135deg, #34a853 0%, #10b981 100%)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: '12px',
-              height: '46px',
+              borderRadius: '99px',
+              height: '48px',
               fontSize: '0.78rem',
-              fontWeight: 700,
-              letterSpacing: '0.02em',
+              fontWeight: 800,
+              letterSpacing: '0.04em',
               cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              boxShadow: isAutoSequenceActive 
+                ? '0 6px 20px rgba(239, 68, 68, 0.25)' 
+                : '0 8px 24px rgba(52, 168, 83, 0.22)',
               textTransform: 'uppercase'
             }}
           >
@@ -12050,32 +12061,35 @@ const targetVol = isActive ? vol : 0;
               animation: isAutoSequenceActive ? 'pulse 1s infinite alternate' : 'none',
               opacity: isAutoSequenceActive ? 1 : 0.8
             }} />
-            <span>{isAutoSequenceActive ? autoSequenceStatus : 'AUTO-SEQUENCE START'}</span>
+            <span>{isAutoSequenceActive ? autoSequenceStatus : '✨ AUTO-SEQUENCE START'}</span>
           </button>
           {isAutoSequenceActive && (
             <span style={{ 
               fontSize: '0.54rem', 
               color: '#ea4335', 
               letterSpacing: '0.04em', 
-              fontWeight: 700, 
+              fontWeight: 800, 
               textAlign: 'center', 
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              animation: 'pulse 1.5s infinite alternate'
             }}>
               Aufnahme läuft - bitte weiterspielen!
             </span>
           )}
 
-          {/* Master Control Parameter Panel (console look) */}
+          {/* Master Control Parameter Panel (Clean Glass design) */}
           <div style={{
             width: '100%',
-            background: 'rgba(0, 0, 0, 0.02)',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            borderRadius: '16px',
+            background: 'rgba(255, 255, 255, 0.45)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            borderRadius: '24px',
             padding: '12px',
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.015)'
           }}>
             {/* Kopfhörer Modus Toggle Card */}
             <div 
@@ -12087,63 +12101,63 @@ const targetVol = isActive ? vol : 0;
               }}
               style={{
                 width: '100%',
-                background: useHeadphones ? 'rgba(230, 244, 234, 0.6)' : '#ffffff',
-                border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)',
-                borderRadius: '10px',
-                padding: '8px 10px',
+                background: useHeadphones ? 'rgba(52, 168, 83, 0.08)' : 'rgba(255, 255, 255, 0.6)',
+                border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(255, 255, 255, 0.7)',
+                borderRadius: '16px',
+                padding: '10px 12px',
                 cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '8px',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.25s ease',
                 opacity: isAutoSequenceActive ? 0.6 : 1,
                 boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{
-                  width: '28px',
-                  height: '28px',
+                  width: '30px',
+                  height: '30px',
                   borderRadius: '50%',
-                  background: useHeadphones ? '#34a853' : '#edf2f7',
+                  background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.04)',
                   color: useHeadphones ? '#ffffff' : '#86868b',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.25s ease'
                 }}>
                   <Headphones size={13} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
                     Kopfhörer-Modus
                   </span>
                   <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 500 }}>
-                    Studio & Mehrspur
+                    Studio & Mehrspur aktiv
                   </span>
                 </div>
               </div>
               
               <div style={{
-                width: '32px',
-                height: '18px',
-                borderRadius: '9px',
-                background: useHeadphones ? '#34a853' : '#e5e5ea',
+                width: '34px',
+                height: '20px',
+                borderRadius: '99px',
+                background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.08)',
                 position: 'relative',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.25s ease',
                 padding: '2px'
               }}>
                 <div style={{
-                  width: '14px',
-                  height: '14px',
+                  width: '16px',
+                  height: '16px',
                   borderRadius: '50%',
                   background: '#ffffff',
                   position: 'absolute',
                   left: useHeadphones ? '16px' : '2px',
                   top: '2px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                  transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }} />
               </div>
             </div>
@@ -12153,26 +12167,26 @@ const targetVol = isActive ? vol : 0;
               alignItems: 'center', 
               justifyContent: 'space-between',
               width: '100%',
-              padding: '0 2px'
+              padding: '0 4px'
             }}>
-              <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#55555d' }}>
-                Spur-Anzahl:
+              <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#55555d', letterSpacing: '0.01em' }}>
+                Spuren:
               </span>
               <select
                 value={desiredTrackCount}
                 onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
                 disabled={isAutoSequenceActive || !useHeadphones}
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid rgba(0, 0, 0, 0.08)',
-                  borderRadius: '6px',
-                  padding: '4px 6px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.04)',
+                  borderRadius: '99px',
+                  padding: '5px 12px',
                   fontSize: '0.66rem',
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: useHeadphones ? '#1d1d1f' : '#86868b',
                   cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
                   outline: 'none',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
                 }}
               >
                 <option value={2}>2 Spuren (Boxen-Limit)</option>
@@ -12185,7 +12199,7 @@ const targetVol = isActive ? vol : 0;
         </div>
 
         {/* Global Controls */}
-        <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
           <button
             type="button"
             onClick={handlePlayToggle}
@@ -12193,23 +12207,30 @@ const targetVol = isActive ? vol : 0;
             className="tactile-btn"
             style={{
               flex: 2,
-              background: isPlaying ? '#ea4335' : '#ffffff',
-              color: isPlaying ? '#ffffff' : '#34a853',
-              border: isPlaying ? 'none' : '1px solid #34a853',
-              borderRadius: '12px',
-              height: '42px',
-              fontSize: '0.74rem',
-              fontWeight: 700,
+              background: isPlaying 
+                ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
+                : 'linear-gradient(135deg, #34a853 0%, #10b981 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '99px',
+              height: '44px',
+              fontSize: '0.76rem',
+              fontWeight: 800,
               cursor: masterLoopDuration ? 'pointer' : 'not-allowed',
               opacity: masterLoopDuration ? 1 : 0.45,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              transition: 'all 0.2s ease'
+              boxShadow: masterLoopDuration 
+                ? isPlaying 
+                  ? '0 6px 16px rgba(239, 68, 68, 0.2)' 
+                  : '0 6px 16px rgba(52, 168, 83, 0.2)'
+                : 'none',
+              transition: 'all 0.25s ease'
             }}
           >
-            {isPlaying ? <Square size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+            {isPlaying ? <Square size={9} fill="currentColor" /> : <Play size={9} fill="currentColor" />}
             <span>{isPlaying ? 'STOP' : 'PLAY'}</span>
           </button>
 
@@ -12219,21 +12240,22 @@ const targetVol = isActive ? vol : 0;
             className="tactile-btn"
             style={{
               flex: 1,
-              background: '#f5f5f7',
+              background: 'rgba(0, 0, 0, 0.04)',
               color: '#1d1d1f',
               border: 'none',
-              borderRadius: '12px',
-              height: '42px',
+              borderRadius: '99px',
+              height: '44px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              transition: 'all 0.2s ease'
+              boxShadow: '0 4px 10px rgba(0, 0, 0, 0.01)',
+              transition: 'all 0.25s ease'
             }}
           >
             <RotateCcw size={11} />
-            <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>RESET</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 800 }}>RESET</span>
           </button>
         </div>
 
