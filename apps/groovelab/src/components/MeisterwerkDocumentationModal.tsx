@@ -12920,8 +12920,22 @@ const targetVol = isActive ? vol : 0;
                 } else {
                   const hasRecordedTracks = tracks.some(t => t.url);
                   if (hasRecordedTracks) {
-                    const confirmReset = window.confirm("Möchtest du deinen aktuellen Loop wirklich löschen und neu aufnehmen?");
-                    if (!confirmReset) return;
+                    const wasPlaying = isPlayingRef.current;
+                    if (wasPlaying) {
+                      stopAll();
+                    }
+                    // Small delay to ensure Web Audio nodes stop cleanly before blocking dialog
+                    setTimeout(() => {
+                      const confirmReset = window.confirm("Möchtest du deinen aktuellen Loop wirklich löschen und neu aufnehmen?");
+                      if (!confirmReset) {
+                        if (wasPlaying) {
+                          playAll();
+                        }
+                        return;
+                      }
+                      handleReset();
+                    }, 50);
+                    return;
                   }
                   handleReset();
                 }
