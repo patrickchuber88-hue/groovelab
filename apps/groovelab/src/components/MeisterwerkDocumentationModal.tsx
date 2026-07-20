@@ -12484,7 +12484,7 @@ const targetVol = isActive ? vol : 0;
                   letterSpacing: '0.02em'
                 }}
               >
-                {isExporting ? 'RENDERE MP3...' : 'ALS MP3 HERUNTERLADEN'}
+                {isExporting ? 'RENDERE MP3...' : 'MP3 SPEICHERN'}
               </button>
             </div>
           ) : (
