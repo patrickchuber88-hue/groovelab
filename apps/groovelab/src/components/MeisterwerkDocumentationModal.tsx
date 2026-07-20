@@ -11655,7 +11655,7 @@ const targetVol = isActive ? vol : 0;
     return () => clearTimeout(animId);
   }, [isPlaying, tracks]);
 
-  const isPause = isAutoSequenceActive && autoSequenceStatus.startsWith("PAUSE");
+  const isPause = isAutoSequenceActive && !autoSequenceStatus.includes("AUFNAHME") && !autoSequenceStatus.includes("FERTIG");
   const isAnyTrackRecording = tracks.some(t => t.isRecording);
   const ringColor = isPause
     ? '#eab308' // Yellow during the intermission pause
