@@ -6807,7 +6807,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                               boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                                             }}>
                                               <div style={{ flex: 1, paddingRight: '8px' }}>
-                                                {item.note}
+                                                {item.note.startsWith("LOOP:") ? (() => {
+                                                  const parts = item.note.substring(5).split('|');
+                                                  const label = parts[3] || 'Mein Loop-Mix';
+                                                  const duration = parts[1] || '8';
+                                                  return `🎵 Loop-Mix gespeichert: "${label}" (${duration}s)`;
+                                                })() : item.note}
                                               </div>
                                               <button
                                                 type="button"
@@ -9621,6 +9626,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
   const [selectedSavedLoop, setSelectedSavedLoop] = useState<any>(null);
   const savedLoopAudioRef = useRef<HTMLAudioElement | null>(null);
+  const savedLoopSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const calibrationStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
@@ -9645,6 +9651,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       if (savedLoopAudioRef.current) {
         savedLoopAudioRef.current.pause();
       }
+      if (savedLoopSourceRef.current) {
+        try { savedLoopSourceRef.current.stop(); } catch (e) {}
+        savedLoopSourceRef.current = null;
+      }
       if (calibrationStreamRef.current) {
         try {
           calibrationStreamRef.current.getTracks().forEach(track => track.stop());
@@ -9655,20 +9665,19 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     };
   }, []);
 
-  const handlePlaySavedLoop = (url: string) => {
+  const handlePlaySavedLoop = async (url: string) => {
     if (playingSavedLoopUrl === url) {
-      if (savedLoopAudioRef.current) {
-        savedLoopAudioRef.current.pause();
+      if (savedLoopSourceRef.current) {
+        try { savedLoopSourceRef.current.stop(); } catch (e) {}
+        savedLoopSourceRef.current = null;
       }
       setPlayingSavedLoopUrl(null);
       setPlaybackProgress(0);
     } else {
-      if (savedLoopAudioRef.current) {
-        savedLoopAudioRef.current.pause();
+      if (savedLoopSourceRef.current) {
+        try { savedLoopSourceRef.current.stop(); } catch (e) {}
+        savedLoopSourceRef.current = null;
       }
-      const audio = new Audio(url);
-      audio.loop = true;
-      savedLoopAudioRef.current = audio;
       setPlayingSavedLoopUrl(url);
 
       const matched = savedLoops.find(l => l.url === url);
@@ -9676,22 +9685,48 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         setSelectedSavedLoop(matched);
       }
 
-      audio.ontimeupdate = () => {
-        if (audio.duration) {
-          setPlaybackProgress((audio.currentTime / audio.duration) * 100);
-        }
-      };
+      try {
+        await initAudio();
+        const ctx = audioContextRef.current;
+        if (!ctx) return;
 
-      audio.play().catch(e => {
-        console.error("Failed to play audio:", e);
+        // Fetch and decode for gapless Web Audio looping
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.loop = true;
+
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 0.8; // premium clean volume level
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        const loopStartTime = ctx.currentTime;
+        source.start(0);
+        savedLoopSourceRef.current = source;
+
+        // Progress animation frame loop synced with audio context timeline
+        if (progressIntervalRef.current) {
+          cancelAnimationFrame(progressIntervalRef.current);
+        }
+        const durationSec = audioBuffer.duration;
+        const progressSync = () => {
+          if (!savedLoopSourceRef.current) return;
+          const elapsed = (audioContextRef.current ? audioContextRef.current.currentTime : ctx.currentTime) - loopStartTime;
+          const loopElapsed = elapsed % durationSec;
+          setPlaybackProgress((loopElapsed / durationSec) * 100);
+          progressIntervalRef.current = requestAnimationFrame(progressSync);
+        };
+        progressIntervalRef.current = requestAnimationFrame(progressSync);
+
+      } catch (err) {
+        console.error("Failed to play gapless saved loop:", err);
         setPlayingSavedLoopUrl(null);
         setPlaybackProgress(0);
-      });
-      
-      audio.onended = () => {
-        setPlayingSavedLoopUrl(null);
-        setPlaybackProgress(0);
-      };
+      }
     }
   };
 
@@ -11163,12 +11198,20 @@ const targetVol = isActive ? vol : 0;
         delete activeSourcesRef.current[track.id];
       }
     });
+    if (savedLoopSourceRef.current) {
+      try { savedLoopSourceRef.current.stop(); } catch (e) {}
+      savedLoopSourceRef.current = null;
+    }
   };
 
   const handleReset = () => {
     isAutoSequenceActiveRef.current = false;
     setIsAutoSequenceActive(false);
     stopAll();
+    if (savedLoopSourceRef.current) {
+      try { savedLoopSourceRef.current.stop(); } catch (e) {}
+      savedLoopSourceRef.current = null;
+    }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
@@ -12163,8 +12206,8 @@ const targetVol = isActive ? vol : 0;
                   transition: 'all 0.3s ease'
                 }}>
                   {activeSubTab === 'saved'
-                    ? (isSavedLoopPlaying && savedLoopAudioRef.current
-                      ? `${Math.floor(savedLoopAudioRef.current.currentTime)}s`
+                    ? (isSavedLoopPlaying
+                      ? `${Math.floor((playbackProgress / 100) * (selectedSavedLoop ? Number(selectedSavedLoop.duration) : 8))}s`
                       : '0s')
                     : (countInBeats !== null ? `${countInBeats}` : (isPlaying || isAutoSequenceActive) ? `${currentBar}.1` : '0.0')}
                 </span>
@@ -12409,17 +12452,39 @@ const targetVol = isActive ? vol : 0;
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '12px',
-                  padding: '12px 20px',
-                  fontSize: '0.74rem',
+                  padding: '10px 16px',
+                  fontSize: '0.7rem',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isExporting ? 'not-allowed' : 'pointer',
                   width: '100%',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)',
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.15)',
                   transition: 'all 0.2s ease',
                   letterSpacing: '0.02em'
                 }}
               >
-                <span>{isExporting ? 'LADE HERUNTER...' : 'ALS MP3 HERUNTERLADEN'}</span>
+                {isExporting ? 'SPEICHERE...' : 'LOOP SPEICHERN'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadMix}
+                disabled={isExporting}
+                className="tactile-btn"
+                style={{
+                  background: '#1d1d1f',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  cursor: isExporting ? 'not-allowed' : 'pointer',
+                  width: '100%',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.2s ease',
+                  letterSpacing: '0.02em'
+                }}
+              >
+                {isExporting ? 'RENDERE MP3...' : 'ALS MP3 HERUNTERLADEN'}
               </button>
             </div>
           ) : (
