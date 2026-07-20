@@ -13535,10 +13535,14 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco'>('metronome');
+  const [selectedVariation, setSelectedVariation] = useState<'A' | 'B' | 'C'>('A');
   const [volKick, setVolKick] = useState(80);
   const [volSnare, setVolSnare] = useState(80);
   const [volHat, setVolHat] = useState(80);
   const [volMetronome, setVolMetronome] = useState(80);
+  
+  const [mutedInstruments, setMutedInstruments] = useState<string[]>([]);
+  const [soloedInstruments, setSoloedInstruments] = useState<string[]>([]);
   
   const [activeBeatIndex, setActiveBeatIndex] = useState<number | null>(null);
 
@@ -13553,16 +13557,35 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
   const barStartAudioTimeRef = useRef<number>(0);
   const progressFrameRef = useRef<number | null>(null);
 
-  // Refs to allow real-time volume adjustments without rebuilding the scheduler loop
+  // Refs to allow real-time volume, variation, and solo/mute adjustments without rebuilding the scheduler loop
   const volKickRef = useRef(volKick);
   const volSnareRef = useRef(volSnare);
   const volHatRef = useRef(volHat);
   const volMetronomeRef = useRef(volMetronome);
+  const selectedVariationRef = useRef(selectedVariation);
+  const mutedInstrumentsRef = useRef(mutedInstruments);
+  const soloedInstrumentsRef = useRef(soloedInstruments);
 
   useEffect(() => { volKickRef.current = volKick; }, [volKick]);
   useEffect(() => { volSnareRef.current = volSnare; }, [volSnare]);
   useEffect(() => { volHatRef.current = volHat; }, [volHat]);
   useEffect(() => { volMetronomeRef.current = volMetronome; }, [volMetronome]);
+  useEffect(() => { selectedVariationRef.current = selectedVariation; }, [selectedVariation]);
+  useEffect(() => { mutedInstrumentsRef.current = mutedInstruments; }, [mutedInstruments]);
+  useEffect(() => { soloedInstrumentsRef.current = soloedInstruments; }, [soloedInstruments]);
+
+  const toggleMute = (inst: string) => {
+    setMutedInstruments(prev => 
+      prev.includes(inst) ? prev.filter(x => x !== inst) : [...prev, inst]
+    );
+  };
+  const toggleSolo = (inst: string) => {
+    setSoloedInstruments(prev => 
+      prev.includes(inst) ? prev.filter(x => x !== inst) : [...prev, inst]
+    );
+  };
+  const isMuted = (inst: string) => mutedInstruments.includes(inst);
+  const isSolo = (inst: string) => soloedInstruments.includes(inst);
 
   // Keep bpm and style in refs to update scheduler on the fly without closing AudioContext
   const bpmRef = useRef(bpm);
@@ -13675,10 +13698,20 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
   }, [isPlaying]);
 
   const scheduleNote = (step: number, time: number, ctx: AudioContext, masterGain: GainNode) => {
-    const kVol = volKickRef.current / 100;
-    const sVol = volSnareRef.current / 100;
-    const hVol = volHatRef.current / 100;
-    const mVol = volMetronomeRef.current / 100;
+    const getEffectiveVolume = (id: string, baseVol: number) => {
+      if (soloedInstrumentsRef.current.length > 0 && !soloedInstrumentsRef.current.includes(id)) {
+        return 0;
+      }
+      if (mutedInstrumentsRef.current.includes(id)) {
+        return 0;
+      }
+      return baseVol / 100;
+    };
+
+    const kVol = getEffectiveVolume('kick', volKickRef.current);
+    const sVol = getEffectiveVolume('snare', volSnareRef.current);
+    const hVol = getEffectiveVolume('hat', volHatRef.current);
+    const mVol = getEffectiveVolume('click', volMetronomeRef.current);
 
     const playKick = (volMul = 1.0) => {
       if (kVol <= 0.001) return;
@@ -13903,122 +13936,229 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
     };
 
     const isSwing = selectedStyleRef.current === 'swing';
+    const variant = selectedVariationRef.current; // 'A', 'B' or 'C'
+
     if (selectedStyleRef.current === 'metronome') {
-      if (step % 4 === 0) {
-        const beatIdx = Math.floor(step / 4);
-        playClick(beatIdx === 0);
-        triggerVisualBeat(beatIdx);
+      const beatIdx = Math.floor(step / 4);
+      if (variant === 'A') {
+        // V1: Classic quarter-note clicks
+        if (step % 4 === 0) {
+          playClick(beatIdx === 0);
+          triggerVisualBeat(beatIdx);
+        }
+      } else if (variant === 'B') {
+        // V2: Eighth-note clicks (pedagogical subdivision)
+        if (step % 2 === 0) {
+          playClick(step === 0);
+          if (step % 4 === 0) triggerVisualBeat(beatIdx);
+        }
+      } else {
+        // V3: 16th-note clicks (high resolution micro-timing)
+        playClick(step === 0);
+        if (step % 4 === 0) triggerVisualBeat(beatIdx);
       }
     } else if (selectedStyleRef.current === 'rock') {
-      // Classic Rock/Pop groove: syncopated kick upbeat on 10
-      if (step === 0 || step === 8 || step === 10) playKick(1.0);
-      if (step === 4 || step === 12) playSnare(1.0);
-      if (step % 2 === 0) {
-        // Accented hi-hat on quarter beats, softer on offbeats
-        const isQuarter = step % 4 === 0;
-        playHat(false, isQuarter ? 1.0 : 0.62);
+      if (variant === 'A') {
+        // V1: Solid basic Pop/Rock beat
+        if (step === 0 || step === 8 || step === 10) playKick(1.0);
+        if (step === 4 || step === 12) playSnare(1.0);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 1.0 : 0.62);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Syncopated kick upbeats)
+        if (step === 0 || step === 6 || step === 8 || step === 10 || step === 14) playKick(1.0);
+        if (step === 4 || step === 12) playSnare(1.0);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 1.0 : 0.65);
+      } else {
+        // V3: Complex (Snare ghost notes + ride feel)
+        if (step === 0 || step === 3 || step === 8 || step === 10 || step === 11) playKick(1.0);
+        if (step === 4 || step === 12) playSnare(1.0);
+        else if (step === 7 || step === 15) playSnare(0.25); // Ghost notes
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 1.05 : 0.72);
+        else if (step === 11) playHat(false, 0.45);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'hiphop') {
-      // Laid-back hip-hop groove with a swing upbeat kick and quiet snare ghost notes
-      if (step === 0) playKick(1.3);
-      else if (step === 3 || step === 10) playKick(0.9);
-      if (step === 4 || step === 12) playSnare(1.1);
-      else if (step === 7 || step === 15) playSnare(0.22); // subtle backbeat ghost notes
-      if (step % 2 === 0) {
-        const isOpen = step === 14;
-        playHat(isOpen, isOpen ? 1.0 : (step % 4 === 0 ? 0.9 : 0.55));
+      if (variant === 'A') {
+        // V1: Classic laid-back pocket
+        if (step === 0) playKick(1.3);
+        else if (step === 3 || step === 10) playKick(0.9);
+        if (step === 4 || step === 12) playSnare(1.1);
+        else if (step === 7 || step === 15) playSnare(0.22);
+        if (step % 2 === 0) playHat(step === 14, step % 4 === 0 ? 0.9 : 0.55);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Boom-Bap double kick)
+        if (step === 0 || step === 2 || step === 8 || step === 10) playKick(1.2);
+        if (step === 4 || step === 12) playSnare(1.1);
+        else if (step === 15) playSnare(0.25);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.95 : 0.62);
+      } else {
+        // V3: Complex (Trap hat subdivisions/rolls)
+        if (step === 0 || step === 8 || step === 11) playKick(1.3);
+        if (step === 4 || step === 12) playSnare(1.15);
+        // Hi-Hat roll on step 14 & 15
+        if (step === 14 || step === 15) {
+          playHat(false, 0.75);
+        } else if (step % 2 === 0) {
+          playHat(false, step % 4 === 0 ? 1.0 : 0.6);
+        }
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (isSwing) {
-      // Jazz swing feathering (very quiet kick on every beat)
-      if (step === 0 || step === 3 || step === 6 || step === 9) playKick(0.35);
-      // Snare comping/rim hits on upbeats
-      if (step === 2) playRimClick(0.45);
-      else if (step === 8) playSnare(0.4);
-      // Classic Ride swing pattern on the hi-hat (swung triplets grid)
-      if (step === 0 || step === 3 || step === 6 || step === 9) {
-        playHat(false, 1.0); // downbeats
-      } else if (step === 2 || step === 5 || step === 8 || step === 11) {
-        playHat(true, 0.55); // swung upbeats
-      }
-      // Foot hi-hat chick layer on 2 & 4
-      if (step === 3 || step === 9) {
-        playRimClick(0.25);
+      if (variant === 'A') {
+        // V1: Classic jazz swing ride cymbal with feathered kick
+        if (step === 0 || step === 3 || step === 6 || step === 9) playKick(0.32);
+        if (step === 2) playRimClick(0.45);
+        else if (step === 8) playSnare(0.4);
+        if (step === 0 || step === 3 || step === 6 || step === 9) playHat(false, 1.0);
+        else if (step === 2 || step === 5 || step === 8 || step === 11) playHat(true, 0.55);
+        if (step === 3 || step === 9) playRimClick(0.25);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Comping snare hits)
+        if (step === 0 || step === 6) playKick(0.35);
+        if (step === 2 || step === 5 || step === 11) playSnare(0.5); // active snare comping
+        if (step === 0 || step === 3 || step === 6 || step === 9) playHat(false, 1.05);
+        else if (step === 2 || step === 5 || step === 8 || step === 11) playHat(true, 0.62);
+        if (step === 3 || step === 9) playRimClick(0.3);
+      } else {
+        // V3: Complex (Swing triplets fill)
+        if (step === 0 || step === 6) playKick(0.5);
+        if (step === 9 || step === 10 || step === 11) {
+          playSnare(0.7); // crescendo snare fill
+        } else if (step === 2 || step === 5) {
+          playSnare(0.32);
+        }
+        if (step === 0 || step === 3 || step === 6 || step === 9) playHat(false, 1.0);
       }
       if (step % 3 === 0) triggerVisualBeat(Math.floor(step / 3));
     } else if (selectedStyleRef.current === 'latin') {
-      // Authentic syncopated Bossa double kick
-      if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.95);
-      // Side-stick rim clave instead of snare
-      if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick(1.0);
-      if (step % 2 === 0) {
-        playHat(false, step % 4 === 0 ? 0.8 : 0.48);
+      if (variant === 'A') {
+        // V1: Classic Bossa double kick & rim clave
+        if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.95);
+        if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick(1.0);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.8 : 0.48);
+      } else if (variant === 'B') {
+        // V2: Groove+ (High-energy Samba surdo sweep)
+        if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 14) {
+          playKick(step % 4 === 2 ? 1.15 : 0.6); // typical surdo groove
+        }
+        if (step === 0 || step === 4 || step === 8 || step === 12) playRimClick(0.95);
+        if (step % 2 === 0) playHat(false, 0.75);
+      } else {
+        // V3: Complex (Cascara clave & open hats)
+        if (step === 0 || step === 3 || step === 8 || step === 11) playKick(1.0);
+        // Cascara rimshot pattern
+        if (step === 0 || step === 2 || step === 3 || step === 5 || step === 6 || step === 8 || step === 10 || step === 11 || step === 13 || step === 14) {
+          playRimClick(0.85);
+        }
+        if (step % 4 === 2) playHat(true, 0.7); // open hat barks
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'funk') {
-      // Funky Drummer style breakbeat: heavy syncopation and ghost snares
-      if (step === 0 || step === 6 || step === 10 || step === 11) playKick(1.15);
-      if (step === 4 || step === 12) playSnare(1.1);
-      else if (step === 7 || step === 13 || step === 15) playSnare(0.28); // funky ghost notes
-      
-      if (step % 2 === 0) {
-        // Open hat barks on 6 and 14
-        const isOpen = step === 6 || step === 14;
-        playHat(isOpen, isOpen ? 1.0 : (step % 4 === 0 ? 0.95 : 0.55));
-      } else if (step === 3 || step === 11) {
-        playHat(false, 0.35); // subtle 16th hats
+      if (variant === 'A') {
+        // V1: Funky Breakbeat with ghost snares
+        if (step === 0 || step === 6 || step === 10 || step === 11) playKick(1.15);
+        if (step === 4 || step === 12) playSnare(1.1);
+        else if (step === 7 || step === 13 || step === 15) playSnare(0.28);
+        if (step % 2 === 0) playHat(step === 6 || step === 14, (step === 6 || step === 14) ? 1.0 : (step % 4 === 0 ? 0.95 : 0.55));
+        else if (step === 3 || step === 11) playHat(false, 0.35);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Linear Funk - tight groove, no simultaneous strikes)
+        if (step === 0 || step === 6 || step === 10) playKick(1.2);
+        else if (step === 4 || step === 12 || step === 14) playSnare(1.15);
+        else if (step === 2 || step === 8 || step === 15) playHat(false, 0.85);
+      } else {
+        // V3: Complex (Funk drum fill)
+        if (step === 0 || step === 6 || step === 11) playKick(1.2);
+        if (step === 4 || step === 12) playSnare(1.1);
+        else if (step === 13 || step === 14 || step === 15) playSnare(0.9); // rapid fill
+        if (step % 2 === 0) playHat(false, 0.8);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'reggae') {
-      // One Drop: Drop the kick and snare exactly on beat 3
-      if (step === 8) {
-        playKick(1.2);
-        playSnare(1.05);
-      }
-      // Sidestick rim-clicks on beats 2 and 4
-      if (step === 4 || step === 12) {
-        playRimClick(0.9);
-      }
-      // Pedagogical Guide: quiet rim click on beat 1 for student orientation
-      if (step === 0) {
-        playRimClick(0.22);
-      }
-      if (step % 2 === 0) {
-        // Rocksteady hat feel: emphasize upbeat eighth notes
-        const isUpbeat = step === 2 || step === 6 || step === 10 || step === 14;
-        playHat(false, isUpbeat ? 1.0 : 0.58);
+      if (variant === 'A') {
+        // V1: Classic One-Drop with guide click
+        if (step === 8) { playKick(1.2); playSnare(1.05); }
+        if (step === 4 || step === 12) playRimClick(0.9);
+        if (step === 0) playRimClick(0.22); // pedagogical guide
+        if (step % 2 === 0) playHat(false, (step === 2 || step === 6 || step === 10 || step === 14) ? 1.0 : 0.58);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Steppers style - four on the floor kick)
+        if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
+        if (step === 8) playSnare(1.05);
+        if (step === 4 || step === 12) playRimClick(0.85);
+        if (step % 2 === 0) playHat(false, 0.88);
+      } else {
+        // V3: Complex (Rocksteady with rimshot fill)
+        if (step === 8) playKick(1.2);
+        if (step === 8 || step === 14 || step === 15) playSnare(1.0);
+        if (step === 4 || step === 12) playRimClick(0.9);
+        if (step % 2 === 0) playHat(false, 0.8);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'walzer') {
-      // Walzer waltz boom-chick-chick pulse
-      if (step === 0) playKick(1.0);
-      if (step === 4 || step === 8) {
-        playRimClick(0.85);
-        playSnare(0.22); // soft snare layer
-      }
-      if (step % 2 === 0) {
-        const vol = step === 0 ? 0.95 : (step === 4 || step === 8 ? 0.72 : 0.45);
-        playHat(false, vol);
+      if (variant === 'A') {
+        // V1: Classic Waltz boom-chick-chick
+        if (step === 0) playKick(1.0);
+        if (step === 4 || step === 8) { playRimClick(0.85); playSnare(0.22); }
+        if (step % 2 === 0) playHat(false, step === 0 ? 0.95 : (step === 4 || step === 8 ? 0.72 : 0.45));
+      } else if (variant === 'B') {
+        // V2: Groove+ (Syncopated Jazz Waltz)
+        if (step === 0 || step === 6) playKick(0.9);
+        if (step === 4 || step === 8) playSnare(0.75);
+        if (step === 0 || step === 3 || step === 4 || step === 7 || step === 8 || step === 11) playHat(false, 0.8);
+      } else {
+        // V3: Complex (Waltz snare fill)
+        if (step === 0) playKick(1.0);
+        if (step === 4) playSnare(0.7);
+        if (step === 8 || step === 9 || step === 10 || step === 11) playSnare(0.8); // 3rd beat roll
+        if (step % 2 === 0) playHat(false, 0.8);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'ballad68') {
-      // Slow 6/8 ballad: rolling triplet feel
-      if (step === 0) playKick(1.2);
-      else if (step === 5) playKick(0.6); // heartbeat kick
-      if (step === 6) playSnare(1.1);
-      if (step % 2 === 0) {
-        const isMain = step === 0 || step === 6;
-        playHat(false, isMain ? 1.0 : 0.6);
+      if (variant === 'A') {
+        // V1: Slow 6/8 Triplet Ballad
+        if (step === 0) playKick(1.2);
+        else if (step === 5) playKick(0.6);
+        if (step === 6) playSnare(1.1);
+        if (step % 2 === 0) playHat(false, (step === 0 || step === 6) ? 1.0 : 0.6);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Heartbeat Ballad)
+        if (step === 0 || step === 4 || step === 5) playKick(1.1);
+        if (step === 6) playSnare(1.15);
+        else if (step === 11) playRimClick(0.5);
+        if (step % 2 === 0) playHat(false, 0.82);
+      } else {
+        // V3: Complex (Ballad fill on 10/11)
+        if (step === 0 || step === 5) playKick(1.2);
+        if (step === 6) playSnare(1.1);
+        else if (step === 10 || step === 11) playSnare(0.85); // roll
+        if (step % 2 === 0) playHat(false, 0.8);
       }
       if (step % 2 === 0) triggerVisualBeat(Math.floor(step / 2));
     } else if (selectedStyleRef.current === 'disco') {
-      // Four on the floor disco groove with offbeat open hats
-      if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
-      if (step === 4 || step === 12) playSnare(1.0);
-      if (step % 2 === 0) {
-        const isOff = step === 2 || step === 6 || step === 10 || step === 14;
-        playHat(isOff, isOff ? 1.05 : 0.5);
+      if (variant === 'A') {
+        // V1: Classic Four-on-the-Floor
+        if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
+        if (step === 4 || step === 12) playSnare(1.0);
+        if (step % 2 === 0) playHat(step === 2 || step === 6 || step === 10 || step === 14, (step === 2 || step === 6 || step === 10 || step === 14) ? 1.05 : 0.5);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Syncopated Hi-hat opening)
+        if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
+        if (step === 4 || step === 12) playSnare(1.0);
+        // Hi-Hat bark on all offbeat eighths (2, 6, 10, 14 open, then closed on 3, 7, 11, 15)
+        if (step === 2 || step === 6 || step === 10 || step === 14) {
+          playHat(true, 1.1);
+        } else if (step === 3 || step === 7 || step === 11 || step === 15) {
+          playHat(false, 0.5);
+        } else if (step % 4 === 0) {
+          playHat(false, 0.85);
+        }
+      } else {
+        // V3: Complex (Disco fill)
+        if (step === 0 || step === 3 || step === 4 || step === 8 || step === 11 || step === 12) playKick(1.1);
+        if (step === 4 || step === 12) playSnare(1.1);
+        else if (step === 15) playSnare(0.8);
+        if (step % 2 === 0) playHat(false, 0.8);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     }
@@ -14526,6 +14666,56 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
             })}
           </div>
 
+          {/* Beat Variations Selector */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            marginTop: '8px',
+            borderTop: '1px solid #f1f3f5',
+            paddingTop: '14px'
+          }}>
+            <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Groove-Variationen
+            </span>
+            <div style={{
+              display: 'flex',
+              gap: '6px'
+            }}>
+              {[
+                { id: 'A', label: 'Variante A: Standard' },
+                { id: 'B', label: 'Variante B: Groove+' },
+                { id: 'C', label: 'Variante C: Fill / Komplex' }
+              ].map((varOpt) => {
+                const isSelected = selectedVariation === varOpt.id;
+                return (
+                  <button
+                    key={varOpt.id}
+                    type="button"
+                    onClick={() => setSelectedVariation(varOpt.id as any)}
+                    className="tactile-btn"
+                    style={{
+                      flex: 1,
+                      background: isSelected ? '#eab308' : '#f5f5f7',
+                      color: isSelected ? '#ffffff' : '#1d1d1f',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '8px 4px',
+                      fontSize: '0.66rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.2s ease-in-out',
+                      boxShadow: isSelected ? '0 2px 8px rgba(234, 179, 8, 0.3)' : 'none'
+                    }}
+                  >
+                    {varOpt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Mixer Channel Strips */}
           <div style={{
             display: 'flex',
@@ -14545,60 +14735,227 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Klick-Lautstärke</span>
                   <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volMetronome}%</span>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={volMetronome}
-                  onChange={(e) => setVolMetronome(Number(e.target.value))}
-                  className="groovelab-fader"
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleMute('click')}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.62rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        background: isMuted('click') ? '#ea4335' : '#f5f5f7',
+                        color: isMuted('click') ? '#ffffff' : '#5f6368',
+                        transition: 'all 0.15s ease-in-out'
+                      }}
+                    >
+                      M
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleSolo('click')}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        fontSize: '0.62rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        background: isSolo('click') ? '#eab308' : '#f5f5f7',
+                        color: isSolo('click') ? '#ffffff' : '#5f6368',
+                        transition: 'all 0.15s ease-in-out'
+                      }}
+                    >
+                      S
+                    </button>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volMetronome}
+                    onChange={(e) => setVolMetronome(Number(e.target.value))}
+                    className="groovelab-fader"
+                    style={{ flex: 1 }}
+                  />
+                </div>
               </div>
             ) : (
               <>
+                {/* Bass Drum (Kick) Channel */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Bass Drum (Kick)</span>
                     <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volKick}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={volKick}
-                    onChange={(e) => setVolKick(Number(e.target.value))}
-                    className="groovelab-fader"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleMute('kick')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          background: isMuted('kick') ? '#ea4335' : '#f5f5f7',
+                          color: isMuted('kick') ? '#ffffff' : '#5f6368',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        M
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSolo('kick')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          background: isSolo('kick') ? '#eab308' : '#f5f5f7',
+                          color: isSolo('kick') ? '#ffffff' : '#5f6368',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        S
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volKick}
+                      onChange={(e) => setVolKick(Number(e.target.value))}
+                      className="groovelab-fader"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
                 </div>
 
+                {/* Snare Drum Channel */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Snare Drum</span>
                     <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volSnare}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={volSnare}
-                    onChange={(e) => setVolSnare(Number(e.target.value))}
-                    className="groovelab-fader"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleMute('snare')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          background: isMuted('snare') ? '#ea4335' : '#f5f5f7',
+                          color: isMuted('snare') ? '#ffffff' : '#5f6368',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        M
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSolo('snare')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          background: isSolo('snare') ? '#eab308' : '#f5f5f7',
+                          color: isSolo('snare') ? '#ffffff' : '#5f6368',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        S
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volSnare}
+                      onChange={(e) => setVolSnare(Number(e.target.value))}
+                      className="groovelab-fader"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
                 </div>
 
+                {/* Hi-Hat Channel */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Hi-Hat</span>
                     <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volHat}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={volHat}
-                    onChange={(e) => setVolHat(Number(e.target.value))}
-                    className="groovelab-fader"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleMute('hat')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          background: isMuted('hat') ? '#ea4335' : '#f5f5f7',
+                          color: isMuted('hat') ? '#ffffff' : '#5f6368',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        M
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSolo('hat')}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          background: isSolo('hat') ? '#eab308' : '#f5f5f7',
+                          color: isSolo('hat') ? '#ffffff' : '#5f6368',
+                          transition: 'all 0.15s ease-in-out'
+                        }}
+                      >
+                        S
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volHat}
+                      onChange={(e) => setVolHat(Number(e.target.value))}
+                      className="groovelab-fader"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
                 </div>
               </>
             )}
