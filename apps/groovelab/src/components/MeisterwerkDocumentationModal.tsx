@@ -11256,6 +11256,13 @@ const targetVol = isActive ? vol : 0;
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
     }
+    
+    // Clear existing recording data immediately to allow clean override in next loop cycle
+    delete audioBuffersRef.current[trackId];
+    setTracks((prev) =>
+      prev.map((t) => (t.id === trackId ? { ...t, url: null, blob: null } : t))
+    );
+    
     initAudio();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -11618,15 +11625,37 @@ const targetVol = isActive ? vol : 0;
       return;
     }
     setIsExporting(true);
-    let label = "Mein Loop-Mix";
+    let label = "Mein Loop";
     try {
-      const inputLabel = prompt("Gib deinem Loop einen Namen:", "Mein Loop-Mix");
+      const baseName = "Mein Loop";
+      let uniqueName = baseName;
+      let counter = 2;
+      const existingLabels = homeworkNotesList
+        .filter(note => note.startsWith('LOOP:'))
+        .map(note => {
+          const parts = note.replace('LOOP:', '').split('|');
+          return (parts[3] || 'Loop-Mix').trim();
+        });
+      while (existingLabels.includes(uniqueName)) {
+        uniqueName = `${baseName}${counter}`;
+        counter++;
+      }
+
+      const inputLabel = prompt("Gib deinem Loop einen Namen:", uniqueName);
       if (inputLabel === null) {
         setIsExporting(false);
         return; // user cancelled
       }
-      label = inputLabel;
-      const sanitizedLabel = label.replace(/\|/g, '-').trim() || 'Loop-Mix';
+      
+      let finalLabel = inputLabel.trim() || baseName;
+      let checkName = finalLabel;
+      let finalCounter = 2;
+      while (existingLabels.includes(checkName)) {
+        checkName = `${finalLabel}${finalCounter}`;
+        finalCounter++;
+      }
+      label = checkName;
+      const sanitizedLabel = label.replace(/\|/g, '-');
       
       const offlineCtx = new OfflineAudioContext(
         2,
@@ -11703,12 +11732,34 @@ const targetVol = isActive ? vol : 0;
     if (!masterLoopDuration) return;
     setIsExporting(true);
     try {
-      const label = prompt("Gib deinem Loop einen Namen für den Download:", "Mein Loop-Mix");
-      if (label === null) {
+      const baseName = "Mein Loop";
+      let uniqueName = baseName;
+      let counter = 2;
+      const existingLabels = homeworkNotesList
+        .filter(note => note.startsWith('LOOP:'))
+        .map(note => {
+          const parts = note.replace('LOOP:', '').split('|');
+          return (parts[3] || 'Loop-Mix').trim();
+        });
+      while (existingLabels.includes(uniqueName)) {
+        uniqueName = `${baseName}${counter}`;
+        counter++;
+      }
+
+      const inputLabel = prompt("Gib deinem Loop einen Namen für den Download:", uniqueName);
+      if (inputLabel === null) {
         setIsExporting(false);
         return; // user cancelled
       }
-      const sanitizedLabel = label.replace(/\|/g, '-').trim() || 'Loop-Mix';
+      
+      let finalLabel = inputLabel.trim() || baseName;
+      let checkName = finalLabel;
+      let finalCounter = 2;
+      while (existingLabels.includes(checkName)) {
+        checkName = `${finalLabel}${finalCounter}`;
+        finalCounter++;
+      }
+      const sanitizedLabel = checkName.replace(/\|/g, '-');
 
       const repsPrompt = prompt("Wie oft soll der Loop im exportierten Song hintereinander wiederholt werden?", "4");
       if (repsPrompt === null) {
