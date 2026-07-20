@@ -208,11 +208,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   
-  // Create Board form state
-  const [newBoardDay, setNewBoardDay] = useState(1);
-  const [newBoardStart, setNewBoardStart] = useState('14:00');
-  const [newBoardRoom, setNewBoardRoom] = useState('');
-  const [showAddBoardForm, setShowAddBoardForm] = useState(false);
+   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default snap to 15 mins
+
+   const snapTimeToGrid = (timeStr: string, snapMinutes: number): string => {
+     if (!timeStr) return timeStr;
+     const [hours, minutes] = timeStr.split(':').map(Number);
+     const totalMinutes = hours * 60 + minutes;
+     const snappedMinutes = Math.round(totalMinutes / snapMinutes) * snapMinutes;
+     const snappedHours = Math.floor(snappedMinutes / 60) % 24;
+     const snappedMins = snappedMinutes % 60;
+     const hStr = String(snappedHours).padStart(2, '0');
+     const mStr = String(snappedMins).padStart(2, '0');
+     return `${hStr}:${mStr}`;
+   };
 
   const [draggedStudentId, setDraggedStudentId] = useState<string | null>(null);
   const [dragSource, setDragSource] = useState<'sidebar' | 'board' | null>(null);
@@ -3201,8 +3209,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
-                      <select
-                        value={cfg.start}
+                      <input
+                        type="time"
+                        value={cfg.start || ''}
                         onChange={(e) => {
                           setOnboardingAvailability(prev => ({
                             ...prev,
@@ -3220,18 +3229,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           cursor: 'pointer',
                           outline: 'none'
                         }}
-                      >
-                        <option value="">Startzeit</option>
-                        {timeOptions.map(t => (
-                          <option key={t} value={t}>{t} Uhr</option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
-                      <select
-                        value={cfg.end}
+                      <input
+                        type="time"
+                        value={cfg.end || ''}
                         onChange={(e) => {
                           setOnboardingAvailability(prev => ({
                             ...prev,
@@ -3249,12 +3254,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           cursor: 'pointer',
                           outline: 'none'
                         }}
-                      >
-                        <option value="">Endzeit</option>
-                        {timeOptions.map(t => (
-                          <option key={t} value={t}>{t} Uhr</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                 )}
@@ -3454,6 +3454,29 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {/* Grid Snap Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
+                <select
+                  value={gridSnapMinutes}
+                  onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
+                  style={{
+                    border: 'none',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    color: '#1e293b',
+                    background: 'transparent',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  <option value={30}>30 Min</option>
+                  <option value={15}>15 Min</option>
+                  <option value={5}>5 Min</option>
+                </select>
+              </div>
+
               {/* Group A: Onboarding & Setup */}
               <div className="apple-btn-group">
                 {currentUserRole === 'teacher' && selectedTeacherId === userId ? (
@@ -3922,9 +3945,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             className="mini-time-input"
                             onChange={(e) => {
                               const newVal = e.target.value;
+                              const snappedVal = newVal ? snapTimeToGrid(newVal, gridSnapMinutes) : '14:00';
                               setBoards(prev => prev.map(b => {
                                 if (b.id !== board.id) return b;
-                                return recalculateBoardTimes({ ...b, startAnchor: newVal || '14:00' });
+                                return recalculateBoardTimes({ ...b, startAnchor: snappedVal });
                               }));
                             }}
                             onClick={(e) => e.stopPropagation()}
@@ -4282,7 +4306,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     type="time" value={bs.customStartTime || bs.assignedTime} className="mini-time-input"
                                     onChange={(e) => {
                                       const newTime = e.target.value || undefined;
-                                      const resolvedTime = newTime === bs.assignedTime ? undefined : newTime;
+                                      const snappedTime = newTime ? snapTimeToGrid(newTime, gridSnapMinutes) : undefined;
+                                      const resolvedTime = snappedTime === bs.assignedTime ? undefined : snappedTime;
                                       setBoards(prev => prev.map(b => {
                                         if (b.id !== board.id) return b;
                                         const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: resolvedTime } : s);
