@@ -14052,7 +14052,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
           </div>
 
           {/* Mechanical Metronome Container */}
-          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '4px 0' }}>
             <style>{`
               @keyframes swing-anim {
                 0% { transform: rotate(-24deg); }
@@ -14064,174 +14064,156 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
               }
             `}</style>
 
-            {/* Metronome Wrapper (to keep winding key outside clipped pyramid) */}
-            <div style={{ position: 'relative', width: '170px', height: '185px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              
-              {/* Golden Winding Key (mechanical handle rotating when playing) */}
-              <div style={{
-                position: 'absolute',
-                right: '2px',
-                bottom: '36px',
-                width: '14px',
-                height: '8px',
-                background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
-                border: '1.2px solid #b45309',
-                borderRadius: '2px',
-                transformOrigin: 'left center',
-                animation: isPlaying ? 'rotate-key 4s linear infinite' : 'none',
-                zIndex: 0,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            <svg width="180" height="215" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
+              <defs>
+                {/* Walnut Wood Gradient */}
+                <linearGradient id="walnutWood" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#6c472c" />
+                  <stop offset="40%" stopColor="#53331b" />
+                  <stop offset="85%" stopColor="#2f1d0f" />
+                  <stop offset="100%" stopColor="#1c1109" />
+                </linearGradient>
+                {/* Wood Shadow Overlay */}
+                <radialGradient id="woodGlow" cx="50%" cy="40%" r="60%">
+                  <stop offset="0%" stopColor="#ffe5d9" stopOpacity="0.08" />
+                  <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
+                </radialGradient>
+                {/* Hollow Interior Shadow */}
+                <linearGradient id="interiorChamber" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#19110d" />
+                  <stop offset="100%" stopColor="#060403" />
+                </linearGradient>
+                {/* Ivory scale Plate */}
+                <linearGradient id="ivoryPlate" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#fbf9f4" />
+                  <stop offset="100%" stopColor="#e5decb" />
+                </linearGradient>
+                {/* Steel Pendulum Rod */}
+                <linearGradient id="steelRod" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#f3f4f6" />
+                  <stop offset="50%" stopColor="#9ca3af" />
+                  <stop offset="100%" stopColor="#d1d5db" />
+                </linearGradient>
+                {/* Brass Gold Gradient */}
+                <linearGradient id="brassGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#ffe066" />
+                  <stop offset="35%" stopColor="#e5c142" />
+                  <stop offset="75%" stopColor="#b58e17" />
+                  <stop offset="100%" stopColor="#7a5b08" />
+                </linearGradient>
+                {/* Soft Casing Drop Shadow */}
+                <filter id="casingShadow" x="-20%" y="-10%" width="140%" height="130%">
+                  <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000000" floodOpacity="0.32" />
+                </filter>
+              </defs>
+
+              {/* Side Winding Key (behind the metronome shadow/body) */}
+              <g style={{
+                transformOrigin: '154px 145px',
+                animation: isPlaying ? 'rotate-key 4s linear infinite' : 'none'
               }}>
-                {/* Winding loop detail */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-4px',
-                  left: '10px',
-                  width: '10px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  border: '1.5px solid #d97706',
-                  background: 'transparent'
-                }} />
-              </div>
+                <rect x="146" y="142" width="10" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
+                <circle cx="160" cy="145" r="7" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
+                <circle cx="160" cy="145" r="2.5" fill="url(#brassGold)" />
+              </g>
 
-              {/* Pyramid Walnut Casing (clipped triangle) */}
-              <div style={{
-                position: 'relative',
-                width: '150px',
-                height: '180px',
-                background: 'linear-gradient(180deg, #5c3b22 0%, #301d0f 100%)', // premium walnut wood grain
-                boxShadow: '0 8px 22px rgba(0,0,0,0.35), inset 0 1px 3px rgba(255,255,255,0.12)',
-                clipPath: 'polygon(50% 0%, 15% 100%, 85% 100%)',
-                border: '2px solid #28180c',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'flex-end',
-                paddingBottom: '8px',
-                zIndex: 1
+              {/* 3D Pyramid Casing (Walnut Wood) */}
+              <path 
+                d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
+                fill="url(#walnutWood)" 
+                stroke="#2f1d0f" 
+                strokeWidth="2.5"
+                filter="url(#casingShadow)"
+              />
+              <path 
+                d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
+                fill="url(#woodGlow)" 
+                style={{ mixBlendMode: 'multiply' }}
+              />
+
+              {/* Golden Casing Trim Line */}
+              <path 
+                d="M 90 18 L 29 191 C 32 195, 36 197, 42 197 L 138 197 C 144 197, 148 195, 151 191 Z" 
+                fill="none" 
+                stroke="#e5c142" 
+                strokeWidth="1.2" 
+                opacity="0.32"
+              />
+
+              {/* Hollow Interior Chamber (Depth Chamber) */}
+              <path 
+                d="M 90 28 L 44 190 L 136 190 Z" 
+                fill="url(#interiorChamber)" 
+                stroke="#19110d" 
+                strokeWidth="1.5"
+              />
+
+              {/* Ivory scale Plate */}
+              <path 
+                d="M 90 34 L 50 184 L 130 184 Z" 
+                fill="url(#ivoryPlate)" 
+                stroke="#b5ad9e"
+                strokeWidth="0.5"
+              />
+
+              {/* Detailed scale lines and tempo markings */}
+              <g fill="#1d1d1f" opacity="0.48" fontFamily="monospace" fontSize="6.5" fontWeight="900" textAnchor="middle">
+                <text x="90" y="54">- 40 Largo -</text>
+                <line x1="68" y1="58" x2="112" y2="58" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
+                
+                <text x="90" y="76">- 80 Adagio -</text>
+                <line x1="64" y1="80" x2="116" y2="80" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
+                
+                <text x="90" y="98">- 120 Andante -</text>
+                <line x1="60" y1="102" x2="120" y2="102" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
+                
+                <text x="90" y="120">- 160 Allegro -</text>
+                <line x1="56" y1="124" x2="124" y2="124" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
+                
+                <text x="90" y="142">- 200 Presto -</text>
+                <line x1="52" y1="146" x2="128" y2="146" stroke="#1d1d1f" strokeWidth="0.5" opacity="0.3" />
+                
+                <text x="90" y="164">- 240 Prestiss -</text>
+              </g>
+
+              {/* Pendulum Group (rotating from pivot point) */}
+              <g style={{
+                transformOrigin: '90px 180px',
+                transform: isPlaying ? 'none' : 'rotate(0deg)',
+                animation: isPlaying ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate` : 'none',
+                transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
               }}>
-                {/* Hollow Inner Chamber (Depth Effect) */}
-                <div style={{
-                  position: 'absolute',
-                  top: '26px',
-                  bottom: '8px',
-                  left: '22%',
-                  right: '22%',
-                  background: 'linear-gradient(180deg, #160e0a 0%, #0a0604 100%)',
-                  borderRadius: '4px',
-                  boxShadow: 'inset 0 4px 12px rgba(0,0,0,0.85)',
-                  zIndex: 1,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  justifyContent: 'center'
-                }}>
-                  {/* Ivory Scale Plate */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '6px',
-                    bottom: '6px',
-                    left: '6px',
-                    right: '6px',
-                    background: 'linear-gradient(180deg, #f7f3eb 0%, #e6dfd2 100%)',
-                    borderRadius: '2px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    paddingTop: '6px',
-                    zIndex: 1
-                  }}>
-                    {/* Detailed Tempo Scales */}
-                    <div style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '5.5px', 
-                      opacity: 0.22, 
-                      fontSize: '5.5px', 
-                      fontFamily: 'monospace', 
-                      fontWeight: 800,
-                      color: '#1d1d1f',
-                      textAlign: 'center',
-                      lineHeight: 1
-                    }}>
-                      <span>- 40 Largo -</span>
-                      <span>- 80 Adagio -</span>
-                      <span>- 120 Andante -</span>
-                      <span>- 160 Allegro -</span>
-                      <span>- 200 Presto -</span>
-                      <span>- 240 Prestiss -</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Steel Pendulum Rod */}
+                <line x1="90" y1="180" x2="90" y2="40" stroke="url(#steelRod)" strokeWidth="3" strokeLinecap="round" />
+                
+                {/* 3D Brass weight */}
+                <rect 
+                  x="80" 
+                  y={40 + ((240 - bpm) / (240 - 40)) * 115} 
+                  width="20" 
+                  height="15" 
+                  rx="2"
+                  fill="url(#brassGold)" 
+                  stroke="#856404"
+                  strokeWidth="1.2"
+                  style={{ transition: 'y 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                />
+                {/* Center screw detail on weight */}
+                <circle 
+                  cx="90" 
+                  cy={40 + ((240 - bpm) / (240 - 40)) * 115 + 7.5} 
+                  r="2.5" 
+                  fill="url(#brassGold)" 
+                  stroke="#5a3d00" 
+                  strokeWidth="0.8"
+                  style={{ transition: 'cy 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                />
+              </g>
 
-                {/* Pendulum Rod Container (pivot at bottom center) */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '16px',
-                  width: '100%',
-                  height: '128px',
-                  transformOrigin: '50% 95%',
-                  transform: 'rotate(0deg)',
-                  animation: isPlaying 
-                    ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate`
-                    : 'none',
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
-                }}>
-                  {/* Metal Pendulum Rod (Polished Steel) */}
-                  <div style={{
-                    width: '3.5px',
-                    height: '110px',
-                    background: 'linear-gradient(90deg, #f3f4f6, #9ca3af 50%, #d1d5db)',
-                    borderRadius: '2px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-                  }} />
-
-                  {/* 3D Trapezoidal Brass Weight */}
-                  <div style={{
-                    position: 'absolute',
-                    width: '18px',
-                    height: '14px',
-                    background: 'linear-gradient(135deg, #ffe066 0%, #d4af37 40%, #aa8010 100%)', // metal gloss
-                    border: '1.2px solid #856404',
-                    borderRadius: '2px 2px 3px 3px',
-                    boxShadow: '0 3px 6px rgba(0,0,0,0.45)',
-                    // Height mapping
-                    bottom: `${((240 - bpm) / (240 - 40)) * 74 + 14}px`,
-                    left: 'calc(50% - 9px)',
-                    transition: 'bottom 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}>
-                    {/* Inner brass screw detail */}
-                    <div style={{
-                      width: '4px',
-                      height: '4px',
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle, #ffe066, #78350f)',
-                      border: '0.8px solid #5a3d00'
-                    }} />
-                  </div>
-                </div>
-
-                {/* Brass Pivot Cap cover */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '10px',
-                  width: '13px',
-                  height: '13px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #d4af37, #aa8010)',
-                  border: '1.2px solid #5a3d00',
-                  zIndex: 3,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.35)'
-                }} />
-              </div>
-            </div>
+              {/* Brass Lager / Pivot Cap */}
+              <circle cx="90" cy="180" r="7.5" fill="url(#brassGold)" stroke="#5a3d00" strokeWidth="1.5" />
+              <circle cx="90" cy="180" r="2.5" fill="#423000" />
+            </svg>
           </div>
 
           {/* Visual Beat Indicator Dots */}
