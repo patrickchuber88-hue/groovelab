@@ -3560,29 +3560,6 @@ export function ScheduleCalendarView({
 
           {/* Right: Actions */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Grid Snap Selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
-              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
-              <select
-                value={gridSnapMinutes}
-                onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
-                style={{
-                  border: 'none',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: '#1e293b',
-                  background: 'transparent',
-                  outline: 'none',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                <option value={30}>30 Min</option>
-                <option value={15}>15 Min</option>
-                <option value={5}>5 Min</option>
-              </select>
-            </div>
-
             {/* Unified Segmented Control for View & Actions */}
             <div id="tour-calendar-actions" className="apple-btn-group">
               {/* Namen zeigen Toggle */}
@@ -3656,6 +3633,29 @@ export function ScheduleCalendarView({
                 <Trash2 size={13} />
                 <span>Zurücksetzen</span>
               </button>
+            </div>
+
+            {/* Grid Snap Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
+              <select
+                value={gridSnapMinutes}
+                onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
+                style={{
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: '#1e293b',
+                  background: 'transparent',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                <option value={30}>30 Min</option>
+                <option value={15}>15 Min</option>
+                <option value={5}>5 Min</option>
+              </select>
             </div>
 
             {/* Merge Selected Action (Floating outside groups since it's a primary CTA) */}
