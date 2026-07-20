@@ -12923,8 +12923,9 @@ const targetVol = isActive ? vol : 0;
                       const elapsedSecs = (audioContextRef.current ? audioContextRef.current.currentTime : 0) - sequenceStartTimeRef.current;
                       const continuousTick = elapsedSecs / (60 / bpm);
                       if (continuousTick >= 4) {
-                        const sequenceOffset = Math.floor(continuousTick - 4);
-                        const activeStep = sequenceOffset % 32;
+                        const sequenceOffsetBeats = continuousTick - 4;
+                        const sequenceOffsetSteps = Math.floor(sequenceOffsetBeats * 2);
+                        const activeStep = sequenceOffsetSteps % 32;
                         isCurrentStep = track.isRecording && activeStep === stepIdx;
                       }
                     }
