@@ -5671,7 +5671,6 @@ export function TeacherDashboard({
           student={docStudent} 
           onClose={() => setDocStudent(null)} 
           teacherId={userId}
-          isTeacherTools={true}
           onProfileClick={(student) => {
             setDocStudent(null);
             setSelectedStudentProfile(student);
