@@ -13102,6 +13102,44 @@ const targetVol = isActive ? vol : 0;
           boxShadow: '0 8px 20px rgba(0, 0, 0, 0.03)',
           marginBottom: '8px'
         }}>
+          <style>{`
+            .apple-slider {
+              -webkit-appearance: none;
+              appearance: none;
+              height: 4px;
+              border-radius: 2px;
+              outline: none;
+              transition: background 0.1s ease;
+            }
+            .apple-slider::-webkit-slider-thumb {
+              -webkit-appearance: none;
+              appearance: none;
+              width: 14px;
+              height: 14px;
+              border-radius: 50%;
+              background: #ffffff;
+              border: 0.5px solid rgba(0, 0, 0, 0.15);
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.1);
+              cursor: pointer;
+              transition: transform 0.1s ease;
+            }
+            .apple-slider::-webkit-slider-thumb:hover {
+              transform: scale(1.1);
+            }
+            .apple-slider::-webkit-slider-thumb:active {
+              transform: scale(0.95);
+            }
+            .apple-slider::-moz-range-thumb {
+              width: 14px;
+              height: 14px;
+              border-radius: 50%;
+              background: #ffffff;
+              border: 0.5px solid rgba(0, 0, 0, 0.15);
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.1);
+              cursor: pointer;
+              border: none;
+            }
+          `}</style>
           <div style={{ display: 'flex', gap: '12px', width: '100%', alignItems: 'center' }}>
             {/* Kopfhörer Modus Toggle Card */}
             <div 
@@ -13457,7 +13495,13 @@ const targetVol = isActive ? vol : 0;
                     max="100" 
                     value={loopstationMetronomeVolume} 
                     onChange={(e) => setLoopstationMetronomeVolume(parseInt(e.target.value))} 
-                    style={{ width: '100%', accentColor: '#eab308', height: '4px', cursor: 'pointer' }}
+                    className="apple-slider"
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      cursor: 'pointer',
+                      background: `linear-gradient(to right, #86868b 0%, #86868b ${loopstationMetronomeVolume}%, rgba(0,0,0,0.06) ${loopstationMetronomeVolume}%, rgba(0,0,0,0.06) 100%)`
+                    }}
                   />
                 </div>
               </div>
@@ -13496,7 +13540,13 @@ const targetVol = isActive ? vol : 0;
                     onTouchEnd={(e) => {
                       updateLatencyInDb(parseInt((e.target as HTMLInputElement).value));
                     }}
-                    style={{ width: '100%', accentColor: '#eab308', height: '4px', cursor: 'pointer' }}
+                    className="apple-slider"
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      cursor: 'pointer',
+                      background: `linear-gradient(to right, #86868b 0%, #86868b ${((syncOffsetMs + 150) / 500) * 100}%, rgba(0,0,0,0.06) ${((syncOffsetMs + 150) / 500) * 100}%, rgba(0,0,0,0.06) 100%)`
+                    }}
                   />
                 </div>
                 
