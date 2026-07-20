@@ -12318,7 +12318,16 @@ const targetVol = isActive ? vol : 0;
                 if (activeSubTab === 'saved') {
                   if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url);
                 } else {
-                  startAutoSequence();
+                  if (isPlaying) {
+                    stopAll();
+                  } else {
+                    const hasRecordedTracks = tracks.some(t => t.url);
+                    if (hasRecordedTracks) {
+                      const confirmReset = window.confirm("Möchtest du deinen aktuellen Loop wirklich löschen und neu aufnehmen?");
+                      if (!confirmReset) return;
+                    }
+                    startAutoSequence();
+                  }
                 }
               }}
               disabled={activeSubTab === 'studio' && isAutoSequenceActive}
@@ -12334,7 +12343,7 @@ const targetVol = isActive ? vol : 0;
                     : isAutoSequenceActive 
                       ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
                       : isPlaying 
-                        ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)'
+                        ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)'
                         : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)'),
                 border: '1.5px solid rgba(0, 0, 0, 0.15)',
                 boxShadow: (activeSubTab === 'studio' && isAutoSequenceActive)
@@ -12353,7 +12362,7 @@ const targetVol = isActive ? vol : 0;
             >
               {activeSubTab === 'saved'
                 ? (isSavedLoopPlaying ? 'PLAY' : 'START')
-                : (isAutoSequenceActive ? 'REC' : 'START')}
+                : (isAutoSequenceActive ? 'REC' : (isPlaying ? 'STOP' : 'START'))}
             </button>
           </div>
         </div>
