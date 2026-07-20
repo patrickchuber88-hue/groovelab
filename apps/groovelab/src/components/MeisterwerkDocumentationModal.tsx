@@ -11907,13 +11907,13 @@ const targetVol = isActive ? vol : 0;
       }}>
         {/* The iPod Classic Hardware Controller */}
         <div style={{
-          width: '260px',
-          height: '410px',
+          width: '280px',
+          height: '430px',
           background: 'linear-gradient(135deg, #3c3c3e 0%, #1c1c1e 100%)',
-          borderRadius: '32px',
+          borderRadius: '36px',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           boxShadow: '0 25px 50px rgba(0, 0, 0, 0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.15), inset 0 -2px 5px rgba(0,0,0,0.5)',
-          padding: '16px 14px',
+          padding: '18px 16px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -11925,18 +11925,18 @@ const targetVol = isActive ? vol : 0;
           <div style={{
             position: 'absolute',
             inset: '1px',
-            borderRadius: '31px',
+            borderRadius: '35px',
             border: '1px solid rgba(255, 255, 255, 0.04)',
             pointerEvents: 'none'
           }} />
 
           {/* LCD Display Screen Bezel */}
           <div style={{
-            width: '230px',
-            height: '160px',
+            width: '248px',
+            height: '170px',
             background: 'linear-gradient(180deg, #18202c 0%, #0d1218 100%)',
-            borderRadius: '16px',
-            border: '2px solid #111112',
+            borderRadius: '18px',
+            border: '2.5px solid #111112',
             boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',
@@ -11947,8 +11947,8 @@ const targetVol = isActive ? vol : 0;
             {/* Screen Content */}
             <div style={{
               position: 'relative',
-              width: '124px',
-              height: '124px',
+              width: '130px',
+              height: '130px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -11997,8 +11997,8 @@ const targetVol = isActive ? vol : 0;
                 className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
                 style={{
                   position: 'absolute',
-                  width: '98px',
-                  height: '98px',
+                  width: '102px',
+                  height: '102px',
                   borderRadius: '50%',
                   background: isAutoSequenceActive 
                     ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
@@ -12014,7 +12014,7 @@ const targetVol = isActive ? vol : 0;
                 }}
               >
                 <span style={{ 
-                  fontSize: '1.8rem', 
+                  fontSize: '1.9rem', 
                   fontWeight: 800, 
                   fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   letterSpacing: '-0.04em', 
@@ -12056,8 +12056,8 @@ const targetVol = isActive ? vol : 0;
 
           {/* Click Wheel Controller */}
           <div style={{
-            width: '180px',
-            height: '180px',
+            width: '196px',
+            height: '196px',
             borderRadius: '50%',
             background: '#242426',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.05), inset 0 -1.5px 3px rgba(0,0,0,0.3)',
@@ -12067,87 +12067,130 @@ const targetVol = isActive ? vol : 0;
             justifyContent: 'center',
             userSelect: 'none'
           }}>
-            {/* Top Quadrant: MENU (Toggle Advanced Settings) */}
+            {/* Top Quadrant: MENU Button Pad */}
             <div 
               onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+              className="tactile-btn"
               style={{
                 position: 'absolute',
                 top: '12px',
-                width: '60px',
-                textAlign: 'center',
+                width: '64px',
+                height: '24px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 cursor: 'pointer',
-                fontSize: '0.62rem',
+                fontSize: '0.58rem',
                 fontWeight: 900,
-                color: '#8e8e93',
+                color: '#d1d1d6',
                 letterSpacing: '0.05em',
-                transition: 'color 0.2s'
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#8e8e93'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.color = '#d1d1d6';
+              }}
             >
               MENU
             </div>
 
-            {/* Bottom Quadrant: PLAY / PAUSE */}
+            {/* Bottom Quadrant: PLAY / PAUSE Button Pad */}
             <div 
               onClick={handlePlayToggle}
+              className="tactile-btn"
               style={{
                 position: 'absolute',
                 bottom: '12px',
-                width: '80px',
-                textAlign: 'center',
-                cursor: 'pointer',
+                width: '92px',
+                height: '24px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '4px',
-                fontSize: '0.58rem',
+                cursor: 'pointer',
+                fontSize: '0.55rem',
                 fontWeight: 900,
-                color: '#8e8e93',
-                transition: 'color 0.2s'
+                color: '#d1d1d6',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#8e8e93'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.color = '#d1d1d6';
+              }}
             >
-              {isPlaying ? <Square size={8} fill="currentColor" style={{ marginRight: '1px' }} /> : <Play size={8} fill="currentColor" />}
+              {isPlaying ? <Square size={7} fill="currentColor" /> : <Play size={7} fill="currentColor" />}
               <span>PLAY / PAUSE</span>
             </div>
 
-            {/* Left Quadrant: RESET */}
+            {/* Left Quadrant: RESET Button Pad */}
             <div 
               onClick={handleReset}
+              className="tactile-btn"
               style={{
                 position: 'absolute',
                 left: '12px',
-                width: '50px',
-                textAlign: 'center',
-                cursor: 'pointer',
+                width: '56px',
+                height: '24px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '2px',
-                fontSize: '0.56rem',
+                cursor: 'pointer',
+                fontSize: '0.55rem',
                 fontWeight: 900,
-                color: '#8e8e93',
-                transition: 'color 0.2s'
+                color: '#d1d1d6',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#ffffff'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#8e8e93'}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.color = '#d1d1d6';
+              }}
             >
-              <RotateCcw size={8} />
+              <RotateCcw size={7} />
               <span>RESET</span>
             </div>
 
-            {/* Right Quadrant: Indicator (Passive or Label) */}
+            {/* Right Quadrant: SELECT Button Pad */}
             <div 
+              className="tactile-btn"
               style={{
                 position: 'absolute',
-                right: '14px',
-                width: '45px',
-                textAlign: 'center',
+                right: '12px',
+                width: '56px',
+                height: '24px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontSize: '0.52rem',
                 fontWeight: 900,
-                color: '#444446',
+                color: '#555558',
                 letterSpacing: '0.04em'
               }}
             >
@@ -12161,8 +12204,8 @@ const targetVol = isActive ? vol : 0;
               disabled={isAutoSequenceActive}
               className="tactile-btn"
               style={{
-                width: '64px',
-                height: '64px',
+                width: '70px',
+                height: '70px',
                 borderRadius: '50%',
                 background: isPause 
                   ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
@@ -12179,7 +12222,7 @@ const targetVol = isActive ? vol : 0;
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.62rem',
+                fontSize: '0.66rem',
                 fontWeight: 900,
                 color: isAutoSequenceActive || isPause || isPlaying ? '#ffffff' : '#a1a1a6',
                 textTransform: 'uppercase',
@@ -12191,19 +12234,17 @@ const targetVol = isActive ? vol : 0;
           </div>
         </div>
 
-        {/* Master Control Parameter Tray (Glass look, sits right below the iPod Classic hardware) */}
+        {/* Master Control Parameter Tray (High-contrast ceramic deck) */}
         <div style={{
           width: '100%',
-          background: 'rgba(255, 255, 255, 0.45)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
+          border: '1.5px solid rgba(0, 0, 0, 0.08)',
           borderRadius: '24px',
           padding: '12px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.015)'
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.04), inset 0 1px 0 #ffffff'
         }}>
           {/* Kopfhörer Modus Toggle Card */}
           <div 
@@ -12215,8 +12256,8 @@ const targetVol = isActive ? vol : 0;
             }}
             style={{
               width: '100%',
-              background: useHeadphones ? 'rgba(52, 168, 83, 0.08)' : 'rgba(255, 255, 255, 0.6)',
-              border: useHeadphones ? '1px solid rgba(52, 168, 83, 0.15)' : '1px solid rgba(255, 255, 255, 0.7)',
+              background: useHeadphones ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#ffffff',
+              border: useHeadphones ? '1.5px solid #34a853' : '1.5px solid rgba(0, 0, 0, 0.08)',
               borderRadius: '16px',
               padding: '10px 12px',
               cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
@@ -12226,7 +12267,7 @@ const targetVol = isActive ? vol : 0;
               gap: '8px',
               transition: 'all 0.25s ease',
               opacity: isAutoSequenceActive ? 0.6 : 1,
-              boxShadow: useHeadphones ? '0 4px 12px rgba(52, 168, 83, 0.03)' : 'none'
+              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -12244,10 +12285,10 @@ const targetVol = isActive ? vol : 0;
                 <Headphones size={13} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#34a853' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#2e7d32' : '#1d1d1f', letterSpacing: '0.01em' }}>
                   Kopfhörer-Modus
                 </span>
-                <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 500 }}>
+                <span style={{ fontSize: '0.52rem', color: '#616161', fontWeight: 500 }}>
                   Studio & Mehrspur aktiv
                 </span>
               </div>
@@ -12276,6 +12317,7 @@ const targetVol = isActive ? vol : 0;
             </div>
           </div>
 
+          {/* Track count select row */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -12291,8 +12333,8 @@ const targetVol = isActive ? vol : 0;
               onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
               disabled={isAutoSequenceActive || !useHeadphones}
               style={{
-                background: 'rgba(255, 255, 255, 0.8)',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
+                background: '#ffffff',
+                border: '1.5px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '99px',
                 padding: '5px 12px',
                 fontSize: '0.66rem',
@@ -12309,31 +12351,62 @@ const targetVol = isActive ? vol : 0;
               <option value={5}>5 Spuren (Max)</option>
             </select>
           </div>
-        </div>
 
-        {/* Collapsible Advanced Settings Toggle (tempo adjust etc) */}
-        <button
-          type="button"
-          onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-          className="tactile-btn"
-          style={{
-            background: 'rgba(0, 0, 0, 0.03)',
-            color: '#55555d',
-            border: '1px solid rgba(0, 0, 0, 0.02)',
-            borderRadius: '20px',
-            fontSize: '0.64rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            padding: '6px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            marginTop: '2px',
-            textDecoration: 'none'
-          }}
-        >
-          <span>{showAdvancedSettings ? '↑ Einstellungen ausblenden' : '↓ Tempo & Metronom anpassen...'}</span>
-        </button>
+          <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', margin: '2px 0' }} />
+
+          {/* Tempo & Metronom Action Card */}
+          <div 
+            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+            style={{
+              width: '100%',
+              background: showAdvancedSettings ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : '#ffffff',
+              border: showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)',
+              borderRadius: '16px',
+              padding: '10px 12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                background: showAdvancedSettings ? '#1976d2' : 'rgba(0, 0, 0, 0.04)',
+                color: showAdvancedSettings ? '#ffffff' : '#86868b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.25s ease'
+              }}>
+                <Sliders size={13} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: showAdvancedSettings ? '#1565c0' : '#1d1d1f', letterSpacing: '0.01em' }}>
+                  Tempo & Metronom
+                </span>
+                <span style={{ fontSize: '0.52rem', color: '#616161', fontWeight: 500 }}>
+                  {bpm} BPM | Click {isMetronomeActive ? 'AN' : 'AUS'}
+                </span>
+              </div>
+            </div>
+            
+            <div style={{
+              color: showAdvancedSettings ? '#1565c0' : '#86868b',
+              transition: 'transform 0.2s ease',
+              transform: showAdvancedSettings ? 'rotate(90deg)' : 'none',
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              <ChevronRight size={14} />
+            </div>
+          </div>
+        </div>
 
         {showAdvancedSettings && (
           /* Metronome Panel */
@@ -12492,7 +12565,7 @@ const targetVol = isActive ? vol : 0;
                 gap: '8px'
               }}
             >
-              <span>{isExporting ? 'SPEICHERE...' : 'IM HAUSAUFGABENHEFT SPEICHERN'}</span>
+              <span>{isExporting ? 'SPEICHERE...' : 'LOOP SPEICHERN'}</span>
             </button>
             <button
               type="button"
