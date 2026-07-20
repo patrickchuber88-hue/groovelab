@@ -10257,9 +10257,16 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       if (!ctx) return;
       const playTime = time !== undefined ? time : ctx.currentTime;
       const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(450, playTime);
+
       const gainNode = ctx.createGain();
       gainNode.gain.value = 0; // Initialize to 0 to prevent any pop from default 1.0 gain
-      osc.connect(gainNode);
+      osc.connect(hp);
+      hp.connect(gainNode);
       gainNode.connect(ctx.destination);
       
       // Auto-Quiet Metronome: Completely mute (0%) after Spur 1 has been recorded to prevent click accumulation (bypassed for headphones)
@@ -13675,78 +13682,110 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
 
     const playKick = (volMul = 1.0) => {
       if (kVol <= 0.001) return;
-      // Main Body
+      // Resonant drumhead sine sweep (warm bass body)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.connect(gain);
-      gain.connect(masterGain);
-      osc.frequency.setValueAtTime(135, time);
-      osc.frequency.exponentialRampToValueAtTime(45, time + 0.08);
-      gain.gain.setValueAtTime(kVol * volMul, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
-      osc.start(time);
-      osc.stop(time + 0.15);
+      
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(140, time);
 
-      // Wooden skin contact click
-      const clickOsc = ctx.createOscillator();
-      const clickGain = ctx.createGain();
-      clickOsc.type = 'triangle';
-      clickOsc.connect(clickGain);
-      clickGain.connect(masterGain);
-      clickOsc.frequency.setValueAtTime(450, time);
-      clickOsc.frequency.exponentialRampToValueAtTime(90, time + 0.005);
-      clickGain.gain.setValueAtTime(kVol * volMul * 0.45, time);
-      clickGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.006);
-      clickOsc.start(time);
-      clickOsc.stop(time + 0.01);
+      osc.connect(lp);
+      lp.connect(gain);
+      gain.connect(masterGain);
+
+      osc.frequency.setValueAtTime(110, time);
+      osc.frequency.exponentialRampToValueAtTime(46, time + 0.09);
+
+      gain.gain.setValueAtTime(kVol * volMul * 0.9, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
+      
+      osc.start(time);
+      osc.stop(time + 0.20);
+
+      // Acoustic leather beater contact slap
+      const beater = ctx.createOscillator();
+      const beaterGain = ctx.createGain();
+      beater.type = 'triangle';
+      
+      const beaterFilter = ctx.createBiquadFilter();
+      beaterFilter.type = 'bandpass';
+      beaterFilter.frequency.setValueAtTime(1700, time);
+      beaterFilter.Q.setValueAtTime(2.0, time);
+
+      beater.connect(beaterFilter);
+      beaterFilter.connect(beaterGain);
+      beaterGain.connect(masterGain);
+
+      beater.frequency.setValueAtTime(800, time);
+      beater.frequency.exponentialRampToValueAtTime(140, time + 0.008);
+
+      beaterGain.gain.setValueAtTime(kVol * volMul * 0.22, time);
+      beaterGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.01);
+
+      beater.start(time);
+      beater.stop(time + 0.015);
     };
 
     const playSnare = (volMul = 1.0) => {
       if (sVol <= 0.001) return;
       if (!noiseBufferRef.current) return;
       
-      // Snappy Snare Wires (Tight sizzle)
+      // Snappy snare wires rattle (filtered noise)
       const noise = ctx.createBufferSource();
       noise.buffer = noiseBufferRef.current;
-      const bandpass = ctx.createBiquadFilter();
-      bandpass.type = 'bandpass';
-      bandpass.frequency.value = 1800;
-      bandpass.Q.value = 1.0;
       
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(sVol * 0.4 * volMul, time);
-      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.setValueAtTime(2100, time);
+      noiseFilter.Q.setValueAtTime(1.4, time);
       
-      noise.connect(bandpass);
-      bandpass.connect(noiseGain);
-      noiseGain.connect(masterGain);
-      noise.start(time);
-      noise.stop(time + 0.11);
+      const noiseHp = ctx.createBiquadFilter();
+      noiseHp.type = 'highpass';
+      noiseHp.frequency.setValueAtTime(950, time);
 
-      // Snare Rimshot Body Resonance 1
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(sVol * 0.36 * volMul, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
+      
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseHp);
+      noiseHp.connect(noiseGain);
+      noiseGain.connect(masterGain);
+      
+      noise.start(time);
+      noise.stop(time + 0.18);
+
+      // Acoustic drumhead shell resonance tone
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
-      osc1.frequency.setValueAtTime(210, time);
-      osc1.frequency.exponentialRampToValueAtTime(140, time + 0.05);
-      gain1.gain.setValueAtTime(sVol * 0.45 * volMul, time);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.07);
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(175, time);
+      osc1.frequency.exponentialRampToValueAtTime(125, time + 0.08);
+
+      gain1.gain.setValueAtTime(sVol * 0.40 * volMul, time);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+      
       osc1.connect(gain1);
       gain1.connect(masterGain);
       osc1.start(time);
-      osc1.stop(time + 0.08);
+      osc1.stop(time + 0.11);
 
-      // Snare Shell Ring 2
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(380, time);
-      gain2.gain.setValueAtTime(sVol * 0.15 * volMul, time);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, time + 0.035);
-      osc2.connect(gain2);
-      gain2.connect(masterGain);
-      osc2.start(time);
-      osc2.stop(time + 0.04);
+      // Stick impact transient
+      const rim = ctx.createOscillator();
+      const rimGain = ctx.createGain();
+      rim.type = 'triangle';
+      rim.frequency.setValueAtTime(950, time);
+      rim.frequency.exponentialRampToValueAtTime(350, time + 0.01);
+      
+      rimGain.gain.setValueAtTime(sVol * 0.18 * volMul, time);
+      rimGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.014);
+      
+      rim.connect(rimGain);
+      rimGain.connect(masterGain);
+      rim.start(time);
+      rim.stop(time + 0.018);
     };
 
     const playRimClick = (volMul = 1.0) => {
@@ -13754,77 +13793,96 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
-      osc.connect(gain);
+      
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(450, time);
+
+      osc.connect(hp);
+      hp.connect(gain);
       gain.connect(masterGain);
-      osc.frequency.setValueAtTime(850, time);
-      osc.frequency.exponentialRampToValueAtTime(450, time + 0.015);
-      gain.gain.setValueAtTime(sVol * 0.5 * volMul, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.02);
+
+      osc.frequency.setValueAtTime(1100, time);
+      osc.frequency.exponentialRampToValueAtTime(580, time + 0.012);
+
+      gain.gain.setValueAtTime(sVol * 0.38 * volMul, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.016);
       osc.start(time);
-      osc.stop(time + 0.025);
+      osc.stop(time + 0.02);
     };
 
     const playHat = (isOpen = false) => {
       if (hVol <= 0.001) return;
       if (!noiseBufferRef.current) return;
       
-      // Metallic resonant bank (6 oscillators)
-      const freqs = [365, 452, 630, 815, 1200, 3200];
-      const oscs = freqs.map(f => {
-        const osc = ctx.createOscillator();
-        osc.type = 'square';
-        osc.frequency.value = f;
-        return osc;
-      });
-      
-      const metalGain = ctx.createGain();
-      metalGain.gain.setValueAtTime(hVol * 0.05, time);
-      metalGain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.18 : 0.038));
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 9500;
-      
-      oscs.forEach(osc => {
-        osc.connect(filter);
-        osc.start(time);
-        osc.stop(time + (isOpen ? 0.20 : 0.05));
-      });
-      
-      filter.connect(metalGain);
-      metalGain.connect(masterGain);
-
-      // Soft highpass sizzle component
       const noise = ctx.createBufferSource();
       noise.buffer = noiseBufferRef.current;
-      const noiseFilter = ctx.createBiquadFilter();
-      noiseFilter.type = 'highpass';
-      noiseFilter.frequency.value = 9000;
       
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(hVol * 0.1, time);
-      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.16 : 0.025));
-      
-      noise.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(masterGain);
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(7000, time);
+
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(11500, time);
+      bp.Q.setValueAtTime(1.8, time);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(hVol * (isOpen ? 0.14 : 0.09), time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.20 : 0.035));
+
+      noise.connect(hp);
+      hp.connect(bp);
+      bp.connect(gain);
+      gain.connect(masterGain);
       
       noise.start(time);
-      noise.stop(time + (isOpen ? 0.18 : 0.04));
+      noise.stop(time + (isOpen ? 0.22 : 0.05));
     };
-
 
     const playClick = (isAccent = false) => {
       if (mVol <= 0.001) return;
+      
+      // Resonant woodblock body
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isAccent ? 1350 : 920, time);
+      
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.setValueAtTime(380, time);
+
+      osc.connect(hp);
+      hp.connect(gain);
       gain.connect(masterGain);
-      osc.frequency.setValueAtTime(isAccent ? 1500 : 900, time);
-      gain.gain.setValueAtTime(mVol * 0.9, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+
+      gain.gain.setValueAtTime(mVol * 0.68, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.038);
       osc.start(time);
-      osc.stop(time + 0.05);
+      osc.stop(time + 0.055);
+
+      // Mallet click transient
+      if (noiseBufferRef.current) {
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBufferRef.current;
+        
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(2800, time);
+        noiseFilter.Q.setValueAtTime(2.8, time);
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(mVol * 0.35, time);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.007);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(masterGain);
+
+        noise.start(time);
+        noise.stop(time + 0.012);
+      }
     };
 
     const triggerVisualBeat = (beatIdx: number) => {
@@ -13938,22 +13996,151 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
             </span>
           </div>
 
+          {/* Mechanical Metronome Container */}
+          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '5px 0' }}>
+            <style>{`
+              @keyframes swing-anim {
+                0% { transform: rotate(-24deg); }
+                100% { transform: rotate(24deg); }
+              }
+            `}</style>
+            
+            {/* Pyramid Casing */}
+            <div style={{
+              position: 'relative',
+              width: '150px',
+              height: '170px',
+              background: 'linear-gradient(180deg, #6c472b 0%, #462c19 100%)', // walnut wood gradient
+              clipPath: 'polygon(50% 0%, 15% 100%, 85% 100%)',
+              boxShadow: 'inset 0 0 15px rgba(0,0,0,0.6), 0 8px 16px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              paddingBottom: '8px',
+              border: '2px solid #2f1d10',
+              borderRadius: '6px'
+            }}>
+              {/* Front Plate / Faceplate */}
+              <div style={{
+                position: 'absolute',
+                top: '32px',
+                bottom: '8px',
+                left: '26%',
+                right: '26%',
+                background: '#fcf8f2',
+                borderRadius: '3px',
+                boxShadow: 'inset 0 0 5px rgba(0,0,0,0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                paddingTop: '6px',
+                zIndex: 1
+              }}>
+                {/* Scale markings */}
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '6px', 
+                  opacity: 0.18, 
+                  fontSize: '5.5px', 
+                  fontFamily: 'monospace', 
+                  fontWeight: 700,
+                  color: '#1d1d1f',
+                  textAlign: 'center',
+                  lineHeight: 1
+                }}>
+                  <span>- 40 -</span>
+                  <span>- 80 -</span>
+                  <span>- 120 -</span>
+                  <span>- 160 -</span>
+                  <span>- 200 -</span>
+                  <span>- 240 -</span>
+                </div>
+              </div>
+
+              {/* Pendulum Rod Container (pivot at bottom center) */}
+              <div style={{
+                position: 'absolute',
+                bottom: '16px',
+                width: '100%',
+                height: '120px',
+                transformOrigin: '50% 95%',
+                transform: 'rotate(0deg)',
+                animation: isPlaying 
+                  ? `swing-anim ${120 / bpm}s ease-in-out infinite alternate`
+                  : 'none',
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
+              }}>
+                {/* Metal Pendulum Rod */}
+                <div style={{
+                  width: '3.5px',
+                  height: '100px',
+                  background: 'linear-gradient(90deg, #e5e7eb, #9ca3af, #e5e7eb)',
+                  borderRadius: '2px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                }} />
+
+                {/* Sliding brass weight */}
+                <div style={{
+                  position: 'absolute',
+                  width: '15px',
+                  height: '13px',
+                  background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', // golden brass
+                  border: '1.2px solid #b45309',
+                  borderRadius: '2px',
+                  boxShadow: '0 1.5px 3px rgba(0,0,0,0.35)',
+                  // Height on rod mapping: bpm=40 (bottom: 82px), bpm=240 (bottom: 12px)
+                  bottom: `${((240 - bpm) / (240 - 40)) * 70 + 12}px`,
+                  left: 'calc(50% - 7.5px)',
+                  transition: 'bottom 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)'
+                }}>
+                  {/* Weight knob dot */}
+                  <div style={{
+                    width: '3.5px',
+                    height: '3.5px',
+                    background: '#78350f',
+                    borderRadius: '50%',
+                    margin: '4px auto 0 auto'
+                  }} />
+                </div>
+              </div>
+
+              {/* Pivot Cap cover */}
+              <div style={{
+                position: 'absolute',
+                bottom: '10px',
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #9ca3af, #4b5563)',
+                border: '1.2px solid #1f2937',
+                zIndex: 3,
+                boxShadow: '0 1.5px 3px rgba(0,0,0,0.3)'
+              }} />
+            </div>
+          </div>
+
           {/* Visual Beat Indicator Dots */}
-          <div style={{ display: 'flex', gap: '14px', margin: '10px 0' }}>
+          <div style={{ display: 'flex', gap: '14px', margin: '5px 0' }}>
             {Array.from({ length: getBeatsPerBar(selectedStyle) }).map((_, idx) => {
               const isActive = activeBeatIndex === idx;
               return (
                 <div
                   key={idx}
                   style={{
-                    width: '16px',
-                    height: '16px',
+                    width: '12px',
+                    height: '12px',
                     borderRadius: '50%',
                     background: isActive 
                       ? (idx === 0 ? '#ea4335' : '#34a853') 
                       : '#e5e5e7',
                     boxShadow: isActive 
-                      ? `0 0 10px ${idx === 0 ? 'rgba(234, 67, 53, 0.6)' : 'rgba(52, 168, 83, 0.6)'}` 
+                      ? `0 0 8px ${idx === 0 ? 'rgba(234, 67, 53, 0.5)' : 'rgba(52, 168, 83, 0.5)'}` 
                       : 'none',
                     transition: 'all 0.08s ease'
                   }}
@@ -13964,14 +14151,14 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
 
           {/* Takt-Fortschritts-Sweep-Bar */}
           <div style={{
-            width: '180px',
-            height: '6px',
+            width: '160px',
+            height: '5px',
             background: '#e5e5e7',
             borderRadius: '10px',
             overflow: 'hidden',
             position: 'relative',
-            marginTop: '-6px',
-            marginBottom: '6px'
+            marginTop: '-2px',
+            marginBottom: '4px'
           }}>
             <div style={{
               position: 'absolute',
@@ -13980,7 +14167,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
               height: '100%',
               width: `${barProgress}%`,
               background: 'linear-gradient(90deg, #34a853 0%, #2ecc71 100%)',
-              boxShadow: '0 0 8px rgba(52, 168, 83, 0.4)',
+              boxShadow: '0 0 6px rgba(52, 168, 83, 0.3)',
               borderRadius: '10px',
               transition: isPlaying ? 'none' : 'width 0.1s ease-out'
             }} />
