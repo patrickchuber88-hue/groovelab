@@ -11556,6 +11556,12 @@ const targetVol = isActive ? vol : 0;
   };
 
   const startRecording = async (trackId: number) => {
+    // Force one-time latency calibration before first recording
+    if (!localStorage.getItem('groovelab_latency_calibrated')) {
+      setIsCalibratingLatency(true);
+      setCalibrationPhaseState('idle');
+      return;
+    }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
@@ -13435,7 +13441,10 @@ const targetVol = isActive ? vol : 0;
                 
                 <button
                   type="button"
-                  onClick={runAutoLatencyCalibration}
+                  onClick={() => {
+                    setIsCalibratingLatency(true);
+                    setCalibrationPhaseState('idle');
+                  }}
                   disabled={isCalibratingLatency}
                   className="tactile-btn"
                   style={{
@@ -13952,6 +13961,7 @@ const targetVol = isActive ? vol : 0;
                   System-Kalibrierung
                 </span>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>
+                  {calibrationPhaseState === 'idle' && 'Latenz einrichten'}
                   {calibrationPhaseState === 'ambient' && 'Hintergrundgeräusche...'}
                   {calibrationPhaseState === 'clicks' && `Messung läuft...`}
                   {calibrationPhaseState === 'result' && 'Kalibrierung abgeschlossen!'}
@@ -13959,7 +13969,51 @@ const targetVol = isActive ? vol : 0;
               </div>
 
               {/* Display progress status */}
-              {calibrationPhaseState !== 'result' ? (
+              {calibrationPhaseState === 'idle' ? (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#515154', lineHeight: 1.5, padding: '0 8px' }}>
+                    Bitte kalibriere einmalig deine Latenz, um deine erste Aufnahme perfekt synchron einzuspielen. Dieser Vorgang dauert nur wenige Sekunden.
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => runAutoLatencyCalibration()}
+                      className="tactile-btn"
+                      style={{
+                        background: '#34a853',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 24px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        width: '100%'
+                      }}
+                    >
+                      Kalibrierung starten
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCalibratingLatency(false)}
+                      className="tactile-btn"
+                      style={{
+                        background: 'transparent',
+                        color: '#86868b',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '8px 24px',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        width: '100%'
+                      }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+              ) : calibrationPhaseState !== 'result' ? (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#86868b' }}>
                     {calibrationPhaseState === 'ambient' 
@@ -14233,6 +14287,7 @@ const targetVol = isActive ? vol : 0;
                     onClick={() => {
                       setIsCalibratingLatency(false);
                       updateLatencyInDb(syncOffsetMs);
+                      localStorage.setItem('groovelab_latency_calibrated', 'true');
                     }}
                     className="tactile-btn"
                     style={{
