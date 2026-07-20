@@ -11903,17 +11903,17 @@ const targetVol = isActive ? vol : 0;
         justifyContent: 'flex-start',
         gap: '20px',
         width: '100%',
-        maxWidth: '280px'
+        maxWidth: '300px'
       }}>
         {/* The iPod Classic Hardware Controller */}
         <div style={{
-          width: '280px',
-          height: '430px',
+          width: '300px',
+          height: '460px',
           background: 'linear-gradient(135deg, #3c3c3e 0%, #1c1c1e 100%)',
-          borderRadius: '36px',
+          borderRadius: '38px',
           border: '1px solid rgba(255, 255, 255, 0.08)',
           boxShadow: '0 25px 50px rgba(0, 0, 0, 0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.15), inset 0 -2px 5px rgba(0,0,0,0.5)',
-          padding: '18px 16px',
+          padding: '20px 16px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -11925,17 +11925,17 @@ const targetVol = isActive ? vol : 0;
           <div style={{
             position: 'absolute',
             inset: '1px',
-            borderRadius: '35px',
+            borderRadius: '37px',
             border: '1px solid rgba(255, 255, 255, 0.04)',
             pointerEvents: 'none'
           }} />
 
           {/* LCD Display Screen Bezel */}
           <div style={{
-            width: '248px',
-            height: '170px',
+            width: '266px',
+            height: '180px',
             background: 'linear-gradient(180deg, #18202c 0%, #0d1218 100%)',
-            borderRadius: '18px',
+            borderRadius: '20px',
             border: '2.5px solid #111112',
             boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.08)',
             display: 'flex',
@@ -11947,8 +11947,8 @@ const targetVol = isActive ? vol : 0;
             {/* Screen Content */}
             <div style={{
               position: 'relative',
-              width: '130px',
-              height: '130px',
+              width: '136px',
+              height: '136px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -11997,8 +11997,8 @@ const targetVol = isActive ? vol : 0;
                 className={isPause ? 'central-pulse-pause' : (isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
                 style={{
                   position: 'absolute',
-                  width: '102px',
-                  height: '102px',
+                  width: '106px',
+                  height: '106px',
                   borderRadius: '50%',
                   background: isAutoSequenceActive 
                     ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)' 
@@ -12014,7 +12014,7 @@ const targetVol = isActive ? vol : 0;
                 }}
               >
                 <span style={{ 
-                  fontSize: '1.9rem', 
+                  fontSize: '2.0rem', 
                   fontWeight: 800, 
                   fontFamily: '"Outfit", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   letterSpacing: '-0.04em', 
@@ -12056,8 +12056,8 @@ const targetVol = isActive ? vol : 0;
 
           {/* Click Wheel Controller */}
           <div style={{
-            width: '196px',
-            height: '196px',
+            width: '210px',
+            height: '210px',
             borderRadius: '50%',
             background: '#242426',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.05), inset 0 -1.5px 3px rgba(0,0,0,0.3)',
@@ -12073,9 +12073,9 @@ const targetVol = isActive ? vol : 0;
               className="tactile-btn"
               style={{
                 position: 'absolute',
-                top: '12px',
-                width: '64px',
-                height: '24px',
+                top: '14px',
+                width: '70px',
+                height: '26px',
                 borderRadius: '8px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -12084,7 +12084,7 @@ const targetVol = isActive ? vol : 0;
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                fontSize: '0.58rem',
+                fontSize: '0.62rem',
                 fontWeight: 900,
                 color: '#d1d1d6',
                 letterSpacing: '0.05em',
@@ -12108,9 +12108,9 @@ const targetVol = isActive ? vol : 0;
               className="tactile-btn"
               style={{
                 position: 'absolute',
-                bottom: '12px',
-                width: '92px',
-                height: '24px',
+                bottom: '14px',
+                width: '100px',
+                height: '26px',
                 borderRadius: '8px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -12120,7 +12120,7 @@ const targetVol = isActive ? vol : 0;
                 justifyContent: 'center',
                 gap: '4px',
                 cursor: 'pointer',
-                fontSize: '0.55rem',
+                fontSize: '0.58rem',
                 fontWeight: 900,
                 color: '#d1d1d6',
                 transition: 'all 0.2s ease'
@@ -12144,9 +12144,9 @@ const targetVol = isActive ? vol : 0;
               className="tactile-btn"
               style={{
                 position: 'absolute',
-                left: '12px',
-                width: '56px',
-                height: '24px',
+                left: '14px',
+                width: '60px',
+                height: '26px',
                 borderRadius: '8px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -12156,7 +12156,7 @@ const targetVol = isActive ? vol : 0;
                 justifyContent: 'center',
                 gap: '2px',
                 cursor: 'pointer',
-                fontSize: '0.55rem',
+                fontSize: '0.58rem',
                 fontWeight: 900,
                 color: '#d1d1d6',
                 transition: 'all 0.2s ease'
@@ -12179,16 +12179,16 @@ const targetVol = isActive ? vol : 0;
               className="tactile-btn"
               style={{
                 position: 'absolute',
-                right: '12px',
-                width: '56px',
-                height: '24px',
+                right: '14px',
+                width: '60px',
+                height: '26px',
                 borderRadius: '8px',
                 background: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid rgba(255, 255, 255, 0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.52rem',
+                fontSize: '0.55rem',
                 fontWeight: 900,
                 color: '#555558',
                 letterSpacing: '0.04em'
@@ -12204,8 +12204,8 @@ const targetVol = isActive ? vol : 0;
               disabled={isAutoSequenceActive}
               className="tactile-btn"
               style={{
-                width: '70px',
-                height: '70px',
+                width: '74px',
+                height: '74px',
                 borderRadius: '50%',
                 background: isPause 
                   ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
@@ -12222,7 +12222,7 @@ const targetVol = isActive ? vol : 0;
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '0.66rem',
+                fontSize: '0.7rem',
                 fontWeight: 900,
                 color: isAutoSequenceActive || isPause || isPlaying ? '#ffffff' : '#a1a1a6',
                 textTransform: 'uppercase',
@@ -12234,316 +12234,9 @@ const targetVol = isActive ? vol : 0;
           </div>
         </div>
 
-        {/* Master Control Parameter Tray (High-contrast ceramic deck) */}
-        <div style={{
-          width: '100%',
-          background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
-          border: '1.5px solid rgba(0, 0, 0, 0.08)',
-          borderRadius: '24px',
-          padding: '12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.04), inset 0 1px 0 #ffffff'
-        }}>
-          {/* Kopfhörer Modus Toggle Card */}
-          <div 
-            onClick={() => {
-              if (!isAutoSequenceActive) {
-                isManualHeadphonesRef.current = true;
-                setUseHeadphones(!useHeadphones);
-              }
-            }}
-            style={{
-              width: '100%',
-              background: useHeadphones ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#ffffff',
-              border: useHeadphones ? '1.5px solid #34a853' : '1.5px solid rgba(0, 0, 0, 0.08)',
-              borderRadius: '16px',
-              padding: '10px 12px',
-              cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              transition: 'all 0.25s ease',
-              opacity: isAutoSequenceActive ? 0.6 : 1,
-              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
-                background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.04)',
-                color: useHeadphones ? '#ffffff' : '#86868b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.25s ease'
-              }}>
-                <Headphones size={13} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#2e7d32' : '#1d1d1f', letterSpacing: '0.01em' }}>
-                  Kopfhörer-Modus
-                </span>
-                <span style={{ fontSize: '0.52rem', color: '#616161', fontWeight: 500 }}>
-                  Studio & Mehrspur aktiv
-                </span>
-              </div>
-            </div>
-            
-            <div style={{
-              width: '34px',
-              height: '20px',
-              borderRadius: '99px',
-              background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.08)',
-              position: 'relative',
-              transition: 'all 0.25s ease',
-              padding: '2px'
-            }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: '#ffffff',
-                position: 'absolute',
-                left: useHeadphones ? '16px' : '2px',
-                top: '2px',
-                transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }} />
-            </div>
-          </div>
-
-          {/* Track count select row */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            width: '100%',
-            padding: '0 4px'
-          }}>
-            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#55555d', letterSpacing: '0.01em' }}>
-              Spuren:
-            </span>
-            <select
-              value={desiredTrackCount}
-              onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
-              disabled={isAutoSequenceActive || !useHeadphones}
-              style={{
-                background: '#ffffff',
-                border: '1.5px solid rgba(0, 0, 0, 0.08)',
-                borderRadius: '99px',
-                padding: '5px 12px',
-                fontSize: '0.66rem',
-                fontWeight: 800,
-                color: useHeadphones ? '#1d1d1f' : '#86868b',
-                cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)'
-              }}
-            >
-              <option value={2}>2 Spuren (Boxen-Limit)</option>
-              <option value={3}>3 Spuren</option>
-              <option value={4}>4 Spuren</option>
-              <option value={5}>5 Spuren (Max)</option>
-            </select>
-          </div>
-
-          <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', margin: '2px 0' }} />
-
-          {/* Tempo & Metronom Action Card */}
-          <div 
-            onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-            style={{
-              width: '100%',
-              background: showAdvancedSettings ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : '#ffffff',
-              border: showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)',
-              borderRadius: '16px',
-              padding: '10px 12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '8px',
-              transition: 'all 0.25s ease',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
-                background: showAdvancedSettings ? '#1976d2' : 'rgba(0, 0, 0, 0.04)',
-                color: showAdvancedSettings ? '#ffffff' : '#86868b',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.25s ease'
-              }}>
-                <Sliders size={13} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: showAdvancedSettings ? '#1565c0' : '#1d1d1f', letterSpacing: '0.01em' }}>
-                  Tempo & Metronom
-                </span>
-                <span style={{ fontSize: '0.52rem', color: '#616161', fontWeight: 500 }}>
-                  {bpm} BPM | Click {isMetronomeActive ? 'AN' : 'AUS'}
-                </span>
-              </div>
-            </div>
-            
-            <div style={{
-              color: showAdvancedSettings ? '#1565c0' : '#86868b',
-              transition: 'transform 0.2s ease',
-              transform: showAdvancedSettings ? 'rotate(90deg)' : 'none',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              <ChevronRight size={14} />
-            </div>
-          </div>
-        </div>
-
-        {showAdvancedSettings && (
-          /* Metronome Panel */
-          <div style={{
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            borderRadius: '16px',
-            padding: '14px',
-            width: '100%',
-            maxWidth: '280px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            marginTop: '2px',
-            background: 'rgba(255, 255, 255, 0.6)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 15px rgba(0, 0, 0, 0.02)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.04em' }}>TEMPO / UTILITY</span>
-              <button
-                type="button"
-                onClick={() => setIsMetronomeActive(!isMetronomeActive)}
-                className="tactile-btn"
-                style={{
-                  background: isMetronomeActive ? '#34a853' : '#f5f5f7',
-                  border: 'none',
-                  color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
-                  fontSize: '0.55rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  letterSpacing: '0.04em'
-                }}
-              >
-                {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={handleTapTempo}
-                className="tactile-btn"
-                style={{
-                  flex: 1.2,
-                  background: '#f5f5f7',
-                  color: '#1d1d1f',
-                  border: 'none',
-                  borderRadius: '8px',
-                  height: '34px',
-                  fontSize: '0.66rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                TAP TEMPO
-              </button>
-              
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-                  className="tactile-btn"
-                  style={{ width: '30px', height: '34px', background: '#f5f5f7', border: 'none', color: '#1d1d1f', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
-                >
-                  -
-                </button>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: 'SF Mono, monospace', minWidth: '34px', textAlign: 'center', color: '#1d1d1f' }}>
-                  {bpm}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-                  className="tactile-btn"
-                  style={{ width: '30px', height: '34px', background: '#f5f5f7', border: 'none', color: '#1d1d1f', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s ease' }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            
-            {/* Hardware Latency Calibration Slider */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #f1f3f5', paddingTop: '10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                  SYNC LATENCY
-                </span>
-                <span style={{ fontSize: '0.62rem', color: '#34a853', fontWeight: 700, fontFamily: 'SF Mono, monospace' }}>
-                  {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input 
-                  type="range" 
-                  min="-150" 
-                  max="350" 
-                  value={syncOffsetMs} 
-                  onChange={(e) => {
-                    setSyncOffsetMs(parseInt(e.target.value));
-                    isManualLatencyAdjustmentRef.current = true;
-                  }} 
-                  style={{ flex: 1, accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={runAutoLatencyCalibration}
-                disabled={isCalibratingLatency}
-                className="tactile-btn"
-                style={{
-                  background: isCalibratingLatency ? '#e5e5ea' : 'rgba(52, 168, 83, 0.08)',
-                  color: isCalibratingLatency ? '#86868b' : '#34a853',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px 10px',
-                  fontSize: '0.62rem',
-                  fontWeight: 700,
-                  cursor: isCalibratingLatency ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s ease',
-                  width: '100%',
-                  textAlign: 'center',
-                  textTransform: 'uppercase',
-                  marginTop: '2px'
-                }}
-              >
-                {isCalibratingLatency ? 'Kalibriere...' : 'Auto-Kalibrierung'}
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Master Mixdown Export Buttons */}
         {masterLoopDuration && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '280px', marginTop: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '300px', marginTop: '4px' }}>
             <button
               type="button"
               onClick={handleExportMix}
@@ -12594,7 +12287,6 @@ const targetVol = isActive ? vol : 0;
         )}
       </div>
 
-      {/* Right Column: 4 DAW Console Mixer Strips */}
       <div style={{
         flex: '1.2 1 0%',
         display: 'flex',
@@ -12603,6 +12295,274 @@ const targetVol = isActive ? vol : 0;
         padding: '2px 0',
         justifyContent: 'flex-start'
       }}>
+        {/* Master Control Parameter Tray (Horizontal layout at the top of right column) */}
+        <div style={{
+          width: '100%',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
+          border: '1.5px solid rgba(0, 0, 0, 0.08)',
+          borderRadius: '20px',
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.03)',
+          marginBottom: '8px'
+        }}>
+          <div style={{ display: 'flex', gap: '12px', width: '100%', alignItems: 'center' }}>
+            {/* Kopfhörer Modus Toggle Card */}
+            <div 
+              onClick={() => {
+                if (!isAutoSequenceActive) {
+                  isManualHeadphonesRef.current = true;
+                  setUseHeadphones(!useHeadphones);
+                }
+              }}
+              style={{
+                flex: 1.3,
+                background: useHeadphones ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#ffffff',
+                border: useHeadphones ? '1.5px solid #34a853' : '1.5px solid rgba(0, 0, 0, 0.08)',
+                borderRadius: '12px',
+                padding: '8px 12px',
+                cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                transition: 'all 0.25s ease',
+                opacity: isAutoSequenceActive ? 0.6 : 1
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Headphones size={13} style={{ color: useHeadphones ? '#2e7d32' : '#86868b' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#2e7d32' : '#1d1d1f' }}>
+                    Kopfhörer-Modus
+                  </span>
+                  <span style={{ fontSize: '0.50rem', color: '#616161', fontWeight: 500 }}>
+                    Mehrspur aktiv
+                  </span>
+                </div>
+              </div>
+              
+              <div style={{
+                width: '32px',
+                height: '18px',
+                borderRadius: '99px',
+                background: useHeadphones ? '#34a853' : 'rgba(0, 0, 0, 0.08)',
+                position: 'relative',
+                transition: 'all 0.25s ease',
+                padding: '2px'
+              }}>
+                <div style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  position: 'absolute',
+                  left: useHeadphones ? '16px' : '2px',
+                  top: '2px',
+                  transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                }} />
+              </div>
+            </div>
+
+            {/* Spuren Select Option Card */}
+            <div style={{ 
+              flex: 1,
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              background: '#ffffff',
+              border: '1.5px solid rgba(0, 0, 0, 0.08)',
+              borderRadius: '12px',
+              padding: '8px 12px'
+            }}>
+              <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#55555d' }}>
+                Spuren:
+              </span>
+              <select
+                value={desiredTrackCount}
+                onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
+                disabled={isAutoSequenceActive || !useHeadphones}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '0.66rem',
+                  fontWeight: 800,
+                  color: useHeadphones ? '#1d1d1f' : '#86868b',
+                  cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value={2}>2 Spuren</option>
+                <option value={3}>3 Spuren</option>
+                <option value={4}>4 Spuren</option>
+                <option value={5}>5 Spuren</option>
+              </select>
+            </div>
+
+            {/* Tempo & Metronom Action Card */}
+            <div 
+              onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+              style={{
+                flex: 1.3,
+                background: showAdvancedSettings ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : '#ffffff',
+                border: showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)',
+                borderRadius: '12px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                transition: 'all 0.25s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={13} style={{ color: showAdvancedSettings ? '#1565c0' : '#86868b' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: showAdvancedSettings ? '#1565c0' : '#1d1d1f' }}>
+                    Tempo & Metronom
+                  </span>
+                  <span style={{ fontSize: '0.50rem', color: '#616161', fontWeight: 500 }}>
+                    {bpm} BPM | Click {isMetronomeActive ? 'AN' : 'AUS'}
+                  </span>
+                </div>
+              </div>
+              <ChevronRight size={12} style={{
+                color: showAdvancedSettings ? '#1565c0' : '#86868b',
+                transition: 'transform 0.2s',
+                transform: showAdvancedSettings ? 'rotate(90deg)' : 'none'
+              }} />
+            </div>
+          </div>
+
+          {/* Advanced Drawer inside the Horizontal Tray */}
+          {showAdvancedSettings && (
+            <div style={{
+              borderTop: '1.5px solid rgba(0, 0, 0, 0.06)',
+              paddingTop: '12px',
+              marginTop: '4px',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '16px',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap'
+            }}>
+              {/* Click Switch & Tap Tempo */}
+              <div style={{ flex: '1 1 200px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsMetronomeActive(!isMetronomeActive)}
+                  className="tactile-btn"
+                  style={{
+                    background: isMetronomeActive ? '#34a853' : '#e5e5ea',
+                    border: 'none',
+                    color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    letterSpacing: '0.04em'
+                  }}
+                >
+                  {isMetronomeActive ? 'CLICK ON' : 'CLICK OFF'}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={handleTapTempo}
+                  className="tactile-btn"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.04)',
+                    color: '#1d1d1f',
+                    border: 'none',
+                    borderRadius: '8px',
+                    height: '32px',
+                    padding: '0 12px',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  TAP TEMPO
+                </button>
+              </div>
+
+              {/* Tempo BPM Adjuster */}
+              <div style={{ flex: '0 1 120px', display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                  className="tactile-btn"
+                  style={{ width: '28px', height: '30px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  -
+                </button>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, fontFamily: 'SF Mono, monospace', minWidth: '32px', textAlign: 'center', color: '#1d1d1f' }}>
+                  {bpm}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                  className="tactile-btn"
+                  style={{ width: '28px', height: '30px', background: 'rgba(0, 0, 0, 0.04)', border: 'none', color: '#1d1d1f', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Latency Sync Slider */}
+              <div style={{ flex: '1 1 240px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.04em' }}>SYNC LATENCY</span>
+                    <span style={{ fontSize: '0.58rem', color: '#34a853', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="-150" 
+                    max="350" 
+                    value={syncOffsetMs} 
+                    onChange={(e) => {
+                      setSyncOffsetMs(parseInt(e.target.value));
+                      isManualLatencyAdjustmentRef.current = true;
+                    }} 
+                    style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
+                  />
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={runAutoLatencyCalibration}
+                  disabled={isCalibratingLatency}
+                  className="tactile-btn"
+                  style={{
+                    background: isCalibratingLatency ? '#e5e5ea' : 'rgba(52, 168, 83, 0.08)',
+                    color: isCalibratingLatency ? '#86868b' : '#34a853',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    fontSize: '0.58rem',
+                    fontWeight: 800,
+                    cursor: isCalibratingLatency ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s ease',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {isCalibratingLatency ? 'Kalibriere...' : 'Auto-Kalibrierung'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {tracks.map((track) => {
           const hasAudio = !!track.url;
           const hasAnySolo = tracks.some(t => t.isSoloed);
