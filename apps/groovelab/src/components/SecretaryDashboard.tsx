@@ -6569,7 +6569,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 <option value="All">👥 Alle Lehrer</option>
                 <option value="none">⬜ Allgemein (kein Lehrer)</option>
                 {allUniqueTeachers.map(t => (
-                  <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
+                  <option key={t.id} value={t.id}>{`${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim()}</option>
                 ))}
               </select>
             </div>
@@ -8407,7 +8407,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                   <option value="All">Alle Lehrer</option>
                   <option value="none">Allgemein (kein Lehrer)</option>
                   {allUniqueTeachers.map(t => (
-                    <option key={t.id} value={t.id}>{t.lastName || t.last_name}</option>
+                    <option key={t.id} value={t.id}>{`${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim()}</option>
                   ))}
                 </select>
               </div>
