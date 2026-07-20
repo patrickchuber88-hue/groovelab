@@ -13811,7 +13811,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       osc.stop(time + 0.02);
     };
 
-    const playHat = (isOpen = false) => {
+    const playHat = (isOpen = false, volMul = 1.0) => {
       if (hVol <= 0.001) return;
       if (!noiseBufferRef.current) return;
       
@@ -13828,7 +13828,7 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       bp.Q.setValueAtTime(1.8, time);
 
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(hVol * (isOpen ? 0.14 : 0.09), time);
+      gain.gain.setValueAtTime(hVol * (isOpen ? 0.14 : 0.09) * volMul, time);
       gain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.20 : 0.035));
 
       noise.connect(hp);
@@ -13905,56 +13905,111 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
         triggerVisualBeat(beatIdx);
       }
     } else if (selectedStyleRef.current === 'rock') {
-      if (step === 0 || step === 8) playKick();
-      if (step === 4 || step === 12) playSnare();
-      if (step % 2 === 0) playHat(false);
+      // Classic Rock/Pop groove: syncopated kick upbeat on 10
+      if (step === 0 || step === 8 || step === 10) playKick(1.0);
+      if (step === 4 || step === 12) playSnare(1.0);
+      if (step % 2 === 0) {
+        // Accented hi-hat on quarter beats, softer on offbeats
+        const isQuarter = step % 4 === 0;
+        playHat(false, isQuarter ? 1.0 : 0.62);
+      }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'hiphop') {
-      if (step === 0) playKick(1.5);
-      else if (step === 3 || step === 10) playKick(1.0);
+      // Laid-back hip-hop groove with a swing upbeat kick and quiet snare ghost notes
+      if (step === 0) playKick(1.3);
+      else if (step === 3 || step === 10) playKick(0.9);
       if (step === 4 || step === 12) playSnare(1.1);
-      if (step % 2 === 0) playHat(step === 14);
+      else if (step === 7 || step === 15) playSnare(0.22); // subtle backbeat ghost notes
+      if (step % 2 === 0) {
+        const isOpen = step === 14;
+        playHat(isOpen, isOpen ? 1.0 : (step % 4 === 0 ? 0.9 : 0.55));
+      }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (isSwing) {
-      if (step === 0 || step === 6) playKick();
-      if (step === 3 || step === 9) playSnare();
-      if (step === 0 || step === 2 || step === 3 || step === 5 || step === 6 || step === 8 || step === 9 || step === 11) {
-        playHat(step === 2 || step === 5 || step === 8 || step === 11);
+      // Jazz swing feathering (very quiet kick on every beat)
+      if (step === 0 || step === 3 || step === 6 || step === 9) playKick(0.35);
+      // Snare comping/rim hits on upbeats
+      if (step === 2) playRimClick(0.45);
+      else if (step === 8) playSnare(0.4);
+      // Classic Ride swing pattern on the hi-hat (swung triplets grid)
+      if (step === 0 || step === 3 || step === 6 || step === 9) {
+        playHat(false, 1.0); // downbeats
+      } else if (step === 2 || step === 5 || step === 8 || step === 11) {
+        playHat(true, 0.55); // swung upbeats
+      }
+      // Foot hi-hat chick layer on 2 & 4
+      if (step === 3 || step === 9) {
+        playRimClick(0.25);
       }
       if (step % 3 === 0) triggerVisualBeat(Math.floor(step / 3));
     } else if (selectedStyleRef.current === 'latin') {
-      if (step === 0 || step === 3 || step === 8 || step === 11) playKick();
-      if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick();
-      if (step % 2 === 0) playHat(false);
+      // Authentic syncopated Bossa double kick
+      if (step === 0 || step === 3 || step === 8 || step === 11) playKick(0.95);
+      // Side-stick rim clave instead of snare
+      if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick(1.0);
+      if (step % 2 === 0) {
+        playHat(false, step % 4 === 0 ? 0.8 : 0.48);
+      }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'funk') {
-      if (step === 0 || step === 6 || step === 10 || step === 14) playKick();
-      if (step === 4 || step === 12 || step === 15) playSnare();
-      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 13 || step === 14) {
-        playHat(step === 6 || step === 13);
+      // Funky Drummer style breakbeat: heavy syncopation and ghost snares
+      if (step === 0 || step === 6 || step === 10 || step === 11) playKick(1.15);
+      if (step === 4 || step === 12) playSnare(1.1);
+      else if (step === 7 || step === 13 || step === 15) playSnare(0.28); // funky ghost notes
+      
+      if (step % 2 === 0) {
+        // Open hat barks on 6 and 14
+        const isOpen = step === 6 || step === 14;
+        playHat(isOpen, isOpen ? 1.0 : (step % 4 === 0 ? 0.95 : 0.55));
+      } else if (step === 3 || step === 11) {
+        playHat(false, 0.35); // subtle 16th hats
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'reggae') {
-      if (step === 0 || step === 8) playKick(1.0);
-      if (step === 8) playSnare(1.1);
-      if (step === 2 || step === 6 || step === 10 || step === 14) playRimClick(1.0);
-      if (step % 2 === 0) playHat(false);
+      // One Drop: Drop the kick and snare exactly on beat 3
+      if (step === 8) {
+        playKick(1.2);
+        playSnare(1.05);
+      }
+      // Sidestick rim-clicks on beats 2 and 4
+      if (step === 4 || step === 12) {
+        playRimClick(0.9);
+      }
+      if (step % 2 === 0) {
+        // Rocksteady hat feel: emphasize upbeat eighth notes
+        const isUpbeat = step === 2 || step === 6 || step === 10 || step === 14;
+        playHat(false, isUpbeat ? 1.0 : 0.58);
+      }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'walzer') {
-      if (step === 0) playKick();
-      if (step === 4 || step === 8) playSnare();
-      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10) playHat(false);
+      // Walzer waltz boom-chick-chick pulse
+      if (step === 0) playKick(1.0);
+      if (step === 4 || step === 8) {
+        playRimClick(0.85);
+        playSnare(0.22); // soft snare layer
+      }
+      if (step % 2 === 0) {
+        const vol = step === 0 ? 0.95 : (step === 4 || step === 8 ? 0.72 : 0.45);
+        playHat(false, vol);
+      }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'ballad68') {
-      if (step === 0) playKick();
-      if (step === 6) playSnare();
-      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10) playHat(false);
+      // Slow 6/8 ballad: rolling triplet feel
+      if (step === 0) playKick(1.2);
+      else if (step === 5) playKick(0.6); // heartbeat kick
+      if (step === 6) playSnare(1.1);
+      if (step % 2 === 0) {
+        const isMain = step === 0 || step === 6;
+        playHat(false, isMain ? 1.0 : 0.6);
+      }
       if (step % 2 === 0) triggerVisualBeat(Math.floor(step / 2));
     } else if (selectedStyleRef.current === 'disco') {
-      if (step === 0 || step === 4 || step === 8 || step === 12) playKick();
-      if (step === 4 || step === 12) playSnare();
-      if (step === 0 || step === 2 || step === 4 || step === 6 || step === 8 || step === 10 || step === 12 || step === 14) {
-        playHat(step === 2 || step === 6 || step === 10 || step === 14);
+      // Four on the floor disco groove with offbeat open hats
+      if (step === 0 || step === 4 || step === 8 || step === 12) playKick(1.15);
+      if (step === 4 || step === 12) playSnare(1.0);
+      if (step % 2 === 0) {
+        const isOff = step === 2 || step === 6 || step === 10 || step === 14;
+        playHat(isOff, isOff ? 1.05 : 0.5);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     }
