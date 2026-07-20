@@ -12783,6 +12783,10 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
   const noiseBufferRef = useRef<AudioBuffer | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
 
+  const [barProgress, setBarProgress] = useState(0);
+  const barStartAudioTimeRef = useRef<number>(0);
+  const progressFrameRef = useRef<number | null>(null);
+
   // Refs to allow real-time volume adjustments without rebuilding the scheduler loop
   const volKickRef = useRef(volKick);
   const volSnareRef = useRef(volSnare);
@@ -12821,11 +12825,13 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
   useEffect(() => {
     if (!isPlaying) {
       if (timerIdRef.current) clearInterval(timerIdRef.current);
+      if (progressFrameRef.current) cancelAnimationFrame(progressFrameRef.current);
       if (audioCtxRef.current) {
         audioCtxRef.current.close();
         audioCtxRef.current = null;
       }
       setActiveBeatIndex(null);
+      setBarProgress(0);
       return;
     }
 
@@ -12846,7 +12852,21 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
     noiseBufferRef.current = noiseBuffer;
 
     nextNoteTimeRef.current = audioCtx.currentTime;
+    barStartAudioTimeRef.current = audioCtx.currentTime;
     current16thNoteRef.current = 0;
+
+    const syncBarProgress = () => {
+      if (!audioCtxRef.current || !isPlayingRef.current) return;
+      const ctx = audioCtxRef.current;
+      const secondsPerBeat = 60.0 / bpmRef.current;
+      const secondsPerBar = secondsPerBeat * 4;
+      
+      const elapsed = ctx.currentTime - barStartAudioTimeRef.current;
+      const progressPercent = Math.min(100, Math.max(0, (elapsed / secondsPerBar) * 100));
+      setBarProgress(progressPercent);
+      progressFrameRef.current = requestAnimationFrame(syncBarProgress);
+    };
+    progressFrameRef.current = requestAnimationFrame(syncBarProgress);
 
     const scheduler = () => {
       while (nextNoteTimeRef.current < audioCtx.currentTime + 0.1) {
@@ -12862,11 +12882,16 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       const stepDuration = secondsPerBeat / (isSwing ? 3 : 4);
       nextNoteTimeRef.current += stepDuration;
       current16thNoteRef.current = (current16thNoteRef.current + 1) % stepsInBar;
+      
+      if (current16thNoteRef.current === 0) {
+        barStartAudioTimeRef.current = nextNoteTimeRef.current;
+      }
     };
 
     timerIdRef.current = setInterval(scheduler, 25);
     return () => {
       clearInterval(timerIdRef.current);
+      if (progressFrameRef.current) cancelAnimationFrame(progressFrameRef.current);
       if (audioCtxRef.current) audioCtxRef.current.close();
     };
   }, [isPlaying]);
@@ -13052,6 +13077,30 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
                 />
               );
             })}
+          </div>
+
+          {/* Takt-Fortschritts-Sweep-Bar */}
+          <div style={{
+            width: '180px',
+            height: '6px',
+            background: '#e5e5e7',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            position: 'relative',
+            marginTop: '-6px',
+            marginBottom: '6px'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              width: `${barProgress}%`,
+              background: 'linear-gradient(90deg, #34a853 0%, #2ecc71 100%)',
+              boxShadow: '0 0 8px rgba(52, 168, 83, 0.4)',
+              borderRadius: '10px',
+              transition: isPlaying ? 'none' : 'width 0.1s ease-out'
+            }} />
           </div>
 
           {/* Large Tempo Display */}
