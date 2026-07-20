@@ -12292,6 +12292,11 @@ const targetVol = isActive ? vol : 0;
                     setPlaybackProgress(0);
                   }
                 } else {
+                  const hasRecordedTracks = tracks.some(t => t.url);
+                  if (hasRecordedTracks) {
+                    const confirmReset = window.confirm("Möchtest du deinen aktuellen Loop wirklich löschen und neu aufnehmen?");
+                    if (!confirmReset) return;
+                  }
                   handleReset();
                 }
               }}
@@ -12340,10 +12345,10 @@ const targetVol = isActive ? vol : 0;
                   } else {
                     const hasRecordedTracks = tracks.some(t => t.url);
                     if (hasRecordedTracks) {
-                      const confirmReset = window.confirm("Möchtest du deinen aktuellen Loop wirklich löschen und neu aufnehmen?");
-                      if (!confirmReset) return;
+                      playAll();
+                    } else {
+                      startAutoSequence();
                     }
-                    startAutoSequence();
                   }
                 }
               }}
@@ -12359,9 +12364,11 @@ const targetVol = isActive ? vol : 0;
                     ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
                     : isAutoSequenceActive 
                       ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
-                      : isPlaying 
-                        ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)'
-                        : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)'),
+                      : (tracks.some(t => t.url)
+                          ? (isPlaying
+                              ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' // Red for STOP
+                              : 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)') // Green for PLAY
+                          : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)')), // Gray for RECORD
                 border: '1.5px solid rgba(0, 0, 0, 0.15)',
                 boxShadow: (activeSubTab === 'studio' && isAutoSequenceActive)
                   ? '0 0 15px rgba(239, 68, 68, 0.4)' 
@@ -12379,7 +12386,11 @@ const targetVol = isActive ? vol : 0;
             >
               {activeSubTab === 'saved'
                 ? (isSavedLoopPlaying ? 'PLAY' : 'START')
-                : (isAutoSequenceActive ? 'REC' : (isPlaying ? 'STOP' : 'START'))}
+                : (isAutoSequenceActive 
+                    ? 'REC' 
+                    : (tracks.some(t => t.url) 
+                        ? (isPlaying ? 'STOP' : 'PLAY') 
+                        : 'RECORD'))}
             </button>
           </div>
         </div>
