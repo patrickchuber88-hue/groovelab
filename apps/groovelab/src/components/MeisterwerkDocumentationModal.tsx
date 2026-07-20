@@ -12515,30 +12515,62 @@ const targetVol = isActive ? vol : 0;
             </div>
           )
         ) : (
-          <div style={{
-            width: '100%',
-            maxWidth: '300px',
-            background: 'rgba(255, 255, 255, 0.45)',
-            border: '1.5px dashed rgba(0, 0, 0, 0.08)',
-            borderRadius: '20px',
-            padding: '16px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            textAlign: 'center',
-            marginTop: '4px'
-          }}>
-            <Music size={16} style={{ color: '#86868b' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d1d1f' }}>
-                Archiv-Modus
-              </span>
-              <span style={{ fontSize: '0.54rem', color: '#86868b', lineHeight: 1.3 }}>
-                Wähle einen Loop aus der Liste. Steuere die Wiedergabe über das <strong>Click Wheel</strong> am iPod.
-              </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '300px' }}>
+            <div style={{
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.45)',
+              border: '1.5px dashed rgba(0, 0, 0, 0.08)',
+              borderRadius: '20px',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              textAlign: 'center',
+              marginTop: '4px'
+            }}>
+              <Music size={16} style={{ color: '#86868b' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d1d1f' }}>
+                  Archiv-Modus
+                </span>
+                <span style={{ fontSize: '0.54rem', color: '#86868b', lineHeight: 1.3 }}>
+                  Wähle einen Loop aus der Liste. Steuere die Wiedergabe über das <strong>Click Wheel</strong> am iPod.
+                </span>
+              </div>
             </div>
+            {selectedSavedLoop && (
+              <button
+                type="button"
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = selectedSavedLoop.url;
+                  a.download = `${selectedSavedLoop.label || 'loop'}.mp3`;
+                  a.target = '_blank';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+                className="tactile-btn"
+                style={{
+                  background: '#1d1d1f',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  width: '100%',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.2s ease',
+                  letterSpacing: '0.02em'
+                }}
+              >
+                MP3 SPEICHERN
+              </button>
+            )}
           </div>
         )}
       </div>
