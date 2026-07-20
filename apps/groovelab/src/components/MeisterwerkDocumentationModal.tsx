@@ -11598,6 +11598,22 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         .glow-play {
           animation: glow-play 2s infinite ease-in-out;
         }
+        @keyframes central-pulse-play {
+          0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
+          50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(52,168,83,0.25); }
+          100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
+        }
+        @keyframes central-pulse-rec {
+          0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
+          50% { transform: scale(1.04); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 12px 32px rgba(234,67,53,0.35); }
+          100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); }
+        }
+        .central-pulse-play {
+          animation: central-pulse-play 2s infinite ease-in-out;
+        }
+        .central-pulse-rec {
+          animation: central-pulse-rec 2s infinite ease-in-out;
+        }
         .tactile-btn {
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
@@ -11785,19 +11801,23 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           </svg>
 
           {/* Central Plate */}
-          <div style={{
-            position: 'absolute',
-            width: '124px',
-            height: '124px',
-            borderRadius: '50%',
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(16px)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03)'
-          }}>
+          <div 
+            className={(isAnyTrackRecording || isAutoSequenceActive) ? 'central-pulse-rec' : isPlaying ? 'central-pulse-play' : ''}
+            style={{
+              position: 'absolute',
+              width: '124px',
+              height: '124px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(16px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03)',
+              transition: 'all 0.3s ease'
+            }}
+          >
             <span style={{ 
               fontSize: '2.0rem', 
               fontWeight: 800, 
