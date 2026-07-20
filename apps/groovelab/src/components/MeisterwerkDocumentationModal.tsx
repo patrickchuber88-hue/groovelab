@@ -13923,8 +13923,8 @@ const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) => {
       }
       if (step % 3 === 0) triggerVisualBeat(Math.floor(step / 3));
     } else if (selectedStyleRef.current === 'latin') {
-      if (step === 0 || step === 4 || step === 8 || step === 12) playKick();
-      if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playSnare();
+      if (step === 0 || step === 3 || step === 8 || step === 11) playKick();
+      if (step === 0 || step === 3 || step === 6 || step === 10 || step === 12) playRimClick();
       if (step % 2 === 0) playHat(false);
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     } else if (selectedStyleRef.current === 'funk') {
