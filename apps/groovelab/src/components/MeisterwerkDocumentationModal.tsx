@@ -638,6 +638,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Audio Recorder logic
   const startRecordingAudio = async () => {
+    const audioNotesCount = homeworkNotesList.filter(note => note.startsWith("AUDIO:")).length;
+    if (audioNotesCount >= 12) {
+      alert("Limit erreicht! Du hast bereits 12 Sprachaufnahmen in diesem Protokoll. Bitte lösche eine alte Sprachaufnahme, bevor du eine neue aufnimmst.");
+      return;
+    }
     let durationInSeconds = 0;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -9970,6 +9975,13 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       }
     });
   }, [maxAllowedTracks]);
+
+  useEffect(() => {
+    if (!useHeadphones) {
+      setDesiredTrackCount((prev) => Math.min(2, prev));
+    }
+  }, [useHeadphones]);
+
   const audioBuffersRef = useRef<{ [key: number]: AudioBuffer }>({});
   const activeSourcesRef = useRef<{ [key: number]: AudioBufferSourceNode }>({});
   const gainNodesRef = useRef<{ [key: number]: GainNode }>({});
@@ -11527,6 +11539,11 @@ const targetVol = isActive ? vol : 0;
   // Mixdown Master Export to Homework (Instant & offline rendering)
   const handleExportMix = async () => {
     if (!masterLoopDuration) return;
+    const loopNotesCount = homeworkNotesList.filter(note => note.startsWith('LOOP:')).length;
+    if (loopNotesCount >= 10) {
+      alert("Limit erreicht! Du hast bereits 10 gespeicherte Loops. Bitte lösche im Tab 'Gespeicherte Loops' zuerst einen alten Loop, um Platz für diesen neuen Loop-Mix zu machen.");
+      return;
+    }
     setIsExporting(true);
     let label = "Mein Loop-Mix";
     try {
@@ -12548,21 +12565,26 @@ const targetVol = isActive ? vol : 0;
               <select
                 value={desiredTrackCount}
                 onChange={(e) => setDesiredTrackCount(parseInt(e.target.value))}
-                disabled={isAutoSequenceActive || !useHeadphones}
+                disabled={isAutoSequenceActive}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   fontSize: '0.66rem',
                   fontWeight: 800,
-                  color: useHeadphones ? '#1d1d1f' : '#86868b',
-                  cursor: (isAutoSequenceActive || !useHeadphones) ? 'not-allowed' : 'pointer',
+                  color: '#1d1d1f',
+                  cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
                   outline: 'none'
                 }}
               >
+                <option value={1}>1 Spur</option>
                 <option value={2}>2 Spuren</option>
-                <option value={3}>3 Spuren</option>
-                <option value={4}>4 Spuren</option>
-                <option value={5}>5 Spuren</option>
+                {useHeadphones && (
+                  <>
+                    <option value={3}>3 Spuren</option>
+                    <option value={4}>4 Spuren</option>
+                    <option value={5}>5 Spuren</option>
+                  </>
+                )}
               </select>
             </div>
 
