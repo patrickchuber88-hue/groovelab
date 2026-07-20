@@ -14166,7 +14166,7 @@ const targetVol = isActive ? vol : 0;
                               {/* Left: Ideal */}
                               <div style={{
                                 flex: 1,
-                                height: '54px',
+                                height: '58px',
                                 background: '#18202c',
                                 border: '1.5px solid #0d1218',
                                 borderRadius: '8px',
@@ -14178,18 +14178,18 @@ const targetVol = isActive ? vol : 0;
                                 padding: '4px'
                               }}>
                                 <span style={{ fontSize: '0.46rem', color: '#34a853', fontWeight: 800 }}>✓ IDEAL (SYNCHRON)</span>
-                                <svg style={{ width: '100%', height: '24px', overflow: 'visible' }}>
-                                  {/* Red Ref Line */}
-                                  <line x1="30%" y1="0" x2="30%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
-                                  {/* Green Wave aligned to onset at 30% */}
-                                  <path d="M 0 12 L 25 12 L 30 12 Q 35 4, 40 20 T 45 4 T 50 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" />
+                                <svg viewBox="0 0 100 32" style={{ width: '100%', height: '32px' }}>
+                                  {/* Red Ref Line at x=30 */}
+                                  <line x1="30" y1="0" x2="30" y2="32" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
+                                  {/* Green Wave aligned: starts rising exactly at x=30 with taller amplitude */}
+                                  <path d="M 0 16 L 30 16 Q 35 0, 40 16 T 50 16 L 100 16" fill="none" stroke="#34a853" strokeWidth="1.8" />
                                 </svg>
                               </div>
 
                               {/* Right: Too Late */}
                               <div style={{
                                 flex: 1,
-                                height: '54px',
+                                height: '58px',
                                 background: '#18202c',
                                 border: '1.5px solid #0d1218',
                                 borderRadius: '8px',
@@ -14201,11 +14201,11 @@ const targetVol = isActive ? vol : 0;
                                 padding: '4px'
                               }}>
                                 <span style={{ fontSize: '0.46rem', color: '#ea4335', fontWeight: 800 }}>✗ ZU SPÄT (LATENZ)</span>
-                                <svg style={{ width: '100%', height: '24px', overflow: 'visible' }}>
-                                  {/* Red Ref Line */}
-                                  <line x1="30%" y1="0" x2="30%" y2="100%" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
-                                  {/* Green Wave shifted too far right */}
-                                  <path d="M 0 12 L 50 12 L 55 12 Q 60 4, 65 20 T 70 4 T 75 12 L 100 12" fill="none" stroke="#34a853" strokeWidth="1.5" opacity="0.6" />
+                                <svg viewBox="0 0 100 32" style={{ width: '100%', height: '32px' }}>
+                                  {/* Red Ref Line at x=30 */}
+                                  <line x1="30" y1="0" x2="30" y2="32" stroke="#ea4335" strokeWidth="1.5" strokeDasharray="2,2" />
+                                  {/* Green Wave shifted: starts rising way after at x=55 with taller amplitude */}
+                                  <path d="M 0 16 L 55 16 Q 60 0, 65 16 T 75 16 L 100 16" fill="none" stroke="#34a853" strokeWidth="1.8" opacity="0.6" />
                                 </svg>
                               </div>
                             </div>
