@@ -11285,7 +11285,8 @@ const targetVol = isActive ? vol : 0;
           const arrayBuffer = await blob.arrayBuffer();
           if (audioContextRef.current) {
             const decoded = await audioContextRef.current.decodeAudioData(arrayBuffer);
-            audioBuffersRef.current[trackId] = decoded;
+            const normalized = normalizeAudioBuffer(decoded, 0.95);
+            audioBuffersRef.current[trackId] = normalized;
           }
         } catch (decodeErr) {
           console.error("Decoding error:", decodeErr);
@@ -11533,6 +11534,35 @@ const targetVol = isActive ? vol : 0;
     return new Blob([bufferArr], { type: 'audio/wav' });
   };
 
+  const normalizeAudioBuffer = (buffer: AudioBuffer, targetPeak: number = 0.95): AudioBuffer => {
+    const numChannels = buffer.numberOfChannels;
+    let maxVal = 0;
+    
+    // Find peak value
+    for (let c = 0; c < numChannels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < data.length; i++) {
+        const val = Math.abs(data[i]);
+        if (val > maxVal) {
+          maxVal = val;
+        }
+      }
+    }
+    
+    // Scale if we have a signal and it's not already at target
+    if (maxVal > 0 && maxVal < targetPeak) {
+      const scaleFactor = targetPeak / maxVal;
+      for (let c = 0; c < numChannels; c++) {
+        const data = buffer.getChannelData(c);
+        for (let i = 0; i < data.length; i++) {
+          data[i] *= scaleFactor;
+        }
+      }
+    }
+    
+    return buffer;
+  };
+
   const bufferToMp3 = (buffer: AudioBuffer) => {
     const channels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
@@ -11626,6 +11656,7 @@ const targetVol = isActive ? vol : 0;
       });
       
       const renderedBuffer = await offlineCtx.startRendering();
+      normalizeAudioBuffer(renderedBuffer, 0.95);
       
       // Attempt MP3 conversion, fallback to WAV
       let mixBlob: Blob;
@@ -11716,6 +11747,7 @@ const targetVol = isActive ? vol : 0;
       });
       
       const renderedBuffer = await offlineCtx.startRendering();
+      normalizeAudioBuffer(renderedBuffer, 0.95);
       
       // Attempt MP3 conversion, fallback to WAV
       let mixBlob: Blob;
@@ -12589,6 +12621,7 @@ const targetVol = isActive ? vol : 0;
                     source.start(0);
                     
                     const renderedBuffer = await offlineCtx.startRendering();
+                    normalizeAudioBuffer(renderedBuffer, 0.95);
                     
                     btn.innerText = "KONVERTIERE...";
                     let mixBlob: Blob;
