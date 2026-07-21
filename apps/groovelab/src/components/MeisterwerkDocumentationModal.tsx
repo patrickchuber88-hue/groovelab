@@ -9936,7 +9936,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const [calibrationWaveform, setCalibrationWaveform] = useState<number[] | null>(null);
-  const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(50);
+  const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4'>('4/4');
   const [barLength, setBarLength] = useState<1 | 2 | 4 | 8>(4);
   const [metronomeSound, setMetronomeSound] = useState<'wood' | 'cowbell' | 'rimshot' | 'synth'>('rimshot');
@@ -10744,10 +10744,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const soundType = overrideSound || metronomeSoundRef.current || 'wood';
       
       const hasTrack1 = !!tracksRef.current[0]?.url;
-      const baseMetronomeGain = (loopstationMetronomeVolumeRef.current / 100) * 0.10;
+      const baseMetronomeGain = (loopstationMetronomeVolumeRef.current / 100) * 0.45;
       // If previewing (time is undefined), ignore track 1 muting logic and play at full volume
       const targetMetronomeGain = (time === undefined) 
-        ? 0.15 
+        ? 0.45 
         : ((hasTrack1 && !useHeadphonesRef.current) ? 0 : baseMetronomeGain);
 
       if (targetMetronomeGain === 0) return;

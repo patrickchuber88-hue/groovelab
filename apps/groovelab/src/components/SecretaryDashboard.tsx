@@ -2252,7 +2252,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
   const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
   const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
-  const baseB2B_global = moduleCost_global + (allTeachers.filter((t: any) => t.isActive ?? true).length + employees.filter((e: any) => e.isActive ?? true).length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
+  const billableTeachersCount = allTeachers.filter((t: any) => t.role !== 'admin' && t.role !== 'secretary').length;
+  const baseB2B_global = moduleCost_global + billableTeachersCount * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
@@ -8314,13 +8315,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     <UserCheck size={12} color="white" />
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeCampusCount}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeCampusCount}</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: '6px' }}>
+                    {(activeCampusCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.
+                  </span>
                 </div>
               </div>
 
-              {/* Card 3: Campus-Groovelab Aktiv */}
+              {/* Card 3: GrooveLab Aktiv */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
                 background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
@@ -8331,14 +8337,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 border: '1px solid rgba(255, 255, 255, 0.1)'
               }} className="hover-scale">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Campus-Groovelab Aktiv</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
                   <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
                     <Music size={12} color="white" />
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: '6px' }}>
+                    {(activeGroovelabCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.
+                  </span>
                 </div>
               </div>
 
@@ -8626,16 +8637,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         {/* Campus Toggle */}
                         <button
                           onClick={async () => {
+                            const isCampusAvailable = !isBillingBooked || hasCampusSub;
+                            if (!isCampusAvailable) {
+                              alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht. Bitte aktiviere das Campus-Modul zuerst in den Admin-Einstellungen unter Abrechnung.");
+                              return;
+                            }
                             if (student.isPendingOnboarding) {
                               if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Überweisung (Jahresbetrag) als Zahlungsart hinterlegt.`)) {
                                 return;
                               }
                               try {
                                 // 1. Onboarding abschließen (in users Tabelle verschieben)
-                                const { error: completeError } = await supabase.rpc('complete_onboarding', {
+                                let completeError: any = null;
+                                const rpcRes1 = await supabase.rpc('complete_onboarding', {
                                   input_student_id: student.id,
-                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`,
+                                  input_pin: ''
                                 });
+                                completeError = rpcRes1.error;
+                                if (completeError) {
+                                  const rpcRes2 = await supabase.rpc('complete_onboarding', {
+                                    input_student_id: student.id,
+                                    input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+                                  });
+                                  completeError = rpcRes2.error;
+                                }
                                 if (completeError) throw completeError;
 
                                 // 2. Aktivieren und Zahlungsart festlegen
@@ -8643,6 +8669,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                   .from('users')
                                   .update({ 
                                     is_campus_active: true, 
+                                    is_groovelab_active: false,
                                     student_billing_payment_method: 'cash' 
                                   })
                                   .eq('id', student.id);
@@ -8671,12 +8698,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             border: 'none',
                             fontSize: '0.75rem',
                             fontWeight: 800,
-                            cursor: 'pointer',
+                            cursor: (!isBillingBooked || hasCampusSub) ? 'pointer' : 'not-allowed',
                             background: student.is_campus_active ? '#e6f4ea' : '#f5f5f7',
                             color: student.is_campus_active ? '#34a853' : '#86868b',
+                            opacity: (!isBillingBooked || hasCampusSub) ? 1 : 0.45,
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap'
                           }}
+                          title={(!isBillingBooked || hasCampusSub) ? (student.is_campus_active ? (student.isPendingOnboarding ? 'Campus Passiv (0,09 € Datensatz)' : 'Campus Aktiv (0,49 €)') : 'Campus Inaktiv') : 'Campus-Modul in den Einstellungen buchen'}
                           className="hover-scale-mini"
                         >
                           Campus
@@ -8685,16 +8714,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         {/* Groove Toggle */}
                         <button
                           onClick={async () => {
+                            const isGrooveAvailable = !isBillingBooked || hasGroovelabSub;
+                            if (!isGrooveAvailable) {
+                              alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht. Bitte aktiviere das GrooveLab-Modul zuerst in den Admin-Einstellungen unter Abrechnung.");
+                              return;
+                            }
                             if (student.isPendingOnboarding) {
                               if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Überweisung (Jahresbetrag) hinterlegt.`)) {
                                 return;
                               }
                               try {
                                 // 1. Onboarding abschließen (in users Tabelle verschieben)
-                                const { error: completeError } = await supabase.rpc('complete_onboarding', {
+                                let completeError: any = null;
+                                const rpcRes1 = await supabase.rpc('complete_onboarding', {
                                   input_student_id: student.id,
-                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`,
+                                  input_pin: ''
                                 });
+                                completeError = rpcRes1.error;
+                                if (completeError) {
+                                  const rpcRes2 = await supabase.rpc('complete_onboarding', {
+                                    input_student_id: student.id,
+                                    input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
+                                  });
+                                  completeError = rpcRes2.error;
+                                }
                                 if (completeError) throw completeError;
 
                                 // 2. Aktivieren und Zahlungsart festlegen
@@ -8702,6 +8746,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                   .from('users')
                                   .update({ 
                                     is_groovelab_active: true, 
+                                    is_campus_active: false,
                                     student_billing_payment_method: 'cash' 
                                   })
                                   .eq('id', student.id);
@@ -8730,12 +8775,14 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             border: 'none',
                             fontSize: '0.75rem',
                             fontWeight: 800,
-                            cursor: 'pointer',
+                            cursor: (!isBillingBooked || hasGroovelabSub) ? 'pointer' : 'not-allowed',
                             transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap',
                             background: student.is_groovelab_active ? '#fef3c7' : '#f5f5f7',
-                            color: student.is_groovelab_active ? '#b45309' : '#86868b'
+                            color: student.is_groovelab_active ? '#b45309' : '#86868b',
+                            opacity: (!isBillingBooked || hasGroovelabSub) ? 1 : 0.45
                           }}
+                          title={(!isBillingBooked || hasGroovelabSub) ? (student.is_groovelab_active ? 'GrooveLab Aktiviert (0,49 € Sammelzahler)' : 'GrooveLab Inaktiv (0 €)') : 'GrooveLab-Modul in den Einstellungen buchen'}
                           className="hover-scale-mini"
                         >
                           Groovelab
@@ -21778,7 +21825,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 const studentLevyMonthly = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
                 const extraLevyMonthly = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
 
-                const baseB2B = moduleCost + (allTeachers.filter((t: any) => t.isActive ?? true).length + employees.filter((e: any) => e.isActive ?? true).length) * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
+                const baseB2B = moduleCost + allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
                 const studentSharePreview = 0;
                 const isAnnual = studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial';
                 
@@ -22013,7 +22060,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '12px 14px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.74rem', color: '#475569' }}>
                                 <span>💡</span>
                                 <span>
-                                  <strong>Service-Gebühr für Lehrer &amp; Verwaltung:</strong> Aktuell sind <strong>{employees.filter((e: any) => e.isActive ?? true).length} aktive Verwalter</strong> und <strong>{allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Lehrer</strong> eingetragen. Jedes Profil kostet 0,49 € / Monat. Dies entspricht monatlich {((allTeachers.filter((t: any) => t.isActive ?? true).length + employees.filter((e: any) => e.isActive ?? true).length) * 0.49).toFixed(2).replace('.', ',')} € (Netto).
+                                  <strong>Service-Gebühr für Lehrer &amp; Verwaltung:</strong> Aktuell sind <strong>{allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Lehrer</strong> eingetragen (0,49 € / Monat pro Profil, entspricht {((allTeachers.filter((t: any) => t.isActive ?? true).length) * 0.49).toFixed(2).replace('.', ',')} € / Mo. Netto). Die <strong>{employees.filter((e: any) => e.isActive ?? true).length} Verwaltungs- &amp; Sekretariats-Nutzer</strong> sind vollständig kostenlos in den gebuchten Modulen enthalten.
                                 </span>
                               </div>
 
@@ -22996,11 +23043,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               )}
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                <span>Cloud-Datenbank &amp; Support Verwaltung (0,49 € x {employees.filter((e: any) => e.isActive ?? true).length} aktive Profile):</span>
-                                <strong>{isStarterFlat ? 'Inklusive' : `${(employees.filter((e: any) => e.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
-                              </div>
-
-                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                 <span>Cloud-Datenbank &amp; Support Lehrer (0,49 € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
                                 <strong>{isStarterFlat ? 'Inklusive' : `${(allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
                               </div>
@@ -23525,7 +23567,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                                   <span>Server &amp; Service Gebühren Groovelab:</span>
                                                   <strong>4,99 € / Mo.</strong>
                                                 </div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#34a853', fontWeight: 'bold' }}>
+                                                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
                                                   <span>Kombi-Rabatt (Campus + Groovelab):</span>
                                                   <strong>-2,99 € / Mo.</strong>
                                                 </div>
@@ -23548,19 +23590,21 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                             )}
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Verwaltung (0,49 € x {employees.filter((e: any) => e.isActive ?? true).length} aktive Profile):</span>
-                                              <strong>{(employees.filter((e: any) => e.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                            </div>
-
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.filter((t: any) => t.isActive ?? true).length} aktive Profile):</span>
-                                              <strong>{(allTeachers.filter((t: any) => t.isActive ?? true).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.length} angelegte Profile):</span>
+                                              <strong>{(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                                               <span>DB &amp; Service Schüler (0,09 € x {Math.max(0, students.length - activeStudents)} passive Profile):</span>
                                               <strong>{(Math.max(0, students.length - activeStudents) * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
+                                            
+                                            {students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length > 0 && (
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309' }}>
+                                                <span>DB &amp; Service GrooveLab Schüler (0,49 € x {students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length} aktive Profile):</span>
+                                                <strong>{(students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              </div>
+                                            )}
 
                                             <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#0f172a' }}>
                                               <span>Infrastruktur (Schulanteil):</span>
@@ -23569,23 +23613,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                           </div>
 
                                           <div style={{ borderTop: '2px solid #e9d5ff', paddingTop: '14px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            {studentLevyMonthlySim > 0 && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#4f46e5' }}>
-                                                <span>Schüler-Aktivierung ({activeStudents} aktiv):</span>
-                                                <strong style={{ fontWeight: 800 }}>{studentLevyMonthlySim.toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                              </div>
+                                            {billingPayer === 'school' && studentBillingOption === 'option2' && (
+                                              <>
+                                                {students.filter((s: any) => s.isCampusActive || s.is_campus_active).length > 0 && (
+                                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#34a853' }}>
+                                                    <span>DB &amp; Service Campus Schüler ({students.filter((s: any) => s.isCampusActive || s.is_campus_active).length} aktiv x 0,49 €):</span>
+                                                    <strong style={{ fontWeight: 800 }}>{(students.filter((s: any) => s.isCampusActive || s.is_campus_active).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                  </div>
+                                                )}
+                                                {students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length > 0 && (
+                                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#b45309' }}>
+                                                    <span>DB &amp; Service GrooveLab Schüler ({students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length} aktiv x 0,49 €):</span>
+                                                    <strong style={{ fontWeight: 800 }}>{(students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                  </div>
+                                                )}
+                                              </>
                                             )}
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#34a853', borderTop: '1px solid #e9d5ff', paddingTop: '10px', marginTop: '4px' }}>
                                               <span style={{ fontWeight: 900 }}>Gesamtrate:</span>
                                               <strong style={{ fontSize: '1.1rem', fontWeight: 950 }}>{totalMonthlySim.toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
-                                            {billingPayer === 'school' && studentBillingOption === 'option2' && activeStudents > 0 && (
-                                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#4f46e5', marginTop: '2px' }}>
-                                                <span>Schüler-Aktivierung ({activeStudents} aktiv):</span>
-                                                <strong style={{ fontWeight: 800 }}>{(activeStudents * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                              </div>
-                                            )}
                                             
                                             {showOneTime && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.94rem', color: '#6d28d9', borderTop: '1px dashed #cbd5e1', paddingTop: '10px', marginTop: '4px' }}>
