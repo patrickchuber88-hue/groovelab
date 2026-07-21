@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName } from '../utils/nameHelper';
 
@@ -241,19 +241,30 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [parentPinAttempts, setParentPinAttempts] = useState(0);
   const [parentPinLockoutUntil, setParentPinLockoutUntil] = useState<number | null>(null);
   const [pinChangeLoading, setPinChangeLoading] = useState(false);
+  const [parentPinErrorMsg, setParentPinErrorMsg] = useState<string | null>(null);
+  const [parentPinSuccessMsg, setParentPinSuccessMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const showToastMsg = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
 
   const handleSaveInitialPin = async () => {
     if (!profile) return;
+    setParentPinErrorMsg(null);
+    setParentPinSuccessMsg(null);
     if (newPinInput.length !== 4 || newPinConfirm.length !== 4) {
-      alert('Die PIN muss 4 Ziffern lang sein.');
+      setParentPinErrorMsg('Die PIN muss 4 Ziffern lang sein.');
       return;
     }
     if (newPinInput !== newPinConfirm) {
-      alert('Die PINs stimmen nicht überein.');
+      setParentPinErrorMsg('Die PINs stimmen nicht überein.');
       return;
     }
     if (newPinInput === '0000') {
-      alert('Die PIN darf nicht „0000“ sein.');
+      setParentPinErrorMsg('Die PIN darf nicht „0000“ sein.');
       return;
     }
     setPinChangeLoading(true);
@@ -273,10 +284,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setShowPinPrompt(false);
       setNewPinInput('');
       setNewPinConfirm('');
-      alert('Erfolgreich! Deine persönliche Eltern-PIN wurde gespeichert.');
+      // Show custom success state or reset messages
+      setParentPinSuccessMsg('Deine Eltern-PIN wurde erfolgreich gespeichert!');
     } catch (err: any) {
       console.error('Failed to save parent PIN:', err);
-      alert('Fehler beim Speichern der PIN: ' + err.message);
+      setParentPinErrorMsg('Fehler beim Speichern der PIN: ' + err.message);
     } finally {
       setPinChangeLoading(false);
     }
@@ -4638,18 +4650,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           {!timerRunning && profile.app_usage_mode === 'parent_hybrid' && (
             <div style={{
-              background: parentUnlocked ? '#e0f2fe' : '#f8fafc',
+              background: parentUnlocked ? '#e6f4ea' : '#f8fafc',
               borderBottom: '1px solid #e2e8f0',
               padding: '10px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               fontSize: '0.8rem',
-              color: parentUnlocked ? '#0369a1' : '#475569',
+              color: parentUnlocked ? '#1b5e20' : '#475569',
               fontWeight: 700
             }}>
-              <span>
-                {parentUnlocked ? '🔓 Eltern-Bereich aktiv (Einstellungen freigeschaltet)' : '👪 Dieser Bereich ist für Schüler optimiert.'}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                {parentUnlocked ? (
+                  <>
+                    <Lock size={14} style={{ color: '#1b5e20' }} />
+                    Eltern-Bereich aktiv (Einstellungen freigeschaltet)
+                  </>
+                ) : (
+                  <>
+                    <Users size={14} style={{ color: '#64748b' }} />
+                    Dieser Bereich ist für Schüler optimiert.
+                  </>
+                )}
               </span>
               <button
                 type="button"
@@ -4657,26 +4679,41 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   if (parentUnlocked) {
                     setParentUnlocked(false);
                   } else {
+                    setParentPinErrorMsg(null);
+                    setParentPinSuccessMsg(null);
                     setShowPinPrompt(true);
                   }
                 }}
                 style={{
-                  background: parentUnlocked ? '#0284c7' : '#4f46e5',
-                  color: 'white',
-                  border: 'none',
+                  background: parentUnlocked ? '#f1f5f9' : '#34a853',
+                  color: parentUnlocked ? '#475569' : 'white',
+                  border: parentUnlocked ? '1.5px solid #cbd5e1' : 'none',
                   borderRadius: '8px',
                   padding: '6px 12px',
                   fontWeight: 800,
                   fontSize: '0.75rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}
               >
-                {parentUnlocked ? 'Sperren' : '🔑 Eltern-Bereich'}
+                {parentUnlocked ? (
+                  <>
+                    <Lock size={12} />
+                    Sperren
+                  </>
+                ) : (
+                  <>
+                    <Key size={12} />
+                    Eltern-Bereich
+                  </>
+                )}
               </button>
             </div>
           )}
 
-          {showPinPrompt && (
+           {showPinPrompt && (
             <div style={{
               position: 'fixed',
               top: 0, left: 0, right: 0, bottom: 0,
@@ -4698,10 +4735,52 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 textAlign: 'center'
               }}>
+                {parentPinErrorMsg && (
+                  <div style={{
+                    background: '#fee2e2',
+                    border: '1.5px solid #fca5a5',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    color: '#b91c1c',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    marginBottom: '12px',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <AlertTriangle size={14} style={{ color: '#b91c1c', flexShrink: 0 }} />
+                    <span style={{ lineHeight: 1.3 }}>{parentPinErrorMsg}</span>
+                  </div>
+                )}
+                {parentPinSuccessMsg && (
+                  <div style={{
+                    background: '#e6f4ea',
+                    border: '1.5px solid #a7f3d0',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    color: '#047857',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    marginBottom: '12px',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <CheckCircle size={14} style={{ color: '#047857', flexShrink: 0 }} />
+                    <span style={{ lineHeight: 1.3 }}>{parentPinSuccessMsg}</span>
+                  </div>
+                )}
+
                 {isInitialPinSetup ? (
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>🔒 Neue Eltern-PIN vergeben</h3>
-                    <p style={{ margin: '8px 0 16px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <Lock size={18} />
+                      Neue Eltern-PIN vergeben
+                    </h3>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                       Um fortzufahren, musst du die standardmäßige PIN (0000) durch eine persönliche, sichere 4-stellige Nummer ersetzen.
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
@@ -4711,7 +4790,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           type="password"
                           maxLength={4}
                           value={newPinInput}
-                          onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                          onChange={(e) => {
+                            setParentPinErrorMsg(null);
+                            setNewPinInput(e.target.value.replace(/\D/g, ''));
+                          }}
                           placeholder="••••"
                           style={{
                             width: '100%',
@@ -4734,7 +4816,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           type="password"
                           maxLength={4}
                           value={newPinConfirm}
-                          onChange={(e) => setNewPinConfirm(e.target.value.replace(/\D/g, ''))}
+                          onChange={(e) => {
+                            setParentPinErrorMsg(null);
+                            setNewPinConfirm(e.target.value.replace(/\D/g, ''));
+                          }}
                           placeholder="••••"
                           style={{
                             width: '100%',
@@ -4760,6 +4845,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           setShowPinPrompt(false);
                           setNewPinInput('');
                           setNewPinConfirm('');
+                          setParentPinErrorMsg(null);
+                          setParentPinSuccessMsg(null);
                         }}
                         style={{
                           flex: 1,
@@ -4798,8 +4885,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </div>
                 ) : (
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>👪 Eltern-PIN eingeben</h3>
-                    <p style={{ margin: '8px 0 20px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 650 }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <Users size={20} style={{ color: '#34a853' }} />
+                      Eltern-PIN eingeben
+                    </h3>
+                    <p style={{ margin: '0 0 20px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                       Bitte gib die 4-stellige Eltern-PIN ein, um den geschützten Eltern-Bereich freizuschalten.
                     </p>
                     <input
@@ -4809,50 +4899,54 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         setParentPinInput(val);
+                        setParentPinErrorMsg(null);
                         if (val.length === 4) {
                           if (parentPinLockoutUntil && Date.now() < parentPinLockoutUntil) {
                             const minsLeft = Math.ceil((parentPinLockoutUntil - Date.now()) / 60000);
-                            alert(`Eltern-Bereich gesperrt. Bitte versuche es in ${minsLeft} Minuten erneut.`);
+                            setParentPinErrorMsg(`Eltern-Bereich gesperrt. Bitte versuche es in ${minsLeft} Minuten erneut.`);
                             setParentPinInput('');
                             return;
                           }
 
                           supabase
-                            .rpc('verify_parent_pin', { student_id: profile.id, input_pin: val })
-                            .then(({ data: isCorrect, error: rpcErr }) => {
-                              if (rpcErr) {
-                                console.error('PIN verification failed:', rpcErr);
-                                setParentPinError(true);
-                                setParentPinInput('');
-                                return;
-                              }
-                              if (isCorrect) {
-                                setParentPinAttempts(0);
-                                const isDefault = !profile.has_parent_pin || val === '0000';
-                                if (isDefault) {
-                                  setIsInitialPinSetup(true);
-                                  setParentPinInput('');
-                                } else {
-                                  setParentUnlocked(true);
-                                  setShowPinPrompt(false);
-                                  setParentPinInput('');
-                                  setParentPinError(false);
-                                }
-                              } else {
-                                const newAttempts = parentPinAttempts + 1;
-                                setParentPinAttempts(newAttempts);
-                                if (newAttempts >= 3) {
-                                  const lockoutTime = Date.now() + 15 * 60 * 1000;
-                                  setParentPinLockoutUntil(lockoutTime);
-                                  setParentPinAttempts(0);
-                                  alert('🔒 Zu viele Fehlversuche. Der Eltern-Bereich ist aus Sicherheitsgründen für 15 Minuten gesperrt.');
-                                } else {
+                              .rpc('verify_parent_pin', { student_id: profile.id, input_pin: val })
+                              .then(({ data: isCorrect, error: rpcErr }) => {
+                                if (rpcErr) {
+                                  console.error('PIN verification failed:', rpcErr);
                                   setParentPinError(true);
-                                  alert(`Falsche PIN. Du hast noch ${3 - newAttempts} Versuche.`);
+                                  setParentPinErrorMsg('Verbindung zum Server fehlgeschlagen.');
+                                  setParentPinInput('');
+                                  return;
                                 }
-                                setParentPinInput('');
-                              }
-                            });
+                                if (isCorrect) {
+                                  setParentPinAttempts(0);
+                                  const isDefault = !profile.has_parent_pin || val === '0000';
+                                  if (isDefault) {
+                                    setIsInitialPinSetup(true);
+                                    setParentPinInput('');
+                                    setParentPinErrorMsg(null);
+                                  } else {
+                                    setParentUnlocked(true);
+                                    setShowPinPrompt(false);
+                                    setParentPinInput('');
+                                    setParentPinError(false);
+                                    setParentPinErrorMsg(null);
+                                  }
+                                } else {
+                                  const newAttempts = parentPinAttempts + 1;
+                                  setParentPinAttempts(newAttempts);
+                                  if (newAttempts >= 3) {
+                                    const lockoutTime = Date.now() + 15 * 60 * 1000;
+                                    setParentPinLockoutUntil(lockoutTime);
+                                    setParentPinAttempts(0);
+                                    setParentPinErrorMsg('Zu viele Fehlversuche. Der Eltern-Bereich ist aus Sicherheitsgründen für 15 Minuten gesperrt.');
+                                  } else {
+                                    setParentPinError(true);
+                                    setParentPinErrorMsg(`Falsche PIN. Du hast noch ${3 - newAttempts} Versuche.`);
+                                  }
+                                  setParentPinInput('');
+                                }
+                              });
                         }
                       }}
                       placeholder="••••"
@@ -4878,6 +4972,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         setShowPinPrompt(false);
                         setParentPinInput('');
                         setParentPinError(false);
+                        setParentPinErrorMsg(null);
+                        setParentPinSuccessMsg(null);
                       }}
                       style={{
                         width: '100%',
@@ -4924,8 +5020,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 flexDirection: 'column',
                 gap: '16px'
               }}>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', textAlign: 'center' }}>
-                  📱 Direkt-Kommunikation freischalten
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <Smartphone size={20} style={{ color: '#34a853' }} />
+                  Direkt-Kommunikation freischalten
                 </h3>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
                   Sie erlauben damit Ihrem Kind, direkt und selbstständig über die App mit Lehrkräften zu kommunizieren. Dies schaltet den Chat-Eingang frei und macht das Profil schulintern sichtbar.
@@ -5001,9 +5098,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         setProfile(prev => prev ? { ...prev, app_usage_mode: 'student_only' } : null);
                         setParentUnlocked(false);
                         setShowConsentModal(false);
-                        alert('Erfolgreich freigeschaltet! Der Modus wurde auf "Selbstnutzer" umgestellt.');
+                        showToastMsg('Erfolgreich freigeschaltet! Der Modus wurde auf "Selbstnutzer" umgestellt.', 'success');
                       } catch (err: any) {
-                        alert('Fehler bei der Aktivierung: ' + err.message);
+                        showToastMsg('Fehler bei der Aktivierung: ' + err.message, 'error');
                       }
                     }}
                     style={{
@@ -5023,6 +5120,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {toast && (
+            <div style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: toast.type === 'success' ? '#10b981' : '#ef4444',
+              color: '#ffffff',
+              padding: '12px 24px',
+              borderRadius: '16px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: 800,
+              fontSize: '0.85rem'
+            }}>
+              {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+              <span>{toast.message}</span>
             </div>
           )}
 

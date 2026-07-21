@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -69,6 +69,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [showQrOverlay, setShowQrOverlay] = useState<boolean>(false);
+  const [qrOverlayTab, setQrOverlayTab] = useState<'campus' | 'groovelab'>('campus');
   const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
@@ -82,15 +83,24 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   });
   const isPlatformCampus = localTab === 'campus' || !isGroovelabActive;
 
-
-  let displayAvatarSrc = student.photo_url || '/avatar_ghost.jpg';
   const role = (student.role || '').toLowerCase();
   const roles = Array.isArray(student.roles) ? student.roles.map((r: any) => String(r).toLowerCase()) : [];
-  if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
-    displayAvatarSrc = '/campus_login_hero.png';
-  } else if (isPlatformCampus) {
-    displayAvatarSrc = getInstrumentAvatarUrl(student.instrument);
-  } else {
+  const isAdminOrSecretary = role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary');
+
+  const getCampusAvatarSrc = (): string => {
+    if (isAdminOrSecretary) return '/campus_login_hero.png';
+    return getInstrumentAvatarUrl(student.instrument);
+  };
+
+  const getGroovelabAvatarSrc = (): string => {
+    if (isAdminOrSecretary) return '/campus_login_hero.png';
+    if (student.role === 'teacher') {
+      const isTeacherAvatar = student.photo_url && (
+        student.photo_url.includes('teacher_') ||
+        student.photo_url.includes('avatar_teacher')
+      );
+      return isTeacherAvatar ? student.photo_url : '/avatar_ghost.jpg';
+    }
     const isStudentAvatar = student.photo_url && (
       student.photo_url.includes('student_') ||
       student.photo_url.includes('bandstyle_') ||
@@ -132,16 +142,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       student.photo_url.includes('bariton_avatar') || 
       student.photo_url.includes('oboe_avatar')
     );
-    const isTeacherAvatar = student.photo_url && (
-      student.photo_url.includes('teacher_') ||
-      student.photo_url.includes('avatar_teacher')
-    );
-    if (student.role === 'teacher') {
-      displayAvatarSrc = isTeacherAvatar ? student.photo_url : '/avatar_ghost.jpg';
-    } else if (!student.photo_url || isInstrumentAvatar || student.photo_url === '/avatar_ghost.jpg') {
-      displayAvatarSrc = '/avatar_ghost.jpg';
+    if (!student.photo_url || isInstrumentAvatar || student.photo_url === '/avatar_ghost.jpg') {
+      return '/avatar_ghost.jpg';
     }
-  }
+    return student.photo_url;
+  };
+
+  const displayAvatarSrc = isPlatformCampus ? getCampusAvatarSrc() : getGroovelabAvatarSrc();
 
   useEffect(() => {
     if (activePlatform) {
@@ -1628,6 +1635,1835 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     document.body.removeChild(link);
   };
 
+  const [activeModalTab, setActiveModalTab] = useState<'dashboard' | 'settings' | 'access'>('dashboard');
+
+  const renderProfileHeader = () => {
+    const activeColor = localTab === 'campus' ? '#34a853' : '#eab308';
+    return (
+      <div className="student-detail-header" style={{ display: 'flex', gap: '28px', alignItems: 'flex-start', width: '100%', flexWrap: 'nowrap', marginBottom: '24px' }}>
+        <div 
+          onClick={() => setShowFullPhoto(true)}
+          style={{ width: '120px', height: '120px', borderRadius: '28px', overflow: 'hidden', boxShadow: '0 10px 28px rgba(0,0,0,0.08)', border: '4px solid white', flexShrink: 0, cursor: 'pointer', transition: 'all 0.2s ease' }}
+          className="hover-scale"
+        >
+          <img src={displayAvatarSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
+          {isEditingName ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <input 
+                type="text" 
+                value={editFirstName} 
+                onChange={e => setEditFirstName(e.target.value)} 
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  width: '120px',
+                  outline: 'none'
+                }}
+              />
+              <input 
+                type="text" 
+                value={editLastName} 
+                onChange={e => setEditLastName(e.target.value)} 
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  width: '120px',
+                  outline: 'none'
+                }}
+              />
+              <button 
+                onClick={handleSaveName}
+                style={{
+                  background: '#34a853',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Speichern
+              </button>
+              <button 
+                onClick={() => {
+                  setIsEditingName(false);
+                  setEditFirstName(firstName);
+                  setEditLastName(lastName);
+                }}
+                style={{
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          ) : (
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>{firstName} {maskLastName(lastName, showRealNames)}</span>
+              <button 
+                onClick={() => toggleRealNames()}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px',
+                  borderRadius: '50%',
+                  transition: 'all 0.15s ease'
+                }}
+                title={showRealNames ? "Namen anonymisieren" : "Voller Name anzeigen"}
+                className="hover-scale-mini"
+              >
+                {showRealNames ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                <button 
+                  onClick={() => {
+                    setIsEditingName(true);
+                    setEditFirstName(firstName);
+                    setEditLastName(lastName);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px',
+                    borderRadius: '50%',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Name bearbeiten"
+                  className="hover-scale-mini"
+                >
+                  <Pencil size={16} />
+                </button>
+              )}
+            </h2>
+          )}
+          <div style={{ display: 'flex', gap: '16px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
+              <Calendar size={14} /> Member seit {memberSince}
+            </div>
+            {onOpenTageskompass && (
+              <button 
+                onClick={() => onOpenTageskompass(student)}
+                style={{
+                  background: activeColor,
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '6px 14px',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: `0 4px 12px ${activeColor}33`,
+                  transition: 'transform 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <BookOpen size={14} />
+                <span>Schüler-Aufgabenheft</span>
+              </button>
+            )}
+          </div>
+
+          {/* Instrument challenge counters (only in GrooveLab mode) */}
+          {!isPlatformCampus && (
+            <div style={{ display: 'flex', gap: '6px', marginTop: '12px', flexWrap: 'nowrap' }}>
+              {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
+                const count = skills.filter((s) => {
+                  const sInst = (s.instrument || '').toLowerCase();
+                  const target = inst.toLowerCase();
+                  let match = false;
+                  if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre' || sInst === 'gitarre';
+                  else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
+                  else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums' || sInst === 'schlagzeug';
+                  else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano' || sInst === 'klavier' || sInst === 'keyboard';
+                  else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
+                  else match = sInst === target;
+                  
+                  const isMastered = s.is_stage_ready || s.progress_percent === 100;
+                  return match && isMastered;
+                }).length + (inst === 'Vocals' ? vocalsSongIds.size : 0);
+
+                return (
+                  <div 
+                    key={inst} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px', 
+                      background: '#f8fafc', 
+                      padding: '4px 8px', 
+                      borderRadius: '8px', 
+                      border: '1px solid #f1f5f9' 
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center' }}>
+                      {renderInstrumentIcon(inst, undefined, 13)}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: count > 0 ? activeColor : '#94a3b8' }}>
+                      {count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Activation badges */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {isCampusActive && (
+              <span style={{ background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
+                🎓 Campus
+              </span>
+            )}
+            {isGroovelabActive && (
+              <span style={{ background: '#fefce8', color: '#eab308', border: '1px solid #fef08a', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
+                🎸 GrooveLab
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTabSelector = () => {
+    const activeColor = localTab === 'campus' ? '#34a853' : '#eab308';
+    return (
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        borderBottom: '1px solid #e2e8f0',
+        marginBottom: '28px',
+        paddingBottom: '8px'
+      }}>
+        <button
+          onClick={() => setActiveModalTab('dashboard')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeModalTab === 'dashboard' ? `3px solid ${activeColor}` : '3px solid transparent',
+            padding: '8px 16px',
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            color: activeModalTab === 'dashboard' ? '#1e293b' : '#64748b',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.15s'
+          }}
+        >
+          <LayoutDashboard size={16} style={{ color: activeModalTab === 'dashboard' ? activeColor : '#64748b' }} />
+          <span>Dashboard</span>
+        </button>
+        <button
+          onClick={() => setActiveModalTab('settings')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeModalTab === 'settings' ? `3px solid ${activeColor}` : '3px solid transparent',
+            padding: '8px 16px',
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            color: activeModalTab === 'settings' ? '#1e293b' : '#64748b',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.15s'
+          }}
+        >
+          <Sliders size={16} style={{ color: activeModalTab === 'settings' ? activeColor : '#64748b' }} />
+          <span>Einstellungen &amp; Module</span>
+        </button>
+        <button
+          onClick={() => setActiveModalTab('access')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeModalTab === 'access' ? `3px solid ${activeColor}` : '3px solid transparent',
+            padding: '8px 16px',
+            fontSize: '0.9rem',
+            fontWeight: 700,
+            color: activeModalTab === 'access' ? '#1e293b' : '#64748b',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.15s'
+          }}
+        >
+          <ShieldCheck size={16} style={{ color: activeModalTab === 'access' ? activeColor : '#64748b' }} />
+          <span>Zugang &amp; Datenschutz</span>
+        </button>
+      </div>
+    );
+  };
+
+  const renderModalContent = () => {
+    const activeColor = localTab === 'campus' ? '#34a853' : '#eab308';
+    
+    if (activeModalTab === 'dashboard') {
+      return (
+        <div className="student-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start' }}>
+          {/* Left Column: Stats & Progress Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            {isPlatformCampus ? (
+              /* ---- CAMPUS Dashboard core contents ---- */
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
+                  {/* Campus Card 1: XP */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #4285f4, #2b6cb0)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 6px 15px rgba(66, 133, 244, 0.15)',
+                    height: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Star size={18} fill="white" color="white" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {currentXP} XP
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                        XP GESAMMELT
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Campus Card 2: Songs */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #34a853, #22c55e)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 6px 15px rgba(52, 168, 83, 0.15)',
+                    height: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Award size={18} color="white" fill="white" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {verifiedSongsCount} / {skills.length + vocalsSongIds.size}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                        SONGS GEMEISTERT
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Campus Card 3: Fokus-Übezeit */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fbbc05, #d97706)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 6px 15px rgba(251, 188, 5, 0.15)',
+                    height: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Clock size={18} color="white" fill="white" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {focusMinutes} Min
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                        FOKUS-ÜBEZEIT
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Campus Card 4: Übe-Streak */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #ea4335, #b91c1c)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 6px 15px rgba(234, 67, 53, 0.15)',
+                    height: '100%',
+                    boxSizing: 'border-box',
+                    position: 'relative'
+                  }}>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: '1.1rem' }}>🔥</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {streakDays} Tage
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                        SERIE AM LAUFEN
+                      </div>
+                    </div>
+                    {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                      <button
+                        onClick={() => {
+                          const val = prompt('Neue Anzahl an Streak-Tagen eingeben:', String(streakDays));
+                          if (val !== null) {
+                            const num = parseInt(val, 10);
+                            if (!isNaN(num) && num >= 0) {
+                              handleUpdateStreak(num);
+                            }
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '8px',
+                          background: 'rgba(255,255,255,0.2)',
+                          border: 'none',
+                          color: '#ffffff',
+                          borderRadius: '6px',
+                          padding: '2px 5px',
+                          fontSize: '0.55rem',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Bearbeiten
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Songs & Lehrwerke list widget */}
+                <section style={{ 
+                  background: '#f8fafc', 
+                  borderRadius: '24px', 
+                  padding: '20px', 
+                  border: '1.5px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                      <BookOpen size={16} /> Songs &amp; Lehrwerke
+                    </h4>
+                    {onOpenTageskompass && (
+                      <button 
+                        onClick={() => onOpenTageskompass(student)}
+                        style={{
+                          background: '#34a853',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '6px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <BookOpen size={13} />
+                        <span>Schüler-Aufgabenheft</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {/* Textbooks Row */}
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Lehrwerke</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {(assignedLehrwerke || []).map((assigned) => {
+                          const book = globalLehrwerke.find((b: any) => b.id === assigned.lehrwerkId);
+                          if (!book) return null;
+                          const percent = assigned.progressPercent || 0;
+                          const bookColor = getLehrwerkColor(book.title);
+
+                          return (
+                            <div key={assigned.lehrwerkId} style={{ 
+                              background: '#ffffff', 
+                              padding: '8px 12px', 
+                              borderRadius: '12px', 
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              fontSize: '0.82rem'
+                            }}>
+                              <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{
+                                  width: '24px',
+                                  height: '32px',
+                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                  borderRadius: '4px',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                  border: 'none',
+                                  position: 'relative',
+                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}>
+                                  <BookOpen size={11} color={bookColor.text} />
+                                  <div style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: '3px',
+                                    background: 'rgba(0,0,0,0.08)',
+                                    borderRight: '1px solid rgba(255,255,255,0.1)'
+                                  }} />
+                                </div>
+                                <span>{book.title}</span>
+                              </span>
+                              <span style={{ 
+                                background: percent > 0 ? '#e6f4ea' : '#f1f5f9', 
+                                color: percent > 0 ? '#34a853' : '#64748b', 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                fontWeight: 900,
+                                fontSize: '0.75rem' 
+                              }}>
+                                {percent}% gemeistert
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {(assignedLehrwerke || []).length === 0 && (
+                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine aktiven Lehrwerke zugewiesen.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Divider line inside card */}
+                    <div style={{ height: '1px', background: '#e2e8f0' }} />
+
+                    {/* Songs Row */}
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Songs &amp; Übungen</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {practiceBoard.map((s: any) => (
+                          <div key={s.id + s.level} style={{ 
+                            background: '#ffffff', 
+                            padding: '8px 12px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #e2e8f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.82rem'
+                          }}>
+                            <span style={{ fontWeight: 800, color: '#1e293b' }}>
+                              🎵 {s.title} <span style={{ fontWeight: 500, color: '#64748b', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                            </span>
+                            <span style={{ 
+                              background: '#eff6ff', 
+                              color: '#2563eb', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontWeight: 900,
+                              fontSize: '0.75rem' 
+                            }}>
+                              Übt gerade ({Math.max(...s.instruments.map((i: any) => i.progress)) || 0}%)
+                            </span>
+                          </div>
+                        ))}
+
+                        {repertoire.map((s: any) => (
+                          <div key={s.id + s.level} style={{ 
+                            background: '#e6f4ea', 
+                            padding: '8px 12px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #e6f4ea',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.82rem'
+                          }}>
+                            <span style={{ fontWeight: 800, color: '#34a853' }}>
+                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                            </span>
+                            <span style={{ 
+                              background: '#e6f4ea', 
+                              color: '#34a853', 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              fontWeight: 900,
+                              fontSize: '0.75rem' 
+                            }}>
+                              ✓ Verifiziert
+                            </span>
+                          </div>
+                        ))}
+
+                        {practiceBoard.length === 0 && repertoire.length === 0 && (
+                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Songs eingetragen.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </>
+            ) : (
+              /* ---- GROOVELAB Dashboard core contents ---- */
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
+                  {/* GL Card 1: GL XP */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #eab308, #ca8a04)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 6px 15px rgba(234, 179, 8, 0.15)',
+                    height: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Star size={18} fill="white" color="white" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {verifiedSongsCount * 100} XP
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                        GROOVELAB XP
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* GL Card 2: Mastered Songs */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 6px 15px rgba(29, 78, 216, 0.15)',
+                    height: '100%',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Music size={18} fill="white" color="white" />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                        {verifiedSongsCount}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                        SONGS GEMEISTERT
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Repertoire Songs Widget */}
+                <section style={{ 
+                  background: '#fefce8', 
+                  borderRadius: '24px', 
+                  padding: '20px', 
+                  border: '1.5px solid #fef08a'
+                }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                    <Music size={16} /> Repertoire &amp; Übe-Liste
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {practiceBoard.map((s: any) => (
+                      <div key={s.id + s.level} style={{ 
+                        background: '#ffffff', 
+                        padding: '8px 12px', 
+                        borderRadius: '12px', 
+                        border: '1px solid #fef08a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.82rem'
+                      }}>
+                        <span style={{ fontWeight: 800, color: '#854d0e' }}>
+                          🎵 {s.title} <span style={{ fontWeight: 500, color: '#a16207', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                        </span>
+                        <span style={{ 
+                          background: '#fefce8', 
+                          color: '#eab308', 
+                          padding: '2px 8px', 
+                          borderRadius: '6px', 
+                          fontWeight: 900,
+                          fontSize: '0.75rem' 
+                        }}>
+                          Übt gerade
+                        </span>
+                      </div>
+                    ))}
+                    {repertoire.map((s: any) => (
+                      <div key={s.id + s.level} style={{ 
+                        background: '#e6f4ea', 
+                        padding: '8px 12px', 
+                        borderRadius: '12px', 
+                        border: '1px solid #e6f4ea',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.82rem'
+                      }}>
+                        <span style={{ fontWeight: 800, color: '#34a853' }}>
+                          🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                        </span>
+                        <span style={{ 
+                          background: '#e6f4ea', 
+                          color: '#34a853', 
+                          padding: '2px 8px', 
+                          borderRadius: '6px', 
+                          fontWeight: 900,
+                          fontSize: '0.75rem' 
+                        }}>
+                          ✓ Verifiziert
+                        </span>
+                      </div>
+                    ))}
+                    {practiceBoard.length === 0 && repertoire.length === 0 && (
+                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Songs eingetragen.</div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Meine Bands */}
+                <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Users size={16} /> Meine Bands
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {bands.map((b: any) => (
+                      <div 
+                        key={b.id} 
+                        onClick={() => {
+                          if (onOpenBandProfile) {
+                            onOpenBandProfile(b);
+                          }
+                        }}
+                        className={onOpenBandProfile ? "clickable-band-item" : ""}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '12px', 
+                          padding: '12px', 
+                          background: '#fefce8', 
+                          borderRadius: '16px', 
+                          border: '1px solid #fef08a',
+                          cursor: onOpenBandProfile ? 'pointer' : 'default'
+                        }}
+                      >
+                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden' }}>
+                          <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e' }}>{b.name}</div>
+                      </div>
+                    ))}
+                    {bands.length === 0 && !loading && (
+                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>In keiner Band aktiv.</div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Wochenplan-Zeiten */}
+                {!isPeerStudent && (
+                  <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+                    <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Calendar size={16} /> Wochenplan-Zeiten
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {weekSessions.map((pres, idx) => (
+                        <div key={idx} style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '10px', 
+                          background: '#fffbeb', 
+                          border: '1px solid #fef3c7', 
+                          padding: '12px 14px', 
+                          borderRadius: '16px', 
+                          fontSize: '0.85rem', 
+                          fontWeight: 700, 
+                          color: '#b45309' 
+                        }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                          <div>
+                            {pres.dayStr}. {pres.rangeStr}
+                          </div>
+                        </div>
+                      ))}
+                      {weekSessions.length === 0 && (
+                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
+                      )}
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right Column: Sidebar Widgets */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {isPlatformCampus ? (
+              /* ---- CAMPUS Sidebar: Lesson Card ---- */
+              <section style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                padding: '20px',
+                border: '1.5px solid #f1f5f9',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+              }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                  <Calendar size={16} /> Aktueller Unterricht
+                </h4>
+                {schedulesList.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {schedulesList
+                      .sort((a, b) => {
+                        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+                        return (a.time_slot || '').localeCompare(b.time_slot || '');
+                      })
+                      .map((sched) => {
+                        const isApproved = sched.status === 'approved';
+                        const isReview = sched.status === 'ready_for_admin_review';
+                        const statusText = isApproved ? 'Aktiv' : isReview ? 'In Prüfung' : 'Entwurf';
+                        const dayNames = ['Montags', 'Dienstags', 'Mittwochs', 'Donnerstags', 'Freitags', 'Samstags', 'Sonntags'];
+                        const dayName = dayNames[sched.day_of_week - 1] || 'Unbekannter Tag';
+                        const teacherName = sched.teacher_profiles ? `${sched.teacher_profiles.first_name || ''} ${sched.teacher_profiles.last_name ? sched.teacher_profiles.last_name.charAt(0) + '.' : ''}` : 'Lehrer';
+
+                        return (
+                          <div key={sched.id} style={{
+                            background: isApproved ? '#e6f4ea' : '#f1f5f9',
+                            border: isApproved ? '1px solid #d1fae5' : '1px solid #e2e8f0',
+                            borderRadius: '16px',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                background: isApproved ? '#34a853' : '#64748b',
+                                color: '#ffffff',
+                                borderRadius: '10px',
+                                width: '38px',
+                                height: '38px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.62rem',
+                                fontWeight: 800,
+                                lineHeight: 1.2
+                              }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>{sched.time_slot ? sched.time_slot.slice(0, 2) : ''}</span>
+                                <span>{sched.time_slot ? sched.time_slot.slice(3) : ''}</span>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                                  {groupId ? 'Gruppenunterricht' : 'Einzelunterricht'} bei {teacherName}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  🏢 {sched.rooms ? sched.rooms.name : 'Raum'} • {dayName}
+                                </div>
+                              </div>
+                            </div>
+                            <span style={{
+                              background: isApproved ? '#34a853' : '#cbd5e1',
+                              color: '#ffffff',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 800
+                            }}>
+                              {statusText}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                    Kein aktiver Stundenplan zugeordnet.
+                  </div>
+                )}
+              </section>
+            ) : (
+              /* ---- GROOVELAB Sidebar: Skill Radar Chart ---- */
+              <section style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '20px', 
+                border: '1.5px solid #fef9c3',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <Music size={16} style={{ color: '#eab308' }} /> Skill Radar
+                </h4>
+                
+                <div style={{ width: '100%', height: '240px', display: 'flex', justifyContent: 'center' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="65%" data={studentRadarData}>
+                      <PolarGrid stroke="#f1f5f9" />
+                      <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
+                        <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}>
+                          {payload.value}
+                        </text>
+                      )} />
+                      <Radar name="XP" dataKey="xp" stroke="#eab308" fill="#facc15" fillOpacity={0.5} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (activeModalTab === 'settings') {
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }} className="student-detail-grid">
+          {/* Left Column: Modules & Lesson Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <section style={{ 
+              background: '#ffffff', 
+              borderRadius: '24px', 
+              padding: '20px 24px', 
+              border: '1.5px solid #f1f5f9',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+            }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={18} style={{ color: activeColor }} /> Modul-Aktivierung &amp; Unterricht
+              </h4>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Campus-Modul Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Campus-Modul</span>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Hausaufgaben, XP, Übe-Timer &amp; Raum-Engine</div>
+                  </div>
+                  {activePlatform === 'secretary' ? (
+                    <div style={{ 
+                      background: '#f1f5f9', 
+                      padding: '2px', 
+                      borderRadius: '12px', 
+                      display: 'inline-flex', 
+                      border: 'none',
+                      alignItems: 'center'
+                    }}>
+                      <button
+                        onClick={() => handleToggleCampus(false)}
+                        style={{
+                          background: !isCampusActive ? '#ffffff' : 'transparent',
+                          color: !isCampusActive ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: !isCampusActive ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: !isCampusActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        Inaktiv
+                      </button>
+                      <button
+                        onClick={() => handleToggleCampus(true)}
+                        style={{
+                          background: isCampusActive ? '#34a853' : 'transparent',
+                          color: isCampusActive ? '#ffffff' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: isCampusActive ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: isCampusActive ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
+                        }}
+                      >
+                        Aktiv
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={{ 
+                      background: isCampusActive ? '#e6f4ea' : '#f1f5f9', 
+                      color: isCampusActive ? '#34a853' : '#64748b', 
+                      padding: '4px 10px', 
+                      borderRadius: '10px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 800 
+                    }}>
+                      {isCampusActive ? 'Aktiv' : 'Inaktiv'}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* GrooveLab-Modul Toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>GrooveLab-Modul</span>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Bands, Songverwaltung &amp; Echtzeit Live Lab</div>
+                  </div>
+                  {activePlatform === 'secretary' ? (
+                    <div style={{ 
+                      background: '#f1f5f9', 
+                      padding: '2px', 
+                      borderRadius: '12px', 
+                      display: 'inline-flex', 
+                      border: 'none',
+                      alignItems: 'center'
+                    }}>
+                      <button
+                        onClick={() => handleToggleGroovelab(false)}
+                        style={{
+                          background: !isGroovelabActive ? '#ffffff' : 'transparent',
+                          color: !isGroovelabActive ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: !isGroovelabActive ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: !isGroovelabActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        Inaktiv
+                      </button>
+                      <button
+                        onClick={() => handleToggleGroovelab(true)}
+                        style={{
+                          background: isGroovelabActive ? '#eab308' : 'transparent',
+                          color: isGroovelabActive ? '#ffffff' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: isGroovelabActive ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: isGroovelabActive ? '0 1px 4px rgba(234, 179, 8, 0.3)' : 'none'
+                        }}
+                      >
+                        Aktiv
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={{ 
+                      background: isGroovelabActive ? '#fef3c7' : '#f1f5f9', 
+                      color: isGroovelabActive ? '#b45309' : '#64748b', 
+                      padding: '4px 10px', 
+                      borderRadius: '10px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 800 
+                    }}>
+                      {isGroovelabActive ? 'Aktiv' : 'Inaktiv'}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* Unterrichtsform / Dauer Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Unterrichtsdauer</span>
+                  {activePlatform === 'secretary' || currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {durationRequestSent && (
+                        <span style={{ 
+                          background: '#fffbeb', 
+                          color: '#b45309', 
+                          border: '1px solid #fde68a', 
+                          padding: '3px 6px', 
+                          borderRadius: '8px', 
+                          fontSize: '0.65rem', 
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}>
+                          ⏳ Wunsch: {requestedDuration} Min
+                        </span>
+                      )}
+                      <div style={{
+                        background: '#f1f5f9',
+                        padding: '2px',
+                        borderRadius: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px'
+                      }}>
+                        {[30, 45, 60, 90].map((dur) => {
+                          const isSelected = lessonDuration === dur;
+                          return (
+                            <button
+                              key={dur}
+                              onClick={() => handleUpdateDuration(dur)}
+                              style={{
+                                background: isSelected ? '#ffffff' : 'transparent',
+                                color: isSelected ? '#1e293b' : '#64748b',
+                                border: 'none',
+                                borderRadius: '10px',
+                                padding: '4px 8px',
+                                fontSize: '0.75rem',
+                                fontWeight: isSelected ? 800 : 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                              }}
+                            >
+                              {dur} Min
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      {lessonDuration} Min
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* Gruppenunterricht Linkage */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Users size={14} style={{ color: '#64748b' }} /> Gruppenunterricht
+                  </span>
+                  
+                  {groupId ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 500 }}>
+                        Verknüpft im Gruppenunterricht mit:
+                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {groupStudents.map(s => (
+                            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                              <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: '#64748b' }}></span>
+                              {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                        <button
+                          onClick={handleUnlinkGroup}
+                          style={{
+                            background: '#fff1f2',
+                            color: '#e11d48',
+                            border: '1px solid #fecdd3',
+                            borderRadius: '8px',
+                            padding: '4px 8px',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            alignSelf: 'flex-start'
+                          }}
+                        >
+                          Verbindung trennen
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                        Dieser Schüler hat aktuell Einzelunterricht.
+                      </div>
+
+                      {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                        <>
+                          {!showGroupSelector ? (
+                            <button
+                              onClick={() => setShowGroupSelector(true)}
+                              style={{
+                                background: '#f8fafc',
+                                color: '#1e293b',
+                                border: '1.5px solid #e2e8f0',
+                                borderRadius: '10px',
+                                padding: '6px 10px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
+                                alignSelf: 'flex-start'
+                              }}
+                            >
+                              Gruppenunterricht einrichten
+                            </button>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Partner auswählen:</span>
+                              <div style={{ position: 'relative' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Name des Schülers suchen..."
+                                  value={studentSearchQuery}
+                                  onChange={e => {
+                                    setStudentSearchQuery(e.target.value);
+                                    setSelectedStudentToLink('');
+                                    setSearchDropdownOpen(true);
+                                  }}
+                                  onFocus={() => setSearchDropdownOpen(true)}
+                                  onBlur={() => {
+                                    setTimeout(() => setSearchDropdownOpen(false), 200);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 10px',
+                                    borderRadius: '8px',
+                                    border: '1.5px solid #cbd5e1',
+                                    fontSize: '0.75rem',
+                                    color: '#1e293b',
+                                    outline: 'none',
+                                    background: '#ffffff',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                                {searchDropdownOpen && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    background: '#ffffff',
+                                    border: '1.5px solid #cbd5e1',
+                                    borderRadius: '10px',
+                                    marginTop: '2px',
+                                    maxHeight: '120px',
+                                    overflowY: 'auto',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                    zIndex: 10
+                                  }}>
+                                    {schoolStudents
+                                      .filter(s => {
+                                        const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+                                        return fullName.includes(studentSearchQuery.toLowerCase());
+                                      })
+                                      .map(s => (
+                                        <div
+                                          key={s.id}
+                                          onClick={() => {
+                                            setSelectedStudentToLink(s.id);
+                                            setStudentSearchQuery(`${s.first_name || ''} ${s.last_name || ''}`);
+                                            setSearchDropdownOpen(false);
+                                          }}
+                                          style={{
+                                            padding: '6px 10px',
+                                            fontSize: '0.75rem',
+                                            color: '#1e293b',
+                                            cursor: 'pointer',
+                                            background: selectedStudentToLink === s.id ? '#e6f4ea' : '#ffffff',
+                                            borderBottom: '1px solid #f1f5f9',
+                                            textAlign: 'left'
+                                          }}
+                                        >
+                                          {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
+                                        </div>
+                                      ))}
+                                    {schoolStudents.filter(s => {
+                                      const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+                                      return fullName.includes(studentSearchQuery.toLowerCase());
+                                    }).length === 0 && (
+                                      <div style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#64748b', textAlign: 'center' }}>
+                                        Keine Schüler gefunden
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                                <button
+                                  onClick={handleLinkGroup}
+                                  disabled={!selectedStudentToLink}
+                                  style={{
+                                    flex: 1,
+                                    background: selectedStudentToLink ? '#34a853' : '#cbd5e1',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '4px 8px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: selectedStudentToLink ? 'pointer' : 'default',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  Verknüpfen
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowGroupSelector(false);
+                                    setSelectedStudentToLink('');
+                                    setStudentSearchQuery('');
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: '#ef4444',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '4px 8px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  Abbrechen
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* Right Column: Streaks & Parental Security */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <section style={{ 
+              background: '#ffffff', 
+              borderRadius: '24px', 
+              padding: '20px 24px', 
+              border: '1.5px solid #f1f5f9',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+            }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={18} style={{ color: activeColor }} /> Lern- &amp; Sicherheits-Einstellungen
+              </h4>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Evolution Level (Streaks) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Übungs-Level (Streaks)</span>
+                  {currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                    <div style={{
+                      background: '#f1f5f9',
+                      padding: '2px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}>
+                      {[1, 2, 3].map((lvl) => {
+                        const isSelected = (avatar?.evolution_level || 1) === lvl;
+                        return (
+                          <button
+                            key={lvl}
+                            onClick={() => handleUpdateEvolutionLevel(lvl)}
+                            style={{
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? '#1e293b' : '#64748b',
+                              border: 'none',
+                              borderRadius: '10px',
+                              padding: '4px 8px',
+                              fontSize: '0.75rem',
+                              fontWeight: isSelected ? 800 : 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                              boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                            }}
+                            title={lvl === 1 ? '3/5/10 Min.' : lvl === 2 ? '5/10/15 Min.' : '10/15/20 Min.'}
+                          >
+                            Level {lvl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      Level {avatar?.evolution_level || 1}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* Campus-Nutzungsmodus */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
+                  {currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                    <div style={{
+                      background: '#f1f5f9',
+                      padding: '2px',
+                      borderRadius: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}>
+                      <button
+                        onClick={() => handleUpdateAppUsageMode('student_only')}
+                        style={{
+                          background: appUsageMode === 'student_only' ? '#ffffff' : 'transparent',
+                          color: appUsageMode === 'student_only' ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          fontWeight: appUsageMode === 'student_only' ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          boxShadow: appUsageMode === 'student_only' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Smartphone size={14} />
+                          Selbstnutzer
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => handleUpdateAppUsageMode('parent_hybrid')}
+                        style={{
+                          background: appUsageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+                          color: appUsageMode === 'parent_hybrid' ? '#1e293b' : '#64748b',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          fontWeight: appUsageMode === 'parent_hybrid' ? 800 : 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          boxShadow: appUsageMode === 'parent_hybrid' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Users size={14} />
+                          Eltern-Hybrid
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                      {appUsageMode === 'student_only' ? 'Selbstnutzer' : 'Eltern-Hybrid'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Eltern-PIN (Visible if hybrid) */}
+                {appUsageMode === 'parent_hybrid' && (
+                  <>
+                    <div style={{ height: '1px', background: '#f1f5f9' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Eltern-PIN (4-stellig)</span>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Sichert den Eltern-Bereich auf der Schüler-Startseite</div>
+                      </div>
+                      {currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            placeholder="1234"
+                            value={parentPin}
+                            onChange={e => {
+                              const clean = e.target.value.replace(/\D/g, '');
+                              setParentPin(clean);
+                            }}
+                            style={{
+                              width: '70px',
+                              padding: '6px 10px',
+                              border: '1.5px solid #cbd5e1',
+                              borderRadius: '10px',
+                              fontSize: '0.85rem',
+                              textAlign: 'center',
+                              outline: 'none',
+                              fontWeight: 700,
+                              letterSpacing: '0.1em'
+                            }}
+                          />
+                          <button
+                            onClick={() => handleUpdateParentPin(parentPin)}
+                            style={{
+                              background: '#34a853',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            Speichern
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.1em' }}>****</span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeModalTab === 'access') {
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '32px', alignItems: 'start' }} className="student-detail-grid">
+          {/* Left Column: Onboarding Links (Dual Cards for Campus PWA & GrooveLab PWA) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* CARD 1: CAMPUS PWA APP & AUSWEIS */}
+            <section style={{
+              background: 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)',
+              borderRadius: '24px',
+              padding: '20px',
+              border: '1.5px solid rgba(52, 168, 83, 0.25)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <GraduationCap size={18} /> Campus App &amp; Ausweis
+                </h4>
+                <span style={{ background: '#34a853', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>
+                  Grün
+                </span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#ffffff', padding: '10px 14px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                <img src={getCampusAvatarSrc()} style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover', border: '2px solid #34a853' }} />
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Campus Pass</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Instrument-Avatar • Campus PWA Link</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`;
+                    navigator.clipboard.writeText(link);
+                    setCopiedCampusLink(true);
+                    setTimeout(() => setCopiedCampusLink(false), 2000);
+                  }}
+                  style={{
+                    flex: 1,
+                    background: copiedCampusLink ? '#e6f4ea' : '#34a853',
+                    color: copiedCampusLink ? '#34a853' : '#ffffff',
+                    border: copiedCampusLink ? '1.5px solid #34a853' : 'none',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  {copiedCampusLink ? <Check size={12} /> : <Copy size={12} />}
+                  <span>{copiedCampusLink ? 'Link kopiert! ✓' : 'Campus PWA Link'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQrOverlayTab('campus');
+                    setShowQrOverlay(true);
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    color: '#34a853',
+                    border: '1.5px solid #34a853',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  <Award size={12} />
+                  <span>Campus Pass</span>
+                </button>
+              </div>
+            </section>
+
+            {/* CARD 2: GROOVELAB PWA APP & MEMBER PASS */}
+            <section style={{
+              background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
+              borderRadius: '24px',
+              padding: '20px',
+              border: '1.5px solid rgba(234, 179, 8, 0.3)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Music size={18} /> GrooveLab App &amp; Member Pass
+                </h4>
+                <span style={{ background: '#eab308', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>
+                  Gelb
+                </span>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#ffffff', padding: '10px 14px', borderRadius: '16px', border: '1px solid #fef08a' }}>
+                <img src={getGroovelabAvatarSrc()} style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover', border: '2px solid #eab308' }} />
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e' }}>Member Pass</div>
+                  <div style={{ fontSize: '0.7rem', color: '#a16207' }}>Musiker-Avatar • GrooveLab PWA Link</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=groovelab`;
+                    navigator.clipboard.writeText(link);
+                    setCopiedGrooveLink(true);
+                    setTimeout(() => setCopiedGrooveLink(false), 2000);
+                  }}
+                  style={{
+                    flex: 1,
+                    background: copiedGrooveLink ? '#fefce8' : '#eab308',
+                    color: copiedGrooveLink ? '#854d0e' : '#ffffff',
+                    border: copiedGrooveLink ? '1.5px solid #eab308' : 'none',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  {copiedGrooveLink ? <Check size={12} /> : <Copy size={12} />}
+                  <span>{copiedGrooveLink ? 'Link kopiert! ✓' : 'GrooveLab PWA Link'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQrOverlayTab('groovelab');
+                    setShowQrOverlay(true);
+                  }}
+                  style={{
+                    background: '#ffffff',
+                    color: '#854d0e',
+                    border: '1.5px solid #eab308',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale"
+                >
+                  <Award size={12} />
+                  <span>Member Pass</span>
+                </button>
+              </div>
+            </section>
+          </div>
+
+          {/* Right Column: Attendance & DSGVO */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Presence Log Card (Only in GrooveLab mode) */}
+            {localTab !== 'campus' && (
+              <section style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '20px 24px', 
+                border: '1.5px solid #f1f5f9',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+              }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} style={{ color: '#eab308' }} /> Anwesenheit &amp; Logbuch
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowPresenceLogOverlay(true)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 20px',
+                    background: '#f8fafc',
+                    color: '#1e293b',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '16px',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Calendar size={15} style={{ color: '#64748b' }} />
+                  Anwesenheits-Logbuch öffnen
+                </button>
+              </section>
+            )}
+
+            {/* DSGVO Datenschutz Card */}
+            {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher') && (
+              <section style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '20px 24px', 
+                border: '1.5px solid #f1f5f9',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+              }}>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={18} style={{ color: localTab === 'campus' ? '#34a853' : '#eab308' }} /> Datenschutz &amp; Auskunft (DSGVO)
+                </h4>
+                <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 14px 0', lineHeight: 1.4, fontWeight: 650 }}>
+                  Exportiere alle personenbezogenen Daten dieses Schülers gesetzeskonform nach Art. 15 DSGVO.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button
+                    onClick={handleExportDSGVOPdf}
+                    style={{
+                      width: '100%',
+                      background: '#f8fafc',
+                      color: '#1e293b',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '8px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <Printer size={14} style={{ color: '#64748b' }} />
+                    <span>Datenblatt drucken (PDF)</span>
+                  </button>
+                  <button
+                    onClick={handleExportDSGVOJson}
+                    style={{
+                      width: '100%',
+                      background: '#f8fafc',
+                      color: '#1e293b',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '8px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <Download size={14} style={{ color: '#64748b' }} />
+                    <span>Daten exportieren (JSON)</span>
+                  </button>
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(242, 242, 247, 0.65)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <style>{`
@@ -1776,1833 +3612,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           )}
         </div>
 
-        <div className="student-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start', marginTop: '20px' }}>
-          
-          {/* LEFT COLUMN: Profile Header + Campus Core Data Lists */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            
-            {/* Profile Info Header (Left aligned) */}
-            <div className="student-detail-header" style={{ display: 'flex', gap: '28px', alignItems: 'flex-start', width: '100%', flexWrap: 'nowrap' }}>
-              <div 
-                onClick={() => setShowFullPhoto(true)}
-                style={{ width: '120px', height: '120px', borderRadius: '28px', overflow: 'hidden', boxShadow: '0 10px 28px rgba(0,0,0,0.08)', border: '4px solid white', flexShrink: 0, cursor: 'pointer', transition: 'all 0.2s ease' }}
-                className="hover-scale"
-              >
-                <img src={displayAvatarSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px' }}>
-                {isEditingName ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <input 
-                      type="text" 
-                      value={editFirstName} 
-                      onChange={e => setEditFirstName(e.target.value)} 
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '1rem',
-                        fontWeight: 700,
-                        width: '120px',
-                        outline: 'none'
-                      }}
-                    />
-                    <input 
-                      type="text" 
-                      value={editLastName} 
-                      onChange={e => setEditLastName(e.target.value)} 
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '1rem',
-                        fontWeight: 700,
-                        width: '120px',
-                        outline: 'none'
-                      }}
-                    />
-                    <button 
-                      onClick={handleSaveName}
-                      style={{
-                        background: '#34a853',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '6px 12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Speichern
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setEditFirstName(firstName);
-                        setEditLastName(lastName);
-                        setIsEditingName(false);
-                      }}
-                      style={{
-                        background: '#f1f5f9',
-                        color: '#64748b',
-                        border: 'none',
-                        borderRadius: '10px',
-                        padding: '6px 12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Abbrechen
-                    </button>
-                  </div>
-                ) : (
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{firstName} {maskLastName(lastName, showRealNames)}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleRealNames()}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: showRealNames ? '#ea4335' : '#64748b',
-                        padding: '4px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '50%',
-                        transition: 'all 0.15s ease'
-                      }}
-                      title={showRealNames ? "Nachname ausblenden" : "Nachname einblenden (für 10s)"}
-                      className="hover-scale-mini"
-                    >
-                      {showRealNames ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                    {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditFirstName(firstName);
-                          setEditLastName(lastName);
-                          setIsEditingName(true);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: '#64748b',
-                          padding: '4px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '50%',
-                          transition: 'all 0.15s ease'
-                        }}
-                        title="Name bearbeiten"
-                        className="hover-scale-mini"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                    )}
-                  </h2>
-                )}
-                <div style={{ display: 'flex', gap: '16px', marginTop: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                    <Calendar size={14} /> Member seit {memberSince}
-                  </div>
-                </div>
-
-                {/* Instrument challenge counters (only in GrooveLab mode) */}
-                {!isPlatformCampus && (
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px', flexWrap: 'nowrap' }}>
-                    {['Guitar', 'Drums', 'Keys', 'Bass', 'Vocals'].map(inst => {
-                      const count = skills.filter(s => {
-                        const sInst = (s.instrument || '').toLowerCase();
-                        const target = inst.toLowerCase();
-                        let match = false;
-                        if (target === 'guitar') match = sInst === 'guitar' || sInst === 'e-gitarre' || sInst === 'gitarre';
-                        else if (target === 'bass') match = sInst === 'bass' || sInst === 'e-bass';
-                        else if (target === 'drums') match = sInst === 'drums' || sInst === 'e-drums' || sInst === 'schlagzeug';
-                        else if (target === 'keys') match = sInst === 'keys' || sInst === 'piano' || sInst === 'e-piano' || sInst === 'klavier' || sInst === 'keyboard';
-                        else if (target === 'vocals') match = sInst === 'vocals' || sInst === 'gesang';
-                        else match = sInst === target;
-                        
-                        const isMastered = s.is_stage_ready || s.progress_percent === 100;
-                        return match && isMastered;
-                      }).length + (inst === 'Vocals' ? vocalsSongIds.size : 0);
-
-                      return (
-                        <div 
-                          key={inst} 
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '4px', 
-                            background: '#f8fafc', 
-                            padding: '4px 8px', 
-                            borderRadius: '8px', 
-                            border: '1px solid #f1f5f9' 
-                          }}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center' }}>
-                            {renderInstrumentIcon(inst, undefined, 13)}
-                          </span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 900, color: count > 0 ? 'var(--primary-color)' : '#94a3b8' }}>
-                            {count}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* Activation badges */}
-                <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {isCampusActive && (
-                    <span style={{ background: '#e6f4ea', color: '#34a853', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
-                      🎓 Campus
-                    </span>
-                  )}
-                  {isGroovelabActive && (
-                    <span style={{ background: '#fefce8', color: '#eab308', border: '1px solid #fef08a', padding: '4px 10px', borderRadius: '99px', fontSize: '0.7rem', fontWeight: 800 }}>
-                      🎸 GrooveLab
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* KPIs Grid — tab-specific */}
-            {isPlatformCampus ? (
-              /* ---- CAMPUS KPIs: XP, Songs, Fokus, Streak ---- */
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
-                gap: '12px', 
-                marginTop: '8px',
-                alignItems: 'stretch'
-              }}>
-                {/* Card 1: Campus XP (Blue) */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 6px 15px rgba(29, 78, 216, 0.1)',
-                  height: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
-                    borderRadius: '10px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Star size={18} fill="white" color="white" />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {currentXP} XP
-                    </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                      XP GESAMMELT
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 2: Campus Songs (Green) */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #34a853, #34a853)',
-                  color: 'white',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 6px 15px rgba(19, 115, 51, 0.1)',
-                  height: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
-                    borderRadius: '10px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Award size={18} fill="white" color="white" />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {verifiedSongsCount} / {skills.length + vocalsSongIds.size}
-                    </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                      SONGS GEMEISTERT
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 3: Fokus (Yellow) */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                  color: 'white',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 6px 15px rgba(234, 179, 8, 0.2)',
-                  height: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
-                    borderRadius: '10px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Clock size={18} color="white" />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {focusMinutes} Min
-                    </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                      FOKUS-ÜBEZEIT
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card 4: Streak (Orange) */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #f97316, #c2410c)',
-                  color: 'white',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 6px 15px rgba(194, 65, 12, 0.1)',
-                  height: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
-                    borderRadius: '10px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <span style={{ fontSize: '1.1rem', filter: 'grayscale(100%)' }}>🔥</span>
-                  </div>
-                   <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {streakDays} {streakDays === 1 ? 'Tag' : 'Tage'}
-                      </span>
-                      {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
-                        <button
-                          onClick={async () => {
-                            const val = prompt('Übe-Streak (Tage) manuell anpassen:', String(streakDays));
-                            if (val !== null) {
-                              const num = parseInt(val, 10);
-                              if (!isNaN(num) && num >= 0) {
-                                await handleUpdateStreak(num);
-                              } else {
-                                alert('Bitte gib eine gültige Zahl >= 0 ein.');
-                              }
-                            }
-                          }}
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer',
-                            fontSize: '0.62rem',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontWeight: 800,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            transition: 'background 0.2s',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)'}
-                          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'}
-                        >
-                          Bearbeiten
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '4px', lineHeight: 1.1 }}>
-                      SERIE AM LAUFEN
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* ---- GROOVELAB KPIs: GrooveLab-XP, Anzahl Songs ---- */
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
-                gap: '12px', 
-                marginTop: '8px',
-                alignItems: 'stretch'
-              }}>
-                {/* GL Card 1: GrooveLab XP (Yellow/Gold) */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                  color: 'white',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 6px 15px rgba(234, 179, 8, 0.2)',
-                  height: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
-                    borderRadius: '10px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Star size={18} fill="white" color="white" />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {verifiedSongsCount * 100} XP
-                    </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                      GROOVELAB XP
-                    </div>
-                  </div>
-                </div>
-
-                {/* GL Card 2: Anzahl Songs (Blue) */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 6px 15px rgba(29, 78, 216, 0.15)',
-                  height: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.18)',
-                    borderRadius: '10px',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Music size={18} fill="white" color="white" />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                      {verifiedSongsCount}
-                    </div>
-                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                      SONGS GEMEISTERT
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-
-            {/* View Specific Left Content */}
-            {isPlatformCampus ? (
-              // ---------------- CAMPUS SPECIFIC VIEW DATA LISTS (LEFT) ----------------
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '10px' }}>
-                <section>
-                  {schedulesList.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {schedulesList
-                        .sort((a, b) => {
-                          if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
-                          return (a.time_slot || '').localeCompare(b.time_slot || '');
-                        })
-                        .map((sched) => {
-                          const isApproved = sched.status === 'approved';
-                          const isReview = sched.status === 'ready_for_admin_review';
-                          const statusText = isApproved ? 'Aktiv' : isReview ? 'In Prüfung' : 'Entwurf';
-                          const badgeBg = isApproved ? '#ffffff' : isReview ? '#ffffff' : '#e2e8f0';
-                          const badgeColor = isApproved ? '#34a853' : isReview ? '#b45309' : '#64748b';
-                          const cardBg = isApproved ? '#e6f4ea' : isReview ? '#fffbeb' : '#f8fafc';
-                          const cardBorder = isApproved ? '1.5px solid rgba(52, 168, 83, 0.15)' : isReview ? '1.5px solid rgba(245, 158, 11, 0.15)' : '1.5px solid #e2e8f0';
-                          const textColor = isApproved ? '#34a853' : isReview ? '#b45309' : '#475569';
-
-                          const WEEKDAYS_DE = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-                          const weekday = WEEKDAYS_DE[sched.day_of_week] || 'Wochentag';
-                          const roomName = sched.rooms?.name || 'Unterrichtsraum';
-                          const teacherName = sched.teacher 
-                            ? `${sched.teacher.first_name} ${sched.teacher.last_name}` 
-                            : 'Unbekannte Lehrkraft';
-
-                          return (
-                            <div 
-                              key={sched.id} 
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '12px', 
-                                padding: '10px 14px', 
-                                background: cardBg, 
-                                border: cardBorder, 
-                                borderRadius: '14px',
-                                color: textColor
-                              }}
-                            >
-                              <div style={{ 
-                                width: '46px', 
-                                height: '46px', 
-                                borderRadius: '10px', 
-                                background: '#ffffff', 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 10px rgba(0,0,0,0.03)',
-                                flexShrink: 0,
-                                border: `1px solid ${isApproved ? 'rgba(52, 168, 83, 0.1)' : 'rgba(245, 158, 11, 0.1)'}`
-                              }}>
-                                <span style={{ fontSize: '0.58rem', fontWeight: 900, textTransform: 'uppercase', opacity: 0.7 }}>{weekday.substring(0, 2)}</span>
-                                <span style={{ fontSize: '0.8rem', fontWeight: 900, marginTop: '-2px' }}>{sched.time_slot}</span>
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <strong style={{ fontSize: '0.85rem', color: textColor, fontWeight: 800 }}>
-                                    Einzelunterricht bei {teacherName}
-                                  </strong>
-                                  <span style={{ 
-                                    background: badgeBg, 
-                                    color: badgeColor, 
-                                    padding: '2px 6px', 
-                                    borderRadius: '6px', 
-                                    fontSize: '0.58rem', 
-                                    fontWeight: 900,
-                                    border: isApproved ? '1px solid rgba(52, 168, 83,0.15)' : '1px solid rgba(245,158,11,0.15)'
-                                  }}>
-                                    {statusText}
-                                  </span>
-                                </div>
-                                <span style={{ display: 'block', fontSize: '0.72rem', color: textColor, opacity: 0.8, marginTop: '2px', fontWeight: 650 }}>
-                                  🏢 {roomName} &bull; {weekday}s
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  ) : (
-                    <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem', textAlign: 'center', fontWeight: 600 }}>
-                      Keine Unterrichtsstunden im Stundenplan eingetragen.
-                    </div>
-                  )}
-                </section>
-
-                {/* Songs & Lehrwerke Section */}
-                <section style={{ 
-                  background: '#f8fafc',
-                  borderRadius: '24px',
-                  padding: '20px 24px',
-                  border: '1.5px solid #f1f5f9',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
-                    <h3 style={{ fontSize: '0.9rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', letterSpacing: '0.08em', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Music size={16} /> Songs & Lehrwerke
-                    </h3>
-
-                    {/* Schüler-Notizbuch Button */}
-                    <button
-                      onClick={() => {
-                        if (onOpenTageskompass) {
-                          onOpenTageskompass(student);
-                        } else {
-                          setShowTageskompassModal(true);
-                        }
-                      }}
-                      style={{
-                        border: '1.5px solid #dfd3be',
-                        borderRadius: '99px',
-                        padding: '6px 14px',
-                        fontSize: '0.74rem',
-                        fontWeight: 850,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                        background: 'linear-gradient(135deg, #fdfaf2 0%, #f4e8d1 100%)',
-                        color: '#5c4033',
-                        boxShadow: '0 4px 12px rgba(139, 90, 43, 0.06)',
-                        fontFamily: 'inherit',
-                        height: '30px',
-                        boxSizing: 'border-box'
-                      }}
-                      className="hover-scale"
-                    >
-                      <span style={{ fontSize: '0.85rem', lineHeight: '1' }}>📓</span>
-                      <span style={{ fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.01em' }}>Schüler-Notizbuch</span>
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {/* Lehrwerke Row */}
-                    <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Lehrwerke</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {(assignedLehrwerke || []).map((assigned) => {
-                          const book = globalLehrwerke.find(b => b.id === assigned.lehrwerkId);
-                          if (!book) return null;
-
-                          // Compute progress
-                          const pageStates = assigned.pageStates || {};
-                          const totalPages = book.totalPages || 50;
-                          const masteredCount = Object.values(pageStates).filter((p: any) => p.status === 'mastered').length;
-                          const percent = Math.round((masteredCount / totalPages) * 100);
-
-                          const bookColor = getLehrwerkColor(book.title);
-
-                          return (
-                            <div key={assigned.lehrwerkId} style={{ 
-                              background: '#ffffff', 
-                              padding: '8px 12px', 
-                              borderRadius: '12px', 
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              fontSize: '0.82rem'
-                            }}>
-                              <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{
-                                  width: '24px',
-                                  height: '32px',
-                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                  borderRadius: '4px',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                  border: 'none',
-                                  position: 'relative',
-                                  flexShrink: 0,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}>
-                                  <BookOpen size={11} color={bookColor.text} />
-                                  <div style={{
-                                    position: 'absolute',
-                                    left: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    width: '3px',
-                                    background: 'rgba(0,0,0,0.08)',
-                                    borderRight: '1px solid rgba(255,255,255,0.1)'
-                                  }} />
-                                </div>
-                                <span>{book.title}</span>
-                              </span>
-                              <span style={{ 
-                                background: percent > 0 ? '#e6f4ea' : '#f1f5f9', 
-                                color: percent > 0 ? '#34a853' : '#64748b', 
-                                padding: '2px 8px', 
-                                borderRadius: '6px', 
-                                fontWeight: 900,
-                                fontSize: '0.75rem' 
-                              }}>
-                                {percent}% gemeistert
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {(assignedLehrwerke || []).length === 0 && (
-                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine aktiven Lehrwerke zugewiesen.</div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Divider line inside card */}
-                    <div style={{ height: '1px', background: '#e2e8f0' }} />
-
-                    {/* Songs Row */}
-                    <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Songs & Übungen</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {/* Active (practice) songs */}
-                        {practiceBoard.map((s: any) => (
-                          <div key={s.id + s.level} style={{ 
-                            background: '#ffffff', 
-                            padding: '8px 12px', 
-                            borderRadius: '12px', 
-                            border: '1px solid #e2e8f0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            fontSize: '0.82rem'
-                          }}>
-                            <span style={{ fontWeight: 800, color: '#1e293b' }}>
-                              🎸 {s.title} <span style={{ fontWeight: 500, color: '#64748b', fontSize: '0.75rem' }}>({s.artist})</span>
-                            </span>
-                            <span style={{ 
-                              background: '#eff6ff', 
-                              color: '#2563eb', 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              fontWeight: 900,
-                              fontSize: '0.75rem' 
-                            }}>
-                              Übt gerade ({Math.max(...s.instruments.map((i:any) => i.progress)) || 0}%)
-                            </span>
-                          </div>
-                        ))}
-
-                        {/* Mastered repertoire songs */}
-                        {repertoire.map((s: any) => (
-                          <div key={s.id + s.level} style={{ 
-                            background: '#e6f4ea', 
-                            padding: '8px 12px', 
-                            borderRadius: '12px', 
-                            border: '1px solid #e6f4ea',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            fontSize: '0.82rem'
-                          }}>
-                            <span style={{ fontWeight: 800, color: '#34a853' }}>
-                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
-                            </span>
-                            <span style={{ 
-                              background: '#e6f4ea', 
-                              color: '#34a853', 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              fontWeight: 900,
-                              fontSize: '0.75rem' 
-                            }}>
-                              ✓ Verifiziert
-                            </span>
-                          </div>
-                        ))}
-
-                        {practiceBoard.length === 0 && repertoire.length === 0 && (
-                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Songs eingetragen.</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-              </div>
-            ) : (
-              // ---------------- GROOVELAB SPECIFIC VIEW DATA LISTS (LEFT) ----------------
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', marginTop: '10px' }}>
-
-                {/* Meine Bands */}
-                <section>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Users size={16} /> Meine Bands
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {bands.map((b: any) => (
-                      <div 
-                        key={b.id} 
-                        onClick={() => {
-                          if (onOpenBandProfile) {
-                            onOpenBandProfile(b);
-                          }
-                        }}
-                        className={onOpenBandProfile ? "clickable-band-item" : ""}
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '12px', 
-                          padding: '12px', 
-                          background: '#fefce8', 
-                          borderRadius: '16px', 
-                          border: '1px solid #fef08a',
-                          cursor: onOpenBandProfile ? 'pointer' : 'default'
-                        }}
-                      >
-                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden' }}>
-                          <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e' }}>{b.name}</div>
-                      </div>
-                    ))}
-                    {bands.length === 0 && !loading && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>In keiner Band aktiv.</div>
-                    )}
-                  </div>
-                </section>
-
-                {/* Wochenplan-Zeiten */}
-                {!isPeerStudent && (
-                  <section>
-                    <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Calendar size={16} /> Wochenplan-Zeiten
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {weekSessions.map((pres, idx) => (
-                        <div key={idx} style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '10px', 
-                          background: '#fffbeb', 
-                          border: '1px solid #fef3c7', 
-                          padding: '12px 14px', 
-                          borderRadius: '16px',
-                          fontSize: '0.85rem',
-                          fontWeight: 700,
-                          color: '#b45309'
-                        }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
-                          <div>
-                            {pres.dayStr}. {pres.rangeStr}
-                          </div>
-                        </div>
-                      ))}
-                      {weekSessions.length === 0 && (
-                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
-                      )}
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT COLUMN: Pass first, then settings (campus only) */}
-          {isPlatformCampus ? (
-            <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* App & Ausweis speichern Widget */}
-              <section style={{
-                background: 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)',
-                borderRadius: '24px',
-                padding: '20px',
-                border: '1.5px solid rgba(52, 168, 83, 0.15)',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px'
-              }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Smartphone size={16} /> App &amp; Ausweis speichern
-                </h4>
-                <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4, fontWeight: 650 }}>
-                  {currentUserRole === 'student' 
-                    ? "Speichere deinen Mitgliedsausweis auf dem Homescreen und installiere die App ganz einfach auf deinem Smartphone."
-                    : "Kopiere den Link und sende ihn dem Schüler, damit er seinen Mitgliedsausweis speichern und die App installieren kann."
-                  }
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`;
-                    navigator.clipboard.writeText(link);
-                    setCopiedCampusLink(true);
-                    setTimeout(() => setCopiedCampusLink(false), 2000);
-                  }}
-                  style={{
-                    width: '100%',
-                    background: copiedCampusLink ? '#e6f4ea' : '#34a853',
-                    color: copiedCampusLink ? '#34a853' : '#ffffff',
-                    border: copiedCampusLink ? '1.5px solid #34a853' : 'none',
-                    borderRadius: '14px',
-                    padding: '10px 14px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: copiedCampusLink ? 'none' : '0 4px 12px rgba(19, 115, 51, 0.2)',
-                    transition: 'all 0.2s ease-in-out'
-                  }}
-                  className="hover-scale"
-                >
-                  {copiedCampusLink ? <Check size={12} /> : <Copy size={12} />}
-                  <span>
-                    {copiedCampusLink 
-                      ? 'Link kopiert! ✓' 
-                      : (currentUserRole === 'student' ? 'Link für Smartphone kopieren' : 'Link für Schüler kopieren')
-                    }
-                  </span>
-                </button>
-              </section>
-
-                {/* Onboarding-Link button */}
-                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                  <button
-                    onClick={handleGenerateOnboardingLink}
-                    className="google-btn-secondary"
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      fontSize: '0.8rem',
-                      fontWeight: 850,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      background: copiedOnboardingLink ? '#e6f4ea' : '#ffffff',
-                      border: copiedOnboardingLink ? '1.5px solid #e6f4ea' : '1.5px solid #cbd5e1',
-                      color: copiedOnboardingLink ? '#34a853' : '#0f172a',
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      marginTop: '8px',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                      transition: 'all 0.2s',
-                      fontFamily: 'Urbanist'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!copiedOnboardingLink) {
-                        e.currentTarget.style.background = '#f8fafc';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!copiedOnboardingLink) {
-                        e.currentTarget.style.background = '#ffffff';
-                      }
-                    }}
-                  >
-                    <Link size={14} />
-                    {copiedOnboardingLink ? 'Onboarding-Link kopiert!' : 'Individuellen Onboarding-Link generieren'}
-                  </button>
-                )}
-
-                {/* DSGVO Datenschutzauskunft section */}
-                {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher') && (
-                  <section style={{ 
-                    background: '#ffffff', 
-                    borderRadius: '24px', 
-                    padding: '16px 20px', 
-                    border: '1.5px solid #f1f5f9',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
-                  }}>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <ShieldCheck size={16} style={{ color: '#34a853' }} /> Datenschutz &amp; Auskunft
-                    </h4>
-                    <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 14px 0', lineHeight: 1.4, fontWeight: 550 }}>
-                      Exportiere alle personenbezogenen Daten dieses Schülers gesetzeskonform nach Art. 15 DSGVO.
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <button
-                        onClick={handleExportDSGVOPdf}
-                        style={{
-                          width: '100%',
-                          background: '#f8fafc',
-                          color: '#1e293b',
-                          border: '1.5px solid #cbd5e1',
-                          borderRadius: '12px',
-                          padding: '8px 12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
-                      >
-                        <Printer size={14} style={{ color: '#64748b' }} />
-                        <span>Datenblatt drucken (PDF)</span>
-                      </button>
-                      <button
-                        onClick={handleExportDSGVOJson}
-                        style={{
-                          width: '100%',
-                          background: '#f8fafc',
-                          color: '#1e293b',
-                          border: '1.5px solid #cbd5e1',
-                          borderRadius: '12px',
-                          padding: '8px 12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
-                      >
-                        <Download size={14} style={{ color: '#64748b' }} />
-                        <span>Daten exportieren (JSON)</span>
-                      </button>
-                    </div>
-                  </section>
-                )}
-
-                {/* 2. Module & Einstellungen — below the pass */}
-                <section style={{ 
-                  background: '#ffffff', 
-                  borderRadius: '24px', 
-                  padding: '16px 20px', 
-                  border: '1.5px solid #f1f5f9',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
-                }}>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sliders size={16} style={{ color: '#64748b' }} /> Module &amp; Einstellungen
-                  </h4>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                  {/* Campus-Modul */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 0px', minWidth: '135px', gap: '8px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus</span>
-                    {activePlatform === 'secretary' ? (
-                      <div style={{ 
-                        background: '#f1f5f9', 
-                        padding: '2px', 
-                        borderRadius: '12px', 
-                        display: 'inline-flex', 
-                        border: 'none',
-                        alignItems: 'center'
-                      }}>
-                        <button
-                          onClick={() => handleToggleCampus(false)}
-                          style={{
-                            background: !isCampusActive ? '#ffffff' : 'transparent',
-                            color: !isCampusActive ? '#1e293b' : '#64748b',
-                            border: 'none',
-                            borderRadius: '10px',
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            fontWeight: !isCampusActive ? 800 : 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: !isCampusActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                          }}
-                        >
-                          Inaktiv
-                        </button>
-                        <button
-                          onClick={() => handleToggleCampus(true)}
-                          style={{
-                            background: isCampusActive ? '#34c759' : 'transparent', // Apple Green
-                            color: isCampusActive ? '#ffffff' : '#64748b',
-                            border: 'none',
-                            borderRadius: '10px',
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            fontWeight: isCampusActive ? 800 : 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: isCampusActive ? '0 1px 4px rgba(52, 168, 83, 0.3)' : 'none'
-                          }}
-                        >
-                          Aktiv
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{ 
-                        background: isCampusActive ? '#e6f4ea' : '#f1f5f9', 
-                        color: isCampusActive ? '#34a853' : '#64748b', 
-                        padding: '4px 10px', 
-                        borderRadius: '10px', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 800 
-                      }}>
-                        {isCampusActive ? 'Aktiv' : 'Inaktiv'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Vertikaler Trenner zwischen Campus und GrooveLab */}
-                  <div style={{ width: '1px', height: '18px', background: '#e2e8f0' }} />
-
-                  {/* GrooveLab-Modul */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: '1 1 0px', minWidth: '135px', gap: '8px' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>GrooveLab</span>
-                    {activePlatform === 'secretary' ? (
-                      <div style={{ 
-                        background: '#f1f5f9', 
-                        padding: '2px', 
-                        borderRadius: '12px', 
-                        display: 'inline-flex', 
-                        border: 'none',
-                        alignItems: 'center'
-                      }}>
-                        <button
-                          onClick={() => handleToggleGroovelab(false)}
-                          style={{
-                            background: !isGroovelabActive ? '#ffffff' : 'transparent',
-                            color: !isGroovelabActive ? '#1e293b' : '#64748b',
-                            border: 'none',
-                            borderRadius: '10px',
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            fontWeight: !isGroovelabActive ? 800 : 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: !isGroovelabActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                          }}
-                        >
-                          Inaktiv
-                        </button>
-                        <button
-                          onClick={() => handleToggleGroovelab(true)}
-                          style={{
-                            background: isGroovelabActive ? '#eab308' : 'transparent', // Yellow/Gold
-                            color: isGroovelabActive ? '#ffffff' : '#64748b',
-                            border: 'none',
-                            borderRadius: '10px',
-                            padding: '4px 10px',
-                            fontSize: '0.75rem',
-                            fontWeight: isGroovelabActive ? 800 : 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: isGroovelabActive ? '0 1px 4px rgba(234, 179, 8, 0.3)' : 'none'
-                          }}
-                        >
-                          Aktiv
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{ 
-                        background: isGroovelabActive ? '#fef3c7' : '#f1f5f9', 
-                        color: isGroovelabActive ? '#b45309' : '#64748b', 
-                        padding: '4px 10px', 
-                        borderRadius: '10px', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 800 
-                      }}>
-                        {isGroovelabActive ? 'Aktiv' : 'Inaktiv'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Unterrichtsform</span>
-                  {activePlatform === 'secretary' || currentUserRole === 'admin' || currentUserRole === 'secretary' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      {durationRequestSent && (
-                        <span style={{ 
-                          background: '#fffbeb', 
-                          color: '#b45309', 
-                          border: '1px solid #fde68a', 
-                          padding: '3px 6px', 
-                          borderRadius: '8px', 
-                          fontSize: '0.65rem', 
-                          fontWeight: 800,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px'
-                        }}>
-                          ⏳ Wunsch: {requestedDuration} Min
-                        </span>
-                      )}
-                      <div style={{
-                        background: '#f1f5f9',
-                        padding: '2px',
-                        borderRadius: '12px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '2px'
-                      }}>
-                        {[30, 45, 60, 90].map((dur) => {
-                          const isSelected = lessonDuration === dur;
-                          return (
-                            <button
-                              key={dur}
-                              onClick={() => handleUpdateDuration(dur)}
-                              style={{
-                                background: isSelected ? '#ffffff' : 'transparent',
-                                color: isSelected ? '#1e293b' : '#64748b',
-                                border: 'none',
-                                borderRadius: '10px',
-                                padding: '4px 8px',
-                                fontSize: '0.75rem',
-                                fontWeight: isSelected ? 800 : 600,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s',
-                                boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                              }}
-                            >
-                              {dur} Min
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      {lessonDuration} Min
-                    </span>
-                  )}
-                </div>
-
-                <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Übungs-Level (Streaks)</span>
-                  {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                    <div style={{
-                      background: '#f1f5f9',
-                      padding: '2px',
-                      borderRadius: '12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '2px'
-                    }}>
-                      {[1, 2, 3].map((lvl) => {
-                        const isSelected = (avatar?.evolution_level || 1) === lvl;
-                        return (
-                          <button
-                            key={lvl}
-                            onClick={() => handleUpdateEvolutionLevel(lvl)}
-                            style={{
-                              background: isSelected ? '#ffffff' : 'transparent',
-                              color: isSelected ? '#1e293b' : '#64748b',
-                              border: 'none',
-                              borderRadius: '10px',
-                              padding: '4px 8px',
-                              fontSize: '0.75rem',
-                              fontWeight: isSelected ? 800 : 600,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                            }}
-                            title={lvl === 1 ? '3/5/10 Min.' : lvl === 2 ? '5/10/15 Min.' : '10/15/20 Min.'}
-                          >
-                            Level {lvl}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      Level {avatar?.evolution_level || 1}
-                    </span>
-                  )}
-                </div>
-
-                <div style={{ height: '1px', background: '#f1f5f9' }} />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Campus-Nutzungsmodus</span>
-                  {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                    <div style={{
-                      background: '#f1f5f9',
-                      padding: '2px',
-                      borderRadius: '12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '2px'
-                    }}>
-                      <button
-                        onClick={() => handleUpdateAppUsageMode('student_only')}
-                        style={{
-                          background: appUsageMode === 'student_only' ? '#ffffff' : 'transparent',
-                          color: appUsageMode === 'student_only' ? '#1e293b' : '#64748b',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '4px 8px',
-                          fontSize: '0.75rem',
-                          fontWeight: appUsageMode === 'student_only' ? 800 : 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                          boxShadow: appUsageMode === 'student_only' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                        }}
-                      >
-                        📱 Selbstnutzer
-                      </button>
-                      <button
-                        onClick={() => handleUpdateAppUsageMode('parent_hybrid')}
-                        style={{
-                          background: appUsageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-                          color: appUsageMode === 'parent_hybrid' ? '#1e293b' : '#64748b',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '4px 8px',
-                          fontSize: '0.75rem',
-                          fontWeight: appUsageMode === 'parent_hybrid' ? 800 : 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                          boxShadow: appUsageMode === 'parent_hybrid' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-                        }}
-                      >
-                        👪 Hybrid
-                      </button>
-                    </div>
-                  ) : (
-                    <span style={{ background: '#f1f5f9', color: '#1e293b', padding: '4px 10px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      {appUsageMode === 'parent_hybrid' ? '👪 Hybrid' : '📱 Selbstnutzer'}
-                    </span>
-                  )}
-                </div>
-
-                {appUsageMode === 'parent_hybrid' && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '16px', border: '1px solid #e2e8f0', width: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>👪 Eltern-PIN (4-stellig)</span>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Schützt den Elternbereich vor unbefugtem Zugriff</span>
-                    </div>
-                    {currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          type="text"
-                          maxLength={4}
-                          placeholder="Ziffern"
-                          value={parentPin}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '');
-                            setParentPin(val);
-                            if (val.length === 4 || val.length === 0) {
-                              handleUpdateParentPin(val);
-                            }
-                          }}
-                          style={{
-                            width: '80px',
-                            padding: '6px 10px',
-                            border: '1.5px solid #cbd5e1',
-                            borderRadius: '10px',
-                            fontSize: '0.85rem',
-                            textAlign: 'center',
-                            fontWeight: 700,
-                            color: '#1e293b'
-                          }}
-                        />
-                        {parentPin && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm('Möchtest du die Eltern-PIN wirklich zurücksetzen? Der Schüler/Elternteil muss beim nächsten Scan eine neue PIN vergeben.')) {
-                                setParentPin('');
-                                handleUpdateParentPin('');
-                              }
-                            }}
-                            style={{
-                              padding: '6px 10px',
-                              background: '#fee2e2',
-                              border: 'none',
-                              borderRadius: '8px',
-                              color: '#dc2626',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              transition: 'background 0.2s'
-                            }}
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569' }}>
-                        {parentPin ? '••••' : 'Nicht festgelegt'}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {consentLogs.length > 0 && (
-                  <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', width: '100%' }}>
-                    <h5 style={{ margin: '0 0 8px 0', fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
-                      🛡️ Revisionssichere Einwilligungsprotokolle
-                    </h5>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {consentLogs.map((log, idx) => (
-                        <div key={idx} style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '10px',
-                          padding: '8px 10px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '2px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853' }}>
-                              ✓ {log.consent_type === 'terms_privacy' ? 'AGB & Datenschutz akzeptiert' : 'Direkt-Kommunikation freigegeben'}
-                            </span>
-                            <span style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 600 }}>
-                              {new Date(log.created_at).toLocaleString('de-DE')}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#7d7d82' }}>
-                            <span>IP: {log.ip_address || 'Anonymisiert'}</span>
-                            <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.user_agent}>
-                              Browser: {log.user_agent || 'Unbekannt'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </section>
-
-            {/* Sektion Gruppenunterricht */}
-            <section style={{ 
-              background: '#ffffff', 
-              borderRadius: '24px', 
-              padding: '16px 20px', 
-              border: '1.5px solid #f1f5f9',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              marginTop: '16px'
-            }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={16} style={{ color: '#64748b' }} /> Gruppenunterricht
-              </h4>
-
-              {groupId ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 500 }}>
-                    Verknüpft im Gruppenunterricht mit:
-                    <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                       {groupStudents.map(s => (
-                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>
-                          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#64748b' }}></span>
-                          {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                    <button
-                      onClick={handleUnlinkGroup}
-                      style={{
-                        background: '#fff1f2',
-                        color: '#e11d48',
-                        border: '1px solid #fecdd3',
-                        borderRadius: '12px',
-                        padding: '6px 12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        marginTop: '4px'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = '#ffe4e6';
-                        e.currentTarget.style.borderColor = '#fda4af';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = '#fff1f2';
-                        e.currentTarget.style.borderColor = '#fecdd3';
-                      }}
-                    >
-                      Verbindung trennen
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ fontSize: '0.82rem', color: '#64748b', fontStyle: 'italic' }}>
-                    Dieser Schüler hat aktuell Einzelunterricht.
-                  </div>
-
-                  {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                    <>
-                      {!showGroupSelector ? (
-                        <button
-                          onClick={() => setShowGroupSelector(true)}
-                          style={{
-                            background: '#f8fafc',
-                            color: '#1e293b',
-                            border: '1.5px solid #e2e8f0',
-                            borderRadius: '12px',
-                            padding: '8px 12px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
-                        >
-                          Gruppenunterricht einrichten
-                        </button>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>Partner auswählen:</span>
-                          <div style={{ position: 'relative' }}>
-                            <input
-                              type="text"
-                              placeholder="Name des Schülers suchen..."
-                              value={studentSearchQuery}
-                              onChange={e => {
-                                setStudentSearchQuery(e.target.value);
-                                setSelectedStudentToLink('');
-                                setSearchDropdownOpen(true);
-                              }}
-                              onFocus={() => setSearchDropdownOpen(true)}
-                              onBlur={() => {
-                                setTimeout(() => setSearchDropdownOpen(false), 200);
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                borderRadius: '10px',
-                                border: '1.5px solid #cbd5e1',
-                                fontSize: '0.8rem',
-                                color: '#1e293b',
-                                outline: 'none',
-                                background: '#ffffff',
-                                boxSizing: 'border-box'
-                              }}
-                            />
-                            {searchDropdownOpen && (
-                              <div style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                right: 0,
-                                background: '#ffffff',
-                                border: '1.5px solid #cbd5e1',
-                                borderRadius: '12px',
-                                marginTop: '4px',
-                                maxHeight: '150px',
-                                overflowY: 'auto',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                                zIndex: 10
-                              }}>
-                                {schoolStudents
-                                  .filter(s => {
-                                    const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
-                                    return fullName.includes(studentSearchQuery.toLowerCase());
-                                  })
-                                  .map(s => (
-                                    <div
-                                      key={s.id}
-                                      onClick={() => {
-                                        setSelectedStudentToLink(s.id);
-                                        setStudentSearchQuery(`${s.first_name || ''} ${s.last_name || ''}`);
-                                        setSearchDropdownOpen(false);
-                                      }}
-                                      style={{
-                                        padding: '8px 12px',
-                                        fontSize: '0.8rem',
-                                        color: '#1e293b',
-                                        cursor: 'pointer',
-                                        background: selectedStudentToLink === s.id ? '#e6f4ea' : '#ffffff',
-                                        borderBottom: '1px solid #f1f5f9',
-                                        textAlign: 'left'
-                                      }}
-                                      onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
-                                      onMouseLeave={e => e.currentTarget.style.background = selectedStudentToLink === s.id ? '#e6f4ea' : '#ffffff'}
-                                    >
-                                      {s.first_name} {s.last_name ? s.last_name.charAt(0) + '.' : ''}
-                                    </div>
-                                  ))}
-                                {schoolStudents.filter(s => {
-                                  const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
-                                  return fullName.includes(studentSearchQuery.toLowerCase());
-                                }).length === 0 && (
-                                  <div style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
-                                    Keine Schüler gefunden
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                            <button
-                              onClick={handleLinkGroup}
-                              disabled={!selectedStudentToLink}
-                              style={{
-                                flex: 1,
-                                background: selectedStudentToLink ? '#34a853' : '#cbd5e1',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '6px 10px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                cursor: selectedStudentToLink ? 'pointer' : 'default',
-                                transition: 'all 0.15s'
-                              }}
-                            >
-                              Verknüpfen
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowGroupSelector(false);
-                                setSelectedStudentToLink('');
-                                setStudentSearchQuery('');
-                              }}
-                              style={{
-                                flex: 1,
-                                background: '#ef4444',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '6px 10px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s'
-                              }}
-                            >
-                              Abbrechen
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </section>
-          </aside>
-          ) : (
-            <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* App & Ausweis speichern Widget */}
-              {!isPeerStudent && (
-                <>
-                  <section style={{
-                    background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
-                    borderRadius: '24px',
-                    padding: '20px',
-                    border: '1.5px solid rgba(234, 179, 8, 0.2)',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}>
-                    <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#854d0e', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Smartphone size={16} /> App &amp; Ausweis speichern
-                    </h4>
-                    <p style={{ fontSize: '0.72rem', color: '#475569', margin: 0, lineHeight: 1.4, fontWeight: 650 }}>
-                      {currentUserRole === 'student' 
-                        ? "Speichere deinen Mitgliedsausweis auf dem Homescreen und lade die App ganz einfach herunter."
-                        : "Kopiere den Link und sende ihn dem Schüler, damit er seinen Mitgliedsausweis speichern und die App installieren kann."
-                      }
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=groovelab`;
-                        navigator.clipboard.writeText(link);
-                        setCopiedGrooveLink(true);
-                        setTimeout(() => setCopiedGrooveLink(false), 2000);
-                      }}
-                      style={{
-                        width: '100%',
-                        background: copiedGrooveLink ? '#fefce8' : '#eab308',
-                        color: copiedGrooveLink ? '#854d0e' : '#ffffff',
-                        border: copiedGrooveLink ? '1.5px solid #eab308' : 'none',
-                        borderRadius: '14px',
-                        padding: '10px 14px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        boxShadow: copiedGrooveLink ? 'none' : '0 4px 12px rgba(234, 179, 8, 0.2)',
-                        transition: 'all 0.2s ease-in-out'
-                      }}
-                      className="hover-scale"
-                    >
-                      {copiedGrooveLink ? <Check size={12} /> : <Copy size={12} />}
-                      <span>
-                        {copiedGrooveLink 
-                          ? 'Link kopiert! ✓' 
-                          : (currentUserRole === 'student' ? 'Link für Smartphone kopieren' : 'Link für Schüler kopieren')
-                        }
-                      </span>
-                    </button>
-                  </section>
-
-                  {/* 1. Anwesenheits-Logbuch Button */}
-                  <section style={{ 
-                    background: '#ffffff', 
-                    borderRadius: '24px', 
-                    padding: '16px 20px', 
-                    border: '1.5px solid #fef9c3',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
-                  }}>
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Clock size={16} style={{ color: '#eab308' }} /> Anwesenheit
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={() => setShowPresenceLogOverlay(true)}
-                      style={{
-                        width: '100%',
-                        padding: '14px 20px',
-                        fontSize: '0.85rem',
-                        fontWeight: 800,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        background: '#eab308',
-                        border: 'none',
-                        color: '#ffffff',
-                        borderRadius: '18px',
-                        cursor: 'pointer',
-                        boxShadow: '0 8px 24px rgba(234, 179, 8, 0.25)',
-                        transition: 'all 0.25s ease',
-                        fontFamily: 'Urbanist, sans-serif',
-                        letterSpacing: '0.01em'
-                      }}
-                      className="hover-scale"
-                    >
-                      <BookOpen size={16} />
-                      Anwesenheits-Logbuch öffnen
-                    </button>
-                  </section>
-                </>
-              )}
-
-              {/* 2. Skill Radar */}
-              <section style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '16px 20px', 
-                border: '1.5px solid #fef9c3',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
-              }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  <Music size={16} style={{ color: '#eab308' }} /> Skill Radar
-                </h4>
-                
-                <div style={{ width: '100%', height: '240px', display: 'flex', justifyContent: 'center' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="65%" data={studentRadarData}>
-                      <PolarGrid stroke="#f1f5f9" />
-                      <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
-                        <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}>
-                          {payload.value}
-                        </text>
-                      )} />
-                      <Radar name="XP" dataKey="xp" stroke="#eab308" fill="#facc15" fillOpacity={0.5} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </section>
-
-              {/* DSGVO Datenschutzauskunft section */}
-              {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher') && (
-                <section style={{ 
-                  background: '#ffffff', 
-                  borderRadius: '24px', 
-                  padding: '16px 20px', 
-                  border: '1.5px solid #fef9c3',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-                  marginTop: '16px'
-                }}>
-                  <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ShieldCheck size={16} style={{ color: '#eab308' }} /> Datenschutz &amp; Auskunft
-                  </h4>
-                  <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 14px 0', lineHeight: 1.4, fontWeight: 650 }}>
-                    Exportiere alle personenbezogenen Daten dieses Schülers gesetzeskonform nach Art. 15 DSGVO.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button
-                      onClick={handleExportDSGVOPdf}
-                      style={{
-                        width: '100%',
-                        background: '#f8fafc',
-                        color: '#1e293b',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '12px',
-                        padding: '8px 12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
-                    >
-                      <Printer size={14} style={{ color: '#64748b' }} />
-                      <span>Datenblatt drucken (PDF)</span>
-                    </button>
-                    <button
-                      onClick={handleExportDSGVOJson}
-                      style={{
-                        width: '100%',
-                        background: '#f8fafc',
-                        color: '#1e293b',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '12px',
-                        padding: '8px 12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}
-                    >
-                      <Download size={14} style={{ color: '#64748b' }} />
-                      <span>Daten exportieren (JSON)</span>
-                    </button>
-                  </div>
-                </section>
-              )}
-            </aside>
-          )}
-        </div>
+        {renderProfileHeader()}
+        {renderTabSelector()}
+        {renderModalContent()}
       </div>
 
       {/* CAMPUS / MEMBER PASS OVERLAY MODAL */}
@@ -3664,7 +3676,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             onClick={e => e.stopPropagation()}
           >
 
-            {localTab === 'campus' ? (
+            {qrOverlayTab === 'campus' ? (
               /* ============ CAMPUS PASS OVERLAY ============ */
               <div style={{ 
                 background: 'radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)', 
@@ -3708,7 +3720,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 {/* Top Info Section */}
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center', zIndex: 1, flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between' }}>
                   <img 
-                    src={displayAvatarSrc} 
+                    src={getCampusAvatarSrc()} 
                     alt="Avatar" 
                     style={{ 
                       width: '76px', 
@@ -3758,7 +3770,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
+                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`;
                         navigator.clipboard.writeText(link);
                         alert('Campus-Onboarding-Link in die Zwischenablage kopiert! 📋');
                       }}
@@ -3789,7 +3801,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                       }}
                     >
                       <Copy size={14} />
-                      Onboarding-Link kopieren
+                      Campus PWA Link kopieren
                     </button>
                     <button
                       type="button"
@@ -3875,7 +3887,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     overflow: 'hidden'
                   }}>
                     <img 
-                      src={displayAvatarSrc} 
+                      src={getGroovelabAvatarSrc()} 
                       alt="Profile"
                       style={{ 
                         width: '100%', 

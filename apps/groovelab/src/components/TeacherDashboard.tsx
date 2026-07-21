@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -873,9 +873,89 @@ export function TeacherDashboard({
 
   const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
   const [activeChatOcc, setActiveChatOcc] = useState<any | null>(null);
+  const [confirmCancelSlotId, setConfirmCancelSlotId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleCancelSlotWithDoubleConfirm = async (slot: any) => {
+    try {
+      const targetSlot = slot.isGroup ? slot.slots[0] : slot;
+      const slotId = targetSlot?.id;
+      const scheduleId = targetSlot?.schedule_id || targetSlot?.scheduleId;
+      const studentId = slot.isGroup ? slot.students[0]?.id : slot.student?.id;
+      const dateStr = slot.date || (briefingData?.timeline?.[0]?.date);
+      const startTime = slot.startTime || slot.timeSlot || slot.start_time || '14:00';
+      const duration = slot.duration || 45;
+      
+      if (!dateStr) return;
+
+      if (targetSlot?.is_virtual || (slotId && String(slotId).startsWith('virt_'))) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: scheduleId || null,
+            student_id: studentId || null,
+            teacher_id: userId,
+            date: dateStr,
+            start_time: startTime,
+            duration: duration,
+            status: 'cancelled',
+            student_acknowledged: true
+          });
+
+        if (error) {
+          console.error('Error inserting cancellation:', error);
+          alert('Fehler beim Absagen des Termins: ' + error.message);
+        } else {
+          setToastMessage('Termin erfolgreich abgesagt.');
+          fetchData();
+        }
+      } else if (slotId) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .update({
+            status: 'cancelled',
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', slotId);
+
+        if (error) {
+          console.error('Error updating cancellation:', error);
+          alert('Fehler beim Absagen des Termins: ' + error.message);
+        } else {
+          setToastMessage('Termin erfolgreich abgesagt.');
+          fetchData();
+        }
+      } else {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: scheduleId || null,
+            student_id: studentId || null,
+            teacher_id: userId,
+            date: dateStr,
+            start_time: startTime,
+            duration: duration,
+            status: 'cancelled',
+            student_acknowledged: true
+          });
+
+        if (error) {
+          console.error('Error inserting cancellation:', error);
+          alert('Fehler beim Absagen des Termins: ' + error.message);
+        } else {
+          setToastMessage('Termin erfolgreich abgesagt.');
+          fetchData();
+        }
+      }
+    } catch (err: any) {
+      console.error('Error in handleCancelSlotWithDoubleConfirm:', err);
+    } finally {
+      setConfirmCancelSlotId(null);
+    }
+  };
 
   // Fetch active conversations (occurrence_ids that have messages)
   const fetchActiveChatOccs = async () => {
@@ -8174,7 +8254,7 @@ export function TeacherDashboard({
                                     </span>
                                   )}
 
-                                  {/* 1:1 Shoutbox Icon Button */}
+                                   {/* 1:1 Shoutbox Icon Button */}
                                   {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
                                     <button
                                       type="button"
@@ -8202,7 +8282,7 @@ export function TeacherDashboard({
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         color: activeChatOccIds.has(slot.isGroup ? slot.slots[0]?.id : slot.id) ? '#eab308' : '#94a3b8',
-                                        marginLeft: 'auto',
+                                        marginLeft: confirmCancelSlotId === (slot.isGroup ? slot.slots[0]?.id : slot.id) ? '0' : 'auto',
                                         transition: 'all 0.2s',
                                         borderRadius: '50%',
                                         flexShrink: 0
@@ -14272,20 +14352,59 @@ export function TeacherDashboard({
               {/* Header */}
               <div style={{
                 background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
-                padding: '24px',
+                padding: '20px 24px',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    <span>Rückfragen</span> {titleText}
-                  </h3>
-                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      <span>💬</span> {titleText}
+                    </h3>
+                  </div>
+                  <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
                     Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
                   </p>
+                  
+                  {/* Badges */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      backdropFilter: 'blur(4px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <Calendar size={11} color="#ffffff" />
+                      <span>Termingekoppelt</span>
+                    </span>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      backdropFilter: 'blur(4px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <ShieldCheck size={12} color="#ffffff" />
+                      <span>100% DSGVO-konform</span>
+                    </span>
+                  </div>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => setActiveChatOcc(null)}
@@ -14300,7 +14419,8 @@ export function TeacherDashboard({
                     justifyContent: 'center',
                     cursor: 'pointer',
                     color: '#ffffff',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start'
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
@@ -14323,13 +14443,20 @@ export function TeacherDashboard({
               }} className="custom-scrollbar">
                 {isFrozen && (
                   <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                   </div>
                 )}
                 {chatMessages.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
-                    <MessageSquare size={32} style={{ opacity: 0.3 }} />
-                    <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                      <Calendar size={20} />
+                    </div>
+                    <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                      Termingekoppelter Schulchat
+                    </h5>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
+                      Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                    </p>
                   </div>
                 ) : (
                   chatMessages.map((msg, idx) => {
@@ -14339,7 +14466,7 @@ export function TeacherDashboard({
                         display: 'flex',
                         flexDirection: 'column',
                         alignSelf: isMe ? 'flex-end' : 'flex-start',
-                        maxWidth: '80%',
+                        maxWidth: '82%',
                         alignItems: isMe ? 'flex-end' : 'flex-start',
                         gap: '2px'
                       }}>
@@ -14352,13 +14479,16 @@ export function TeacherDashboard({
                           lineHeight: 1.4,
                           wordBreak: 'break-word',
                           border: isMe ? 'none' : '1px solid #e2e8f0',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
                         }}>
                           {msg.content}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
+                            <span style={{ fontSize: '0.62rem', color: isMe ? 'rgba(255,255,255,0.85)' : '#64748b', fontWeight: 600 }}>
+                              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {isMe && <CheckCheck size={14} color="#ffffff" style={{ marginLeft: '2px', opacity: 0.9 }} />}
+                          </div>
                         </div>
-                        <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
-                          {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
                       </div>
                     );
                   })
@@ -14366,48 +14496,90 @@ export function TeacherDashboard({
                 <div ref={chatMessagesEndRef} />
               </div>
 
-              {/* Message Input Form */}
+              {/* Music Pedagogical Quick Reply Chips */}
+              {!isFrozen && (
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 20px 4px 20px', background: '#fafbfc' }}>
+                  {[
+                    '👍 Ja, geht klar!',
+                    '❌ Nein, geht leider nicht',
+                    '⏳ Bin 5 Min. später',
+                    '🎼 Bitte Notenheft mitbringen',
+                    '📝 Hausaufgabe im Aufgabenheft',
+                    '✅ Termin ist bestätigt'
+                  ].map((text, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setChatTypedMessage(text)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '16px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        color: '#334155',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      }}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Message Input Form (Styled according to Screenshot 2) */}
               <form onSubmit={handleSendChatMessage} style={{
-                padding: '16px 24px',
+                padding: '16px 20px',
                 borderTop: '1px solid #f1f5f9',
-                background: '#f8fafc',
+                background: '#fafbfc',
                 display: 'flex',
+                alignItems: 'center',
                 gap: '10px'
               }}>
                 <input
                   type="text"
-                  placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
+                  placeholder={isFrozen ? "Eingefroren..." : "Nachricht schreiben..."}
                   disabled={isFrozen}
                   value={chatTypedMessage}
                   onChange={e => setChatTypedMessage(e.target.value)}
                   style={{
                     flex: 1,
-                    padding: '10px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
+                    padding: '12px 20px',
+                    borderRadius: '100px',
+                    border: '1.5px solid #cbd5e1',
                     background: isFrozen ? '#f1f5f9' : '#ffffff',
-                    fontSize: '0.85rem',
+                    fontSize: '0.88rem',
                     outline: 'none',
-                    fontWeight: 600
+                    color: '#1e293b',
+                    boxShadow: 'none',
+                    transition: 'all 0.2s'
                   }}
                 />
                 <button
                   type="submit"
                   disabled={isFrozen || !chatTypedMessage.trim()}
                   style={{
-                    background: '#34a853',
+                    background: isFrozen || !chatTypedMessage.trim() ? '#dbe3ea' : '#34a853',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '12px',
-                    padding: '10px 16px',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
+                    borderRadius: '50%',
+                    width: '42px',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: (isFrozen || !chatTypedMessage.trim()) ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s',
-                    flexShrink: 0
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    flexShrink: 0,
+                    transition: 'all 0.2s'
                   }}
+                  className={!isFrozen && chatTypedMessage.trim() ? 'hover-scale' : ''}
+                  title="Nachricht senden"
                 >
-                  Senden
+                  <Send size={18} color="#ffffff" style={{ marginLeft: '-2px' }} />
                 </button>
               </form>
             </div>

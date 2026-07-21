@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Download, Sliders, Smartphone, Copy, Check, ArrowRight, X } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './StudioAvatar';
 
 interface StudentOnboardingPageProps {
   token: string;
@@ -130,15 +131,19 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const handleDownloadJPEG = () => {
     if (!student) return;
 
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const platformParam = urlParams.get('platform');
+    const isCampus = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
+    const themeColor = isCampus ? '#34a853' : '#eab308';
+    const displayAvatar = isCampus 
+      ? getInstrumentAvatarUrl(student.instrument)
+      : (student.photo_url || getDefaultMusicianAvatarUrl(student.instrument, student.role));
+
     const canvas = document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 600;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    const isCampus = student.is_campus_active && !student.is_groovelab_active;
-    const themeColor = isCampus ? '#34a853' : '#eab308';
-    const displayAvatar = student.photo_url || '/avatar_ghost.jpg';
 
     const avatarImg = new Image();
     avatarImg.crossOrigin = 'anonymous';
@@ -168,7 +173,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         ctx.fillStyle = '#ffffff';
         ctx.font = '900 11px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(student.role === 'student' ? 'MEMBER ACCESS' : 'STAFF / COACH', 200, 57);
+        ctx.fillText(isCampus ? 'CAMPUS AUSWEIS' : (student.role === 'student' ? 'MEMBER ACCESS' : 'STAFF / COACH'), 200, 57);
 
         // Draw Portrait circle
         ctx.save();
@@ -224,7 +229,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         // Trigger Download
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         const link = document.createElement('a');
-        link.download = `MemberPass_${student.first_name}.jpg`;
+        link.download = `${isCampus ? 'CampusAusweis' : 'MemberPass'}_${student.first_name}.jpg`;
         link.href = dataUrl;
         link.click();
       }
@@ -259,14 +264,18 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       qrImage.src = URL.createObjectURL(svgBlob);
     } else {
       qrLoaded = true;
+      tryRender();
     }
   };
 
   const handleCopyLink = () => {
-    const link = `${window.location.origin}/onboarding/${token}${window.location.search}`;
+    if (!student) return;
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const platformParam = urlParams.get('platform') || (student.is_campus_active && !student.is_groovelab_active ? 'campus' : 'groovelab');
+    const link = `${window.location.origin}/onboarding/${student.qr_token || student.id}?platform=${platformParam}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   if (loading) {
@@ -295,14 +304,21 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const platformParam = urlParams.get('platform');
   const isCampus = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
   const activeColor = isCampus ? '#34a853' : '#eab308';
-  const displayAvatar = student.photo_url || '/avatar_ghost.jpg';
+  
+  const displayAvatar = isCampus 
+    ? getInstrumentAvatarUrl(student.instrument)
+    : (student.photo_url || getDefaultMusicianAvatarUrl(student.instrument, student.role));
+
+  const pageTitle = isCampus ? 'Willkommen bei Campus' : 'Willkommen bei GrooveLab';
+  const cardHeaderText = isCampus ? 'CAMPUS AUSWEIS' : (student.role === 'student' ? 'MEMBER ACCESS' : 'STAFF / COACH');
+  const cardSaveTitle = isCampus ? 'Campus Ausweis sichern' : 'Member Pass sichern';
 
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', color: '#1e293b', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', fontFamily: 'system-ui, sans-serif', boxSizing: 'border-box' }}>
       
       {/* Header */}
       <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px', color: '#1e293b' }}>Willkommen bei Campus-Groovelab</h1>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px', color: '#1e293b' }}>{pageTitle}</h1>
         <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Dein persönlicher Onboarding-Bereich</p>
       </div>
 
@@ -335,7 +351,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
             textTransform: 'uppercase'
           }}>
             <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-              {student.role === 'student' ? 'Member Access' : 'Staff / Coach'}
+              {cardHeaderText}
             </div>
           </div>
 
@@ -410,7 +426,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           {/* Card Download & Save */}
           <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '24px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0' }}>
-              <Download size={18} color={activeColor} /> Member Pass sichern
+              <Download size={18} color={activeColor} /> {cardSaveTitle}
             </h3>
             
             <button onClick={handleDownloadJPEG} style={{ width: '100%', background: activeColor, color: isCampus ? '#ffffff' : '#0f172a', border: 'none', borderRadius: '14px', padding: '12px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'transform 0.1s' }} className="hover-scale">
@@ -532,7 +548,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
               <Smartphone size={18} color={activeColor} /> App auf Handy installieren (WAP)
             </h3>
             <p style={{ fontSize: '0.78rem', color: '#52525b', margin: '0', lineHeight: 1.4 }}>
-              Installiere GrooveLab als App auf deinem Startbildschirm für schnellen QR-Login:
+              Installiere {isCampus ? 'Campus' : 'GrooveLab'} als App auf deinem Startbildschirm für schnellen QR-Login:
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem', marginTop: '4px' }}>
@@ -604,7 +620,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           {/* Text Content */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', marginBottom: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>GrooveLab</span>
+              <span>{isCampus ? 'Campus' : 'GrooveLab'}</span>
               <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>JETZT</span>
             </div>
             <div style={{ fontSize: '0.72rem', color: '#cbd5e1', lineHeight: 1.3, fontWeight: 500 }}>

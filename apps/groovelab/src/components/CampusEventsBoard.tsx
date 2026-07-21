@@ -30,7 +30,11 @@ import {
   Maximize2,
   Minimize2,
   Minus,
-  Search
+  Search,
+  ShieldCheck,
+  CheckCheck,
+  CalendarX,
+  Send
 } from 'lucide-react';
 
 interface CampusEventsBoardProps {
@@ -320,10 +324,63 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // 1:1 Shoutbox States
   const [activeChatOcc, setActiveChatOcc] = useState<LessonOccurrence | null>(null);
+  const [confirmCancelOccId, setConfirmCancelOccId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState('');
   const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleCancelOccWithDoubleConfirm = async (occ: LessonOccurrence) => {
+    try {
+      if (!occ.date) return;
+      
+      const cancelStatus = 'cancelled';
+
+      if (occ.is_virtual || (occ.id && String(occ.id).startsWith('virt_'))) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: occ.schedule_id || null,
+            student_id: occ.student_id || null,
+            teacher_id: occ.teacher_id || userId,
+            date: occ.date,
+            start_time: occ.start_time,
+            duration: occ.duration || 45,
+            status: cancelStatus,
+            student_acknowledged: true
+          });
+
+        if (error) {
+          console.error('Error canceling occurrence:', error);
+          alert('Fehler beim Absagen des Termins: ' + error.message);
+        } else {
+          alert('Termin wurde erfolgreich abgesagt.');
+          window.location.reload();
+        }
+      } else if (occ.id) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .update({
+            status: cancelStatus,
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', occ.id);
+
+        if (error) {
+          console.error('Error canceling occurrence:', error);
+          alert('Fehler beim Absagen des Termins: ' + error.message);
+        } else {
+          alert('Termin wurde erfolgreich abgesagt.');
+          window.location.reload();
+        }
+      }
+    } catch (err: any) {
+      console.error('Error in handleCancelOccWithDoubleConfirm:', err);
+    } finally {
+      setConfirmCancelOccId(null);
+    }
+  };
 
   // iCal Subscription States
   const [showIcalModal, setShowIcalModal] = useState(false);
@@ -4417,7 +4474,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         </div>
 
                                         {/* Right Status */}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                           <button
                                             type="button"
                                             onClick={(e) => {
@@ -11589,21 +11646,61 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               {/* Header */}
               <div style={{
                 background: `linear-gradient(135deg, ${brandColor || '#34a853'} 0%, #34a853 100%)`,
-                padding: '24px',
+                padding: '20px 24px',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>Rückfragen</span> {titleText}
-                  </h3>
-                  <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>💬</span> {titleText}
+                    </h3>
+                  </div>
+                  <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
                     Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
                   </p>
+                  
+                  {/* Badges */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      backdropFilter: 'blur(4px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <Calendar size={11} color="#ffffff" />
+                      <span>Termingekoppelt</span>
+                    </span>
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      backdropFilter: 'blur(4px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <ShieldCheck size={12} color="#ffffff" />
+                      <span>100% DSGVO-konform</span>
+                    </span>
+                  </div>
                 </div>
+
                 <button
+                  type="button"
                   onClick={() => setActiveChatOcc(null)}
                   style={{
                     border: 'none',
@@ -11616,7 +11713,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                     justifyContent: 'center',
                     cursor: 'pointer',
                     color: '#ffffff',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start'
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
@@ -11639,13 +11737,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               }} className="custom-scrollbar">
                 {isFrozen && (
                   <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                    Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                   </div>
                 )}
                 {chatMessages.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.85rem', textAlign: 'center', padding: '32px', gap: '8px' }}>
-                    <MessageSquare size={32} style={{ opacity: 0.3 }} />
-                    <span>Noch keine Nachrichten für diesen Termin. Schreibe die erste Nachricht für Terminabsprachen.</span>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                      <Calendar size={20} />
+                    </div>
+                    <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                      Termingekoppelter Schulchat
+                    </h5>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
+                      Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                    </p>
                   </div>
                 ) : (
                   chatMessages.map((msg, idx) => {
@@ -11655,12 +11760,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         display: 'flex',
                         flexDirection: 'column',
                         alignSelf: isMe ? 'flex-end' : 'flex-start',
-                        maxWidth: '80%',
+                        maxWidth: '82%',
                         alignItems: isMe ? 'flex-end' : 'flex-start',
                         gap: '2px'
                       }}>
                         <div style={{
-                          background: isMe ? 'linear-gradient(135deg, #34a853, #34a853)' : '#ffffff',
+                          background: isMe ? `linear-gradient(135deg, ${brandColor || '#34a853'}, #34a853)` : '#ffffff',
                           color: isMe ? '#ffffff' : '#1e293b',
                           padding: '10px 14px',
                           borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
@@ -11668,19 +11773,56 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                           lineHeight: 1.4,
                           wordBreak: 'break-word',
                           border: isMe ? 'none' : '1px solid #e2e8f0',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
                         }}>
                           {msg.content}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
+                            <span style={{ fontSize: '0.62rem', color: isMe ? 'rgba(255,255,255,0.85)' : '#64748b', fontWeight: 600 }}>
+                              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {isMe && <CheckCheck size={14} color="#ffffff" style={{ marginLeft: '2px', opacity: 0.9 }} />}
+                          </div>
                         </div>
-                        <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
-                          {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
                       </div>
                     );
                   })
                 )}
                 <div ref={chatMessagesEndRef} />
               </div>
+
+              {/* Music Pedagogical Quick Reply Chips */}
+              {!isFrozen && (
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 20px 4px 20px', background: '#fafbfc' }}>
+                  {[
+                    '👍 Ja, geht klar!',
+                    '❌ Nein, geht leider nicht',
+                    '⏳ Bin 5 Min. später',
+                    '🎼 Bitte Notenheft mitbringen',
+                    '📝 Hausaufgabe im Aufgabenheft',
+                    '✅ Termin ist bestätigt'
+                  ].map((text, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setChatTypedMessage(text)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '16px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        color: '#334155',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      }}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              )}
 
                {(() => {
                  const isNoRecipient = role === 'student' ? !activeChatOcc.teacher_id : !activeChatOcc.student_id;
@@ -11690,13 +11832,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                    ? "Eingefroren..." 
                    : isNoRecipient 
                      ? "Kein Chat-Teilnehmer..." 
-                     : "Schreibe eine Nachricht...";
+                     : "Nachricht schreiben...";
                  return (
                    <form onSubmit={handleSendChatMessage} style={{
-                     padding: '16px 24px',
+                     padding: '16px 20px',
                      borderTop: '1px solid #f1f5f9',
-                     background: '#f8fafc',
+                     background: '#fafbfc',
                      display: 'flex',
+                     alignItems: 'center',
                      gap: '10px'
                    }}>
                      <input
@@ -11707,13 +11850,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                        onChange={e => setChatTypedMessage(e.target.value)}
                        style={{
                          flex: 1,
-                         padding: '10px 14px',
-                         borderRadius: '12px',
-                         border: '1px solid #e2e8f0',
+                         padding: '12px 20px',
+                         borderRadius: '100px',
+                         border: '1.5px solid #cbd5e1',
                          background: isDisabled ? '#f1f5f9' : '#ffffff',
-                         fontSize: '0.85rem',
+                         fontSize: '0.88rem',
                          outline: 'none',
-                         fontWeight: 600
+                         color: '#1e293b',
+                         boxShadow: 'none',
+                         transition: 'all 0.2s'
                        }}
                      />
                      {isCanceled ? (
@@ -11727,9 +11872,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                            background: '#f1f5f9',
                            color: '#475569',
                            border: '1px solid #cbd5e1',
-                           borderRadius: '12px',
+                           borderRadius: '100px',
                            padding: '10px 16px',
-                           fontSize: '0.85rem',
+                           fontSize: '0.82rem',
                            fontWeight: 800,
                            cursor: 'pointer',
                            display: 'flex',
@@ -11749,9 +11894,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                            background: '#ef4444',
                            color: '#ffffff',
                            border: 'none',
-                           borderRadius: '12px',
+                           borderRadius: '100px',
                            padding: '10px 16px',
-                           fontSize: '0.85rem',
+                           fontSize: '0.82rem',
                            fontWeight: 800,
                            cursor: 'pointer',
                            display: 'flex',
@@ -11770,22 +11915,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                        type="submit"
                        disabled={isDisabled || !chatTypedMessage.trim()}
                        style={{
-                         background: isDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #34a853)',
+                         background: isDisabled || !chatTypedMessage.trim() ? '#dbe3ea' : '#34a853',
                          color: '#ffffff',
                          border: 'none',
-                         borderRadius: '12px',
-                         padding: '10px 16px',
-                         fontSize: '0.85rem',
-                         fontWeight: 800,
-                         cursor: isDisabled ? 'not-allowed' : 'pointer',
+                         borderRadius: '50%',
+                         width: '42px',
+                         height: '42px',
                          display: 'flex',
                          alignItems: 'center',
                          justifyContent: 'center',
-                         transition: 'all 0.2s',
-                         flexShrink: 0
+                         cursor: isDisabled || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                         flexShrink: 0,
+                         transition: 'all 0.2s'
                        }}
+                       className={!isDisabled && chatTypedMessage.trim() ? 'hover-scale' : ''}
+                       title="Nachricht senden"
                      >
-                       Senden
+                       <Send size={18} color="#ffffff" style={{ marginLeft: '-2px' }} />
                      </button>
                    </form>
                  );

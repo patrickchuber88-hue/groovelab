@@ -20,7 +20,9 @@ import {
   Download,
   Eye,
   EyeOff,
-  Info
+  Info,
+  CheckCheck,
+  ShieldCheck
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -5475,22 +5477,20 @@ export function ScheduleCalendarView({
                 height: 100%;
               }
               .drawer-col-1 {
-                flex: 1 1 320px;
-                max-width: 350px;
-                min-width: 280px;
+                flex: 0 0 380px;
+                max-width: 400px;
+                min-width: 320px;
               }
               .drawer-col-2 {
-                flex: 1 1 320px;
-                max-width: 350px;
-                min-width: 280px;
+                flex: 1 1 560px;
+                min-width: 380px;
                 border-left: 1px solid #e5e5ea;
                 padding-left: 24px;
+                display: flex;
+                flex-direction: column;
               }
               .drawer-col-3 {
-                flex: 2 1 320px;
-                min-width: 280px;
-                border-left: 1px solid #e5e5ea;
-                padding-left: 24px;
+                display: none;
               }
 
               @media (max-width: 1023px) {
@@ -5503,21 +5503,15 @@ export function ScheduleCalendarView({
                 }
                 .drawer-col-1 {
                   max-width: none !important;
-                  flex: 1 1 45% !important;
+                  flex: 1 1 100% !important;
                 }
                 .drawer-col-2 {
                   max-width: none !important;
-                  flex: 1 1 45% !important;
-                  border-left: none !important;
-                  padding-left: 0 !important;
-                }
-                .drawer-col-3 {
+                  flex: 1 1 100% !important;
                   border-left: none !important;
                   padding-left: 0 !important;
                   border-top: 1px solid #e5e5ea;
                   padding-top: 24px;
-                  flex: 1 1 100% !important;
-                  min-height: 400px;
                 }
               }
 
@@ -5526,7 +5520,7 @@ export function ScheduleCalendarView({
                 background: #ffffff; 
                 border-radius: 24px 0 0 24px;
                 box-shadow: -10px 0 40px rgba(0,0,0,0.12); 
-                width: 960px; 
+                width: 980px; 
                 max-width: 100vw; 
                 border-left: 1px solid rgba(0,0,0,0.08); 
                 display: flex; 
@@ -5537,7 +5531,7 @@ export function ScheduleCalendarView({
                 overflow: hidden;
               }
               .drawer-container.ensemble {
-                width: 1120px;
+                width: 1080px;
               }
 
               @media (max-width: 1023px) {
@@ -5566,8 +5560,8 @@ export function ScheduleCalendarView({
               <div style={{ 
                 background: isEnsembleOcc 
                   ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
-                  : 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
-                padding: '20px 28px', 
+                  : 'linear-gradient(135deg, #34a853 0%, #2e964b 100%)', 
+                padding: '18px 24px', 
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center', 
@@ -5582,92 +5576,228 @@ export function ScheduleCalendarView({
                     <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
                       {modalTitle}
                     </h3>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 550, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                    <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
                       Termin am {formattedDateLabel} um {formattedTimeLabel} Uhr
                     </p>
                   </div>
                 </div>
 
-                {/* Close Button Top Right (semi-transparent) */}
-                <button
-                  onClick={() => setEditOccState(null)}
-                  title="Schließen"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#ffffff',
-                    transition: 'all 0.2s',
-                    zIndex: 10
-                  }}
-                  onMouseOver={e => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                  }}
-                  onMouseOut={e => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                  }}
-                >
-                  <X size={16} strokeWidth={2.5} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {/* Prominent Header Action: Aufgabenheft & Tools */}
+                  {occ && occ.student && (
+                    <button
+                      type="button"
+                      onClick={() => setDocStudent(occ.student)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.22)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        borderRadius: '12px',
+                        padding: '8px 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '7px',
+                        backdropFilter: 'blur(8px)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span>📝</span>
+                      <span>Aufgabenheft & Tools</span>
+                    </button>
+                  )}
+
+                  {/* Close Button Top Right */}
+                  <button
+                    onClick={() => setEditOccState(null)}
+                    title="Schließen"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '34px',
+                      height: '34px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#ffffff',
+                      transition: 'all 0.2s',
+                      zIndex: 10
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                  >
+                    <X size={18} strokeWidth={2.5} />
+                  </button>
+                </div>
               </div>
 
-              {/* Modal Inner Content Body */}
+              {/* Modal Inner Content Body (2 Columns) */}
               <div className="drawer-content-grid">
                 
-                {/* Left Column: Edit Form */}
+                {/* Column 1: Termin-Details, Mini-Profil & Pädagogik */}
                 <div className="drawer-col drawer-col-1">
-                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', marginBottom: '18px' }}>
-                    <div style={{ marginBottom: '18px' }}>
-                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Datum</label>
+                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', marginBottom: '16px' }}>
+                    
+                    {/* Student Mini Profile Header Card */}
+                    {occ && occ.student && !isEnsembleOcc && (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        borderRadius: '16px',
+                        padding: '12px 14px',
+                        marginBottom: '16px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '14px',
+                            background: '#e6f4ea',
+                            color: '#34a853',
+                            fontWeight: 800,
+                            fontSize: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1.5px solid #a7f3d0'
+                          }}>
+                            {occ.student.first_name ? occ.student.first_name[0] : 'S'}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                              {occ.student.first_name} {maskLastName(occ.student.last_name, showRealNames)}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: '#e6f4ea',
+                                color: '#166534',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                border: '1px solid #bbf7d0'
+                              }}>
+                                🎸 {occ.student.instrument || 'Gitarre'}
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                                • {editOccState.duration || 45} Min Lektion
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ensemble Students List (for Group/Band Occurrences) */}
+                    {isEnsembleOcc && (
+                      <div style={{ marginBottom: '18px' }}>
+                        <h4 style={{ marginTop: 0, marginBottom: '12px', fontSize: '0.95rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          👥 {uniqueGroupOccs.length} Schüler in der Gruppe
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                          {uniqueGroupOccs.map(go => {
+                            const isGoCancelled = ['cancelled', 'canceled_by_student'].includes(go.status);
+                            const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
+                            const isConfirmed = go.student_acknowledged === true;
+
+                            let itemBg = 'rgba(0, 0, 0, 0.02)';
+                            let itemBorder = '1px solid rgba(0, 0, 0, 0.05)';
+                            let nameColor = '#1d1d1f';
+
+                            if (isGoCancelled || isGoSick) {
+                              itemBg = 'rgba(239, 68, 68, 0.05)';
+                              itemBorder = '1px solid rgba(239, 68, 68, 0.15)';
+                              nameColor = '#ef4444';
+                            } else if (isConfirmed) {
+                              itemBg = '#e8f0fe';
+                              itemBorder = '1px solid #0b57d0';
+                              nameColor = '#174ea6';
+                            }
+
+                            return (
+                              <div key={go.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: '10px', background: itemBg, border: itemBorder }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, textDecoration: isGoCancelled ? 'line-through' : 'none' }}>
+                                  {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames)}
+                                </span>
+                                {!isGoCancelled && !isGoSick && (
+                                  <button
+                                    onClick={async () => {
+                                      if (await showConfirm(`Möchtest du ${go.student?.first_name} für diesen Gruppentermin absagen?`)) {
+                                        await persistOccurrenceDirectly(go.id, { status: 'cancelled' });
+                                        setEditOccState(null);
+                                      }
+                                    }}
+                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Date Input */}
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Datum</label>
                       <input 
                         type="date" 
                         value={editOccState.date} 
                         onChange={e => setEditOccState({ ...editOccState, date: e.target.value })} 
                         style={{ 
                           width: '100%', 
-                          padding: '11px 14px', 
+                          padding: '10px 12px', 
                           borderRadius: '10px', 
-                          border: '1px solid rgba(0, 0, 0, 0.15)', 
-                          background: 'rgba(255,255,255,0.8)',
-                          fontSize: '0.92rem', 
+                          border: '1px solid #cbd5e1', 
+                          background: '#ffffff',
+                          fontSize: '0.9rem', 
                           fontFamily: 'inherit', 
                           outline: 'none', 
                           boxSizing: 'border-box',
-                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                          transition: 'border-color 0.2s'
+                          fontWeight: 600
                         }} 
                       />
                     </div>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
+
+                    {/* Start Time & End Time Inputs */}
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
                       <div style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Beginn</label>
+                        <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Beginn</label>
                         <input 
                           type="time" 
                           value={editOccState.start_time.substring(0, 5)} 
                           onChange={e => setEditOccState({ ...editOccState, start_time: e.target.value })} 
                           style={{ 
                             width: '100%', 
-                            padding: '11px 14px', 
+                            padding: '10px 12px', 
                             borderRadius: '10px', 
-                            border: '1px solid rgba(0, 0, 0, 0.15)', 
-                            background: 'rgba(255,255,255,0.8)',
-                            fontSize: '0.92rem', 
+                            border: '1px solid #cbd5e1', 
+                            background: '#ffffff',
+                            fontSize: '0.9rem', 
                             fontFamily: 'inherit',
                             outline: 'none',
                             boxSizing: 'border-box',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                            transition: 'border-color 0.2s'
+                            fontWeight: 600
                           }} 
                         />
                       </div>
                       <div style={{ flex: 1 }}>
-                        <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Ende</label>
+                        <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ende</label>
                         <input 
                           type="time" 
                           value={localEndTime} 
@@ -5685,41 +5815,38 @@ export function ScheduleCalendarView({
                           }} 
                           style={{ 
                             width: '100%', 
-                            padding: '11px 14px', 
+                            padding: '10px 12px', 
                             borderRadius: '10px', 
-                            border: '1px solid rgba(0, 0, 0, 0.15)', 
-                            background: 'rgba(255,255,255,0.8)',
-                            fontSize: '0.92rem', 
+                            border: '1px solid #cbd5e1', 
+                            background: '#ffffff',
+                            fontSize: '0.9rem', 
                             fontFamily: 'inherit',
                             outline: 'none',
                             boxSizing: 'border-box',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
-                            transition: 'border-color 0.2s'
+                            fontWeight: 600
                           }} 
                         />
                       </div>
                     </div>
 
                     {/* Room Selection Dropdown */}
-                    <div style={{ marginBottom: '20px', position: 'relative' }}>
-                      <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>Freie Räume</label>
+                    <div style={{ marginBottom: '16px', position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Freie Räume</label>
                       <button
                         type="button"
                         onClick={() => setRoomDropdownOpen(!roomDropdownOpen)}
                         style={{
                           width: '100%',
-                          padding: '11px 14px',
-                          borderRadius: '12px',
-                          border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#34a853'}` : '1px solid rgba(0, 0, 0, 0.15)',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: roomDropdownOpen ? `1px solid ${isEnsembleOcc ? '#007aff' : '#34a853'}` : '1px solid #cbd5e1',
                           background: '#ffffff',
-                          fontSize: '0.92rem',
+                          fontSize: '0.88rem',
                           fontFamily: 'inherit',
                           fontWeight: 600,
                           color: '#1d1d1f',
                           outline: 'none',
                           boxSizing: 'border-box',
-                          boxShadow: roomDropdownOpen ? `0 0 0 3px ${isEnsembleOcc ? 'rgba(0, 122, 255, 0.15)' : 'rgba(19, 115, 51, 0.12)'}` : '0 2px 4px rgba(0,0,0,0.02)',
-                          transition: 'all 0.2s ease',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -5746,11 +5873,11 @@ export function ScheduleCalendarView({
                           marginTop: '6px',
                           background: '#ffffff',
                           border: '1px solid rgba(0,0,0,0.08)',
-                          borderRadius: '14px',
+                          borderRadius: '12px',
                           boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
                           padding: '6px',
                           zIndex: 100,
-                          maxHeight: '200px',
+                          maxHeight: '180px',
                           overflowY: 'auto'
                         }}>
                           <div
@@ -5765,28 +5892,14 @@ export function ScheduleCalendarView({
                               background: !editOccState.room_id ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
                               color: !editOccState.room_id ? '#1d1d1f' : '#515154',
                               fontWeight: !editOccState.room_id ? 700 : 500,
-                              fontSize: '0.9rem',
+                              fontSize: '0.85rem',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '8px',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={e => {
-                              if (editOccState.room_id) {
-                                e.currentTarget.style.background = 'rgba(0,0,0,0.02)';
-                              }
-                            }}
-                            onMouseLeave={e => {
-                              if (editOccState.room_id) {
-                                e.currentTarget.style.background = 'transparent';
-                              }
+                              gap: '8px'
                             }}
                           >
                             <span>❌</span>
                             <span>Kein Raum</span>
-                            {!editOccState.room_id && (
-                              <span style={{ marginLeft: 'auto', fontWeight: 'bold' }}>✓</span>
-                            )}
                           </div>
 
                           {freeRooms.map(r => {
@@ -5808,28 +5921,14 @@ export function ScheduleCalendarView({
                                   background: isSelected ? (isEnsembleOcc ? 'rgba(0, 122, 255, 0.08)' : 'rgba(19, 115, 51, 0.08)') : 'transparent',
                                   color: isSelected ? (isEnsembleOcc ? '#007aff' : '#34a853') : '#1d1d1f',
                                   fontWeight: isSelected ? 700 : 500,
-                                  fontSize: '0.9rem',
-                                  marginTop: '2px',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                onMouseEnter={e => {
-                                  if (!isSelected) {
-                                    e.currentTarget.style.background = isEnsembleOcc ? 'rgba(0, 122, 255, 0.04)' : 'rgba(19, 115, 51, 0.04)';
-                                  }
-                                }}
-                                onMouseLeave={e => {
-                                  if (!isSelected) {
-                                    e.currentTarget.style.background = 'transparent';
-                                  }
+                                  fontSize: '0.85rem',
+                                  marginTop: '2px'
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span>🏫</span>
                                   <span>{r.name}</span>
                                 </div>
-                                {isSelected && (
-                                  <span style={{ color: isEnsembleOcc ? '#007aff' : '#34a853', fontWeight: 'bold' }}>✓</span>
-                                )}
                               </div>
                             );
                           })}
@@ -5837,9 +5936,44 @@ export function ScheduleCalendarView({
                       )}
                     </div>
 
+                    {/* Compact Pedagogy Summary Box */}
+                    {occ && occ.student && !isEnsembleOcc && (
+                      <div style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '14px',
+                        padding: '12px',
+                        marginBottom: '16px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            🎵 Aktuelle Songs & Themen
+                          </span>
+                        </div>
+                        {studentActiveSongs.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {studentActiveSongs.slice(0, 2).map(skill => (
+                              <div key={skill.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#1e293b', background: '#ffffff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                                <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                                  {skill.songs?.title || 'Song'}
+                                </span>
+                                <span style={{ fontWeight: 800, color: '#34a853', fontSize: '0.72rem' }}>
+                                  {skill.progress_percent || 0}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                            Keine aktiven Songs eingetragen
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Explicit Cancel Lesson Section */}
                     {!isCancelled && (
-                      <div style={{ marginBottom: '24px' }}>
+                      <div style={{ marginBottom: '16px' }}>
                         <button 
                           onClick={(e) => {
                             handleCancel(e as any, editOccState.id);
@@ -5847,40 +5981,32 @@ export function ScheduleCalendarView({
                           }}
                           style={{ 
                             width: '100%',
-                            padding: '12px', 
-                            borderRadius: '12px', 
-                            border: '1px solid rgba(255, 59, 48, 0.15)', 
-                            background: 'rgba(255, 59, 48, 0.04)', 
+                            padding: '10px 12px', 
+                            borderRadius: '10px', 
+                            border: '1px solid rgba(255, 59, 48, 0.2)', 
+                            background: 'rgba(255, 59, 48, 0.05)', 
                             color: '#ff3b30', 
-                            fontSize: '0.85rem', 
-                            fontWeight: 600, 
+                            fontSize: '0.82rem', 
+                            fontWeight: 700, 
                             cursor: 'pointer', 
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '8px',
+                            gap: '6px',
                             transition: 'all 0.2s' 
                           }}
-                          onMouseOver={e => {
-                            e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)';
-                            e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.25)';
-                          }}
-                          onMouseOut={e => {
-                            e.currentTarget.style.background = 'rgba(255, 59, 48, 0.04)';
-                            e.currentTarget.style.borderColor = 'rgba(255, 59, 48, 0.15)';
-                          }}
+                          className="hover-scale-mini"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                           Termin absagen
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Left Column Buttons (Abbrechen & Speichern) */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                  {/* Left Column Action Footer Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '14px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                     <div>
-                      {/* Discard changes / Reset button */}
                       {canDiscard && (
                         <button 
                           onClick={async () => {
@@ -5901,7 +6027,6 @@ export function ScheduleCalendarView({
                                   .eq('id', editOccState.id);
                                 if (error) throw error;
   
-                                // Clean up any override room bookings for this occurrence
                                 try {
                                   await supabase.from('room_bookings')
                                     .delete()
@@ -5909,55 +6034,8 @@ export function ScheduleCalendarView({
                                     .eq('date', occ.date)
                                     .eq('start_time', occ.start_time);
                                   window.dispatchEvent(new CustomEvent('refresh-bookings'));
-                                } catch (roomErr) {
-                                  console.warn('Error deleting room booking on revert:', roomErr);
-                                }
+                                } catch (roomErr) {}
 
-                                // Automatic Notification to Student about Reverting to Regular Time
-                                try {
-                                  if (occ.student_id) {
-                                    const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                    const newDate = new Date(targetDate);
-                                    const newDayLabel = DAYS_DE[newDate.getDay()];
-                                    const newDateLabel = newDate.toLocaleDateString('de-DE');
-                                    const newTimeLabel = targetStartTime.substring(0, 5);
-  
-                                    const notificationMessage = `Hallo! Der verschobene Termin wurde wieder auf deinen ursprünglichen regulären Termin zurückgesetzt: ${newDayLabel}, ${newDateLabel} um ${newTimeLabel} Uhr.`;
-                                    
-                                    await supabase.from('campus_direct_messages').insert({
-                                      sender_id: userId,
-                                      recipient_id: occ.student_id,
-                                      content: notificationMessage
-                                    });
-
-                                    // Create a notification record in the DB for push tracking
-                                    const { data: dbNotif } = await supabase
-                                      .from('notifications')
-                                      .insert({
-                                        user_id: occ.student_id,
-                                        title: 'Termin-Update 📅',
-                                        message: notificationMessage,
-                                        metadata: { occurrence_id: editOccState.id, type: 'reschedule_reset' }
-                                      })
-                                      .select('id')
-                                      .single();
-
-                                    // Invoke send-push Edge Function
-                                    await supabase.functions.invoke('send-push', {
-                                      body: {
-                                        userId: occ.student_id,
-                                        title: 'Termin-Update 📅',
-                                        body: notificationMessage,
-                                        url: '/',
-                                        notificationId: dbNotif ? dbNotif.id : null
-                                      }
-                                    });
-                                    console.log('[Push] Sent real-time revert push to student:', occ.student_id);
-                                  }
-                                } catch (notifErr) {
-                                  console.warn('Could not send revert notification:', notifErr);
-                                }
-  
                                 await loadOccurrences();
                               } catch (err) {
                                 console.error(err);
@@ -5970,9 +6048,7 @@ export function ScheduleCalendarView({
                             }
                             setEditOccState(null);
                           }} 
-                          style={{ padding: '8px 14px', borderRadius: '100px', border: '1px solid rgba(0,0,0,0.15)', background: 'transparent', color: '#1d1d1f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.2s' }}
-                          onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
-                          onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                          style={{ padding: '8px 12px', borderRadius: '100px', border: '1px solid rgba(0,0,0,0.15)', background: 'transparent', color: '#1d1d1f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                         >
                           Zurücksetzen
                         </button>
@@ -5982,24 +6058,21 @@ export function ScheduleCalendarView({
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
                         onClick={() => setEditOccState(null)} 
-                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: 'rgba(0,0,0,0.05)', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.09)'}
-                        onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                        style={{ padding: '9px 16px', borderRadius: '100px', border: 'none', background: 'rgba(0,0,0,0.05)', color: '#1d1d1f', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem' }}
                       >
                         Abbrechen
                       </button>
                       <button 
                         onClick={handleSaveEdit} 
-                        style={{ padding: '10px 18px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#34a853', color: 'white', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                        onMouseOver={e => e.currentTarget.style.background = isEnsembleOcc ? '#0055d4' : '#34a853'}
-                        onMouseOut={e => e.currentTarget.style.background = isEnsembleOcc ? '#007aff' : '#34a853'}
+                        style={{ padding: '9px 16px', borderRadius: '100px', border: 'none', background: isEnsembleOcc ? '#007aff' : '#34a853', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}
                       >
                         Speichern
                       </button>
                     </div>
                   </div>
                 </div>
-  
+
+                {/* Column 2: Termingekoppelte Shoutbox */}
                 {occ && occ.student_id && (() => {
                   let isFrozen = false;
                   try {
@@ -6007,413 +6080,288 @@ export function ScheduleCalendarView({
                     const lessonDateTime = new Date(`${occ.date}T${timePart}`);
                     isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
                   } catch (e) {}
-  
+
                   return (
-                    <>
-                      {/* Second Column: Schülerliste (only for ensembles/bands) */}
-                      {isEnsembleOcc && (
-                        <div className="drawer-col drawer-col-2">
-                          <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            👥 {uniqueGroupOccs.length} Schüler in dieser Gruppe
+                    <div className="drawer-col drawer-col-2">
+                      {/* Shoutbox Header Card with Green Gradient & White Text */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                        borderRadius: '16px',
+                        padding: '16px 20px',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '16px',
+                        boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)'
+                      }}>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>💬</span>
+                            <span>Termin-Shoutbox</span>
+                            {isFrozen && <span style={{ fontSize: '0.85rem' }}>🔒</span>}
                           </h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '340px', paddingRight: '4px' }}>
-                            {uniqueGroupOccs.map(go => {
-                              const isGoCancelled = ['cancelled', 'canceled_by_student'].includes(go.status);
-                              const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
-                              const isConfirmed = go.student_acknowledged === true;
+                          <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
+                            Termingekoppelte Direktnachrichten mit {occ.student?.first_name || 'Schüler'}
+                          </p>
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            padding: '4px 9px',
+                            borderRadius: '8px',
+                            background: 'rgba(255, 255, 255, 0.22)',
+                            color: '#ffffff',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            border: '1px solid rgba(255, 255, 255, 0.35)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backdropFilter: 'blur(4px)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <CalendarIcon size={11} color="#ffffff" />
+                            <span>Termingekoppelt</span>
+                          </span>
+                          <span style={{
+                            padding: '4px 9px',
+                            borderRadius: '8px',
+                            background: 'rgba(255, 255, 255, 0.22)',
+                            color: '#ffffff',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                            border: '1px solid rgba(255, 255, 255, 0.35)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backdropFilter: 'blur(4px)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <ShieldCheck size={12} color="#ffffff" />
+                            <span>100% DSGVO-konform</span>
+                          </span>
+                        </div>
+                      </div>
 
-                              let itemBg = 'rgba(0, 0, 0, 0.02)';
-                              let itemBorder = '1px solid rgba(0, 0, 0, 0.05)';
-                              let nameColor = '#1d1d1f';
-                              let subtextColor = '#86868b';
-
-                              if (isGoCancelled || isGoSick) {
-                                itemBg = 'rgba(239, 68, 68, 0.05)';
-                                itemBorder = '1px solid rgba(239, 68, 68, 0.15)';
-                                nameColor = '#ef4444';
-                              } else if (isConfirmed) {
-                                itemBg = '#e8f0fe';
-                                itemBorder = '1px solid #0b57d0';
-                                nameColor = '#174ea6';
-                                subtextColor = '#174ea6cc';
-                              } else {
-                                itemBg = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
-                                itemBorder = '1px solid #0b57d0';
-                                nameColor = '#174ea6';
-                                subtextColor = '#174ea6cc';
-                              }
-
-                              return (
-                                <div key={go.id} style={{ 
-                                  display: 'flex', 
-                                  justifyContent: 'space-between', 
-                                  alignItems: 'center', 
-                                  padding: '10px 14px', 
-                                  borderRadius: '10px', 
-                                  background: itemBg,
-                                  border: itemBorder
-                                }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ 
-                                      fontSize: '0.88rem', 
-                                      fontWeight: 700, 
-                                      color: nameColor,
-                                      textDecoration: isGoCancelled ? 'line-through' : 'none' 
-                                    }}>
-                                      {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames)}
-                                    </span>
-                                    <span style={{ fontSize: '0.72rem', color: subtextColor, marginTop: '2px' }}>
-                                      {go.student?.instrument || 'Kein Instrument'} • {go.duration || 30} Min
-                                    </span>
-                                  </div>
-                                  
-                                  {!isGoCancelled && !isGoSick && (
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                      {/* Absagen (Cancel) Button */}
-                                      <button
-                                        onClick={async () => {
-                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${maskLastName(go.student?.last_name, showRealNames)} für diesen Gruppentermin absagen?`)) {
-                                            await persistOccurrenceDirectly(go.id, { status: 'cancelled' });
-                                            setEditOccState(null);
-                                          }
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          setHoveredTooltip({
-                                            text: "Termin absagen (Schüler fehlt)",
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                            visible: true
-                                          });
-                                        }}
-                                        onMouseMove={(e) => {
-                                          setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                        }}
-                                        onMouseLeave={() => {
-                                          setHoveredTooltip(null);
-                                        }}
-                                        style={{ 
-                                          background: 'transparent', 
-                                          border: 'none', 
-                                          cursor: 'pointer', 
-                                          color: '#ef4444', 
-                                          padding: '6px', 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          justifyContent: 'center', 
-                                          borderRadius: '8px',
-                                          transition: 'background 0.2s'
-                                        }}
-                                        onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <X size={14} strokeWidth={2.5} />
-                                      </button>
-
-                                      {/* Entkoppeln (Decouple) Button */}
-                                      <button
-                                        onClick={async () => {
-                                          if (await showConfirm(`Möchtest du ${go.student?.first_name} ${maskLastName(go.student?.last_name, showRealNames)} wirklich aus dieser Gruppe entkoppeln?`)) {
-                                            const { error } = await supabase.from('schedule_occurrences').delete().eq('id', go.id);
-                                            if (error) {
-                                              await showAlert('Fehler beim Entkoppeln des Schülers: ' + error.message);
-                                            } else {
-                                              if (uniqueGroupOccs.length === 1) {
-                                                try {
-                                                  await supabase.from('room_bookings')
-                                                    .delete()
-                                                    .eq('booked_by', userId)
-                                                    .eq('date', go.date)
-                                                    .eq('start_time', go.start_time);
-                                                } catch (e) {}
-                                              }
-                                              await loadOccurrences();
-                                              setEditOccState(null);
-                                            }
-                                          }
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          setHoveredTooltip({
-                                            text: "Schüler entkoppeln (aus Gruppe entfernen)",
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                            visible: true
-                                          });
-                                        }}
-                                        onMouseMove={(e) => {
-                                          setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                        }}
-                                        onMouseLeave={() => {
-                                          setHoveredTooltip(null);
-                                        }}
-                                        style={{ 
-                                          background: 'transparent', 
-                                          border: 'none', 
-                                          cursor: 'pointer', 
-                                          color: '#86868b', 
-                                          padding: '6px', 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
-                                          justifyContent: 'center', 
-                                          borderRadius: '8px',
-                                          transition: 'background 0.2s'
-                                        }}
-                                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'}
-                                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                                      >
-                                        <Link2Off size={14} strokeWidth={2.2} />
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
+                      {isMoved && (
+                        <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Regulär:</span>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400e' }}>
+                            {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
+                          </span>
                         </div>
                       )}
 
-                      {/* Middle Column: Meisterwerk History & Active Songs (only for single students) */}
-                      {!isEnsembleOcc && (
-                        <div className="drawer-col drawer-col-2">
-                          <h4 style={{ marginTop: 0, marginBottom: '14px', fontSize: '0.98rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
-                            <span>🏆</span>
-                            <span>Meisterwerk-Historie</span>
-                          </h4>
-                          
-                          {/* Verlinkung zum Aufgabenheft / Meisterwerk-Protokoll */}
-                          <div style={{ marginBottom: '18px', background: 'rgba(52, 168, 83, 0.04)', border: '1px solid rgba(52, 168, 83, 0.1)', borderRadius: '16px', padding: '16px', boxSizing: 'border-box' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                              <span style={{ fontSize: '1.1rem' }}>📝</span>
-                              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1d1d1f' }}>Aufgabenheft & Meisterwerk</span>
-                            </div>
-                            <p style={{ margin: '0 0 10px 0', fontSize: '0.72rem', color: '#515154', lineHeight: 1.35 }}>
-                              Hausaufgaben, geübte Songs und Fortschritte zentral eintragen.
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (occ && occ.student) {
-                                  setDocStudent(occ.student);
-                                }
-                              }}
-                              style={{
-                                background: 'linear-gradient(135deg, #34a853 0%, #2e964b 100%)',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '10px',
-                                padding: '10px 14px',
-                                fontSize: '0.82rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                boxShadow: '0 4px 10px rgba(52, 168, 83, 0.12)',
-                                transition: 'all 0.2s ease',
-                                width: '100%'
-                              }}
-                              onMouseOver={e => {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 5px 14px rgba(52, 168, 83, 0.18)';
-                              }}
-                              onMouseOut={e => {
-                                e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(52, 168, 83, 0.12)';
-                              }}
-                            >
-                              <span>Aufgaben öffnen</span>
-                            </button>
-                          </div>
-                          
-                          {/* Songs Section */}
-                          <div style={{ marginBottom: '18px' }}>
-                            <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 800, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Aktive Song-Projekte</span>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '180px', paddingRight: '4px' }}>
-                              {studentActiveSongs.length === 0 ? (
-                                <span style={{ fontSize: '0.76rem', color: '#86868b', fontStyle: 'italic' }}>Keine aktiven Songs</span>
-                              ) : (
-                                studentActiveSongs.map(skill => (
-                                  <div key={skill.id} style={{ background: '#f5f5f7', borderRadius: '10px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1d1d1f', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {skill.songs?.title || 'Unbekannter Song'}
-                                      </span>
-                                      <span style={{ fontSize: '0.68rem', color: '#86868b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {skill.songs?.artist || 'Unbekannter Künstler'}
-                                      </span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34a853' }}>{skill.progress_percent || 0}%</span>
-                                      {skill.is_stage_ready && <span style={{ fontSize: '0.72rem' }}>👑</span>}
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Pedagogical Milestones Section */}
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                            <span style={{ display: 'block', fontSize: '0.62rem', fontWeight: 800, color: '#86868b', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Letzte Hausaufgaben & Themen</span>
-                            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
-                              {studentProgressHistory.length === 0 ? (
-                                <span style={{ fontSize: '0.76rem', color: '#86868b', fontStyle: 'italic' }}>Noch keine Einträge vorhanden</span>
-                              ) : (
-                                studentProgressHistory.map((item, index) => {
-                                  const dateStr = item.updated_at ? new Date(item.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
-
-                                  // Clean parser: strip internal codes, keep human-readable text
-                                  let hwText = '';
-                                  try {
-                                    const raw = item.homework_notes || '';
-                                    const entries: string[] = raw.startsWith('[') ? JSON.parse(raw) : raw ? [raw] : [];
-                                    const readable = entries
-                                      .filter(e =>
-                                        !e.startsWith('AUDIO:') &&
-                                        !e.startsWith('STICKER:') &&
-                                        !e.startsWith('FEEDBACK:')
-                                      )
-                                      .map(e => e.trim())
-                                      .filter(e => e.length > 0);
-                                    hwText = readable.join(' · ');
-                                  } catch { hwText = ''; }
-
-                                  return (
-                                    <div key={item.id || index} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1d1d1f', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '170px' }}>
-                                          {item.topic_name}
-                                        </span>
-                                        <span style={{ fontSize: '0.65rem', color: '#86868b', fontWeight: 700 }}>
-                                          {dateStr}
-                                        </span>
-                                      </div>
-                                      {hwText ? (
-                                        <p style={{ margin: 0, fontSize: '0.74rem', color: '#515154', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                          {hwText}
-                                        </p>
-                                      ) : (
-                                        <span style={{ fontSize: '0.72rem', color: '#b0b0b5', fontStyle: 'italic' }}>Keine Notizen</span>
-                                      )}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-
-                        </div>
-                      )}
-
-                      {/* Third Column: Shoutbox */}
-                      <div className="drawer-col drawer-col-3">
-                        <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          Shoutbox {isFrozen && <span style={{ fontSize: '0.9rem' }}>🔒</span>}
-                        </h4>
-    
-                        {isMoved && (
-                          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Regulär:</span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#92400e' }}>
-                              {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
-                            </span>
+                      {/* Chat Messages Viewport */}
+                      <div 
+                        ref={chatViewportRef} 
+                        style={{ 
+                          flex: 1, 
+                          overflowY: 'auto', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '10px', 
+                          marginBottom: '12px', 
+                          padding: '14px', 
+                          background: '#f8fafc', 
+                          borderRadius: '16px',
+                          border: '1px solid #e2e8f0',
+                          minHeight: '260px',
+                          maxHeight: '440px'
+                        }}
+                      >
+                        {isFrozen && (
+                          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center', justifyContent: 'center' }}>
+                            🔒 Shoutbox nach 48h eingefroren (Schreibschutz aktiv)
                           </div>
                         )}
-    
-                        {/* Chat messages viewport */}
-                        <div ref={chatViewportRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingRight: '4px', maxHeight: '280px', minHeight: '200px' }}>
-                          {isFrozen && (
-                            <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', textAlign: 'center', justifyContent: 'center' }}>
-                              🔒 Shoutbox eingefroren (Schreibschutz aktiv)
-                            </div>
-                          )}
-                          {(() => {
-                            const deduplicatedMessages: any[] = [];
-                            const seenMessages = new Set<string>();
-                            chatMessages.forEach(msg => {
-                              const timeKey = new Date(msg.created_at).toISOString().substring(0, 16); // group by minute
-                              const key = `${msg.sender_id}_${timeKey}_${msg.content}`;
-                              if (!seenMessages.has(key)) {
-                                seenMessages.add(key);
-                                deduplicatedMessages.push(msg);
-                              }
-                            });
+                        {(() => {
+                          const deduplicatedMessages: any[] = [];
+                          const seenMessages = new Set<string>();
+                          chatMessages.forEach(msg => {
+                            const timeKey = new Date(msg.created_at).toISOString().substring(0, 16);
+                            const key = `${msg.sender_id}_${timeKey}_${msg.content}`;
+                            if (!seenMessages.has(key)) {
+                              seenMessages.add(key);
+                              deduplicatedMessages.push(msg);
+                            }
+                          });
 
-                            if (deduplicatedMessages.length === 0) {
-                              return (
-                                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#86868b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
-                                  Noch keine Nachrichten. Schreib dem Schüler für eine Terminabsprache.
+                          if (deduplicatedMessages.length === 0) {
+                            return (
+                              <div style={{
+                                flex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '24px 16px',
+                                textAlign: 'center',
+                                background: 'linear-gradient(185deg, #ffffff 0%, #f8fafc 100%)',
+                                borderRadius: '14px',
+                                border: '1px dashed #cbd5e1',
+                                margin: 'auto 0'
+                              }}>
+                                <div style={{
+                                  width: '46px',
+                                  height: '46px',
+                                  borderRadius: '14px',
+                                  background: '#e6f4ea',
+                                  color: '#34a853',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginBottom: '10px',
+                                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)'
+                                }}>
+                                  <CalendarIcon size={22} />
                                 </div>
-                              );
+                                <h5 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
+                                  Termingekoppelter Schulchat
+                                </h5>
+                                <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
+                                  Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return deduplicatedMessages.map((msg, idx) => {
+                            const isMe = msg.sender_id === userId;
+                            const isTerminMsg = msg.content.startsWith('[Termin');
+                            let displayedContent = msg.content;
+                            let prefixText = '';
+                            if (isTerminMsg) {
+                              const closeBracketIdx = msg.content.indexOf(']');
+                              if (closeBracketIdx !== -1) {
+                                prefixText = msg.content.substring(1, closeBracketIdx);
+                                displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
+                              }
                             }
 
-                            return deduplicatedMessages.map((msg, idx) => {
-                              const isMe = msg.sender_id === userId;
-                              const isTerminMsg = msg.content.startsWith('[Termin');
-                              let displayedContent = msg.content;
-                              let prefixText = '';
-                              if (isTerminMsg) {
-                                const closeBracketIdx = msg.content.indexOf(']');
-                                if (closeBracketIdx !== -1) {
-                                  prefixText = msg.content.substring(1, closeBracketIdx);
-                                  displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
-                                }
-                              }
+                            const senderStudent = uniqueGroupOccs.find(o => o.student_id === msg.sender_id)?.student;
+                            const senderName = senderStudent ? `${senderStudent.first_name} ${maskLastName(senderStudent.last_name, showRealNames)}` : (occ.student?.first_name || 'Schüler');
 
-                              const senderStudent = uniqueGroupOccs.find(o => o.student_id === msg.sender_id)?.student;
-                              const senderName = senderStudent ? `${senderStudent.first_name} ${maskLastName(senderStudent.last_name, showRealNames)}` : 'Schüler';
-    
-                              return (
-                                <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
-                                  {isGroupOcc && !isMe && (
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#86868b', marginBottom: '2px', marginLeft: '4px' }}>
-                                      {senderName}
-                                    </span>
-                                  )}
-                                  {prefixText && (
-                                    <span style={{ fontSize: '0.65rem', color: '#86868b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
-                                      📅 {prefixText}
-                                    </span>
-                                  )}
-                                  <div style={{ 
-                                    background: isMe ? (isEnsembleOcc ? '#007aff' : '#34a853') : '#f5f5f7', 
-                                    color: isMe ? 'white' : '#1d1d1f', 
-                                    padding: '8px 12px', 
-                                    borderRadius: '12px', 
-                                    borderBottomRightRadius: isMe ? '2px' : '12px',
-                                    borderBottomLeftRadius: isMe ? '12px' : '2px',
-                                    fontSize: '0.82rem',
-                                    lineHeight: 1.4,
-                                    wordBreak: 'break-word'
-                                  }}>
-                                    {displayedContent}
-                                  </div>
-                                  <span style={{ fontSize: '0.6rem', color: '#86868b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
-                                    {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            return (
+                              <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '82%', textAlign: 'left' }}>
+                                {!isMe && (
+                                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', marginBottom: '2px', marginLeft: '6px' }}>
+                                    {senderName}
                                   </span>
+                                )}
+                                {prefixText && (
+                                  <span style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
+                                    📅 {prefixText}
+                                  </span>
+                                )}
+                                <div style={{ 
+                                  background: isMe ? '#e6f4ea' : '#ffffff', 
+                                  color: '#0f172a', 
+                                  padding: '9px 13px', 
+                                  borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px', 
+                                  fontSize: '0.84rem',
+                                  lineHeight: 1.4,
+                                  wordBreak: 'break-word',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                                  border: isMe ? '1px solid #a7f3d0' : '1px solid #e2e8f0'
+                                }}>
+                                  {displayedContent}
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '4px' }}>
+                                    <span style={{ fontSize: '0.62rem', color: isMe ? '#34a853' : '#64748b', fontWeight: 600 }}>
+                                      {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {isMe && <CheckCheck size={14} color="#34a853" style={{ marginLeft: '2px' }} />}
+                                  </div>
                                 </div>
-                              );
-                            });
-                          })()}
-                          <div ref={chatMessagesEndRef} />
-                        </div>
-    
-                        {/* Send Input Form */}
-                        <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                          <input 
-                            type="text" 
-                            placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
-                            disabled={isFrozen}
-                            value={chatTypedMessage}
-                            onChange={e => setChatTypedMessage(e.target.value)}
-                            style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #d2d2d7', fontSize: '0.85rem', outline: 'none', background: isFrozen ? '#f5f5f7' : '#ffffff' }}
-                          />
-                          <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : (isEnsembleOcc ? '#007aff' : '#34a853'), color: 'white', border: 'none', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer' }}>
-                            <Send size={14} />
-                          </button>
-                        </form>
+                              </div>
+                            );
+                          });
+                        })()}
+                        <div ref={chatMessagesEndRef} />
                       </div>
-                    </>
+
+                      {/* Music Pedagogical Quick Reply Template Chips */}
+                      {!isFrozen && (
+                        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '4px' }}>
+                          {[
+                            '👍 Ja, geht klar!',
+                            '❌ Nein, geht leider nicht',
+                            '⏳ Bin 5 Min. später',
+                            '🎼 Bitte Notenheft mitbringen',
+                            '📝 Hausaufgabe im Aufgabenheft',
+                            '✅ Termin ist bestätigt'
+                          ].map((text, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setChatTypedMessage(text)}
+                              style={{
+                                padding: '5px 10px',
+                                borderRadius: '16px',
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                color: '#334155',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.15s'
+                              }}
+                              className="hover-scale-mini"
+                            >
+                              {text}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Send Input Form */}
+                      <form onSubmit={(e) => handleSendChatMessage(e, occ.student_id || '', occ)} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: 'auto', paddingTop: '4px' }}>
+                        <input 
+                          type="text" 
+                          placeholder={isFrozen ? "Shoutbox eingefroren..." : "Nachricht schreiben..."}
+                          disabled={isFrozen}
+                          value={chatTypedMessage}
+                          onChange={e => setChatTypedMessage(e.target.value)}
+                          style={{ 
+                            flex: 1, 
+                            padding: '12px 20px', 
+                            borderRadius: '100px', 
+                            border: '1.5px solid #cbd5e1', 
+                            fontSize: '0.88rem', 
+                            outline: 'none', 
+                            background: isFrozen ? '#f1f5f9' : '#ffffff',
+                            color: '#1e293b',
+                            boxShadow: 'none',
+                            transition: 'all 0.2s'
+                          }}
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={isFrozen || !chatTypedMessage.trim()} 
+                          style={{ 
+                            background: isFrozen || !chatTypedMessage.trim() ? '#dbe3ea' : (isEnsembleOcc ? '#007aff' : '#34a853'), 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '50%', 
+                            width: '42px', 
+                            height: '42px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            flexShrink: 0,
+                            transition: 'all 0.2s'
+                          }}
+                          className={!isFrozen && chatTypedMessage.trim() ? 'hover-scale' : ''}
+                          title="Nachricht senden"
+                        >
+                          <Send size={18} color="#ffffff" style={{ marginLeft: '-2px' }} />
+                        </button>
+                      </form>
+                    </div>
                   );
                 })()}
               </div>

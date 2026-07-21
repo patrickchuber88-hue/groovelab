@@ -3806,7 +3806,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const DEFAULT_FOKUS_LEVELS = {
     level1: { kleine: 3, mittlere: 5, helden: 10 },
     level2: { kleine: 5, mittlere: 10, helden: 15 },
-    level3: { kleine: 15, mittlere: 20, helden: 30 }
+    level3: { kleine: 10, mittlere: 15, helden: 20 }
   };
 
   const [schoolFokusLevels, setSchoolFokusLevels] = useState<any>(null);
@@ -3817,8 +3817,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     return 'kleine';
   };
 
+  const totalPracticeMinutes = useMemo(() => {
+    return (fokusLogs || []).reduce((acc, log) => {
+      const mins = log.duration_minutes || Math.round((log.duration_seconds || 0) / 60);
+      return acc + mins;
+    }, 0);
+  }, [fokusLogs]);
+
+  const effectiveLevel = useMemo(() => {
+    const dbLevel = avatar?.evolution_level || 1;
+    let computedLevel = 1;
+    if (totalPracticeMinutes >= 1000) {
+      computedLevel = 3;
+    } else if (totalPracticeMinutes >= 250) {
+      computedLevel = 2;
+    }
+    return Math.max(dbLevel, computedLevel);
+  }, [avatar?.evolution_level, totalPracticeMinutes]);
+
   const getTargetMinutes = (streak: number = 0) => {
-    const level = avatar?.evolution_level || 1;
+    const level = effectiveLevel;
     const cat = getFlameCategory(streak);
     const config = schoolFokusLevels || DEFAULT_FOKUS_LEVELS;
     const levelKey = `level${level}` as 'level1' | 'level2' | 'level3';
@@ -3863,7 +3881,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const getTrimesterProgressDetails = () => {
     const practicedDays = getTrimesterPracticeDays();
-    const level = avatar?.evolution_level || 1;
+    const level = effectiveLevel;
     let targetDays = 30;
     let nextLevel = 2;
 

@@ -77,6 +77,12 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
         '/screenshots/media__1782677784641.png',
         '/screenshots/media__1782677784662.png'
       ]
+    },
+    {
+      title: 'Termingekoppelte Shoutbox.',
+      slogan: '100% DSGVO- & schulrechtskonform.',
+      description: 'Kein WhatsApp-Zwang, keine Preisgabe privater Handynummern. Direktnachrichten sind exklusiv an den Unterrichtstermin gekoppelt, transport- und serververschlüsselt (TLS 1.3 & AES-256) und frieren nach 48 Stunden automatisch ein. Schützt die Privatsphäre der Lehrer, wahrt den Kinderschutz und erfüllt die Dienstaufsichtspflicht der Musikschule.',
+      images: ['/screenshots/media__1782677535200.png']
     }
   ];
 
@@ -1953,7 +1959,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   🛡️ Das Campus-Groovelab Sicherheitsversprechen
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  14-stufiges Sicherheits- & Datenschutzkonzept
+                  15-stufiges Sicherheits- & Datenschutzkonzept
                 </span>
               </div>
               <button 
@@ -2053,7 +2059,11 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   },
                   {
                     title: '14. DSGVO-konforme Nachnamensmaskierung (Schulterblick-Schutz)',
-                    desc: 'Im laufenden Betrieb auf den Dashboards werden Schülernachnamen standardmäßig unkenntlich gemacht (z. B. „Mxxxxx“). Erst durch eine bewusste Klick-Interaktion (Auge-Symbol) können berechtigte Lehrkräfte oder Verwaltungsmitarbeiter die Nachnamen für ein Zeitfenster von genau 10 Sekunden einblenden. Dies verhindert das Mitlesen durch Dritte an Arbeitsplätzen und im Unterrichtsraum.'
+                    desc: 'Im laufenden Betrieb auf den Dashboards werden Schülernachnamen standardmäßig auf den Anfangsbuchstaben gekürzt (z. B. „Max M.“). Erst durch eine bewusste Klick-Interaktion (Auge-Symbol) können berechtigte Lehrkräfte oder Verwaltungsmitarbeiter den vollständigen Nachnamen für ein Zeitfenster von genau 10 Sekunden einblenden. Dies verhindert das Mitlesen durch Dritte an Arbeitsplätzen und im Unterrichtsraum.'
+                  },
+                  {
+                    title: '15. Termingekoppelte Schul-Shoutbox & 48h-Auto-Freeze (Schulrecht-Plus)',
+                    desc: 'Direktnachrichten laufen ohne private Handynummern (kein WhatsApp-Zwang) transport- (TLS 1.3) und serververschlüsselt (AES-256) über die Schul-App. Der Chat ist strikt an den Unterrichtstermin gebunden und friert nach 48 Stunden automatisch ein (Auto-Freeze), um störende Freizeit-Nachrichten abzuwehren, die Privatsphäre der Lehrkräfte zu schützen und gleichzeitig die gesetzliche Dienstaufsichtspflicht der Musikschule zu wahren.'
                   }
                 ].map((stufe, idx) => (
                   <div key={idx} style={{

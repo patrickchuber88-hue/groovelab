@@ -7,35 +7,35 @@ import { supabase } from '../lib/supabase';
 import * as lamejs from '@breezystack/lamejs';
 
 export const ALL_STICKERS = [
-  // Meilensteine / Üben
-  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
-  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 250 Minuten ausdauerndes Üben.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true },
-  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 1000 Minuten Übezeit!', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true },
-  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Für grandiose 2000 Minuten Übezeit!', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
+  // Meilensteine / Üben (Einmalig - Mittelwert-Progression L1=5m, L2=10m, L3=15m im Schuljahr)
+  { id: 'fleiss-pionier', emoji: '🐝', title: 'Fleiß-Pionier', desc: 'Für insgesamt 50 Minuten fleißiges Üben.', equiv: '💡 Level 1: Ca. 17 Fokus-Timer Sessions à 3 Min.', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'ueben', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'uebe-meister', emoji: '🦉', title: 'Übe-Meister', desc: 'Für insgesamt 250 Minuten ausdauerndes Üben.', equiv: '💡 Level 1: Genau 50 Fokus-Timer Sessions à 5 Min.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', auto: true, category: 'ueben', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'uebe-legende', emoji: '👑', title: 'Übe-Legende', desc: 'Für unglaubliche 1000 Minuten Übezeit!', equiv: '💡 Level 2: Genau 100 Fokus-Timer Sessions à 10 Min. im Schuljahr', color: '#af52de', bg: 'rgba(175, 82, 222, 0.1)', auto: true, category: 'ueben', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'uebe-grossmeister', emoji: '🏆', title: 'Übe-Großmeister', desc: 'Für grandiose 2000 Minuten Übezeit!', equiv: '💡 Level 3: Ca. 133 Fokus-Timer Sessions à 15 Min. im Schuljahr', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)', auto: true, category: 'ueben', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
-  // XP
-  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP auf dem Profil gesammelt.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true },
-  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1000 XP auf dem Profil gesammelt.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true },
-  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 2500 XP auf dem Profil gesammelt.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true },
-  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: 'Unglaubliche 5000 XP auf dem Profil gesammelt.', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.1)', auto: true },
+  // XP (Einmalig)
+  { id: 'xp-sammler', emoji: '⭐', title: 'XP-Sammler', desc: '250 XP auf dem Profil gesammelt.', equiv: '🎯 25 Fokus-Ziele im Schuljahr erreicht', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', auto: true, category: 'xp', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'xp-champion', emoji: '🎖️', title: 'XP-Champion', desc: '1000 XP auf dem Profil gesammelt.', equiv: '🎯 100 Fokus-Ziele im Schuljahr erreicht', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', auto: true, category: 'xp', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'xp-meister', emoji: '🌌', title: 'XP-Meister', desc: 'Phänomenale 2500 XP auf dem Profil gesammelt.', equiv: '🎯 Level 2: 250 Fokus-Ziele im Schuljahr erreicht', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', auto: true, category: 'xp', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'xp-legende', emoji: '💎', title: 'XP-Legende', desc: 'Unglaubliche 5000 XP auf dem Profil gesammelt.', equiv: '🎯 Level 3: Repertoire-Großmeister im Schuljahr', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'xp', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
-  // Streaks
-  { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: 'Erreiche eine Übe-Streak von 3 Tagen.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true },
-  { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: 'Erreiche eine Übe-Streak von 7 Tagen.', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true },
-  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 21 Tagen gehalten!', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true },
-  { id: 'streak-kaiser', emoji: '👑', title: 'Streak-Kaiser', desc: 'Legendäre Übe-Streak von 30 Tagen gehalten!', color: '#7c2d12', bg: 'rgba(124, 45, 18, 0.1)', auto: true },
+  // Streaks (Einmalig)
+  { id: 'dranbleiber', emoji: '🔥', title: 'Dranbleiber', desc: 'Erreiche eine Übe-Streak von 3 Tagen.', equiv: '🔥 1 volle Schulwoche konstant am Instrument geblieben', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', auto: true, category: 'streaks', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'wochen-held', emoji: '📆', title: 'Wochen-Held', desc: 'Erreiche eine Übe-Streak von 7 Tagen.', equiv: '🔥 7 Tage in Folge ohne einen einzigen Tag Pause', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', auto: true, category: 'streaks', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'streak-koenig', emoji: '⚡', title: 'Streak-König', desc: 'Unglaubliche Übe-Streak von 21 Tagen gehalten!', equiv: '🔥 3 Wochen am Stück diszipliniert am Ball geblieben', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: true, category: 'streaks', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'streak-kaiser', emoji: '👑', title: 'Streak-Kaiser', desc: 'Legendäre Übe-Streak von 30 Tagen gehalten!', equiv: '🔥 1 ganzer Monat lückenlose Übe-Disziplin', color: '#7c2d12', bg: 'rgba(124, 45, 18, 0.15)', auto: true, category: 'streaks', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
-  // Songs
-  { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true },
-  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true },
-  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true },
-  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', color: '#34a853', bg: 'rgba(19, 115, 51, 0.1)', auto: true },
+  // Songs (Einmalig)
+  { id: 'erster-erfolg', emoji: '🎵', title: 'Erster Erfolg', desc: 'Dein allererster gemeisterter Song (100%).', equiv: '🎵 Dein erster kompletter Song von Anfang bis Ende', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)', auto: true, category: 'songs', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'song-sammler', emoji: '📚', title: 'Song-Sammler', desc: 'Schon 3 Songs komplett gemeistert.', equiv: '🎵 Reicht bereits für ein kleines Mini-Konzert', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', auto: true, category: 'songs', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'repertoire-riese', emoji: '🦖', title: 'Repertoire-Riese', desc: '5 Songs zu 100% gemeistert und im Repertoire!', equiv: '🎵 Ein vollständiges Set für deinen ersten Live-Auftritt', color: '#34a853', bg: 'rgba(52, 168, 83, 0.1)', auto: true, category: 'songs', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs zu 100% gemeistert und im Repertoire!', equiv: '🎵 Ein komplettes Album-Repertoire auf Bühnen-Niveau', color: '#137333', bg: 'rgba(19, 115, 51, 0.15)', auto: true, category: 'songs', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
-  // Manuell
-  { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false },
-  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Wird für jeden zu 100% gemeisterten Song verliehen.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false },
-  { id: 'creative-mind', emoji: '💡', title: 'Kreativ-Kopf', desc: 'Für eigene Kompositionen, Improvisation oder kreative Ideen.', color: '#db2777', bg: 'rgba(219, 39, 119, 0.1)', auto: false },
-  { id: 'extra-mile', emoji: '🚀', title: 'Extra-Meile', desc: 'Für das freiwillige Erarbeiten von Zusatzaufgaben.', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)', auto: false }
+  // Spezielle Auszeichnungen (Mehrfach vergebbar)
+  { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Für jeden Live-Auftritt vor Publikum.', equiv: '🌟 Bühnen-Erfahrung vor echtem Publikum gesammelt', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
+  { id: 'song-master', emoji: '🏆', title: 'Song-Master', desc: 'Wird für jeden zu 100% gemeisterten Song verliehen.', equiv: '🎸 Song zu 100% gemeistert und bühnenreif performt', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true },
+  { id: 'creative-mind', emoji: '💡', title: 'Kreativ-Kopf', desc: 'Für eigene Kompositionen, Improvisation oder kreative Ideen.', equiv: '🎨 Eigenständiges musikalisches Engagement bewiesen', color: '#db2777', bg: 'rgba(219, 39, 119, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
+  { id: 'extra-mile', emoji: '🚀', title: 'Extra-Meile', desc: 'Für das freiwillige Erarbeiten von Zusatzaufgaben.', equiv: '🚀 Über das geforderte Ziel hinausgewachsen', color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)', auto: false, category: 'spezial', rarity: 'rare', rarityLabel: 'Selten', multi: true }
 ];
 
 interface Student {
@@ -248,6 +248,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ? 'Hausaufgabenheft'
       : `${student.first_name}${student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : ''}`;
   }, [readOnly, student.first_name, student.last_name]);
+
+  const actualStudentName = useMemo(() => {
+    const fName = (student.first_name || '').trim();
+    if (!fName) return 'Musiker';
+    const lInitial = student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : '';
+    return `${fName}${lInitial}`;
+  }, [student.first_name, student.last_name]);
+
+  const getSchoolYearString = (dateInput?: string | Date) => {
+    const d = dateInput ? new Date(dateInput) : new Date();
+    const year = d.getFullYear();
+    const month = d.getMonth(); // 0-indexed (0 = Jan, 8 = Sept)
+    if (month >= 8) {
+      return `${year}/${year + 1}`;
+    } else {
+      return `${year - 1}/${year}`;
+    }
+  };
 
   useEffect(() => {
     if (!student.id) return;
@@ -521,10 +539,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [awardedStickerToAnimate, setAwardedStickerToAnimate] = useState<any | null>(null);
   const [schoolName, setSchoolName] = useState<string>('Campus-Groovelab');
   const [shareCardLayout, setShareCardLayout] = useState<'dark' | 'light'>('dark');
-  // Session log to capture all modifications made in current modal open state
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
-  const [lessonDay, setLessonDay] = useState<number>(1); // Default to Monday = 1
+  const [lessonDay, setLessonDay] = useState<number>(1);
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
+  const [simulatedStickers, setSimulatedStickers] = useState<Record<string, { count: number; details: { topic: string; date: string }[] }>>({});
+  const currentSchoolYear = useMemo(() => getSchoolYearString(), []);
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(currentSchoolYear);
+  const [simulatedSchoolYearData] = useState<Record<string, Record<string, { count: number; details: { topic: string; date: string }[] }>>>({
+    '2023/2024': {
+      'fleiss-pionier': { count: 1, details: [{ topic: 'Fleiß-Pionier (50 Min)', date: '2023-11-12' }] },
+      'uebe-meister': { count: 1, details: [{ topic: 'Übe-Meister (250 Min)', date: '2024-03-15' }] },
+      'xp-sammler': { count: 1, details: [{ topic: 'XP-Sammler', date: '2023-10-04' }] },
+      'dranbleiber': { count: 1, details: [{ topic: 'Dranbleiber', date: '2023-09-20' }] },
+      'erster-erfolg': { count: 1, details: [{ topic: 'Erster Erfolg', date: '2023-10-01' }] }
+    },
+    '2024/2025': {
+      'fleiss-pionier': { count: 1, details: [{ topic: 'Fleiß-Pionier', date: '2024-09-18' }] },
+      'uebe-meister': { count: 1, details: [{ topic: 'Übe-Meister', date: '2024-11-05' }] },
+      'uebe-legende': { count: 1, details: [{ topic: 'Übe-Legende (1000 Min)', date: '2025-04-10' }] },
+      'xp-sammler': { count: 1, details: [{ topic: 'XP-Sammler', date: '2024-09-22' }] },
+      'xp-champion': { count: 1, details: [{ topic: 'XP-Champion', date: '2025-01-14' }] },
+      'streak-koenig': { count: 1, details: [{ topic: 'Streak-König', date: '2025-02-02' }] },
+      'song-sammler': { count: 1, details: [{ topic: 'Song-Sammler', date: '2024-12-01' }] },
+      'stage-star': { count: 2, details: [{ topic: 'Stage-Star', date: '2025-06-20' }] }
+    }
+  });
+
+  const simulateMultiYearProgress = () => {
+    setSimulatedStickers({
+      'fleiss-pionier': { count: 1, details: [{ topic: 'Fleiß-Pionier', date: '2025-09-10' }] },
+      'uebe-meister': { count: 1, details: [{ topic: 'Übe-Meister', date: '2025-11-01' }] },
+      'uebe-legende': { count: 1, details: [{ topic: 'Übe-Legende', date: '2026-02-15' }] },
+      'uebe-grossmeister': { count: 1, details: [{ topic: 'Übe-Großmeister', date: '2026-05-20' }] },
+      'xp-sammler': { count: 1, details: [{ topic: 'XP-Sammler', date: '2025-09-15' }] },
+      'xp-champion': { count: 1, details: [{ topic: 'XP-Champion', date: '2025-11-20' }] },
+      'xp-meister': { count: 1, details: [{ topic: 'XP-Meister', date: '2026-02-10' }] },
+      'xp-legende': { count: 1, details: [{ topic: 'XP-Legende', date: '2026-06-01' }] },
+      'streak-kaiser': { count: 1, details: [{ topic: 'Streak-Kaiser', date: '2026-03-01' }] },
+      'repertoire-gigant': { count: 1, details: [{ topic: 'Repertoire-Gigant', date: '2026-06-15' }] },
+      'stage-star': { count: 3, details: [{ topic: 'Stage-Star', date: '2026-07-01' }] }
+    });
+    alert('🎉 3 Schuljahre wurden simuliert! Nutze das Schuljahr-Dropdown im Header, um zwischen 2025/2026 (Aktuell), 2024/2025 (Hall of Fame) und 2023/2024 (Hall of Fame) umzuschalten.');
+  };
+
+  const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
+  const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
   const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>(isTeacherTools ? 'loopstation' : 'document');
 
   // Speech Recognition & Audio play-along state
@@ -747,6 +806,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const awardSticker = async (stickerId: string, topicNameContext?: string) => {
     try {
+      const st = ALL_STICKERS.find(s => s.id === stickerId);
+      // Duplicate Protection: If single-award sticker (multi === false) is already collected, do not add duplicate
+      if (st && st.multi === false && collectedStickers[stickerId] && collectedStickers[stickerId].count > 0) {
+        if (st) setAwardedStickerToAnimate(st);
+        return;
+      }
+
       const targetTopic = topicNameContext || topicName || `Allgemein`;
       const dateStr = new Date().toISOString();
       const stickerMetaStr = `STICKER:${stickerId}|${targetTopic}|${dateStr}`;
@@ -760,7 +826,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       notifyHomeworkChange();
       
       // Trigger visual confetti animation modal
-      const st = ALL_STICKERS.find(s => s.id === stickerId);
       if (st) {
         setAwardedStickerToAnimate(st);
       }
@@ -1299,268 +1364,186 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const medalCenterY = 440;
-    const tX = 180;
+    const medalCenterY = 430;
+    const tX = 160;
     const tY = 80;
-    const tW = 840;
+    const tW = 880;
     const tH = 1040;
 
-    if (shareCardLayout === 'dark') {
-      // 1. Draw premium dark obsidian studio background
-      ctx.fillStyle = '#09090b';
-      ctx.fillRect(0, 0, 1200, 1200);
+    const isLegendary = sticker.rarity === 'legendary';
+    const isEpic = sticker.rarity === 'epic';
+    const themeColor = sticker.color || '#34a853';
 
-      // Draw Spotify Wrapped slanted color splash in canvas
+    // 1. Draw premium dark studio gradient background
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 1200);
+    bgGrad.addColorStop(0, '#090d16');
+    bgGrad.addColorStop(1, '#0f172a');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 1200);
+
+    // 2. Ambient radial background glow behind card
+    const glowGrad = ctx.createRadialGradient(600, 600, 100, 600, 600, 550);
+    glowGrad.addColorStop(0, isLegendary ? 'rgba(234, 179, 8, 0.25)' : 'rgba(52, 168, 83, 0.22)');
+    glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, 1200, 1200);
+
+    // 3. Draw rounded 3D Panini Collector Card Container
+    ctx.save();
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(tX, tY, tW, tH, 44);
+    } else {
+      ctx.rect(tX, tY, tW, tH);
+    }
+    ctx.fill();
+
+    // 4. Draw Rainbow Holo-Foil diagonal stripes inside card for rare/epic/legendary stickers
+    if (isLegendary || isEpic || sticker.rarity === 'rare') {
       ctx.save();
-      ctx.translate(600, 600);
-      ctx.rotate(-12 * Math.PI / 180);
-      const gradient = ctx.createLinearGradient(-600, -600, 600, -200);
-      gradient.addColorStop(0, sticker.color ? `${sticker.color}45` : 'rgba(52, 168, 83, 0.45)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(-800, -800, 1600, 600);
-      ctx.restore();
-
-      // Draw large slanted backdrop text overlay
-      ctx.save();
-      ctx.translate(600, 600);
-      ctx.rotate(-12 * Math.PI / 180);
-      ctx.font = '900 130px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillStyle = sticker.color ? `${sticker.color}15` : 'rgba(52, 168, 83, 0.15)';
-      ctx.textAlign = 'center';
-      ctx.fillText(sticker.title.toUpperCase(), 0, 20);
-      ctx.restore();
-
-      // 1. Draw solid dark grey background card container
-      ctx.fillStyle = '#121216';
+      ctx.clip(); // Clip inside card rounded bounds
+      const holoGrad = ctx.createLinearGradient(tX, tY, tX + tW, tY + tH);
+      holoGrad.addColorStop(0, 'rgba(255, 0, 128, 0.15)');
+      holoGrad.addColorStop(0.25, 'rgba(0, 255, 255, 0.15)');
+      holoGrad.addColorStop(0.5, 'rgba(255, 255, 0, 0.15)');
+      holoGrad.addColorStop(0.75, 'rgba(0, 255, 128, 0.15)');
+      holoGrad.addColorStop(1, 'rgba(255, 0, 255, 0.15)');
+      ctx.fillStyle = holoGrad;
       ctx.fillRect(tX, tY, tW, tH);
-
-      // 5. Draw glowing colored border matching sticker color
-      ctx.save();
-      ctx.shadowColor = sticker.color || '#34a853';
-      ctx.shadowBlur = 40;
-      ctx.strokeStyle = sticker.color || '#34a853';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(tX, tY, tW, tH);
       ctx.restore();
-
-      // 6. Header Action Title Pill (slanted)
-      ctx.save();
-      ctx.translate(600, tY + 90);
-      ctx.rotate(-2 * Math.PI / 180);
-      ctx.fillStyle = sticker.color || '#34a853';
-      const pillText = 'GEMEISTERT!';
-      ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
-      const pillTextWidth = ctx.measureText(pillText).width;
-      const pillW = pillTextWidth + 40;
-      const pillH = 46;
-      ctx.beginPath();
-      if (typeof (ctx as any).roundRect === 'function') {
-        (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 23);
-      } else {
-        ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
-      }
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(pillText, 0, 0);
-      ctx.restore();
-
-      // 7. Student Details (Dynamic layout to avoid overlapping)
-      let textY = tY + 670;
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(displayedStudentName, 600, textY);
-
-      if (studentInstrument) {
-        textY += 45;
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
-        ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
-      }
-
-      textY += 60;
-      ctx.fillStyle = sticker.color || '#34a853';
-      ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(sticker.title.toUpperCase(), 600, textY);
-
-      textY += 55;
-      ctx.fillStyle = '#cbd5e1';
-      ctx.font = 'bold 28px "Helvetica Neue", Inter, sans-serif';
-      ctx.fillText(sticker.desc, 600, textY);
-
-      // 8. Translucent Badge Pill for School Name
-      const badgeText = schoolName.toUpperCase();
-      ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
-      const textWidth = ctx.measureText(badgeText).width;
-      const badgeW = textWidth + 60;
-      const badgeH = 54;
-      const badgeX = 600 - badgeW / 2;
-      const badgeY = tY + 900;
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      if (typeof (ctx as any).roundRect === 'function') {
-        (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 27);
-      } else {
-        ctx.rect(badgeX, badgeY, badgeW, badgeH);
-      }
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
-      ctx.textBaseline = 'alphabetic'; // reset
-
-      // 9. Website URL footer (Dark Mode)
-      ctx.fillStyle = sticker.color || '#34a853';
-      ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('campus-groovelab.de', 600, tY + 985);
-    } else if (shareCardLayout === 'light') {
-      // 1. Draw premium light background
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, 1200, 1200);
-
-      // Draw Spotify Wrapped slanted color splash (light mode)
-      ctx.save();
-      ctx.translate(600, 600);
-      ctx.rotate(-12 * Math.PI / 180);
-      const gradient = ctx.createLinearGradient(-600, -600, 600, -200);
-      gradient.addColorStop(0, sticker.color ? `${sticker.color}25` : 'rgba(52, 168, 83, 0.25)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(-800, -800, 1600, 600);
-      ctx.restore();
-
-      // Draw large slanted backdrop text overlay (light mode)
-      ctx.save();
-      ctx.translate(600, 600);
-      ctx.rotate(-12 * Math.PI / 180);
-      ctx.font = '900 130px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillStyle = sticker.color ? `${sticker.color}10` : 'rgba(52, 168, 83, 0.10)';
-      ctx.textAlign = 'center';
-      ctx.fillText(sticker.title.toUpperCase(), 0, 20);
-      ctx.restore();
-
-      // 1. Draw solid light grey background card container
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(tX, tY, tW, tH);
-
-      // 5. Draw glowing colored border matching sticker color (light mode)
-      ctx.save();
-      ctx.shadowColor = sticker.color || '#34a853';
-      ctx.shadowBlur = 30;
-      ctx.strokeStyle = sticker.color || '#34a853';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(tX, tY, tW, tH);
-      ctx.restore();
-
-      // 6. Header Action Title Pill (slanted - light mode)
-      ctx.save();
-      ctx.translate(600, tY + 90);
-      ctx.rotate(-2 * Math.PI / 180);
-      ctx.fillStyle = sticker.color || '#34a853';
-      const pillText = 'GEMEISTERT!';
-      ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
-      const pillTextWidth = ctx.measureText(pillText).width;
-      const pillW = pillTextWidth + 40;
-      const pillH = 46;
-      ctx.beginPath();
-      if (typeof (ctx as any).roundRect === 'function') {
-        (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 23);
-      } else {
-        ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
-      }
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(pillText, 0, 0);
-      ctx.restore();
-
-      // 7. Student Details (Dynamic layout to avoid overlapping)
-      let textY = tY + 670;
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 54px "Helvetica Neue", Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(displayedStudentName, 600, textY);
-
-      if (studentInstrument) {
-        textY += 45;
-        ctx.fillStyle = '#64748b';
-        ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
-        ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
-      }
-
-      textY += 60;
-      ctx.fillStyle = sticker.color || '#34a853';
-      ctx.font = 'italic 900 48px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(sticker.title.toUpperCase(), 600, textY);
-
-      textY += 55;
-      ctx.fillStyle = '#475569';
-      ctx.font = 'bold 28px "Helvetica Neue", Inter, sans-serif';
-      ctx.fillText(sticker.desc, 600, textY);
-
-      // 8. Translucent Badge Pill for School Name
-      const badgeText = schoolName.toUpperCase();
-      ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
-      const textWidth = ctx.measureText(badgeText).width;
-      const badgeW = textWidth + 60;
-      const badgeH = 54;
-      const badgeX = 600 - badgeW / 2;
-      const badgeY = tY + 900;
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      if (typeof (ctx as any).roundRect === 'function') {
-        (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 27);
-      } else {
-        ctx.rect(badgeX, badgeY, badgeW, badgeH);
-      }
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#1e293b';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
-      ctx.textBaseline = 'alphabetic'; // reset
-
-      // 9. Website URL footer (Light Mode)
-      ctx.fillStyle = sticker.color || '#34a853';
-      ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('campus-groovelab.de', 600, tY + 985);
     }
 
-    // Helper stenciled/slapped sticker asset loader
+    // 5. Card Metallic Glowing Border
+    ctx.shadowColor = isLegendary ? '#eab308' : isEpic ? '#af52de' : themeColor;
+    ctx.shadowBlur = 30;
+    ctx.strokeStyle = isLegendary ? '#eab308' : isEpic ? '#af52de' : 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = isLegendary || isEpic ? 6 : 4;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(tX, tY, tW, tH, 44);
+    } else {
+      ctx.rect(tX, tY, tW, tH);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // 6. Header Rarity Tag & Schuljahr Stamp
+    ctx.save();
+    ctx.translate(600, tY + 50);
+    const syStr = getSchoolYearString();
+    const rarityText = `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • SCHULJAHR ${syStr}`;
+    ctx.font = '900 19px "Helvetica Neue", Inter, sans-serif';
+    ctx.fillStyle = isLegendary ? '#facc15' : isEpic ? '#c084fc' : themeColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(rarityText, 0, 0);
+    ctx.restore();
+
+    // 7. Header Action "GEMEISTERT!" Pill (slanted)
+    ctx.save();
+    ctx.translate(600, tY + 115);
+    ctx.rotate(-2 * Math.PI / 180);
+    ctx.fillStyle = themeColor;
+    const pillText = 'GEMEISTERT!';
+    ctx.font = '900 28px "Helvetica Neue", Arial, sans-serif';
+    const pillTextWidth = ctx.measureText(pillText).width;
+    const pillW = pillTextWidth + 44;
+    const pillH = 48;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 24);
+    } else {
+      ctx.rect(-pillW/2, -pillH/2, pillW, pillH);
+    }
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(pillText, 0, 0);
+    ctx.restore();
+
+    // 8. Student Details (Guaranteed ACTUAL student name, NEVER "Hausaufgabenheft")
+    let textY = tY + 680;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 54px "Helvetica Neue", Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(actualStudentName, 600, textY);
+
+    if (studentInstrument) {
+      textY += 45;
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
+    }
+
+    textY += 60;
+    ctx.fillStyle = themeColor;
+    ctx.font = 'italic 900 46px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText(sticker.title.toUpperCase(), 600, textY);
+
+    textY += 45;
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = 'bold 24px "Helvetica Neue", Inter, sans-serif';
+    ctx.fillText(sticker.desc, 600, textY);
+
+    if (sticker.equiv) {
+      textY += 42;
+      ctx.fillStyle = '#38bdf8'; // Sky blue highlight accent for tangible equivalencies
+      ctx.font = '900 22px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(sticker.equiv, 600, textY);
+    }
+
+    // 9. Translucent Badge Pill for School Name
+    const badgeText = schoolName.toUpperCase();
+    ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
+    const textWidth = ctx.measureText(badgeText).width;
+    const badgeW = textWidth + 60;
+    const badgeH = 52;
+    const badgeX = 600 - badgeW / 2;
+    const badgeY = tY + 910;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 26);
+    } else {
+      ctx.rect(badgeX, badgeY, badgeW, badgeH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, 600, badgeY + badgeH / 2);
+    ctx.textBaseline = 'alphabetic'; // reset
+
+    // 10. Website URL footer (Campus-Groovelab Seal)
+    ctx.fillStyle = themeColor;
+    ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('campus-groovelab.de', 600, tY + 990);
+
+    // Helper stenciled sticker asset loader
     const drawStickerAsset = (imgOrEmoji: HTMLImageElement | string, isImg: boolean) => {
       ctx.save();
       ctx.translate(600, medalCenterY);
 
       // Sticker drop shadow
       ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetX = -5;
-      ctx.shadowOffsetY = 8;
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 10;
 
-      const stickerRad = 180;
+      const stickerRad = 175;
 
       if (isImg && typeof imgOrEmoji !== 'string') {
-        // Draw backing white border for ripped/slapped vinyl sticker effect
+        // Draw backing white die-cut border for vinyl sticker effect
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(0, 0, stickerRad + 8, 0, Math.PI * 2);
+        ctx.arc(0, 0, stickerRad + 10, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.save();
@@ -1580,7 +1563,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       } else {
         // Fallback emoji
         ctx.shadowColor = 'transparent';
-        ctx.font = '220px sans-serif';
+        ctx.font = '200px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(sticker.emoji || '🏆', 0, 0);
@@ -1604,9 +1587,27 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const triggerDownload = (canvas: HTMLCanvasElement, filename: string) => {
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
-    link.download = `campus_sticker_${filename}.png`;
+    link.download = `campus_auszeichnung_${filename}.png`;
     link.href = dataUrl;
     link.click();
+  };
+
+  const shareCard = async (sticker: any) => {
+    try {
+      if (navigator.share) {
+        downloadShareCard(sticker);
+        await navigator.share({
+          title: `Campus-Groovelab Auszeichnung: ${sticker.title}`,
+          text: `Schau dir meine Auszeichnung "${sticker.title}" an der ${schoolName} auf Campus-Groovelab an! 🎵🏆`,
+          url: 'https://campus-groovelab.de'
+        });
+      } else {
+        downloadShareCard(sticker);
+        alert("Auszeichnung heruntergeladen! Du kannst das Bild jetzt in WhatsApp oder Instagram teilen. 📲");
+      }
+    } catch (err) {
+      console.log('Share action ended:', err);
+    }
   };
 
   useEffect(() => {
@@ -2227,8 +2228,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     });
 
+    Object.keys(simulatedStickers).forEach(id => {
+      if (counts[id] && (simulatedStickers[id]?.count || 0) > 0) {
+        counts[id] = simulatedStickers[id];
+      }
+    });
+
     return counts;
-  }, [progressItems]);
+  }, [progressItems, simulatedStickers]);
 
   useEffect(() => {
     if (!student.id || loading || progressItems.length === 0) return;
@@ -3021,6 +3028,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     );
   };
 
+  const renderSchoolYearSelector = () => {
+    if (!isCampusActive) return null;
+    const [cStartYear] = currentSchoolYear.split('/').map(Number);
+    const options = [
+      currentSchoolYear,
+      `${cStartYear - 1}/${cStartYear}`,
+      `${cStartYear - 2}/${cStartYear - 1}`
+    ];
+
+    return (
+      <select
+        value={selectedSchoolYear}
+        onChange={(e) => setSelectedSchoolYear(e.target.value)}
+        style={{
+          background: selectedSchoolYear === currentSchoolYear ? 'rgba(255,255,255,0.15)' : '#eab308',
+          border: '1px solid rgba(255,255,255,0.25)',
+          color: selectedSchoolYear === currentSchoolYear ? '#ffffff' : '#0f172a',
+          borderRadius: '20px',
+          padding: '4px 10px',
+          fontSize: '0.72rem',
+          fontWeight: 800,
+          cursor: 'pointer',
+          outline: 'none',
+          boxShadow: selectedSchoolYear !== currentSchoolYear ? '0 2px 8px rgba(234, 179, 8, 0.4)' : 'none',
+          transition: 'all 0.15s ease',
+          marginRight: '4px',
+          flexShrink: 0
+        }}
+      >
+        <option value={currentSchoolYear} style={{ color: '#0f172a' }}>
+          🎓 Schuljahr {currentSchoolYear} (Aktuell)
+        </option>
+        {options.slice(1).map(sy => (
+          <option key={sy} value={sy} style={{ color: '#0f172a' }}>
+            📜 Schuljahr {sy} (Hall of Fame)
+          </option>
+        ))}
+      </select>
+    );
+  };
+
 
   const renderFullscreenButton = () => {
     return (
@@ -3361,6 +3409,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
               <div className="header-desktop-archiv" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {renderSchoolYearSelector()}
                 {renderSkillRadarButton()}
                 {renderArchivButton()}
               </div>
@@ -7620,68 +7669,103 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
         </>
       ) : activeModalTab === 'stickeralbum' && isCampusActive ? (
-        /* STICKER SAMMELALBUM VIEW */
+        /* STICKER SAMMELALBUM VIEW - 3D PANINI SAMMELALBUM (SENIOR DESIGNER LEVEL) */
         <div style={{
           flex: 1,
-          padding: useNotebookLayout ? '32px 32px 32px 60px' : '32px',
+          width: '100%',
+          padding: '28px 32px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           gap: '24px',
-          background: useNotebookLayout ? '#faf8f2' : '#f8fafc',
-          backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(#faf8f2, #faf8f2 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-          borderRadius: useNotebookLayout ? '0 0 20px 20px' : '0',
-          boxShadow: useNotebookLayout ? '0 10px 30px rgba(0,0,0,0.15)' : 'none',
-          position: 'relative'
+          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+          borderRadius: '0',
+          position: 'relative',
+          boxSizing: 'border-box'
         }}>
-          {useNotebookLayout && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: '42px',
-              width: '2px',
-              background: '#fca5a5',
-              zIndex: 10
-            }} />
-          )}
-          
-          <button
-            type="button"
-            onClick={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: '#f1f5f9',
-              border: 'none',
-              color: '#475569',
-              padding: '8px 14px',
-              borderRadius: '20px',
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              width: 'fit-content',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-              transition: 'all 0.15s ease'
-            }}
-            className="hover-scale"
-          >
-            <span>← Zurück zum Hub</span>
-          </button>
+          {/* Keyframe animations */}
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes holoShimmer {
+              0% { background-position: 0% 0%; }
+              50% { background-position: 100% 100%; }
+              100% { background-position: 0% 0%; }
+            }
+            @keyframes stickerGlow {
+              0%, 100% { box-shadow: 0 0 20px rgba(52, 168, 83, 0.3); }
+              50% { box-shadow: 0 0 35px rgba(52, 168, 83, 0.7); }
+            }
+            @keyframes peelIn {
+              0% { transform: scale(0.6) rotate(-10deg); opacity: 0; }
+              70% { transform: scale(1.08) rotate(3deg); }
+              100% { transform: scale(1) rotate(0deg); opacity: 1; }
+            }
+            .panini-sticker-card {
+              transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+              transform-style: preserve-3d;
+            }
+            .panini-sticker-card:hover {
+              transform: translateY(-8px) scale(1.02);
+            }
+            .holo-foil-overlay {
+              background: linear-gradient(135deg, 
+                rgba(255, 0, 128, 0.25) 0%, 
+                rgba(0, 255, 255, 0.25) 25%, 
+                rgba(255, 255, 0, 0.25) 50%, 
+                rgba(0, 255, 128, 0.25) 75%, 
+                rgba(255, 0, 255, 0.25) 100%
+              );
+              background-size: 300% 300%;
+              mix-blend-mode: color-dodge;
+              animation: holoShimmer 4s ease infinite;
+            }
+            .panini-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+              gap: 24px;
+              width: 100%;
+            }
+          `}} />
 
-          {/* SIMULATOR TOGGLE BAR (Compact) */}
+          {/* TOP BAR: Back to Hub Button */}
+          <div style={{ flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => { setActiveModalTab('document'); setActiveSubView('hub'); }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#ffffff',
+                border: '1.5px solid #e2e8f0',
+                color: '#334155',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                width: 'fit-content',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <span>← Zurück zum Hub</span>
+            </button>
+          </div>
+
+          {/* SIMULATOR TOGGLE BAR (Dev Mode) */}
           <div style={{
             background: 'white',
-            borderRadius: '16px',
+            borderRadius: '20px',
             padding: '12px 20px',
             border: '1.5px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '12px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-            zIndex: 20
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            zIndex: 20,
+            flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sliders size={15} color="#64748b" />
@@ -7691,7 +7775,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {/* Checkbox Toggle */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
                 <input
                   type="checkbox"
@@ -7702,7 +7785,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <span>Klick-Vergabe simulieren</span>
               </label>
 
-              {/* Demo Mode Toggle */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
                 <input
                   type="checkbox"
@@ -7713,7 +7795,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 <span>Demo-Limits</span>
               </label>
 
-              {/* Reset Album Button */}
+              <button
+                type="button"
+                onClick={simulateMultiYearProgress}
+                style={{
+                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                  border: '1px solid #ca8a04',
+                  color: '#0f172a',
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 12px',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 6px rgba(234, 179, 8, 0.3)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <span>🎓 3 Schuljahre simulieren</span>
+              </button>
+
               <button
                 type="button"
                 onClick={resetStickerAlbum}
@@ -7739,194 +7843,736 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </button>
             </div>
           </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '1.25rem' }}>🏆</span>
-            <span style={{
-              fontSize: '1rem',
-              fontWeight: 900,
-              color: '#0f172a',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
-            }}>
-              Sticker Sammelalbum
-            </span>
-          </div>
 
-          {/* XP-Legende Panel */}
-          <div style={{
-            background: useNotebookLayout ? '#fefcf6' : 'white',
-            border: useNotebookLayout ? '1.5px solid #e5e0d4' : '1px solid #e2e8f0',
-            borderRadius: '20px',
-            padding: '20px',
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.02)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            marginBottom: '8px',
-            fontFamily: useNotebookLayout ? '"Kalam", "Comic Sans MS", cursive' : 'inherit',
-            zIndex: 10
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.2rem' }}>🎮</span>
-              <strong style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
-                Campus-Groovelab XP-Legende (Wie du Punkte sammelst)
-              </strong>
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '12px'
-            }}>
-              <div style={{ background: useNotebookLayout ? '#ffffff' : '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '1.25rem', marginTop: '-2px' }}>⏱️</span>
-                <div>
-                  <strong style={{ fontSize: '0.76rem', display: 'block', color: '#334155' }}>Übe-Fokus</strong>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Pro Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
-                </div>
-              </div>
-              <div style={{ background: useNotebookLayout ? '#ffffff' : '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '1.25rem', marginTop: '-2px' }}>🎯</span>
-                <div>
-                  <strong style={{ fontSize: '0.76rem', display: 'block', color: '#334155' }}>Tägliches Fokus-Ziel</strong>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus.</span>
-                </div>
-              </div>
-              <div style={{ background: useNotebookLayout ? '#ffffff' : '#f8fafc', padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '1.25rem', marginTop: '-2px' }}>🏆</span>
-                <div>
-                  <strong style={{ fontSize: '0.76rem', display: 'block', color: '#334155' }}>Song meistern</strong>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* ALBUM HEADER & PROGRESS TRACKER HERO BANNER */}
+          {(() => {
+            const activeStickerSource = selectedSchoolYear === currentSchoolYear 
+              ? collectedStickers 
+              : (simulatedSchoolYearData[selectedSchoolYear] || {});
 
-          <style>{`
-            .sticker-album-grid {
-              display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 20px;
-              width: 100%;
-            }
-            @media (max-width: 1100px) {
-              .sticker-album-grid {
-                grid-template-columns: repeat(3, 1fr);
-              }
-            }
-            @media (max-width: 800px) {
-              .sticker-album-grid {
-                grid-template-columns: repeat(2, 1fr);
-              }
-            }
-            @media (max-width: 500px) {
-              .sticker-album-grid {
-                grid-template-columns: 1fr;
-              }
-            }
-          `}</style>
+            const totalCount = ALL_STICKERS.length;
+            const collectedCount = ALL_STICKERS.filter(st => (activeStickerSource[st.id]?.count || 0) > 0).length;
+            const percentage = Math.round((collectedCount / totalCount) * 100);
 
-          <div className="sticker-album-grid">
-            {ALL_STICKERS.map(st => {
-              const info = collectedStickers[st.id] || { count: 0, details: [] };
-              const isCollected = info.count > 0;
+            if (selectedSchoolYear !== currentSchoolYear) {
               return (
-                <div
-                  key={st.id}
-                  onClick={() => {
-                    if (isDevSimulationActive) {
-                      awardSticker(st.id, "Simulation");
-                    } else {
-                      setSelectedPreviewSticker(st);
-                    }
-                  }}
+                <div style={{
+                  background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #0f172a 100%)',
+                  borderRadius: '28px',
+                  padding: '28px 32px',
+                  color: 'white',
+                  boxShadow: '0 20px 50px -10px rgba(49, 46, 129, 0.5)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  border: '2px solid #facc15',
+                  flexShrink: 0,
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  {/* Gold Glow */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0, right: 0, bottom: 0, left: 0,
+                    background: 'radial-gradient(circle at 80% 20%, rgba(250, 204, 21, 0.25) 0%, transparent 60%)',
+                    pointerEvents: 'none'
+                  }} />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', position: 'relative', zIndex: 2 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '2rem' }}>🏛️</span>
+                        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.5px', color: '#facc15' }}>
+                          Schuljahr-Ehrentafel {selectedSchoolYear}
+                        </h2>
+                        <span style={{
+                          background: 'rgba(250, 204, 21, 0.2)',
+                          border: '1.5px solid #facc15',
+                          color: '#facc15',
+                          fontSize: '0.74rem',
+                          fontWeight: 900,
+                          padding: '4px 14px',
+                          borderRadius: '20px',
+                          letterSpacing: '0.06em'
+                        }}>
+                          🏆 HALL OF FAME ARCHIV
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.86rem', color: '#c7d2fe', fontWeight: 600, maxWidth: '580px' }}>
+                        Abgeheftete Meilensteine aus dem Schuljahr {selectedSchoolYear}. Alle gelernten Songs & Lehrwerke bleiben lebenslang im Repertoire!
+                      </p>
+                    </div>
+
+                    <div style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1.5px solid rgba(250, 204, 21, 0.4)',
+                      borderRadius: '20px',
+                      padding: '14px 22px',
+                      textAlign: 'right',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                      flexShrink: 0
+                    }}>
+                      <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 900, color: '#facc15' }}>
+                        SIEGEL {selectedSchoolYear}
+                      </span>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '2px' }}>
+                        {collectedCount} Trophäen ✓
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            let rankTitle = '🌱 Rookie-Sammler';
+            if (percentage >= 100) rankTitle = '👑 Master Collector';
+            else if (percentage >= 75) rankTitle = '🔥 Sammel-Legende';
+            else if (percentage >= 50) rankTitle = '⚡ Groove-Profi';
+            else if (percentage >= 25) rankTitle = '🎵 Vinyl-Jäger';
+
+            return (
+              <div style={{
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                borderRadius: '28px',
+                padding: '26px 32px',
+                color: 'white',
+                boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.4)',
+                position: 'relative',
+                overflow: 'hidden',
+                border: '1.5px solid rgba(255, 255, 255, 0.08)',
+                flexShrink: 0,
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                {/* Glow splash background */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-80px',
+                  right: '-80px',
+                  width: '300px',
+                  height: '300px',
+                  background: 'radial-gradient(circle, rgba(52, 168, 83, 0.25) 0%, transparent 70%)',
+                  pointerEvents: 'none',
+                  borderRadius: '50%'
+                }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px', position: 'relative', zIndex: 2 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '1.6rem' }}>🏆</span>
+                      <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.5px', color: '#ffffff' }}>
+                        Sticker Sammelalbum
+                      </h2>
+                      <span style={{
+                        background: 'rgba(52, 168, 83, 0.2)',
+                        border: '1px solid #34a853',
+                        color: '#4ade80',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        letterSpacing: '0.04em'
+                      }}>
+                        {rankTitle}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: '#94a3b8', fontWeight: 600, maxWidth: '520px' }}>
+                      Sammle XP, erstelle Streaks & meistere Songs, um alle haptischen Sammel-Sticker für dein virtuelles Musik-Album freizuschalten.
+                    </p>
+                  </div>
+
+                  {/* Score pill */}
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '20px',
+                    padding: '14px 24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    gap: '4px',
+                    flexShrink: 0
+                  }}>
+                    <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, color: '#94a3b8' }}>
+                      Sammelfortschritt
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <strong style={{ fontSize: '1.8rem', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>
+                        {collectedCount}
+                      </strong>
+                      <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 800 }}>
+                        / {totalCount} Sticker ({percentage}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ marginTop: '20px', position: 'relative', zIndex: 2 }}>
+                  <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.08)', borderRadius: '10px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${percentage}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #34a853 0%, #4ade80 100%)',
+                      borderRadius: '10px',
+                      transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* XP LEGENDE TOGGLEABLE PANEL */}
+          <div style={{
+            background: 'white',
+            borderRadius: '20px',
+            border: '1.5px solid #e2e8f0',
+            overflow: 'hidden',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            flexShrink: 0
+          }}>
+            <div 
+              onClick={() => setIsXpLegendOpen(!isXpLegendOpen)}
+              style={{
+                padding: '14px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                background: isXpLegendOpen ? '#f8fafc' : 'white',
+                transition: 'background 0.15s'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.2rem' }}>🎮</span>
+                <strong style={{ fontSize: '0.86rem', fontWeight: 800, color: '#1e293b' }}>
+                  XP-Legende & Punkte-Guide
+                </strong>
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                  (Wie du Punkte & Sticker sammelst)
+                </span>
+              </div>
+              <ChevronRight 
+                size={18} 
+                color="#64748b" 
+                style={{ 
+                  transform: isXpLegendOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }} 
+              />
+            </div>
+
+            {isXpLegendOpen && (
+              <div style={{
+                padding: '16px 20px 20px 20px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '14px',
+                animation: 'fadeIn 0.2s ease-out'
+              }}>
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.4rem' }}>⏱️</span>
+                  <div>
+                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Übe-Fokus</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Pro Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
+                  </div>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.4rem' }}>🎯</span>
+                  <div>
+                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Tägliches Fokus-Ziel</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus.</span>
+                  </div>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.4rem' }}>🏆</span>
+                  <div>
+                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Song meistern</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CATEGORIES FILTER BAR TABS */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            overflowX: 'auto',
+            padding: '4px 2px 8px 2px',
+            flexShrink: 0,
+            minHeight: '48px'
+          }}>
+            {[
+              { id: 'all', label: `Alle (${ALL_STICKERS.length})` },
+              { id: 'ueben', label: '⏱️ Übe-Fleiß' },
+              { id: 'xp', label: '⭐ XP & Stufen' },
+              { id: 'streaks', label: '🔥 Streaks' },
+              { id: 'songs', label: '🎵 Repertoire' },
+              { id: 'spezial', label: '🏆 Spezial' }
+            ].map(tab => {
+              const isActive = stickerCategoryFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStickerCategoryFilter(tab.id as any)}
                   style={{
-                    background: isCollected ? 'white' : 'rgba(241, 245, 249, 0.6)',
-                    border: isCollected ? `2px solid ${st.color}` : '2px dashed #cbd5e1',
-                    borderRadius: '24px',
-                    padding: '24px',
+                    background: isActive ? '#0f172a' : 'white',
+                    color: isActive ? 'white' : '#475569',
+                    border: isActive ? '1.5px solid #0f172a' : '1.5px solid #e2e8f0',
+                    borderRadius: '20px',
+                    padding: '9px 18px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.15)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 3D PANINI STICKER ALBUM GRID */}
+          <div className="panini-grid">
+            {ALL_STICKERS
+              .filter(st => stickerCategoryFilter === 'all' || st.category === stickerCategoryFilter)
+              .map((st, idx) => {
+                const activeStickerSource = selectedSchoolYear === currentSchoolYear 
+                  ? collectedStickers 
+                  : (simulatedSchoolYearData[selectedSchoolYear] || {});
+                const info = activeStickerSource[st.id] || { count: 0, details: [] };
+                const isCollected = info.count > 0;
+                const isLegendary = st.rarity === 'legendary';
+                const isEpic = st.rarity === 'epic';
+
+                // Organic tilt angle offset per position
+                const organicAngle = (idx % 3 - 1) * 2;
+
+                return (
+                  <div
+                    key={st.id}
+                    className="panini-sticker-card"
+                    onClick={() => {
+                      if (isDevSimulationActive) {
+                        awardSticker(st.id, "Simulation");
+                      } else {
+                        setSelectedPreviewSticker(st);
+                      }
+                    }}
+                    style={{
+                      background: isCollected ? 'white' : '#f8fafc',
+                      border: isCollected 
+                        ? (isLegendary ? '2.5px solid #eab308' : isEpic ? '2.5px solid #af52de' : `2px solid ${st.color}`) 
+                        : '2px dashed #cbd5e1',
+                      borderRadius: '28px',
+                      padding: '24px 20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      gap: '14px',
+                      position: 'relative',
+                      boxShadow: isCollected 
+                        ? (isLegendary ? '0 12px 30px rgba(234, 179, 8, 0.2)' : '0 10px 25px rgba(0,0,0,0.06)') 
+                        : 'inset 0 2px 8px rgba(0,0,0,0.02)',
+                      cursor: 'pointer',
+                      transform: `rotate(${organicAngle}deg)`
+                    }}
+                  >
+                    {/* Holographic foil overlay for legendary/epic stickers */}
+                    {isCollected && (isLegendary || isEpic) && (
+                      <div 
+                        className="holo-foil-overlay" 
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: '26px',
+                          pointerEvents: 'none',
+                          opacity: isLegendary ? 0.35 : 0.2,
+                          zIndex: 1
+                        }} 
+                      />
+                    )}
+
+                    {/* Manual Award Button for Teachers / Dev simulation */}
+                    {st.id !== 'song-master' && !st.auto && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
+                          if (context !== null) {
+                            awardSticker(st.id, context || undefined);
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '14px',
+                          left: '14px',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: st.color,
+                          color: 'white',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 3px 8px rgba(0,0,0,0.2)',
+                          zIndex: 10,
+                          fontWeight: 'bold',
+                          fontSize: '1rem'
+                        }}
+                        title="Sticker manuell vergeben"
+                        className="hover-scale"
+                      >
+                        +
+                      </button>
+                    )}
+
+                    {/* Rarity Pill Badge */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '14px',
+                      right: '14px',
+                      zIndex: 5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {isCollected && st.multi && info.count > 1 && (
+                        <span style={{
+                          background: st.color,
+                          color: 'white',
+                          fontWeight: 900,
+                          fontSize: '0.72rem',
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                        }}>
+                          x{info.count}
+                        </span>
+                      )}
+
+                      <span style={{
+                        background: isCollected 
+                          ? (isLegendary ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : isEpic ? '#af52de' : '#e2e8f0') 
+                          : '#f1f5f9',
+                        color: isCollected && (isLegendary || isEpic) ? 'white' : '#64748b',
+                        fontSize: '0.64rem',
+                        fontWeight: 900,
+                        padding: '3px 8px',
+                        borderRadius: '10px',
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase'
+                      }}>
+                        {st.rarityLabel || 'Standard'}
+                      </span>
+                    </div>
+
+                    {/* LARGE HIGH-IMPACT DIE-CUT STICKER GRAPHIC (135px Diameter) */}
+                    <div style={{
+                      width: '135px',
+                      height: '135px',
+                      marginTop: '8px',
+                      borderRadius: '50%',
+                      background: isCollected ? st.bg : '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      border: isCollected ? '4px solid #ffffff' : '2px dashed #cbd5e1',
+                      boxShadow: isCollected 
+                        ? '0 10px 22px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0,0,0,0.06)' 
+                        : 'inset 0 2px 6px rgba(0,0,0,0.05)',
+                      transition: 'all 0.3s ease',
+                      zIndex: 2
+                    }}>
+                      {isCollected ? (
+                        <img 
+                          src={`/stickers/${st.id}.png?v=1`} 
+                          alt={st.title} 
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover',
+                            borderRadius: '50%',
+                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))'
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const parent = e.currentTarget.parentElement;
+                            if (parent) {
+                              const existingSpan = parent.querySelector('.emoji-fallback');
+                              if (!existingSpan) {
+                                const span = document.createElement('span');
+                                span.className = 'emoji-fallback';
+                                span.style.fontSize = '3.5rem';
+                                span.innerText = st.emoji;
+                                parent.appendChild(span);
+                              }
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          opacity: 0.35,
+                          filter: 'grayscale(100%)'
+                        }}>
+                          <img 
+                            src={`/stickers/${st.id}.png?v=1`} 
+                            alt={st.title} 
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'cover',
+                              borderRadius: '50%',
+                              filter: 'grayscale(100%) blur(1px)' 
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const parent = e.currentTarget.parentElement;
+                              if (parent) {
+                                const existingSpan = parent.querySelector('.emoji-fallback');
+                                if (!existingSpan) {
+                                  const span = document.createElement('span');
+                                  span.className = 'emoji-fallback';
+                                  span.style.fontSize = '3.2rem';
+                                  span.innerText = st.emoji;
+                                  parent.appendChild(span);
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {!isCollected && (
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: '50%',
+                          background: 'rgba(241, 245, 249, 0.75)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#94a3b8',
+                          fontSize: '1.4rem'
+                        }}>
+                          🔒
+                        </div>
+                      )}
+                    </div>
+
+                    {/* STICKER TITLE & DESCRIPTION */}
+                    <div style={{ position: 'relative', zIndex: 2, width: '100%' }}>
+                      <h4 style={{ 
+                        margin: '0 0 4px 0', 
+                        fontSize: '0.96rem', 
+                        fontWeight: 900, 
+                        color: isCollected ? '#0f172a' : '#64748b' 
+                      }}>
+                        {st.title}
+                      </h4>
+                      <p style={{ 
+                        margin: 0, 
+                        fontSize: '0.75rem', 
+                        color: isCollected ? '#64748b' : '#94a3b8', 
+                        fontWeight: 600, 
+                        lineHeight: '1.35' 
+                      }}>
+                        {st.desc}
+                      </p>
+                    </div>
+
+                    {/* COLLECTION HISTORY LOG PREVIEW */}
+                    {isCollected && (
+                      <div style={{
+                        width: '100%',
+                        borderTop: '1px solid #f1f5f9',
+                        paddingTop: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        alignItems: 'flex-start',
+                        maxHeight: '75px',
+                        overflowY: 'auto',
+                        position: 'relative',
+                        zIndex: 2
+                      }}>
+                        <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
+                          {st.multi ? `Historie (${info.count}x):` : 'Freigeschaltet:'}
+                        </span>
+                        {st.multi ? (
+                          info.details.slice(0, 2).map((dt, dIdx) => (
+                            <div key={dIdx} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', color: '#475569', fontWeight: 650 }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>{dt.topic}</span>
+                              <span style={{ color: '#94a3b8' }}>{dt.date}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', color: '#34a853', fontWeight: 700 }}>
+                            <span>✓ Freigeschaltet</span>
+                            <span style={{ color: '#64748b' }}>{info.details[0]?.date || 'Aktiv'}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* BRAND NEW 3D PANINI INSPECTOR & DETAIL MODAL (REPLACING SPOTIFY-WRAPPED) */}
+          {selectedPreviewSticker && (() => {
+            const st = selectedPreviewSticker;
+            const info = collectedStickers[st.id] || { count: 0, details: [] };
+            const isCollected = info.count > 0;
+            const displayDate = info.details?.[0]?.date || new Date().toLocaleDateString('de-DE');
+            const displayTopic = info.details?.[0]?.topic || 'Herausforderung gemeistert';
+            const isLegendary = st.rarity === 'legendary';
+            const isEpic = st.rarity === 'epic';
+
+            return (
+              <div 
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(15, 23, 42, 0.88)',
+                  backdropFilter: 'blur(16px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10000,
+                  padding: '20px',
+                  animation: 'fadeIn 0.25s ease-out'
+                }} 
+                onClick={() => setSelectedPreviewSticker(null)}
+              >
+                {/* 3D PANINI COLLECTOR'S CARD */}
+                <div 
+                  style={{
+                    width: '100%',
+                    maxWidth: '440px',
+                    background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+                    borderRadius: '32px',
+                    border: isLegendary 
+                      ? '2.5px solid #eab308' 
+                      : isEpic 
+                      ? '2.5px solid #af52de' 
+                      : '2px solid rgba(255, 255, 255, 0.12)',
+                    boxShadow: isLegendary
+                      ? '0 25px 60px -12px rgba(234, 179, 8, 0.35)'
+                      : '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
+                    padding: '32px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    textAlign: 'center',
-                    gap: '12px',
-                    opacity: isCollected ? 1 : 0.6,
-                    boxShadow: isCollected ? '0 10px 25px rgba(0,0,0,0.05)' : 'none',
-                    transition: 'all 0.3s ease',
+                    gap: '20px',
+                    color: 'white',
                     position: 'relative',
                     overflow: 'hidden',
-                    cursor: 'pointer'
+                    animation: 'peelIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
                   }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {st.id !== 'song-master' && !st.auto && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
-                        if (context !== null) {
-                          awardSticker(st.id, context || undefined);
-                        }
-                      }}
+                  {/* Holographic foil overlay inside card modal */}
+                  {(isLegendary || isEpic) && (
+                    <div 
+                      className="holo-foil-overlay" 
                       style={{
                         position: 'absolute',
-                        top: '12px',
-                        left: '12px',
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: st.color,
-                        color: 'white',
-                        border: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
-                        zIndex: 10,
-                        fontWeight: 'bold',
-                        fontSize: '1rem'
-                      }}
-                      title="Sticker manuell vergeben"
-                      className="hover-scale"
-                    >
-                      +
-                    </button>
+                        inset: 0,
+                        borderRadius: '30px',
+                        pointerEvents: 'none',
+                        opacity: isLegendary ? 0.3 : 0.15
+                      }} 
+                    />
                   )}
 
-                  {isCollected && (!st.auto || ['dranbleiber', 'wochen-held', 'streak-koenig', 'streak-kaiser'].includes(st.id)) && info.count > 1 && (
-                    <div style={{
+                  {/* Close button */}
+                  <button
+                    onClick={() => setSelectedPreviewSticker(null)}
+                    style={{
                       position: 'absolute',
-                      top: '12px',
-                      right: '12px',
-                      background: st.color,
-                      color: 'white',
-                      fontWeight: 900,
-                      fontSize: '0.75rem',
-                      padding: '4px 10px',
-                      borderRadius: '12px',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                    }}>
-                      x{info.count}
-                    </div>
-                  )}
+                      top: '20px',
+                      right: '20px',
+                      background: 'rgba(255,255,255,0.08)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '36px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      transition: 'all 0.15s',
+                      zIndex: 10
+                    }}
+                    className="hover-scale"
+                  >
+                    <X size={18} />
+                  </button>
 
-                  {/* Icon / Badge Container */}
+                  {/* Header Badge & Rarity Tag with Schuljahr Stamp */}
+                  <div style={{ textAlign: 'center', marginTop: '4px', zIndex: 2 }}>
+                    <span style={{ 
+                      fontSize: '0.68rem', 
+                      fontWeight: 900, 
+                      textTransform: 'uppercase', 
+                      letterSpacing: '0.12em', 
+                      color: isLegendary ? '#facc15' : isEpic ? '#c084fc' : st.color || '#34a853',
+                      background: 'rgba(255,255,255,0.06)',
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                      ⭐ {st.rarityLabel || 'Standard'} • Schuljahr {getSchoolYearString(displayDate)}
+                    </span>
+                    <h3 style={{ fontSize: '1.6rem', fontWeight: 900, margin: '10px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
+                      {st.title}
+                    </h3>
+                  </div>
+
+                  {/* XXL STICKER DISPLAY IMAGE (170px) */}
                   <div style={{
-                    width: '80px',
-                    height: '80px',
+                    width: '170px',
+                    height: '170px',
                     borderRadius: '50%',
-                    background: isCollected ? st.bg : '#e2e8f0',
+                    background: isCollected ? st.bg : 'rgba(255,255,255,0.05)',
+                    border: '5px solid #ffffff',
+                    boxShadow: isCollected 
+                      ? `0 12px 30px ${st.color}50, 0 0 0 2px rgba(255,255,255,0.8)` 
+                      : '0 8px 20px rgba(0,0,0,0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '2.5rem',
-                    border: isCollected ? `2px solid ${st.color}` : '2px solid transparent',
-                    filter: isCollected ? 'none' : 'grayscale(100%)',
-                    boxShadow: isCollected ? `0 8px 20px ${st.bg}` : 'none',
-                    transition: 'all 0.3s ease',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    position: 'relative',
+                    zIndex: 2,
+                    margin: '8px 0'
                   }}>
                     {isCollected ? (
                       <img 
@@ -7937,700 +8583,206 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           e.currentTarget.style.display = 'none';
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
-                            const existingSpan = parent.querySelector('.emoji-fallback');
-                            if (!existingSpan) {
-                              const span = document.createElement('span');
-                              span.className = 'emoji-fallback';
-                              span.innerText = st.emoji;
-                              parent.appendChild(span);
-                            }
+                            const span = document.createElement('span');
+                            span.style.fontSize = '4.5rem';
+                            span.innerText = st.emoji;
+                            parent.appendChild(span);
                           }
                         }}
                       />
                     ) : (
-                      <img 
-                        src={`/stickers/${st.id}.png?v=1`} 
-                        alt={st.title} 
-                        style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          objectFit: 'cover', 
-                          filter: 'grayscale(100%) opacity(0.35) blur(1px)' 
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            const existingSpan = parent.querySelector('.emoji-fallback');
-                            if (!existingSpan) {
-                              const span = document.createElement('span');
-                              span.className = 'emoji-fallback';
-                              span.style.fontSize = '2.5rem';
-                              span.style.filter = 'grayscale(100%) opacity(0.35)';
-                              span.innerText = st.emoji;
-                              parent.appendChild(span);
-                            }
-                          }
-                        }}
-                      />
+                      <span style={{ fontSize: '4.5rem', filter: 'grayscale(100%) opacity(0.3)' }}>
+                        {st.emoji}
+                      </span>
                     )}
                   </div>
 
-                  <div>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
-                      {st.title}
-                    </h4>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-                      {st.desc}
-                    </p>
+                  {/* Student Name & Instrument Badge */}
+                  <div style={{ textAlign: 'center', width: '100%', zIndex: 2, marginTop: '-4px' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', margin: 0, letterSpacing: '-0.02em' }}>
+                      {actualStudentName}
+                    </h2>
+                    {studentInstrument && (
+                      <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '4px', display: 'block' }}>
+                        {studentInstrument}
+                      </span>
+                    )}
                   </div>
 
-                  {isCollected && (
-                    <div style={{
-                      width: '100%',
-                      borderTop: '1px solid #f1f5f9',
-                      paddingTop: '10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      alignItems: 'flex-start',
-                      maxHeight: '120px',
-                      overflowY: 'auto'
+                  {/* Description Box */}
+                  <div style={{ 
+                    width: '100%', 
+                    textAlign: 'center', 
+                    background: 'rgba(255,255,255,0.04)', 
+                    padding: '16px 20px', 
+                    borderRadius: '20px', 
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    zIndex: 2
+                  }}>
+                    <p style={{ fontSize: '0.86rem', color: '#e2e8f0', margin: '0 0 6px 0', lineHeight: '1.4', fontWeight: 600 }}>
+                      {st.desc}
+                    </p>
+                    {st.equiv && (
+                      <div style={{
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        borderRadius: '12px',
+                        padding: '6px 12px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        color: '#38bdf8',
+                        margin: '8px 0 6px 0'
+                      }}>
+                        {st.equiv}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
+                      <span style={{ 
+                        fontSize: '0.72rem', 
+                        color: isCollected ? '#4ade80' : '#94a3b8', 
+                        fontWeight: 800 
+                      }}>
+                        {isCollected ? `✓ Freigeschaltet (${info.count}x gesammelt)` : '🔒 Noch nicht freigeschaltet'}
+                      </span>
+                      <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
+                      <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 900 }}>
+                        campus-groovelab.de
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Collection Timeline Details */}
+                  {isCollected && info.details.length > 0 && (
+                    <div style={{ 
+                      width: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '8px', 
+                      maxHeight: '120px', 
+                      overflowY: 'auto',
+                      background: 'rgba(0,0,0,0.2)',
+                      padding: '12px 16px',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      zIndex: 2
                     }}>
-                      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>
-                        Verlauf:
+                      <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Erhalten am:
                       </span>
                       {info.details.map((dt, dIdx) => (
-                        <div key={dIdx} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.68rem', color: '#475569', fontWeight: 650 }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>{dt.topic}</span>
+                        <div key={dIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 600 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>{dt.topic}</span>
                           <span style={{ color: '#94a3b8' }}>{dt.date}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
-              );
-            })}
-          </div>
 
-          {/* STICKER PREVIEW & SOCIAL MEDIA SHARE CARD MODAL */}
-          {selectedPreviewSticker && (() => {
-            const st = selectedPreviewSticker;
-            const info = collectedStickers[st.id] || { count: 0, details: [] };
-            const isCollected = info.count > 0;
-            const displayDate = info.details?.[0]?.date || new Date().toLocaleDateString('de-DE');
-            const displayTopic = info.details?.[0]?.topic || 'Herausforderung gemeistert';
+                  {/* Actions */}
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 2, marginTop: '4px' }}>
+                    {isCollected && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => downloadShareCard(st)}
+                          style={{
+                            width: '100%',
+                            background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '16px',
+                            padding: '14px',
+                            fontSize: '0.84rem',
+                            fontWeight: 900,
+                            cursor: 'pointer',
+                            boxShadow: '0 6px 20px rgba(52, 168, 83, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'all 0.15s'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span>📥</span> Auszeichnung als PNG speichern
+                        </button>
 
-            return (
-              <div style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(15, 23, 42, 0.9)',
-                backdropFilter: 'blur(12px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 10000,
-                padding: '20px',
-                animation: 'fadeIn 0.25s ease-out'
-              }} onClick={() => setSelectedPreviewSticker(null)}>
-                <div 
-                  style={{
-                    width: '100%',
-                    maxWidth: '460px',
-                    background: '#1e293b',
-                    borderRadius: '32px',
-                    border: '1.5px solid #334155',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                    padding: '32px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '24px',
-                    color: 'white',
-                    position: 'relative'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {/* Close button */}
-                  <button
-                    onClick={() => setSelectedPreviewSticker(null)}
-                    style={{
-                      position: 'absolute',
-                      top: '20px',
-                      right: '20px',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: 'none',
-                      borderRadius: '50%',
-                      width: '36px',
-                      height: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      color: '#94a3b8',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    <X size={18} />
-                  </button>
+                        <button
+                          type="button"
+                          onClick={() => shareCard(st)}
+                          style={{
+                            width: '100%',
+                            background: 'rgba(255, 255, 255, 0.12)',
+                            color: 'white',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '16px',
+                            padding: '12px',
+                            fontSize: '0.82rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'all 0.15s'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span>📲</span> Karte Teilen (WhatsApp / Insta)
+                        </button>
+                      </>
+                    )}
 
-                  <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#34a853' }}>
-                      Sticker Details
-                    </span>
-                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
-                      {st.title}
-                    </h3>
-                  </div>
+                    {st.id !== 'song-master' && !st.auto && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const context = prompt(`Beschreibung für den Sticker "${st.title}" eingeben (z.B. Name des Auftritts):`);
+                          if (context !== null) {
+                            awardSticker(st.id, context || undefined);
+                            setSelectedPreviewSticker(null);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          background: st.color || '#34a853',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '16px',
+                          padding: '12px',
+                          fontSize: '0.82rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+                          transition: 'all 0.15s'
+                        }}
+                        className="hover-scale"
+                      >
+                        + Sticker jetzt vergeben
+                      </button>
+                    )}
 
-                  {/* Layout Selector Switch */}
-                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', padding: '4px', borderRadius: '12px', gap: '4px', width: '320px', marginTop: '14px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <button
                       type="button"
-                      onClick={() => setShareCardLayout('dark')}
+                      onClick={() => setSelectedPreviewSticker(null)}
                       style={{
-                        flex: 1,
-                        background: shareCardLayout === 'dark' ? '#34a853' : 'transparent',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        color: '#94a3b8',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '16px',
+                        padding: '12px',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
                         cursor: 'pointer',
                         transition: 'all 0.15s'
                       }}
+                      className="hover-scale"
                     >
-                      Dunkler Beton
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShareCardLayout('light')}
-                      style={{
-                        flex: 1,
-                        background: shareCardLayout === 'light' ? '#34a853' : 'transparent',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      Heller Beton
+                      Schließen
                     </button>
                   </div>
-
-                  {/* PREVIEW POST CARD (Concrete Glow Poster format - Dark or Light) */}
-                  {shareCardLayout === 'dark' ? (
-                    <div style={{
-                      width: '320px',
-                      height: '320px',
-                      overflow: 'hidden',
-                      borderRadius: '24px',
-                      border: '1.5px solid rgba(255,255,255,0.08)',
-                      position: 'relative',
-                      boxShadow: '0 20px 45px rgba(0,0,0,0.6)',
-                      animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                    }}>
-                      <div style={{
-                        width: '1200px',
-                        height: '1200px',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        background: '#09090b',
-                        transform: 'scale(calc(320 / 1200))',
-                        transformOrigin: 'top left',
-                        boxSizing: 'border-box'
-                      }}>
-                        {/* Spotify Wrapped dynamic background color splash */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '-150px',
-                          left: '-150px',
-                          width: '1500px',
-                          height: '900px',
-                          background: `linear-gradient(135deg, ${(st.color || '#34a853')}45 0%, transparent 100%)`,
-                          transform: 'rotate(-12deg)',
-                          pointerEvents: 'none',
-                          zIndex: 1
-                        }} />
-
-                        {/* Giant slanted background text overlay */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '450px',
-                          left: '-100px',
-                          fontSize: '130px',
-                          fontWeight: 900,
-                          color: st.color || '#34a853',
-                          opacity: 0.06,
-                          transform: 'rotate(-12deg)',
-                          whiteSpace: 'nowrap',
-                          fontFamily: '"Montserrat", "Arial Black", sans-serif',
-                          textTransform: 'uppercase',
-                          pointerEvents: 'none',
-                          zIndex: 1
-                        }}>
-                          {st.title}
-                        </div>
-
-                        {/* Core Poster Box */}
-                        <div style={{
-                          position: 'absolute',
-                          left: '180px',
-                          top: '80px',
-                          width: '840px',
-                          height: '1040px',
-                          background: '#121216',
-                          border: `6px solid ${(st.color || '#34a853')}`,
-                          boxShadow: `0 8px 32px ${(st.color || '#34a853')}20`,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '65px 40px 40px 40px',
-                          zIndex: 2,
-                          boxSizing: 'border-box'
-                        }}>
-                          {/* Upper section to flow naturally without overlapping */}
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            width: '100%'
-                          }}>
-                            {/* Action Headline Pill */}
-                            <span style={{ 
-                              fontSize: '28px', 
-                              fontWeight: 900, 
-                              color: '#ffffff', 
-                              background: st.color || '#34a853',
-                              padding: '10px 30px',
-                              borderRadius: '30px',
-                              transform: 'rotate(-2deg) skewX(-6deg)',
-                              letterSpacing: '0.06em', 
-                              fontFamily: '"Arial Black", sans-serif', 
-                              textTransform: 'uppercase', 
-                              textAlign: 'center',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                            }}>
-                              GEMEISTERT!
-                            </span>
-
-                            {/* Giant Sticker Display */}
-                            <div style={{
-                              marginTop: '80px',
-                              width: '360px',
-                              height: '360px',
-                              borderRadius: '50%',
-                              border: '6px solid #ffffff',
-                              boxShadow: `0 0 40px ${(st.color || '#34a853')}60`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              overflow: 'hidden',
-                              boxSizing: 'border-box'
-                            }}>
-                              <img 
-                                src={`/stickers/${st.id}.png?v=1`} 
-                                alt={st.title} 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  const parent = e.currentTarget.parentElement;
-                                  if (parent) {
-                                    const span = document.createElement('span');
-                                    span.style.fontSize = '8rem';
-                                    span.innerText = st.emoji;
-                                    parent.appendChild(span);
-                                  }
-                                }}
-                              />
-                            </div>
-
-                            {/* Student Name */}
-                            <span style={{ 
-                              marginTop: '35px',
-                              fontSize: '54px', 
-                              fontWeight: 900, 
-                              color: '#ffffff', 
-                              textAlign: 'center', 
-                              letterSpacing: '-0.01em',
-                              width: '100%',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {displayedStudentName}
-                            </span>
-
-                            {/* Student Instrument */}
-                            {studentInstrument && (
-                              <span style={{ 
-                                marginTop: '8px',
-                                fontSize: '24px', 
-                                fontWeight: 900, 
-                                color: '#94a3b8', 
-                                letterSpacing: '0.12em', 
-                                textTransform: 'uppercase',
-                                width: '100%',
-                                textAlign: 'center',
-                                fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                              }}>
-                                {studentInstrument}
-                              </span>
-                            )}
-
-                            {/* Sticker Milestone Title */}
-                            <span style={{ 
-                              marginTop: studentInstrument ? '12px' : '20px',
-                              fontSize: '48px', 
-                              fontWeight: 900, 
-                              color: st.color || '#34a853', 
-                              fontFamily: '"Arial Black", sans-serif', 
-                              textTransform: 'uppercase', 
-                              textAlign: 'center',
-                              transform: 'skewX(-6deg)',
-                              width: '100%'
-                            }}>
-                              {st.title}
-                            </span>
-
-                            {/* Challenge Description */}
-                            <p style={{ 
-                              marginTop: '15px',
-                              fontSize: '28px', 
-                              color: '#cbd5e1', 
-                              fontWeight: 750, 
-                              margin: 0, 
-                              textAlign: 'center', 
-                              padding: '0 40px', 
-                              lineHeight: '1.3',
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {st.desc}
-                            </p>
-                          </div>
-
-                          {/* Footer Section */}
-                          <div style={{
-                            width: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '12px'
-                          }}>
-                            <div style={{
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              border: '2px solid rgba(255, 255, 255, 0.15)',
-                              borderRadius: '24px',
-                              padding: '6px 20px',
-                              fontSize: '20px',
-                              fontWeight: 800,
-                              color: '#ffffff',
-                              letterSpacing: '0.04em',
-                              textTransform: 'uppercase',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {schoolName}
-                            </div>
-                            <span style={{
-                              fontSize: '24px',
-                              fontWeight: 900,
-                              color: st.color || '#34a853',
-                              letterSpacing: '0.06em',
-                              textTransform: 'lowercase',
-                              fontFamily: '"Arial Black", sans-serif'
-                            }}>
-                              campus-groovelab.de
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{
-                      width: '320px',
-                      height: '320px',
-                      overflow: 'hidden',
-                      borderRadius: '24px',
-                      border: '1.5px solid rgba(0,0,0,0.06)',
-                      position: 'relative',
-                      boxShadow: '0 20px 45px rgba(0,0,0,0.12)',
-                      animation: 'scaleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                    }}>
-                      <div style={{
-                        width: '1200px',
-                        height: '1200px',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        background: '#ffffff',
-                        transform: 'scale(calc(320 / 1200))',
-                        transformOrigin: 'top left',
-                        boxSizing: 'border-box'
-                      }}>
-                        {/* Spotify Wrapped dynamic background color splash (light mode) */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '-150px',
-                          left: '-150px',
-                          width: '1500px',
-                          height: '900px',
-                          background: `linear-gradient(135deg, ${(st.color || '#34a853')}25 0%, transparent 100%)`,
-                          transform: 'rotate(-12deg)',
-                          pointerEvents: 'none',
-                          zIndex: 1
-                        }} />
-
-                        {/* Giant slanted background text overlay (light mode) */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '450px',
-                          left: '-100px',
-                          fontSize: '130px',
-                          fontWeight: 900,
-                          color: st.color || '#34a853',
-                          opacity: 0.05,
-                          transform: 'rotate(-12deg)',
-                          whiteSpace: 'nowrap',
-                          fontFamily: '"Montserrat", "Arial Black", sans-serif',
-                          textTransform: 'uppercase',
-                          pointerEvents: 'none',
-                          zIndex: 1
-                        }}>
-                          {st.title}
-                        </div>
-
-                        {/* Core Poster Box (Light) */}
-                        <div style={{
-                          position: 'absolute',
-                          left: '180px',
-                          top: '80px',
-                          width: '840px',
-                          height: '1040px',
-                          background: 'rgba(250, 250, 250, 0.85)',
-                          border: `6px solid ${(st.color || '#34a853')}bb`,
-                          boxShadow: `0 8px 32px ${(st.color || '#34a853')}15`,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '65px 40px 40px 40px',
-                          zIndex: 2,
-                          boxSizing: 'border-box'
-                        }}>
-                          {/* Upper section to flow naturally without overlapping */}
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            width: '100%'
-                          }}>
-                            {/* Action Headline Pill (Light) */}
-                            <span style={{ 
-                              fontSize: '28px', 
-                              fontWeight: 900, 
-                              color: '#ffffff', 
-                              background: st.color || '#34a853',
-                              padding: '10px 30px',
-                              borderRadius: '30px',
-                              transform: 'rotate(-2deg) skewX(-6deg)',
-                              letterSpacing: '0.06em', 
-                              fontFamily: '"Arial Black", sans-serif', 
-                              textTransform: 'uppercase', 
-                              textAlign: 'center',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                            }}>
-                              GEMEISTERT!
-                            </span>
-
-                            {/* Giant Sticker Display */}
-                            <div style={{
-                              marginTop: '80px',
-                              width: '360px',
-                              height: '360px',
-                              borderRadius: '50%',
-                              border: '6px solid #ffffff',
-                              boxShadow: `0 0 40px ${(st.color || '#34a853')}45`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              overflow: 'hidden',
-                              boxSizing: 'border-box'
-                            }}>
-                              <img 
-                                src={`/stickers/${st.id}.png?v=1`} 
-                                alt={st.title} 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  const parent = e.currentTarget.parentElement;
-                                  if (parent) {
-                                    const span = document.createElement('span');
-                                    span.style.fontSize = '8rem';
-                                    span.innerText = st.emoji;
-                                    parent.appendChild(span);
-                                  }
-                                }}
-                              />
-                            </div>
-
-                            {/* Student Name */}
-                            <span style={{ 
-                              marginTop: '35px',
-                              fontSize: '54px', 
-                              fontWeight: 900, 
-                              color: '#0f172a', 
-                              textAlign: 'center', 
-                              letterSpacing: '-0.01em',
-                              width: '100%',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {displayedStudentName}
-                            </span>
-
-                            {/* Student Instrument */}
-                            {studentInstrument && (
-                              <span style={{ 
-                                marginTop: '8px',
-                                fontSize: '24px', 
-                                fontWeight: 900, 
-                                color: '#64748b', 
-                                letterSpacing: '0.12em', 
-                                textTransform: 'uppercase',
-                                width: '100%',
-                                textAlign: 'center',
-                                fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                              }}>
-                                {studentInstrument}
-                              </span>
-                            )}
-
-                            {/* Sticker Milestone Title */}
-                            <span style={{ 
-                              marginTop: studentInstrument ? '12px' : '20px',
-                              fontSize: '48px', 
-                              fontWeight: 900, 
-                              color: st.color || '#34a853', 
-                              fontFamily: '"Arial Black", sans-serif', 
-                              textTransform: 'uppercase', 
-                              textAlign: 'center',
-                              transform: 'skewX(-6deg)',
-                              width: '100%'
-                            }}>
-                              {st.title}
-                            </span>
-
-                            {/* Challenge Description */}
-                            <p style={{ 
-                              marginTop: '15px',
-                              fontSize: '28px', 
-                              color: '#475569', 
-                              fontWeight: 750, 
-                              margin: 0, 
-                              textAlign: 'center', 
-                              padding: '0 40px', 
-                              lineHeight: '1.3',
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {st.desc}
-                            </p>
-                          </div>
-
-                          {/* Footer Section */}
-                          <div style={{
-                            width: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '12px'
-                          }}>
-                            <div style={{
-                              background: 'rgba(0, 0, 0, 0.04)',
-                              border: '2px solid rgba(0, 0, 0, 0.08)',
-                              borderRadius: '24px',
-                              padding: '6px 20px',
-                              fontSize: '20px',
-                              fontWeight: 800,
-                              color: '#1e293b',
-                              letterSpacing: '0.04em',
-                              textTransform: 'uppercase',
-                              fontFamily: '"Helvetica Neue", Inter, sans-serif'
-                            }}>
-                              {schoolName}
-                            </div>
-                            <span style={{
-                              fontSize: '24px',
-                              fontWeight: 900,
-                              color: st.color || '#34a853',
-                              letterSpacing: '0.06em',
-                              textTransform: 'lowercase',
-                              fontFamily: '"Arial Black", sans-serif'
-                            }}>
-                              campus-groovelab.de
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ width: '100%', textAlign: 'center', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p style={{ fontSize: '0.78rem', color: '#cbd5e1', margin: '0 0 4px 0', lineHeight: '1.4', fontWeight: 600 }}>
-                      {st.desc}
-                    </p>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>
-                      {isCollected ? `Freigeschaltet! (Gesammelt: ${info.count}x)` : 'Noch nicht freigeschaltet'}
-                    </span>
-                  </div>
-
-                  {/* Share button action */}
-                  <button
-                    type="button"
-                    onClick={() => downloadShareCard(st)}
-                    style={{
-                      width: '100%',
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '16px',
-                      padding: '16px',
-                      fontSize: '0.86rem',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      boxShadow: '0 8px 20px rgba(52, 168, 83, 0.25)',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    Als Share-Card teilen (PNG herunterladen)
-                  </button>
                 </div>
-
-                <style dangerouslySetInnerHTML={{__html: `
-                  @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                  }
-                  @keyframes scaleIn {
-                    from { transform: scale(0.9); opacity: 0; }
-                    to { transform: scale(1); opacity: 1; }
-                  }
-                  @keyframes floatSticker {
-                    0% { transform: translateY(0px) rotate(0deg); }
-                    50% { transform: translateY(-6px) rotate(2deg); }
-                    100% { transform: translateY(0px) rotate(0deg); }
-                  }
-                `}} />
               </div>
             );
           })()}

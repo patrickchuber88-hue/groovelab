@@ -2252,8 +2252,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
   const studentLevyMonthly_global = (billingPayer === 'school' && studentBillingOption === 'option2') ? activeStudentsCount_global * 0.49 : 0;
   const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * 0.49 : 0;
-  const billableTeachersCount = allTeachers.filter((t: any) => t.role !== 'admin' && t.role !== 'secretary').length;
-  const baseB2B_global = moduleCost_global + billableTeachersCount * 0.49 + ((billingPayer === 'student' && studentBillingOption === 'student_partial') ? students.length * 0.09 : Math.max(0, students.length - activeStudentsCount_global) * 0.09);
+  const billableTeachersCount = allTeachers.filter((t: any) => (t.isActive ?? true) && t.role !== 'admin' && t.role !== 'secretary').length;
+  const activeGroovelabStudentsCount_global = students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length;
+  const passiveStudentsCount_global = Math.max(0, students.length - activeGroovelabStudentsCount_global);
+  const baseB2B_global = moduleCost_global + billableTeachersCount * 0.49 + passiveStudentsCount_global * 0.09 + activeGroovelabStudentsCount_global * 0.49;
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
@@ -23590,19 +23592,19 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                             )}
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Lehrer (0,49 € x {allTeachers.length} angelegte Profile):</span>
-                                              <strong>{(allTeachers.length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              <span>DB &amp; Service Lehrer (0,49 € x {billableTeachersCount} aktive Profile):</span>
+                                              <strong>{(billableTeachersCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                              <span>DB &amp; Service Schüler (0,09 € x {Math.max(0, students.length - activeStudents)} passive Profile):</span>
-                                              <strong>{(Math.max(0, students.length - activeStudents) * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              <span>DB &amp; Service Schüler (0,09 € x {passiveStudentsCount_global} passive Profile):</span>
+                                              <strong>{(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                             </div>
                                             
-                                            {students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length > 0 && (
+                                            {activeGroovelabStudentsCount_global > 0 && (
                                               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309' }}>
-                                                <span>DB &amp; Service GrooveLab Schüler (0,49 € x {students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length} aktive Profile):</span>
-                                                <strong>{(students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                <span>DB &amp; Service GrooveLab Schüler (0,49 € x {activeGroovelabStudentsCount_global} aktive Profile):</span>
+                                                <strong>{(activeGroovelabStudentsCount_global * 0.49).toFixed(2).replace('.', ',')} € / Mo.</strong>
                                               </div>
                                             )}
 

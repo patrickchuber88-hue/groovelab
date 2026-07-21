@@ -11,6 +11,7 @@ import {
 import { renderInstrumentIcon } from '../utils/instruments';
 import { StudentDetailModal } from './StudentDetailModal';
 import { ScheduleBoard } from './ScheduleBoard';
+import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
@@ -255,6 +256,14 @@ export function AdminDashboard({
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [selectedTimetableStudent, setSelectedTimetableStudent] = useState<any | null>(null);
+  const [allSchedulePreferences, setAllSchedulePreferences] = useState<Record<string, any[]>>({});
+
+  const hasTimetableOnboarding = (s: any) => {
+    if (s?.timetable_assigned_at) return true;
+    if (allSchedulePreferences[s?.id] && allSchedulePreferences[s?.id].length > 0) return true;
+    return false;
+  };
   const [rooms, setRooms] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<{ start: string, end: string, name: string }[]>([]);
@@ -2015,6 +2024,91 @@ export function AdminDashboard({
     }
   }, [activeTab, selectedCampusRoomId, isDateFilterActive, bookingStartTime]);
 
+  const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string) => {
+    let sq = supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student');
+    let assignedStudentIds: string[] = [];
+
+    if (platform === 'campus') {
+      const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
+        supabase.from('schedules').select('student_id').eq('teacher_id', teacherId),
+        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', teacherId),
+        supabase.from('groups').select('id').eq('teacher_id', teacherId)
+      ]);
+
+      const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
+      const occStudentIds = (occData || []).map(s => s.student_id).filter(Boolean);
+
+      let groupStudentIds: string[] = [];
+      if (groupData && groupData.length > 0) {
+        const groupIds = groupData.map(g => g.id);
+        const { data: gsData } = await supabase.from('group_students').select('student_id').in('group_id', groupIds);
+        groupStudentIds = (gsData || []).map(gs => gs.student_id).filter(Boolean);
+      }
+
+      assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]));
+      if (assignedStudentIds.length > 0) {
+        sq = sq.or(`teacher_id.eq.${teacherId},id.in.(${assignedStudentIds.join(',')})`);
+      } else {
+        sq = sq.eq('teacher_id', teacherId);
+      }
+    } else {
+      sq = sq.eq('is_groovelab_active', true);
+    }
+
+    // 1. Fetch registered students from users table
+    const { data: registeredStudentsData } = await sq.order('first_name');
+    const registeredStudents = registeredStudentsData || [];
+
+    if (registeredStudents.length > 0 && platform === 'campus') {
+      const unlinkedStudents = registeredStudents.filter((s: any) => !s.teacher_id).map((s: any) => s.id);
+      if (unlinkedStudents.length > 0) {
+        supabase.from('users').update({ teacher_id: teacherId }).in('id', unlinkedStudents).then(() => {
+          console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
+        });
+      }
+    }
+
+    // 2. Fetch pending onboarding students from pending_students_decrypted view
+    let mappedPending: any[] = [];
+    try {
+      const { data: pendingData } = await supabase
+        .from('pending_students_decrypted')
+        .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+        .eq('school_id', schoolId);
+
+      if (pendingData && pendingData.length > 0) {
+        const registeredIds = new Set(registeredStudents.map((s: any) => s.id));
+        mappedPending = pendingData
+          .filter((ps: any) => !registeredIds.has(ps.id) && (ps.teacher_id === teacherId || assignedStudentIds.includes(ps.id)))
+          .map((ps: any) => ({
+            id: ps.id,
+            school_id: ps.school_id,
+            teacher_id: ps.teacher_id,
+            role: 'student',
+            first_name: ps.first_name || 'Ausstehendes',
+            last_name: ps.last_name || 'Onboarding',
+            email: '',
+            instrument: ps.instrument || 'Gitarre',
+            is_active: false,
+            is_campus_active: false,
+            is_groovelab_active: false,
+            status: 'inactive',
+            isPendingOnboarding: true,
+            day_of_birth: ps.day_of_birth || null,
+            ausweis_nummer: 'Ausstehend (Onboarding)',
+            created_at: ps.created_at || new Date().toISOString()
+          }));
+      }
+    } catch (err) {
+      console.warn('[Teacher Board] Pending students fetch warning:', err);
+    }
+
+    // Combine registered + pending onboarding students
+    const combined = [...registeredStudents, ...mappedPending];
+    combined.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
+    return combined;
+  };
+
   const fetchData = async (force = false) => {
     let currentAdmin = admin;
     let adminData = null;
@@ -2087,6 +2181,22 @@ export function AdminDashboard({
           .eq('school_id', currentAdmin.school_id);
         setKiosks(kiosksData || []);
       }
+
+      try {
+        const { data: prefData } = await supabase
+          .from('student_schedule_preferences')
+          .select('student_id, preference_type, day_of_week, start_time');
+        if (prefData) {
+          const map: Record<string, any[]> = {};
+          prefData.forEach((p: any) => {
+            if (!map[p.student_id]) map[p.student_id] = [];
+            map[p.student_id].push(p);
+          });
+          setAllSchedulePreferences(map);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch schedule preferences:', e);
+      }
       const adminData = currentAdmin;
 
       // Unconditionally fetch active sessions to keep online indicators and Live Lab realtime
@@ -2112,23 +2222,63 @@ export function AdminDashboard({
         //                                    (no teacher_id filter — GrooveLab is a shared platform)
         // ──────────────────────────────────────────────────────────────────────
         const canSeeAllStudents = adminData.role === 'admin' || adminData.role === 'secretary';
-        let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+        let studentsData: any[] = [];
 
         if (canSeeAllStudents) {
-          // Admins / secretaries: filter by platform activation
+          let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
           if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
           else sq = sq.eq('is_groovelab_active', true);
-        } else if (activePlatform === 'campus') {
-          // Teachers in Campus: see all their own assigned students (no activation filter needed)
-          sq = sq.eq('teacher_id', adminData.id);
+          const { data: regData } = await sq.order('first_name');
+          const registered = regData || [];
+          const regIds = new Set(registered.map((s: any) => s.id));
+
+          let pendingMapped: any[] = [];
+          try {
+            const { data: pendingData } = await supabase
+              .from('pending_students_decrypted')
+              .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+              .eq('school_id', adminData.school_id);
+            if (pendingData) {
+              pendingMapped = pendingData
+                .filter((ps: any) => !regIds.has(ps.id))
+                .map((ps: any) => ({
+                  id: ps.id,
+                  school_id: ps.school_id,
+                  teacher_id: ps.teacher_id,
+                  role: 'student',
+                  first_name: ps.first_name || 'Ausstehendes',
+                  last_name: ps.last_name || 'Onboarding',
+                  email: '',
+                  instrument: ps.instrument || 'Gitarre',
+                  is_active: false,
+                  is_campus_active: false,
+                  is_groovelab_active: false,
+                  status: 'inactive',
+                  isPendingOnboarding: true,
+                  day_of_birth: ps.day_of_birth || null,
+                  ausweis_nummer: 'Ausstehend (Onboarding)',
+                  created_at: ps.created_at || new Date().toISOString()
+                }));
+            }
+          } catch (e) {
+            console.warn('Pending fetch warning in canSeeAllStudents:', e);
+          }
+          studentsData = [...registered, ...pendingMapped];
+          studentsData.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
         } else {
-          // Teachers in GrooveLab: see ALL groovelab-active students school-wide
-          // GrooveLab is a shared gamified platform — all active students participate together
-          sq = sq.eq('is_groovelab_active', true);
+          studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
         }
 
-        const { data: studentsData } = await sq.order('first_name');
         if (studentsData) {
+          // Auto-sync missing users.teacher_id in background for DB consistency
+          if (adminData.role === 'teacher' && studentsData.length > 0) {
+            const unlinkedStudents = studentsData.filter((s: any) => !s.teacher_id).map((s: any) => s.id);
+            if (unlinkedStudents.length > 0) {
+              supabase.from('users').update({ teacher_id: adminData.id }).in('id', unlinkedStudents).then(() => {
+                console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
+              });
+            }
+          }
           // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
           const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
           const expiredIds = expiredStudents.map((s: any) => s.id);
@@ -2421,11 +2571,16 @@ export function AdminDashboard({
         }
 
         // Fetch students for assignments in songs/lehrwerke detail modal
-        let studSq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus' && adminData.role !== 'teacher') studSq = studSq.eq('is_campus_active', true);
-        else if (activePlatform !== 'campus') studSq = studSq.eq('is_groovelab_active', true);
-        if (adminData.role === 'teacher') studSq = studSq.eq('teacher_id', adminData.id);
-        const { data: studentsData } = await studSq.order('first_name');
+        let studentsData: any[] = [];
+        if (adminData.role === 'teacher') {
+          studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
+        } else {
+          let studSq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+          if (activePlatform === 'campus') studSq = studSq.eq('is_campus_active', true);
+          else studSq = studSq.eq('is_groovelab_active', true);
+          const { data } = await studSq.order('first_name');
+          studentsData = data || [];
+        }
         if (studentsData) setStudents(studentsData);
       } else if (activeTab === 'bands') {
         const { data: bandsData } = await supabase
@@ -2550,11 +2705,16 @@ export function AdminDashboard({
           console.warn('Failed to load mission templates or progress:', err);
         }
 
-        let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
-        if (activePlatform === 'campus') ssq = ssq.eq('is_campus_active', true);
-        else ssq = ssq.eq('is_groovelab_active', true);
-        if (adminData.role === 'teacher') ssq = ssq.eq('teacher_id', adminData.id);
-        const { data: studentsData } = await ssq.order('first_name');
+        let studentsData: any[] = [];
+        if (adminData.role === 'teacher') {
+          studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
+        } else {
+          let ssq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+          if (activePlatform === 'campus') ssq = ssq.eq('is_campus_active', true);
+          else ssq = ssq.eq('is_groovelab_active', true);
+          const { data } = await ssq.order('first_name');
+          studentsData = data || [];
+        }
         if (studentsData) setStudents(studentsData);
 
         let query = supabase.from('user_song_skills').select('*, users!user_id(*), songs(*)');
@@ -2673,22 +2833,22 @@ export function AdminDashboard({
     const queryStartDate = resetDate ? (resetDate > annualStartDate ? resetDate : annualStartDate) : annualStartDate;
     const sessionStartDate = new Date(queryStartDate.getTime() - 24 * 60 * 60 * 1000); // 1 day buffer for session overlap
 
-    let studentListSq = supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student');
-    if (activePlatform === 'campus' && admin?.role !== 'teacher') studentListSq = studentListSq.eq('is_campus_active', true);
-    else if (activePlatform !== 'campus') studentListSq = studentListSq.eq('is_groovelab_active', true);
+    let schoolStudents: any[] = [];
+    if (admin?.role === 'teacher') {
+      schoolStudents = await fetchTeacherStudentsHelper(admin.id, schoolId, activePlatform);
+    } else {
+      let studentListSq = supabase.from('users').select('id, first_name, last_name, photo_url, teacher_id').eq('school_id', schoolId).eq('role', 'student');
+      if (activePlatform === 'campus') studentListSq = studentListSq.eq('is_campus_active', true);
+      else studentListSq = studentListSq.eq('is_groovelab_active', true);
+      const { data } = await studentListSq;
+      schoolStudents = data || [];
+    }
 
     let statsSongsSq = supabase.from('songs').select('level').eq('school_id', schoolId);
     if (activePlatform === 'campus') statsSongsSq = statsSongsSq.eq('is_campus_active', true);
     else statsSongsSq = statsSongsSq.eq('is_groovelab_active', true);
 
-    // Execute initial queries first
-    const [
-      { data: schoolStudents },
-      { data: songsData }
-    ] = await Promise.all([
-      studentListSq,
-      statsSongsSq
-    ]);
+    const { data: songsData } = await statsSongsSq;
 
     const studentCount = schoolStudents?.length || 0;
     const songCount = songsData?.length || 0;
@@ -5450,6 +5610,40 @@ export function AdminDashboard({
                         </button>
                       </>
                     )}
+                    {/* Stundenplan-Onboarding Status Icon */}
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setSelectedTimetableStudent(s); 
+                      }} 
+                      style={{ 
+                        background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
+                        border: hasTimetableOnboarding(s) ? '1px solid #a7f3d0' : '1px solid #fef08a', 
+                        padding: "10px", 
+                        borderRadius: "12px", 
+                        cursor: "pointer", 
+                        color: hasTimetableOnboarding(s) ? '#34a853' : '#d97706', 
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative'
+                      }} 
+                      className="hover-scale-mini"
+                      title={hasTimetableOnboarding(s) ? "Stundenplan-Onboarding: Abgeschlossen (Klicken für Slot-Details)" : "Stundenplan-Onboarding: Ausstehend (Klicken für Manuelles Eintragen)"}
+                    >
+                      <Calendar size={18} />
+                      <div style={{
+                        position: 'absolute',
+                        top: '-3px',
+                        right: '-3px',
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        background: hasTimetableOnboarding(s) ? '#34a853' : '#eab308',
+                        border: '2px solid white'
+                      }} />
+                    </button>
                     <button 
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
                       style={{ 
@@ -5465,7 +5659,7 @@ export function AdminDashboard({
                         justifyContent: 'center'
                       }} 
                       className="hover-scale-mini"
-                      title="QR Code"
+                      title="QR Code & Ausweis"
                     >
                       <QrCode size={18} />
                     </button>
@@ -14062,6 +14256,33 @@ export function AdminDashboard({
 
       {renderStudentDetailModal()}
       {renderQRModal()}
+      {selectedTimetableStudent && (
+        <StudentScheduleSlotsModal
+          student={selectedTimetableStudent}
+          onClose={() => setSelectedTimetableStudent(null)}
+          onPreferencesSaved={() => {
+            if (admin?.school_id) {
+              supabase
+                .from('student_schedule_preferences')
+                .select('student_id, preference_type, day_of_week, start_time')
+                .then(({ data }) => {
+                  if (data) {
+                    const map: Record<string, any[]> = {};
+                    data.forEach((p: any) => {
+                      if (!map[p.student_id]) map[p.student_id] = [];
+                      map[p.student_id].push(p);
+                    });
+                    setAllSchedulePreferences(map);
+                  }
+                });
+            }
+            fetchData(true);
+          }}
+          activePlatform={activePlatform}
+          teacherId={admin?.id}
+          onOpenScheduleBoard={() => setActiveTab('schedule')}
+        />
+      )}
       {renderRoomLayoutModal()}
       {renderBatchiPadModal()}
       {renderLogoutDialog()}

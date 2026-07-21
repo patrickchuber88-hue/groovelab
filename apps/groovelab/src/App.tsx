@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
 import { LandingPage2 } from './components/LandingPage2';
+import { LandingPage } from './components/LandingPage';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
 import { CampusPinUnlockModal } from './components/CampusPinUnlockModal';
@@ -1298,7 +1299,7 @@ if (typeof window !== 'undefined') {
         isCampus = true;
       }
     }
-    let titleText = isCampus ? 'Campus' : 'Campus-Groovelab';
+    let titleText = isCampus ? 'Campus' : (activePlat === 'groovelab' ? 'GrooveLab' : 'Campus-Groovelab');
     let btnBackground = 'linear-gradient(135deg, #34a853, #34a853)';
     let btnShadow = '0 4px 12px rgba(52, 168, 83, 0.2)';
     
@@ -2420,6 +2421,7 @@ function App() {
     const isAuth = !!loggedInUserId;
     const isPublicRoute = 
       location.pathname === '/' || 
+      location.pathname === '/landingpage' || 
       location.pathname === '/login' || 
       location.pathname === '/signup' || 
       location.pathname.startsWith('/qr/') ||
@@ -2543,9 +2545,12 @@ function App() {
         localStorage.setItem('ensembles_active_tab', val);
       } else {
         localStorage.setItem('groovelab_active_tab', val);
+        if (val === 'live' && user?.id) {
+          fetchDashboardData(user.id);
+        }
       }
     });
-  }, []);
+  }, [user?.id]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -6949,6 +6954,16 @@ function App() {
     );
   }
 
+  // 1.1 DETAILED LANDING PAGE
+  if (location.pathname === '/landingpage') {
+    return (
+      <LandingPage 
+        onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
+        onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+      />
+    );
+  }
+
   // 2. AUTHENTICATION CHECK
   if (!loggedInUserId && !showDeletionPrompt) {
     if (location.pathname === '/') {
@@ -8743,23 +8758,35 @@ function App() {
 
                   {/* Unified School, Teacher, Student, Admin & Secretary Pill */}
                   {(() => {
+                    const badgeBaseStyle: React.CSSProperties = {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'rgba(59, 130, 246, 0.04)',
+                      height: windowWidth <= 768 ? '36px' : '40px',
+                      padding: windowWidth <= 768 ? '0 12px' : '0 16px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(59, 130, 246, 0.12)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    };
+                    const textStyle: React.CSSProperties = {
+                      fontWeight: 750,
+                      fontSize: '0.76rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    };
+
                     if (activePlatform === 'groovelab') {
                       return (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: '5px 10px', 
-                          borderRadius: '10px', 
-                          border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={badgeBaseStyle}>
+                          <span style={textStyle}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <School size={12} color="#ef4444" />
+                              <School size={14} color="#ef4444" />
                               <span>
                                 {school?.name || 'Meine Musikschule'}
                               </span>
@@ -8769,30 +8796,19 @@ function App() {
                       );
                     } else if (user?.role === 'student') {
                       return (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: '5px 10px', 
-                          borderRadius: '10px', 
-                          border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={badgeBaseStyle}>
+                          <span style={textStyle}>
                             {windowWidth > 768 && (
                               <>
                                 <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                  <School size={12} color="#ef4444" />
+                                  <School size={14} color="#ef4444" />
                                   <span>
                                     {school?.name || 'Meine Musikschule'}
                                   </span>
                                 </span>
                                 <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                                 <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <User size={12} color="#3b82f6" />
+                                  <User size={14} color="#3b82f6" />
                                   <span>
                                     {(() => {
                                       const teacherName = teachers.find(t => t.id === user.teacher_id) 
@@ -8817,21 +8833,10 @@ function App() {
                       );
                     } else if (user?.role === 'teacher') {
                       return (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: '5px 10px', 
-                          borderRadius: '10px', 
-                          border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={badgeBaseStyle}>
+                          <span style={textStyle}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <School size={12} color="#ef4444" />
+                              <School size={14} color="#ef4444" />
                               <span>
                                 {windowWidth <= 768 
                                   ? getInitials(school?.name === 'Testlauf' ? 'Testlauf' : (school?.name || 'Meine Musikschule')) 
@@ -8840,7 +8845,7 @@ function App() {
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <User size={12} color="#3b82f6" />
+                              <User size={14} color="#3b82f6" />
                               <span>
                                 {windowWidth <= 768 
                                   ? getInitials(`${user.first_name} ${user.last_name}`) 
@@ -8883,21 +8888,10 @@ function App() {
                       );
                     } else {
                       return (
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: '5px 10px', 
-                          borderRadius: '10px', 
-                          border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={badgeBaseStyle}>
+                          <span style={textStyle}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <School size={12} color="#ef4444" />
+                              <School size={14} color="#ef4444" />
                               <span>
                                 {windowWidth <= 768 
                                   ? getInitials(school?.name || 'Meine Musikschule') 
@@ -8906,7 +8900,7 @@ function App() {
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <User size={12} color="#3b82f6" />
+                              <User size={14} color="#3b82f6" />
                               <span>
                                 {windowWidth <= 768 
                                   ? `${getInitials(`${user.first_name} ${user.last_name}`)} • ${user?.role === 'admin' ? 'AD' : 'VW'}`
@@ -9087,10 +9081,41 @@ function App() {
                   </div>
                 </div>
               )}
+              {/* Elegant Refresh / Reload Button */}
+              <button 
+                onClick={() => window.location.reload()}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  width: windowWidth <= 768 ? '36px' : '40px', 
+                  height: windowWidth <= 768 ? '36px' : '40px', 
+                  borderRadius: '12px', 
+                  background: '#f8fafc', 
+                  border: '1px solid #e2e8f0', 
+                  color: '#64748b', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0
+                }}
+                className="hover-scale"
+                title="Seite neu laden"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.color = '#334155';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                <RefreshCw size={16} />
+              </button>
+
               {activePlatform !== 'campus' && (
                 <div 
                   onClick={() => setActiveStudentTab('profile')}
-                  style={{ width: windowWidth <= 768 ? '40px' : '52px', height: windowWidth <= 768 ? '40px' : '52px', borderRadius: '16px', border: '3px solid white', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}
+                  style={{ width: windowWidth <= 768 ? '36px' : '40px', height: windowWidth <= 768 ? '36px' : '40px', borderRadius: '12px', border: '3px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}
                 >
                   <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} onClick={() => setActiveStudentTab('profile')} />
                 </div>
@@ -9105,10 +9130,12 @@ function App() {
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
+                    justifyContent: 'center',
                     gap: '6px', 
                     background: '#fce8e6', 
                     border: '1px solid #fad2cf', 
-                    padding: windowWidth <= 480 ? '8px' : '8px 14px', 
+                    height: windowWidth <= 768 ? '36px' : '40px',
+                    padding: windowWidth <= 480 ? '0 10px' : '0 14px', 
                     borderRadius: '12px', 
                     color: '#ea4335', 
                     fontWeight: 800, 
@@ -9132,10 +9159,12 @@ function App() {
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
+                    justifyContent: 'center',
                     gap: '6px', 
                     background: '#ffe4e6', 
                     border: '1px solid #fecdd3', 
-                    padding: windowWidth <= 480 ? '8px' : '8px 14px', 
+                    height: windowWidth <= 768 ? '36px' : '40px',
+                    padding: windowWidth <= 480 ? '0 10px' : '0 14px', 
                     borderRadius: '12px', 
                     color: '#e11d48', 
                     fontWeight: 800, 
