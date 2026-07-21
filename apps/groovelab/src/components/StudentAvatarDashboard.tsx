@@ -4169,11 +4169,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           date: dateStr,
           focusSeconds: 0,
           extraSeconds: 0,
-          flameLevel: log.flame_level || 'Kleine Flamme'
+          flameLevel: log.flame_level || 'Keine Flamme',
+          isPlaceholder: true
         };
-      } else if (groups[dateStr].isPlaceholder) {
-        // If it was initialized as a placeholder, clear the placeholder flag since we have real logs
-        groups[dateStr].isPlaceholder = false;
       }
       
       const seconds = log.duration_seconds || ((log.duration_minutes || 0) * 60);
@@ -4182,7 +4180,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       } else {
         groups[dateStr].focusSeconds += seconds;
       }
-      if (log.flame_level) {
+
+      if (groups[dateStr].focusSeconds >= 180 || groups[dateStr].extraSeconds >= 60) {
+        groups[dateStr].isPlaceholder = false;
+      }
+
+      if (log.flame_level && log.flame_level !== 'Keine Flamme') {
         groups[dateStr].flameLevel = log.flame_level;
       }
     });
@@ -4777,7 +4780,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               try {
                 if (currentLogIdRef.current) {
                   if (nextVal <= targetSeconds) {
-                    const mins = Math.round(nextVal / 60);
+                    const mins = Math.floor(nextVal / 60);
                     await supabase
                       .from('fokus_logs')
                       .update({ duration_seconds: nextVal, duration_minutes: mins })
@@ -4785,7 +4788,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   } else {
                     await supabase
                       .from('fokus_logs')
-                      .update({ duration_seconds: targetSeconds, duration_minutes: Math.round(targetSeconds / 60) })
+                      .update({ duration_seconds: targetSeconds, duration_minutes: Math.floor(targetSeconds / 60) })
                       .eq('id', currentLogIdRef.current);
                     currentLogIdRef.current = null;
                   }
@@ -4997,9 +5000,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     isFinishingSessionRef.current = true;
 
     setSessionActive(false);
-    if (secondsElapsed <= 0) {
-      alert("Du hast noch nicht genug geübt, um die Session zu beenden. 🎸");
+    if (secondsElapsed < 60) {
+      if (currentLogIdRef.current) {
+        try {
+          await supabase.from('fokus_logs').delete().eq('id', currentLogIdRef.current);
+        } catch (e) {
+          // ignore
+        }
+        currentLogIdRef.current = null;
+      }
+      setSecondsElapsed(0);
+      setIsExtraTime(false);
       isFinishingSessionRef.current = false;
+      alert("Session unter 1 Minute abgebrochen – es wurden keine Übe-Minuten verbucht. 🎸");
       return;
     }
 
@@ -5036,9 +5049,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         extraSeconds = 0;
       }
 
-      // Convert to minutes (at least 1 if we have seconds, or rounded)
-      const focusMinutes = focusSeconds > 0 ? Math.max(1, Math.round(focusSeconds / 60)) : 0;
-      const extraMinutes = extraSeconds > 0 ? Math.round(extraSeconds / 60) : 0;
+      // Convert to strict completed minutes (floor)
+      const focusMinutes = Math.floor(focusSeconds / 60);
+      const extraMinutes = Math.floor(extraSeconds / 60);
 
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
@@ -8095,8 +8108,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     }
                     groupedByMonth[key].entries.push(entry);
                     
-                    // Count as practice day if they actually practiced
-                    const practiced = !entry.isPlaceholder || entry.focusSeconds > 0 || entry.extraSeconds > 0;
+                    // Count as practice day ONLY if target was completed (>= 180s focus or >= 60s extra)
+                    const practiced = !entry.isPlaceholder || entry.focusSeconds >= 180 || entry.extraSeconds >= 60;
                     if (practiced) {
                       groupedByMonth[key].practiceDays += 1;
                     }
@@ -9751,7 +9764,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
 
-                {/* KPI 3: Fokus */}
+                {/* KPI 3: Übeminuten */}
                 {flamesActive && (
                   <div style={{ 
                     flex: '1 1 0px',
@@ -9772,7 +9785,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                       <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                        {wrappedData?.monthlyFlashback?.focusMinutes || 0}
+                        {totalPracticeMinutes || 0}
                       </span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Min</span>
                     </div>

@@ -582,6 +582,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     alert('🎉 3 Schuljahre wurden simuliert! Nutze das Schuljahr-Dropdown im Header, um zwischen 2025/2026 (Aktuell), 2024/2025 (Hall of Fame) und 2023/2024 (Hall of Fame) umzuschalten.');
   };
 
+  const triggerCelebrationTest = () => {
+    const stickerToCelebrate = ALL_STICKERS.find(s => s.id === 'uebe-grossmeister') || ALL_STICKERS[0];
+    setAwardedStickerToAnimate(stickerToCelebrate);
+    setSelectedPreviewSticker(stickerToCelebrate);
+  };
+
+  // Persistent memory cache for sticker image assets to prevent garbage collection and eliminate loading flicker
+  const preloadedStickerImagesRef = useRef<Record<string, HTMLImageElement>>({});
+
+  useEffect(() => {
+    ALL_STICKERS.forEach(st => {
+      if (!preloadedStickerImagesRef.current[st.id]) {
+        const img = new Image();
+        img.src = `/stickers/${st.id}.png?v=1`;
+        preloadedStickerImagesRef.current[st.id] = img;
+      }
+    });
+  }, []);
+
   const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
   const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>(isTeacherTools ? 'loopstation' : 'document');
@@ -7820,6 +7839,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
               <button
                 type="button"
+                onClick={triggerCelebrationTest}
+                style={{
+                  background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
+                  border: '1px solid #0369a1',
+                  color: '#ffffff',
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 12px',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <span>✨ Animation testen</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={resetStickerAlbum}
                 style={{
                   background: 'none',
@@ -8077,14 +8119,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <span style={{ fontSize: '1.4rem' }}>⏱️</span>
                   <div>
                     <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Übe-Fokus</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Pro Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Pro absolvierte Minute Übezeit erhältst du <strong>1 XP</strong>.</span>
                   </div>
                 </div>
                 <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '1.4rem' }}>🎯</span>
                   <div>
                     <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Tägliches Fokus-Ziel</strong>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus.</span>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Tägliches Fokus-Ziel erreicht = <strong>+10 XP</strong> Bonus <em>(z.B. 3m Timer + 1m Extra = 4 XP Übezeit + 10 XP Bonus = 14 XP total)</em>.</span>
                   </div>
                 </div>
                 <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
@@ -8092,6 +8134,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   <div>
                     <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Song meistern</strong>
                     <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Lied auf 100% oder Stage-Ready = <strong>+50 XP</strong> Bonus.</span>
+                  </div>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '1.4rem' }}>🔥</span>
+                  <div>
+                    <strong style={{ fontSize: '0.8rem', display: 'block', color: '#1e293b' }}>Streak-Bonus</strong>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.3' }}>Disziplin-Bonus: 7 Tage = <strong>+25 XP</strong>, 14 Tage = <strong>+50 XP</strong>, 30 Tage = <strong>+100 XP</strong>.</span>
                   </div>
                 </div>
               </div>
@@ -8304,69 +8353,48 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       transition: 'all 0.3s ease',
                       zIndex: 2
                     }}>
-                      {isCollected ? (
+                      <div style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        overflow: 'hidden'
+                      }}>
+                        {/* Instant Emoji Fallback (renders with 0ms latency) */}
+                        <span style={{ 
+                          fontSize: isCollected ? '3.5rem' : '3.2rem', 
+                          zIndex: 1, 
+                          filter: isCollected ? 'none' : 'grayscale(100%) opacity(0.35)',
+                          userSelect: 'none'
+                        }}>
+                          {st.emoji}
+                        </span>
+
+                        {/* High-Res PNG Image with smooth async decoding */}
                         <img 
                           src={`/stickers/${st.id}.png?v=1`} 
                           alt={st.title} 
+                          loading="eager"
+                          decoding="async"
                           style={{ 
+                            position: 'absolute',
+                            inset: 0,
                             width: '100%', 
                             height: '100%', 
                             objectFit: 'cover',
                             borderRadius: '50%',
-                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))'
+                            zIndex: 2,
+                            filter: isCollected ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))' : 'grayscale(100%) opacity(0.35) blur(1px)',
+                            transition: 'opacity 0.2s ease-in-out'
                           }}
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const parent = e.currentTarget.parentElement;
-                            if (parent) {
-                              const existingSpan = parent.querySelector('.emoji-fallback');
-                              if (!existingSpan) {
-                                const span = document.createElement('span');
-                                span.className = 'emoji-fallback';
-                                span.style.fontSize = '3.5rem';
-                                span.innerText = st.emoji;
-                                parent.appendChild(span);
-                              }
-                            }
+                            e.currentTarget.style.opacity = '0';
                           }}
                         />
-                      ) : (
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          opacity: 0.35,
-                          filter: 'grayscale(100%)'
-                        }}>
-                          <img 
-                            src={`/stickers/${st.id}.png?v=1`} 
-                            alt={st.title} 
-                            style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              objectFit: 'cover',
-                              borderRadius: '50%',
-                              filter: 'grayscale(100%) blur(1px)' 
-                            }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const existingSpan = parent.querySelector('.emoji-fallback');
-                                if (!existingSpan) {
-                                  const span = document.createElement('span');
-                                  span.className = 'emoji-fallback';
-                                  span.style.fontSize = '3.2rem';
-                                  span.innerText = st.emoji;
-                                  parent.appendChild(span);
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
+                      </div>
 
                       {!isCollected && (
                         <div style={{
@@ -8681,56 +8709,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   {/* Actions */}
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 2, marginTop: '4px' }}>
                     {isCollected && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => downloadShareCard(st)}
-                          style={{
-                            width: '100%',
-                            background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '16px',
-                            padding: '14px',
-                            fontSize: '0.84rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
-                            boxShadow: '0 6px 20px rgba(52, 168, 83, 0.3)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            transition: 'all 0.15s'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span>📥</span> Auszeichnung als PNG speichern
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => shareCard(st)}
-                          style={{
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.12)',
-                            color: 'white',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            borderRadius: '16px',
-                            padding: '12px',
-                            fontSize: '0.82rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            transition: 'all 0.15s'
-                          }}
-                          className="hover-scale"
-                        >
-                          <span>📲</span> Karte Teilen (WhatsApp / Insta)
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() => shareCard(st)}
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '16px',
+                          padding: '14px',
+                          fontSize: '0.86rem',
+                          fontWeight: 900,
+                          cursor: 'pointer',
+                          boxShadow: '0 6px 20px rgba(52, 168, 83, 0.3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          transition: 'all 0.15s'
+                        }}
+                        className="hover-scale"
+                      >
+                        <span>📲</span> Auszeichnung teilen
+                      </button>
                     )}
 
                     {st.id !== 'song-master' && !st.auto && (
