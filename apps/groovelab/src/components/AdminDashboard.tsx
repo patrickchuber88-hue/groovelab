@@ -2143,7 +2143,9 @@ export function AdminDashboard({
             const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
             if (toDelete.length > 0) {
               await deleteUserStorageAssets(toDelete);
+              await supabase.from('bands').update({ coach_id: null }).in('coach_id', toDelete);
               await supabase.from('user_song_skills').delete().in('user_id', toDelete);
+              await supabase.from('user_song_skills').update({ verified_by_id: null }).in('verified_by_id', toDelete);
               await supabase.from('sessions').delete().in('user_id', toDelete);
               await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);
               await supabase.from('lab_planning').delete().in('user_id', toDelete);
@@ -3261,7 +3263,9 @@ export function AdminDashboard({
           if (error) throw error;
         } else {
           // Hard delete: student is only on this platform, remove completely
+          await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id);
           await supabase.from('user_song_skills').delete().eq('user_id', id);
+          await supabase.from('user_song_skills').update({ verified_by_id: null }).eq('verified_by_id', id);
           await supabase.from('band_members').delete().eq('user_id', id);
           await supabase.from('sessions').delete().eq('user_id', id);
           await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
@@ -3430,8 +3434,11 @@ export function AdminDashboard({
     if (window.confirm('Möchtest du diesen Lehrer wirklich löschen?')) {
       try {
         // Cleanup related data
+        await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id);
         await supabase.from('sessions').delete().eq('user_id', id);
         await supabase.from('band_members').delete().eq('user_id', id);
+        await supabase.from('user_song_skills').delete().eq('user_id', id);
+        await supabase.from('user_song_skills').update({ verified_by_id: null }).eq('verified_by_id', id);
         await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
         await supabase.from('lab_planning').delete().eq('user_id', id);
         await supabase.from('band_shoutbox').delete().eq('user_id', id);
@@ -4812,8 +4819,10 @@ export function AdminDashboard({
       const studentIds = students.map(s => s.id);
       if (studentIds.length === 0) return;
 
+      await supabase.from('bands').update({ coach_id: null }).in('coach_id', studentIds);
       await supabase.from('band_members').delete().in('user_id', studentIds);
       await supabase.from('user_song_skills').delete().in('user_id', studentIds);
+      await supabase.from('user_song_skills').update({ verified_by_id: null }).in('verified_by_id', studentIds);
       await supabase.from('sessions').delete().in('user_id', studentIds);
       await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', studentIds);
       await supabase.from('lab_planning').delete().in('user_id', studentIds);

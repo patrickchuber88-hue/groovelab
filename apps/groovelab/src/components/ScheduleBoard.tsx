@@ -1555,6 +1555,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setLoading(true);
       // 1. Delete user record if exists
       await deleteUserStorageAssets([studentId]);
+      await supabase.from('bands').update({ coach_id: null }).eq('coach_id', studentId);
       const { error: userErr } = await supabase.from('users').delete().eq('id', studentId);
       if (userErr) console.error("Error deleting user during reset:", userErr);
       

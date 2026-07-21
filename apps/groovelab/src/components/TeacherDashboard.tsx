@@ -4071,12 +4071,8 @@ export function TeacherDashboard({
             setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
           }
         });
-        // Prepare Student Query depending on platform
-        // For student viewMode: fetch all students in school (userId is the student's own ID, NOT a teacher_id)
-        // For admin/teacher viewMode: fetch only the teacher's own students filtered by teacher_id
-        const studentQuery = viewMode === 'student'
-          ? supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student')
-          : supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student').eq('teacher_id', userId);
+        // Prepare Student Query: fetch all students in the school
+        const studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
 
         // Prepare dynamic matching board songs query
         let wallSongsQuery = supabase.from('songs').select(`
@@ -4296,7 +4292,14 @@ export function TeacherDashboard({
         setAllBands(bData || []);
 
         // 7. Students
-        let filteredStudData = studData || [];
+        let filteredStudData = (studData || []).filter((student: any) => {
+          // If teacher is logged in, show students assigned to this teacher (or all if admin/secretary or if viewMode demands)
+          if (tData.role === 'teacher') {
+            return student.teacher_id === userId;
+          }
+          return true;
+        });
+
         if (new Date().getMonth() === 7) { // 7 is August
           const currentYear = new Date().getFullYear();
           const limitDate = new Date(currentYear, 7, 31, 23, 59, 59).getTime();
@@ -5434,7 +5437,9 @@ export function TeacherDashboard({
           // Physically purge assets from Supabase Storage
           await deleteUserStorageAssets([id]);
 
+          await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id);
           await supabase.from('user_song_skills').delete().eq('user_id', id);
+          await supabase.from('user_song_skills').update({ verified_by_id: null }).eq('verified_by_id', id);
           await supabase.from('band_members').delete().eq('user_id', id);
           await supabase.from('sessions').delete().eq('user_id', id);
           await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
@@ -12869,6 +12874,17 @@ export function TeacherDashboard({
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {student.first_name} {maskLastName(student.last_name, showRealNames)}
+                            </div>
+                            <div style={{ marginTop: '2px' }}>
+                              {(student.is_campus_active || student.isCampusActive) ? (
+                                <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', display: 'inline-block' }}>
+                                  Aktiv
+                                </span>
+                              ) : (
+                                <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', display: 'inline-block' }}>
+                                  Inaktiv
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

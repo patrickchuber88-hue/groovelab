@@ -8743,19 +8743,45 @@ function App() {
 
                   {/* Unified School, Teacher, Student, Admin & Secretary Pill */}
                   {(() => {
-                    if (user?.role === 'student') {
+                    if (activePlatform === 'groovelab') {
                       return (
                         <div style={{ 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '8px', 
+                          gap: '6px', 
                           background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
-                          borderRadius: '12px', 
+                          padding: '5px 10px', 
+                          borderRadius: '10px', 
                           border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
                         }}>
-                          <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <School size={12} color="#ef4444" />
+                              <span>
+                                {school?.name || 'Meine Musikschule'}
+                              </span>
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    } else if (user?.role === 'student') {
+                      return (
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '6px', 
+                          background: 'rgba(59, 130, 246, 0.04)', 
+                          padding: '5px 10px', 
+                          borderRadius: '10px', 
+                          border: '1px solid rgba(59, 130, 246, 0.12)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
+                        }}>
+                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {windowWidth > 768 && (
                               <>
                                 <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -8766,7 +8792,7 @@ function App() {
                                 </span>
                                 <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                                 <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <User size={14} color="#3b82f6" />
+                                  <User size={12} color="#3b82f6" />
                                   <span>
                                     {(() => {
                                       const teacherName = teachers.find(t => t.id === user.teacher_id) 
@@ -8781,7 +8807,7 @@ function App() {
                                 <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                               </>
                             )}
-                            <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#34a853', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span>
                                 {user.first_name || 'Schüler'}
                               </span>
@@ -8794,14 +8820,16 @@ function App() {
                         <div style={{ 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '8px', 
+                          gap: '6px', 
                           background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
-                          borderRadius: '12px', 
+                          padding: '5px 10px', 
+                          borderRadius: '10px', 
                           border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
                         }}>
-                          <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <School size={12} color="#ef4444" />
                               <span>
@@ -8812,7 +8840,7 @@ function App() {
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <User size={14} color="#3b82f6" />
+                              <User size={12} color="#3b82f6" />
                               <span>
                                 {windowWidth <= 768 
                                   ? getInitials(`${user.first_name} ${user.last_name}`) 
@@ -8832,10 +8860,10 @@ function App() {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  padding: '4px',
+                                  padding: '2px',
                                   color: '#3b82f6',
                                   borderRadius: '50%',
-                                  marginLeft: '6px',
+                                  marginLeft: '4px',
                                   transition: 'background 0.2s, transform 0.2s',
                                 }}
                                 title="Zur Verwaltung wechseln"
@@ -8847,7 +8875,7 @@ function App() {
                                   e.currentTarget.style.background = 'transparent';
                                 }}
                               >
-                                <RefreshCw size={14} />
+                                <RefreshCw size={12} />
                               </button>
                             )}
                           </span>
@@ -8858,14 +8886,16 @@ function App() {
                         <div style={{ 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '8px', 
+                          gap: '6px', 
                           background: 'rgba(59, 130, 246, 0.04)', 
-                          padding: windowWidth <= 768 ? '8px 12px' : '8px 16px', 
-                          borderRadius: '12px', 
+                          padding: '5px 10px', 
+                          borderRadius: '10px', 
                           border: '1px solid rgba(59, 130, 246, 0.12)',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
                         }}>
-                          <span style={{ fontWeight: 900, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 750, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <School size={12} color="#ef4444" />
                               <span>
@@ -8876,7 +8906,7 @@ function App() {
                             </span>
                             <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
                             <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <User size={14} color="#3b82f6" />
+                              <User size={12} color="#3b82f6" />
                               <span>
                                 {windowWidth <= 768 
                                   ? `${getInitials(`${user.first_name} ${user.last_name}`)} • ${user?.role === 'admin' ? 'AD' : 'VW'}`
