@@ -9759,11 +9759,11 @@ function App() {
                   {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? (
                     (() => {
                       const groovelabInstDefs = [
-                        { key: 'Gitarre', altKey: 'E-Gitarre', label: 'E-Gitarre', Icon: Music },
-                        { key: 'Piano / Keys', altKey: 'E-Piano', label: 'E-Piano', Icon: Music },
-                        { key: 'Drums', altKey: 'E-Drum', label: 'E-Drum', Icon: Disc },
-                        { key: 'Bass', altKey: 'E-Bass', label: 'E-Bass', Icon: Music },
-                        { key: 'Vocals', altKey: 'Gesang', label: 'Gesang', Icon: Mic }
+                        { key: 'Gitarre', altKey: 'E-Gitarre', label: 'E-Gitarre', instName: 'E-Gitarre' },
+                        { key: 'Piano / Keys', altKey: 'E-Piano', label: 'E-Piano', instName: 'E-Piano' },
+                        { key: 'Drums', altKey: 'E-Drum', label: 'E-Drum', instName: 'Drums' },
+                        { key: 'Bass', altKey: 'E-Bass', label: 'E-Bass', instName: 'E-Bass' },
+                        { key: 'Vocals', altKey: 'Gesang', label: 'Gesang', instName: 'Vocals' }
                       ];
 
                       const currentRaw = (user.groovelab_instrument || '');
@@ -9806,7 +9806,6 @@ function App() {
                               const isActive = currentInstList.some((s: string) => 
                                 s === instDef.key || s === instDef.altKey || s === instDef.label
                               );
-                              const InstIcon = instDef.Icon;
 
                               return (
                                 <button
@@ -9841,13 +9840,11 @@ function App() {
                                     }
                                   }}
                                 >
-                                  <InstIcon size={16} style={{ color: isActive ? 'white' : '#64748b' }} />
+                                  {renderInstrumentIcon(instDef.instName, isActive ? '#ffffff' : undefined, 18)}
                                   <span>{instDef.label}</span>
                                   {isActive && <span style={{ fontSize: '0.75rem', marginLeft: '2px' }}>✓</span>}
                                 </button>
                               );
-                            })}
-                          </div>
                         </div>
                       );
                     })()
