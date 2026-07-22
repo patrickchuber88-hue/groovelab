@@ -120,6 +120,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [loadingAdminStats, setLoadingAdminStats] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Teacher Mobile Schedule States
+  const [teacherTodayLessons, setTeacherTodayLessons] = useState<any[]>([]);
+  const [loadingTeacherSchedule, setLoadingTeacherSchedule] = useState(false);
+  const [teacherModuleFilter, setTeacherModuleFilter] = useState<'all' | 'campus' | 'groovelab'>('all');
+
   // Inaktive Aktivierungs-States
   const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
   const [parentEmail, setParentEmail] = useState('');
@@ -778,9 +783,94 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
   }, [profile]);
 
-  // ── Dashboard-Daten laden ──────────────────────────────────────────────────
+  // ── Lehrkräfte-Daten laden (Heutiger Stundenplan) ──────────────────────────
+  useEffect(() => {
+    if (profile && profile.role === 'teacher') {
+      const fetchTeacherSchedule = async () => {
+        setLoadingTeacherSchedule(true);
+        try {
+          const todayDate = new Date();
+          const todayStr = todayDate.toLocaleDateString('en-CA');
+          const currentDayOfWeek = todayDate.getDay() || 7;
+
+          const [schRes, occRes] = await Promise.all([
+            supabase
+              .from('schedules')
+              .select(`
+                *,
+                student:student_id(first_name, last_name, instrument),
+                room:room_id(name)
+              `)
+              .eq('teacher_id', profile.id)
+              .eq('day_of_week', currentDayOfWeek),
+            supabase
+              .from('schedule_occurrences')
+              .select(`
+                *,
+                student:student_id(first_name, last_name, instrument),
+                schedule:schedule_id(room:room_id(name))
+              `)
+              .eq('teacher_id', profile.id)
+              .eq('date', todayStr)
+          ]);
+
+          const merged: any[] = [];
+          const overriddenScheduleIds = new Set<string>();
+
+          if (occRes.data) {
+            occRes.data.forEach((occ: any) => {
+              if (occ.schedule_id) overriddenScheduleIds.add(occ.schedule_id);
+              const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status);
+              if (!isCanceled) {
+                const sLastName = maskLastName(occ.student?.last_name, true);
+                const studentName = occ.student 
+                  ? `${occ.student.first_name || ''} ${sLastName}`.trim()
+                  : 'Schüler';
+                merged.push({
+                  id: occ.id,
+                  time: occ.start_time ? occ.start_time.substring(0, 5) : '00:00',
+                  student_name: studentName,
+                  instrument: occ.student?.instrument || profile.instrument || 'Unterricht',
+                  room_name: occ.schedule?.room?.name || 'Groovelab Raum'
+                });
+              }
+            });
+          }
+
+          if (schRes.data) {
+            schRes.data.forEach((sch: any) => {
+              if (!overriddenScheduleIds.has(sch.id) && sch.status !== 'canceled_by_teacher_sick') {
+                const sLastName = maskLastName(sch.student?.last_name, true);
+                const studentName = sch.student 
+                  ? `${sch.student.first_name || ''} ${sLastName}`.trim()
+                  : 'Schüler';
+                merged.push({
+                  id: sch.id,
+                  time: sch.time_slot ? sch.time_slot.substring(0, 5) : '00:00',
+                  student_name: studentName,
+                  instrument: sch.student?.instrument || profile.instrument || 'Unterricht',
+                  room_name: sch.room?.name || 'Groovelab Raum'
+                });
+              }
+            });
+          }
+
+          merged.sort((a, b) => a.time.localeCompare(b.time));
+          setTeacherTodayLessons(merged);
+        } catch (err) {
+          console.error('Error fetching teacher schedule:', err);
+        } finally {
+          setLoadingTeacherSchedule(false);
+        }
+      };
+
+      fetchTeacherSchedule();
+    }
+  }, [profile]);
+
+  // ── Dashboard-Daten laden (Schüler) ───────────────────────────────────────
   const fetchDashboardData = useCallback(async () => {
-    if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile) return;
+    if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile || profile.role === 'admin' || profile.role === 'secretary' || profile.role === 'teacher') return;
     setLoadingDashboard(true);
     try {
       const todayDate = new Date();
@@ -4309,9 +4399,114 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── Render: Profile (10-Sekunden-Interface) ───────────────────────────────
   if (pageState === 'profile' && profile) {
-    const isAdminOrSecretary = profile.role === 'admin' || profile.role === 'secretary';
+    // ── 1. GrooveLab-only Schüler Abfangen ──────────────────────────────────
+    if (profile.role === 'student' && !profile.is_campus_active && profile.is_groovelab_active) {
+      const handleGoToApp = () => {
+        sessionStorage.removeItem('groovelab_user_id');
+        sessionStorage.removeItem('groovelab_qr_token');
+        window.location.replace('/');
+      };
 
-    if (isAdminOrSecretary) {
+      return (
+        <div style={{
+          ...styles.fullScreen,
+          background: '#0f172a',
+          padding: '20px',
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: '"Outfit", "Inter", sans-serif'
+        }}>
+          <div style={{
+            ...styles.card,
+            maxWidth: '420px',
+            width: '100%',
+            background: 'rgba(255, 255, 255, 0.03)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+            border: '1px solid rgba(250, 204, 21, 0.2)',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            borderRadius: '24px',
+            padding: '28px',
+            color: '#ffffff',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: '20px'
+          }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+              width: '54px',
+              height: '54px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 10px 25px rgba(234, 179, 8, 0.3)'
+            }}>
+              <Sparkles size={26} color="#ffffff" />
+            </div>
+
+            <div>
+              <span style={{ fontSize: '0.68rem', color: '#facc15', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                GrooveLab Modul
+              </span>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.02em', color: '#ffffff' }}>
+                Lernen an den Musikschul-Stationen
+              </h1>
+            </div>
+
+            <div style={{
+              background: 'rgba(234, 179, 8, 0.06)',
+              border: '1px solid rgba(234, 179, 8, 0.2)',
+              borderRadius: '16px',
+              padding: '16px',
+              fontSize: '0.82rem',
+              color: '#cbd5e1',
+              lineHeight: 1.5,
+              textAlign: 'left'
+            }}>
+              <strong style={{ color: '#facc15', display: 'block', marginBottom: '4px' }}>Kein Hausaufgabenheft verfügbar</strong>
+              GrooveLab ist für das gemeinsame Band- und Songlernen vor Ort an den Musikschul-Stationen entwickelt worden. Für GrooveLab-Schüler gibt es kein mobiles Online-Hausaufgabenheft.
+            </div>
+
+            <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: 0, lineHeight: 1.4 }}>
+              Falls du auch Einzelunterricht hast und dein Hausaufgabenheft nutzen möchtest, bitte deine Musikschule, deinen <strong>Campus-Zugang</strong> zu aktivieren.
+            </p>
+
+            <button
+              onClick={handleGoToApp}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                border: 'none',
+                color: '#ffffff',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 8px 20px rgba(234, 179, 8, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Zur Musikschul-Anmeldung →
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── 2. Mitarbeiter- & Lehrer-Rollen (Verwaltung / Campus / GrooveLab / Hybrid) ──
+    const rolesArray = Array.isArray(profile.roles) ? profile.roles : [];
+    const isAdminOrSecretary = profile.role === 'admin' || profile.role === 'secretary' || rolesArray.includes('admin') || rolesArray.includes('secretary');
+    const isTeacher = profile.role === 'teacher' || rolesArray.includes('teacher');
+    const isCampusTeacher = isTeacher && profile.is_campus_active;
+    const isGroovelabTeacher = isTeacher && profile.is_groovelab_active;
+
+    if (isAdminOrSecretary || isTeacher) {
       const handleLogout = () => {
         sessionStorage.removeItem('groovelab_user_id');
         sessionStorage.removeItem('groovelab_qr_token');
@@ -4343,6 +4538,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         setTimeout(() => setCopiedLink(false), 2000);
       };
 
+      // Avatar Policy: Admin/Secretary MUST display /campus_login_hero.png across all modules
+      const profileAvatar = isAdminOrSecretary
+        ? '/campus_login_hero.png'
+        : (profile.photo_url || getInstrumentAvatarUrl(profile.instrument));
+
+      // Primary theme color
+      const primaryColor = isAdminOrSecretary
+        ? '#ea4335'
+        : (isGroovelabTeacher && !isCampusTeacher ? '#eab308' : '#34a853');
+
+      const gradientBg = isAdminOrSecretary
+        ? 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)'
+        : (isGroovelabTeacher && !isCampusTeacher
+            ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
+            : 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)');
+
+      // Filter lessons for Kombi-Lehrer
+      const filteredLessons = teacherTodayLessons.filter(lesson => {
+        if (teacherModuleFilter === 'campus') return lesson.module === 'campus';
+        if (teacherModuleFilter === 'groovelab') return lesson.module === 'groovelab';
+        return true;
+      });
+
       return (
         <div style={{
           ...styles.fullScreen,
@@ -4361,7 +4579,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             background: 'rgba(255, 255, 255, 0.03)',
             backdropFilter: 'blur(30px)',
             WebkitBackdropFilter: 'blur(30px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            border: `1px solid ${primaryColor}25`,
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
             borderRadius: '24px',
             padding: '24px',
@@ -4373,28 +4591,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {/* Header / Logo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
-                background: 'linear-gradient(135deg, #34a853 0%, #eab308 100%)',
+                background: gradientBg,
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 8px 20px rgba(52, 168, 83, 0.2)'
+                boxShadow: `0 8px 20px ${primaryColor}40`
               }}>
-                <Shield size={18} color="#ffffff" />
+                {isAdminOrSecretary ? <Shield size={18} color="#ffffff" /> : <Music size={18} color="#ffffff" />}
               </div>
               <div>
                 <h1 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#ffffff' }}>
                   Campus-Groovelab
                 </h1>
-                <span style={{ fontSize: '0.62rem', color: '#34a853', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  Mobiles Leitstand-Dashboard
+                <span style={{ fontSize: '0.62rem', color: primaryColor, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  {isAdminOrSecretary ? 'Mobiles Leitstand-Dashboard' : 'Mobiles Lehrkraft-Pass'}
                 </span>
               </div>
             </div>
 
-            {/* Profile Briefing Board Card */}
+            {/* Profile Card */}
             <div style={{
               background: 'rgba(255, 255, 255, 0.02)',
               border: '1px solid rgba(255, 255, 255, 0.04)',
@@ -4405,106 +4623,332 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               gap: '14px'
             }}>
               <img
-                src="/campus_login_hero.png"
-                alt="Profile Chalkboard"
+                src={profileAvatar}
+                alt="Profile Avatar"
                 style={{
-                  width: '50px',
-                  height: '50px',
-                  borderRadius: '12px',
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '14px',
                   objectFit: 'cover',
-                  border: '1.5px solid rgba(255, 255, 255, 0.1)'
+                  border: `2px solid ${primaryColor}60`
                 }}
               />
               <div style={{ minWidth: 0, flex: 1 }}>
-                <h2 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {profile.first_name} {profile.last_name || ''}
                 </h2>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  {profile.role === 'admin' ? 'Schulleitung' : 'Sekretariat/Verwaltung'}
+                
+                {/* Badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
+                  {isAdminOrSecretary && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      background: 'rgba(234, 67, 53, 0.15)',
+                      color: '#ea4335',
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase'
+                    }}>
+                      {profile.role === 'admin' || rolesArray.includes('admin') ? 'Schulleitung' : 'Sekretariat'}
+                    </span>
+                  )}
+                  {isCampusTeacher && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      background: 'rgba(52, 168, 83, 0.15)',
+                      color: '#34a853',
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase'
+                    }}>
+                      Campus Lehrkraft
+                    </span>
+                  )}
+                  {isGroovelabTeacher && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      background: 'rgba(234, 179, 8, 0.15)',
+                      color: '#eab308',
+                      padding: '2px 7px',
+                      borderRadius: '6px',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase'
+                    }}>
+                      GrooveLab Coach
+                    </span>
+                  )}
+                  {!isAdminOrSecretary && profile.instrument && (
+                    <span style={{ fontSize: '0.72rem', color: '#cbd5e1', fontWeight: 600 }}>
+                      · {profile.instrument}
+                    </span>
+                  )}
                 </div>
-                <div style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 600, marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {profile.school_name}
                 </div>
               </div>
             </div>
 
-            {/* Alert: Pending Activations */}
-            {adminStats.pendingActivations > 0 ? (
-              <div style={{
-                background: 'rgba(245, 158, 11, 0.06)',
-                border: '1px solid rgba(245, 158, 11, 0.2)',
-                borderRadius: '16px',
-                padding: '16px',
+            {/* Direct Login Button */}
+            <button
+              onClick={() => {
+                setPinPurpose('unlock_app');
+                setPageState('pin_required');
+              }}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '14px',
+                background: gradientBg,
+                border: 'none',
+                color: '#ffffff',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: `0 8px 20px ${primaryColor}40`,
                 display: 'flex',
-                gap: '12px',
-                alignItems: 'flex-start'
-              }}>
-                <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: '1px' }} />
-                <div>
-                  <strong style={{ display: 'block', fontSize: '0.85rem', color: '#f59e0b', fontWeight: 800, marginBottom: '2px' }}>
-                    Registrierungen ausstehend!
-                  </strong>
-                  <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 550, lineHeight: 1.4 }}>
-                    Es warten <strong>{adminStats.pendingActivations}</strong> neue Profile auf die manuelle Freischaltung im Briefing Board nach Zahlungseingang.
-                  </span>
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Direkt in Campus-Groovelab anmelden →
+            </button>
+
+            {/* Section 1: Admin KPIs (Rendered if Admin / Secretary / Hybrid) */}
+            {isAdminOrSecretary && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {adminStats.pendingActivations > 0 ? (
+                  <div style={{
+                    background: 'rgba(245, 158, 11, 0.06)',
+                    border: '1px solid rgba(245, 158, 11, 0.2)',
+                    borderRadius: '16px',
+                    padding: '14px',
+                    display: 'flex',
+                    gap: '12px',
+                    alignItems: 'flex-start'
+                  }}>
+                    <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <div>
+                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#f59e0b', fontWeight: 800, marginBottom: '2px' }}>
+                        Registrierungen ausstehend!
+                      </strong>
+                      <span style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 550, lineHeight: 1.4 }}>
+                        Es warten <strong>{adminStats.pendingActivations}</strong> neue Profile auf Freischaltung.
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: 'rgba(52, 168, 83, 0.05)',
+                    border: '1px solid rgba(52, 168, 83, 0.15)',
+                    borderRadius: '16px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    gap: '10px',
+                    alignItems: 'center'
+                  }}>
+                    <CheckCircle size={16} color="#34a853" />
+                    <span style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 600 }}>
+                      Alle Profile sind aktuell freigeschaltet.
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    borderRadius: '14px',
+                    padding: '12px',
+                    textAlign: 'center'
+                  }}>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Schüler</span>
+                    {loadingAdminStats ? (
+                      <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                      </div>
+                    ) : (
+                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '2px' }}>{adminStats.activeStudents}</strong>
+                    )}
+                  </div>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    borderRadius: '14px',
+                    padding: '12px',
+                    textAlign: 'center'
+                  }}>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Lehrkräfte</span>
+                    {loadingAdminStats ? (
+                      <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                      </div>
+                    ) : (
+                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '2px' }}>{adminStats.activeTeachers}</strong>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div style={{
-                background: 'rgba(52, 168, 83, 0.05)',
-                border: '1px solid rgba(52, 168, 83, 0.15)',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'center'
-              }}>
-                <CheckCircle size={18} color="#34a853" />
-                <span style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: 600 }}>
-                  Alle Profile sind aktuell freigeschaltet. Keine ausstehenden Aktivitäten.
-                </span>
               </div>
             )}
 
-            {/* KPI Stats Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '16px'
-            }}>
+            {/* Section 2: Teacher Schedule (Rendered if Teacher / Hybrid) */}
+            {isTeacher && (
               <div style={{
                 background: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid rgba(255, 255, 255, 0.04)',
                 borderRadius: '16px',
                 padding: '16px',
-                textAlign: 'center'
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
               }}>
-                <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Schüler</span>
-                {loadingAdminStats ? (
-                  <div style={{ height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div className="animate-spin" style={{ width: '12px', height: '12px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Heutiger Unterrichtsplan
+                  </span>
+                  <span style={{ fontSize: '0.68rem', color: primaryColor, fontWeight: 700 }}>
+                    {new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                  </span>
+                </div>
+
+                {/* Filter Toggle for Kombi-Lehrer */}
+                {isCampusTeacher && isGroovelabTeacher && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr',
+                    gap: '4px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    padding: '3px',
+                    borderRadius: '10px'
+                  }}>
+                    <button
+                      onClick={() => setTeacherModuleFilter('all')}
+                      style={{
+                        padding: '5px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: teacherModuleFilter === 'all' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                        color: teacherModuleFilter === 'all' ? '#ffffff' : '#94a3b8',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Alle
+                    </button>
+                    <button
+                      onClick={() => setTeacherModuleFilter('campus')}
+                      style={{
+                        padding: '5px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: teacherModuleFilter === 'campus' ? '#34a853' : 'transparent',
+                        color: '#ffffff',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Campus
+                    </button>
+                    <button
+                      onClick={() => setTeacherModuleFilter('groovelab')}
+                      style={{
+                        padding: '5px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: teacherModuleFilter === 'groovelab' ? '#eab308' : 'transparent',
+                        color: '#ffffff',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      GrooveLab
+                    </button>
+                  </div>
+                )}
+
+                {loadingTeacherSchedule ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                    Lade Stundenplan...
+                  </div>
+                ) : filteredLessons.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {filteredLessons.map((item, idx) => {
+                      const isGL = item.module === 'groovelab';
+                      const badgeColor = isGL ? '#eab308' : '#34a853';
+                      const badgeBg = isGL ? 'rgba(234, 179, 8, 0.15)' : 'rgba(52, 168, 83, 0.15)';
+
+                      return (
+                        <div key={item.id || idx} style={{
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          borderRadius: '12px',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              background: badgeBg,
+                              color: badgeColor,
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              padding: '4px 8px',
+                              borderRadius: '6px'
+                            }}>
+                              {item.time}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {item.student_name}
+                                {isCampusTeacher && isGroovelabTeacher && (
+                                  <span style={{ fontSize: '0.58rem', background: badgeBg, color: badgeColor, padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
+                                    {isGL ? 'GL' : 'Campus'}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                {item.instrument}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', padding: '3px 8px', borderRadius: '6px' }}>
+                            {item.room_name}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '4px' }}>{adminStats.activeStudents}</strong>
-                )}
-              </div>
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.04)',
-                borderRadius: '16px',
-                padding: '16px',
-                textAlign: 'center'
-              }}>
-                <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkräfte</span>
-                {loadingAdminStats ? (
-                  <div style={{ height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div className="animate-spin" style={{ width: '12px', height: '12px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                  <div style={{
+                    background: 'rgba(52, 168, 83, 0.05)',
+                    border: '1px solid rgba(52, 168, 83, 0.15)',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    color: '#cbd5e1',
+                    fontSize: '0.78rem',
+                    fontWeight: 600
+                  }}>
+                    <CheckCircle size={18} color="#34a853" style={{ flexShrink: 0 }} />
+                    Heute kein Unterricht geplant.
                   </div>
-                ) : (
-                  <strong style={{ fontSize: '1.5rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '4px' }}>{adminStats.activeTeachers}</strong>
                 )}
               </div>
-            </div>
+            )}
 
             {/* School Registration Link Card */}
             <div style={{
@@ -4525,7 +4969,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '12px',
-                  background: copiedLink ? '#34a853' : 'rgba(255, 255, 255, 0.04)',
+                  background: copiedLink ? primaryColor : 'rgba(255, 255, 255, 0.04)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                   color: '#ffffff',
                   fontSize: '0.78rem',
@@ -4542,19 +4986,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </button>
             </div>
 
-            {/* Hint & Actions */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.01)',
-              borderRadius: '16px',
-              padding: '14px',
-              border: '1.5px dashed rgba(255, 255, 255, 0.06)',
-              fontSize: '0.7rem',
-              color: '#94a3b8',
-              lineHeight: 1.4,
-              textAlign: 'center'
-            }}>
-              Die vollumfängliche Verwaltung (Stundenpläne, Abrechnung, Banking und Schulinformationen) ist für <strong>Desktop-Computer</strong> optimiert.
-            </div>
+            {/* Desktop Hint for Staff */}
+            {isAdminOrSecretary && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.01)',
+                borderRadius: '14px',
+                padding: '12px',
+                border: '1.5px dashed rgba(255, 255, 255, 0.06)',
+                fontSize: '0.68rem',
+                color: '#94a3b8',
+                lineHeight: 1.4,
+                textAlign: 'center'
+              }}>
+                Die vollumfängliche Verwaltung (Stundenpläne, Abrechnung, Banking) ist für <strong>Desktop-Computer</strong> optimiert.
+              </div>
+            )}
 
             <button
               onClick={handleLogout}
@@ -4585,6 +5031,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </div>
       );
     }
+
 
     const todayStr = new Date().toLocaleDateString('en-CA');
     const currentDayOfWeek = new Date().getDay() || 7; // Monday = 1, ..., Sunday = 7
