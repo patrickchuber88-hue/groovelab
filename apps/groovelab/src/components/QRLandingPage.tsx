@@ -3998,23 +3998,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               // ACTIVE STUDENT WIDGETS
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
                 {/* Level Roadmap & Fokus-Timer Mobile Card */}
-                <div style={{...styles.card, padding: '20px', gap: '16px', border: '1.5px solid #a7f3d0', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: 'white', textAlign: 'center', borderRadius: '24px', boxShadow: '0 10px 25px rgba(15,23,42,0.25)'}}>
+                <div style={{...styles.card, padding: '20px', gap: '16px', border: '1.5px solid #bbf7d0', background: '#ffffff', color: '#0f172a', textAlign: 'center', borderRadius: '24px', boxShadow: '0 10px 25px rgba(52, 168, 83, 0.08)'}}>
                   
                   {/* Smartphone Level Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Award size={18} color="#ffffff" />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Übe-Pfad</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#ffffff' }}>Level 1: Übe-Pionier 🚀</div>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Übe-Pfad</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>Level 1: Übe-Pionier 🚀</div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '4px 8px', borderRadius: '999px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fef2f2', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '999px' }}>
                       <Flame size={14} fill="#ef4444" color="#ef4444" />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ffffff' }}>{profile.streak_flame || 0} Tage</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#dc2626' }}>{profile.streak_flame || 0} Tage</span>
                     </div>
                   </div>
 
@@ -4029,18 +4029,20 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                         <div style={{
                           width: '30px', height: '30px', borderRadius: '50%',
-                          background: stg.active ? '#34a853' : 'rgba(255,255,255,0.15)',
-                          border: stg.active ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
+                          background: stg.active ? '#34a853' : '#f1f5f9',
+                          border: stg.active ? '2px solid #ffffff' : '1px solid #e2e8f0',
+                          color: stg.active ? '#ffffff' : '#64748b',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem'
                         }}>
                           {stg.icon}
                         </div>
-                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: stg.active ? '#a7f3d0' : 'rgba(255,255,255,0.5)' }}>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: stg.active ? '#166534' : '#94a3b8' }}>
                           {stg.title}
                         </span>
                       </div>
                     ))}
                   </div>
+
 
                   <button
                     onClick={handleStartTimer}
@@ -4410,7 +4412,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return (
         <div style={{
           ...styles.fullScreen,
-          background: '#0f172a',
+          background: '#f8fafc',
           padding: '20px',
           boxSizing: 'border-box',
           display: 'flex',
@@ -4422,14 +4424,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             ...styles.card,
             maxWidth: '420px',
             width: '100%',
-            background: 'rgba(255, 255, 255, 0.03)',
-            backdropFilter: 'blur(30px)',
-            WebkitBackdropFilter: 'blur(30px)',
-            border: '1px solid rgba(250, 204, 21, 0.2)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            background: '#ffffff',
+            border: '1.5px solid #fde68a',
+            boxShadow: '0 20px 40px -15px rgba(217, 119, 6, 0.12), 0 1px 3px rgba(0,0,0,0.04)',
             borderRadius: '24px',
             padding: '28px',
-            color: '#ffffff',
+            color: '#0f172a',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -4444,36 +4444,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 10px 25px rgba(234, 179, 8, 0.3)'
+              boxShadow: '0 10px 25px rgba(234, 179, 8, 0.25)'
             }}>
               <Sparkles size={26} color="#ffffff" />
             </div>
 
             <div>
-              <span style={{ fontSize: '0.68rem', color: '#facc15', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                 GrooveLab Modul
               </span>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.02em', color: '#ffffff' }}>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.02em', color: '#0f172a' }}>
                 Lernen an den Musikschul-Stationen
               </h1>
             </div>
 
             <div style={{
-              background: 'rgba(234, 179, 8, 0.06)',
-              border: '1px solid rgba(234, 179, 8, 0.2)',
+              background: '#fefce8',
+              border: '1px solid #fde68a',
               borderRadius: '16px',
               padding: '16px',
               fontSize: '0.82rem',
-              color: '#cbd5e1',
+              color: '#475569',
               lineHeight: 1.5,
               textAlign: 'left'
             }}>
-              <strong style={{ color: '#facc15', display: 'block', marginBottom: '4px' }}>Kein Hausaufgabenheft verfügbar</strong>
+              <strong style={{ color: '#b45309', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Kein Hausaufgabenheft verfügbar</strong>
               GrooveLab ist für das gemeinsame Band- und Songlernen vor Ort an den Musikschul-Stationen entwickelt worden. Für GrooveLab-Schüler gibt es kein mobiles Online-Hausaufgabenheft.
             </div>
 
-            <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: 0, lineHeight: 1.4 }}>
-              Falls du auch Einzelunterricht hast und dein Hausaufgabenheft nutzen möchtest, bitte deine Musikschule, deinen <strong>Campus-Zugang</strong> zu aktivieren.
+            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, lineHeight: 1.45 }}>
+              Falls du auch Einzelunterricht hast und dein Hausaufgabenheft nutzen möchtest, bitte deine Musikschule, deinen <strong style={{ color: '#0f172a' }}>Campus-Zugang</strong> zu aktivieren.
             </p>
 
             <button
@@ -4546,7 +4546,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       // Primary theme color
       const primaryColor = isAdminOrSecretary
         ? '#ea4335'
-        : (isGroovelabTeacher && !isCampusTeacher ? '#eab308' : '#34a853');
+        : (isGroovelabTeacher && !isCampusTeacher ? '#d97706' : '#34a853');
 
       const gradientBg = isAdminOrSecretary
         ? 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)'
@@ -4564,7 +4564,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return (
         <div style={{
           ...styles.fullScreen,
-          background: '#0f172a',
+          background: '#f8fafc',
           padding: '20px',
           boxSizing: 'border-box',
           display: 'flex',
@@ -4576,14 +4576,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             ...styles.card,
             maxWidth: '420px',
             width: '100%',
-            background: 'rgba(255, 255, 255, 0.03)',
-            backdropFilter: 'blur(30px)',
-            WebkitBackdropFilter: 'blur(30px)',
-            border: `1px solid ${primaryColor}25`,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03)',
             borderRadius: '24px',
             padding: '24px',
-            color: '#ffffff',
+            color: '#0f172a',
             display: 'flex',
             flexDirection: 'column',
             gap: '20px'
@@ -4592,21 +4590,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 background: gradientBg,
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
+                width: '38px',
+                height: '38px',
+                borderRadius: '11px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: `0 8px 20px ${primaryColor}40`
+                boxShadow: `0 6px 16px ${primaryColor}30`
               }}>
                 {isAdminOrSecretary ? <Shield size={18} color="#ffffff" /> : <Music size={18} color="#ffffff" />}
               </div>
               <div>
-                <h1 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#ffffff' }}>
+                <h1 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
                   Campus-Groovelab
                 </h1>
-                <span style={{ fontSize: '0.62rem', color: primaryColor, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: '0.64rem', color: primaryColor, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {isAdminOrSecretary ? 'Mobiles Leitstand-Dashboard' : 'Mobiles Lehrkraft-Pass'}
                 </span>
               </div>
@@ -4614,8 +4612,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             {/* Profile Card */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.04)',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
               borderRadius: '16px',
               padding: '16px',
               display: 'flex',
@@ -4630,11 +4628,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   height: '54px',
                   borderRadius: '14px',
                   objectFit: 'cover',
-                  border: `2px solid ${primaryColor}60`
+                  border: `2px solid ${primaryColor}40`
                 }}
               />
               <div style={{ minWidth: 0, flex: 1 }}>
-                <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {profile.first_name} {profile.last_name || ''}
                 </h2>
                 
@@ -4643,8 +4641,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   {isAdminOrSecretary && (
                     <span style={{
                       fontSize: '0.62rem',
-                      background: 'rgba(234, 67, 53, 0.15)',
+                      background: '#fef2f2',
                       color: '#ea4335',
+                      border: '1px solid #fecaca',
                       padding: '2px 7px',
                       borderRadius: '6px',
                       fontWeight: 800,
@@ -4657,8 +4656,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   {isCampusTeacher && (
                     <span style={{
                       fontSize: '0.62rem',
-                      background: 'rgba(52, 168, 83, 0.15)',
+                      background: '#f0fdf4',
                       color: '#34a853',
+                      border: '1px solid #bbf7d0',
                       padding: '2px 7px',
                       borderRadius: '6px',
                       fontWeight: 800,
@@ -4671,8 +4671,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   {isGroovelabTeacher && (
                     <span style={{
                       fontSize: '0.62rem',
-                      background: 'rgba(234, 179, 8, 0.15)',
-                      color: '#eab308',
+                      background: '#fefce8',
+                      color: '#d97706',
+                      border: '1px solid #fde68a',
                       padding: '2px 7px',
                       borderRadius: '6px',
                       fontWeight: 800,
@@ -4683,13 +4684,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     </span>
                   )}
                   {!isAdminOrSecretary && profile.instrument && (
-                    <span style={{ fontSize: '0.72rem', color: '#cbd5e1', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
                       · {profile.instrument}
                     </span>
                   )}
                 </div>
 
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {profile.school_name}
                 </div>
               </div>
@@ -4711,7 +4712,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 fontWeight: 800,
                 fontSize: '0.88rem',
                 cursor: 'pointer',
-                boxShadow: `0 8px 20px ${primaryColor}40`,
+                boxShadow: `0 8px 20px ${primaryColor}35`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -4727,28 +4728,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {adminStats.pendingActivations > 0 ? (
                   <div style={{
-                    background: 'rgba(245, 158, 11, 0.06)',
-                    border: '1px solid rgba(245, 158, 11, 0.2)',
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
                     borderRadius: '16px',
                     padding: '14px',
                     display: 'flex',
                     gap: '12px',
                     alignItems: 'flex-start'
                   }}>
-                    <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
                     <div>
-                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#f59e0b', fontWeight: 800, marginBottom: '2px' }}>
+                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#b45309', fontWeight: 800, marginBottom: '2px' }}>
                         Registrierungen ausstehend!
                       </strong>
-                      <span style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 550, lineHeight: 1.4 }}>
-                        Es warten <strong>{adminStats.pendingActivations}</strong> neue Profile auf Freischaltung.
+                      <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 550, lineHeight: 1.4 }}>
+                        Es warten <strong style={{ color: '#0f172a' }}>{adminStats.pendingActivations}</strong> neue Profile auf Freischaltung.
                       </span>
                     </div>
                   </div>
                 ) : (
                   <div style={{
-                    background: 'rgba(52, 168, 83, 0.05)',
-                    border: '1px solid rgba(52, 168, 83, 0.15)',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
                     borderRadius: '16px',
                     padding: '12px 14px',
                     display: 'flex',
@@ -4756,7 +4757,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     alignItems: 'center'
                   }}>
                     <CheckCircle size={16} color="#34a853" />
-                    <span style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 600 }}>
                       Alle Profile sind aktuell freigeschaltet.
                     </span>
                   </div>
@@ -4764,35 +4765,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '14px',
                     padding: '12px',
                     textAlign: 'center'
                   }}>
-                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Schüler</span>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Schüler</span>
                     {loadingAdminStats ? (
                       <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #cbd5e1', borderTopColor: '#0f172a', borderRadius: '50%' }}></div>
                       </div>
                     ) : (
-                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '2px' }}>{adminStats.activeStudents}</strong>
+                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', display: 'block', marginTop: '2px' }}>{adminStats.activeStudents}</strong>
                     )}
                   </div>
                   <div style={{
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '14px',
                     padding: '12px',
                     textAlign: 'center'
                   }}>
-                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Lehrkräfte</span>
+                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Lehrkräfte</span>
                     {loadingAdminStats ? (
                       <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #64748b', borderTopColor: '#ffffff', borderRadius: '50%' }}></div>
+                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #cbd5e1', borderTopColor: '#0f172a', borderRadius: '50%' }}></div>
                       </div>
                     ) : (
-                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '2px' }}>{adminStats.activeTeachers}</strong>
+                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', display: 'block', marginTop: '2px' }}>{adminStats.activeTeachers}</strong>
                     )}
                   </div>
                 </div>
@@ -4802,8 +4803,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {/* Section 2: Teacher Schedule (Rendered if Teacher / Hybrid) */}
             {isTeacher && (
               <div style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.04)',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
                 borderRadius: '16px',
                 padding: '16px',
                 display: 'flex',
@@ -4811,10 +4812,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 gap: '12px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Heutiger Unterrichtsplan
                   </span>
-                  <span style={{ fontSize: '0.68rem', color: primaryColor, fontWeight: 700 }}>
+                  <span style={{ fontSize: '0.68rem', color: primaryColor, fontWeight: 800 }}>
                     {new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                   </span>
                 </div>
@@ -4825,21 +4826,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr 1fr',
                     gap: '4px',
-                    background: 'rgba(255, 255, 255, 0.04)',
+                    background: '#e2e8f0',
                     padding: '3px',
                     borderRadius: '10px'
                   }}>
                     <button
                       onClick={() => setTeacherModuleFilter('all')}
                       style={{
-                        padding: '5px',
+                        padding: '6px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: teacherModuleFilter === 'all' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-                        color: teacherModuleFilter === 'all' ? '#ffffff' : '#94a3b8',
+                        background: teacherModuleFilter === 'all' ? '#ffffff' : 'transparent',
+                        color: teacherModuleFilter === 'all' ? '#0f172a' : '#64748b',
                         fontSize: '0.68rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: teacherModuleFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
                       }}
                     >
                       Alle
@@ -4847,14 +4849,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <button
                       onClick={() => setTeacherModuleFilter('campus')}
                       style={{
-                        padding: '5px',
+                        padding: '6px',
                         borderRadius: '8px',
                         border: 'none',
                         background: teacherModuleFilter === 'campus' ? '#34a853' : 'transparent',
-                        color: '#ffffff',
+                        color: teacherModuleFilter === 'campus' ? '#ffffff' : '#64748b',
                         fontSize: '0.68rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: teacherModuleFilter === 'campus' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
                       }}
                     >
                       Campus
@@ -4862,14 +4865,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <button
                       onClick={() => setTeacherModuleFilter('groovelab')}
                       style={{
-                        padding: '5px',
+                        padding: '6px',
                         borderRadius: '8px',
                         border: 'none',
                         background: teacherModuleFilter === 'groovelab' ? '#eab308' : 'transparent',
-                        color: '#ffffff',
+                        color: teacherModuleFilter === 'groovelab' ? '#ffffff' : '#64748b',
                         fontSize: '0.68rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: teacherModuleFilter === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
                       }}
                     >
                       GrooveLab
@@ -4878,30 +4882,33 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 )}
 
                 {loadingTeacherSchedule ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
                     Lade Stundenplan...
                   </div>
                 ) : filteredLessons.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {filteredLessons.map((item, idx) => {
                       const isGL = item.module === 'groovelab';
-                      const badgeColor = isGL ? '#eab308' : '#34a853';
-                      const badgeBg = isGL ? 'rgba(234, 179, 8, 0.15)' : 'rgba(52, 168, 83, 0.15)';
+                      const badgeColor = isGL ? '#b45309' : '#166534';
+                      const badgeBg = isGL ? '#fefce8' : '#f0fdf4';
+                      const badgeBorder = isGL ? '#fde68a' : '#bbf7d0';
 
                       return (
                         <div key={item.id || idx} style={{
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
                           borderRadius: '12px',
                           padding: '10px 12px',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between'
+                          justifyContent: 'space-between',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div style={{
                               background: badgeBg,
                               color: badgeColor,
+                              border: `1px solid ${badgeBorder}`,
                               fontSize: '0.75rem',
                               fontWeight: 800,
                               padding: '4px 8px',
@@ -4910,20 +4917,20 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               {item.time}
                             </div>
                             <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {item.student_name}
                                 {isCampusTeacher && isGroovelabTeacher && (
-                                  <span style={{ fontSize: '0.58rem', background: badgeBg, color: badgeColor, padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
+                                  <span style={{ fontSize: '0.58rem', background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}`, padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
                                     {isGL ? 'GL' : 'Campus'}
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                                 {item.instrument}
                               </div>
                             </div>
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: '#cbd5e1', fontWeight: 600, background: 'rgba(255, 255, 255, 0.05)', padding: '3px 8px', borderRadius: '6px' }}>
+                          <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: '6px' }}>
                             {item.room_name}
                           </div>
                         </div>
@@ -4932,14 +4939,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </div>
                 ) : (
                   <div style={{
-                    background: 'rgba(52, 168, 83, 0.05)',
-                    border: '1px solid rgba(52, 168, 83, 0.15)',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
                     borderRadius: '12px',
                     padding: '14px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    color: '#cbd5e1',
+                    color: '#166534',
                     fontSize: '0.78rem',
                     fontWeight: 600
                   }}>
@@ -4952,15 +4959,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             {/* School Registration Link Card */}
             <div style={{
-              background: 'rgba(255, 255, 255, 0.01)',
-              border: '1px solid rgba(255, 255, 255, 0.04)',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
               borderRadius: '16px',
               padding: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px'
             }}>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Registrierungs-Link
               </span>
               <button
@@ -4969,9 +4976,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '12px',
-                  background: copiedLink ? primaryColor : 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  color: '#ffffff',
+                  background: copiedLink ? primaryColor : '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: copiedLink ? '#ffffff' : '#0f172a',
                   fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -4979,6 +4986,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                   transition: 'all 0.2s ease'
                 }}
               >
@@ -4989,16 +4997,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {/* Desktop Hint for Staff */}
             {isAdminOrSecretary && (
               <div style={{
-                background: 'rgba(255, 255, 255, 0.01)',
+                background: '#f8fafc',
                 borderRadius: '14px',
                 padding: '12px',
-                border: '1.5px dashed rgba(255, 255, 255, 0.06)',
+                border: '1.5px dashed #cbd5e1',
                 fontSize: '0.68rem',
-                color: '#94a3b8',
+                color: '#64748b',
                 lineHeight: 1.4,
                 textAlign: 'center'
               }}>
-                Die vollumfängliche Verwaltung (Stundenpläne, Abrechnung, Banking) ist für <strong>Desktop-Computer</strong> optimiert.
+                Die vollumfängliche Verwaltung (Stundenpläne, Abrechnung, Banking) ist für <strong style={{ color: '#0f172a' }}>Desktop-Computer</strong> optimiert.
               </div>
             )}
 
@@ -5008,9 +5016,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 width: '100%',
                 padding: '12px',
                 borderRadius: '12px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-                color: '#f87171',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                color: '#dc2626',
                 fontWeight: 800,
                 fontSize: '0.82rem',
                 cursor: 'pointer',
@@ -5021,8 +5029,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 e.currentTarget.style.color = '#ffffff';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                e.currentTarget.style.color = '#f87171';
+                e.currentTarget.style.background = '#fef2f2';
+                e.currentTarget.style.color = '#dc2626';
               }}
             >
               Abmelden
