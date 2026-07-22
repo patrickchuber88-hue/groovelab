@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Users, Plus, Copy, Check, UserCheck, Smartphone, Globe, Music, Trash2, AlertCircle } from 'lucide-react';
+import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { deleteStudentFully } from '../utils/studentDeletionService';
 
 interface Student {
   id: string;
@@ -12,6 +14,8 @@ interface Student {
   status: string;
   created_at?: string;
   lesson_duration?: number;
+  is_campus_active?: boolean;
+  is_groovelab_active?: boolean;
 }
 
 interface TeacherStudentManagementProps {
@@ -22,6 +26,7 @@ interface TeacherStudentManagementProps {
 
 export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: TeacherStudentManagementProps) {
   const [students, setStudents] = useState<Student[]>([]);
+  const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -205,18 +210,14 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
     setError(null);
   };
 
-  const handleDeleteStudent = async (studentId: string, name: string) => {
-    if (!window.confirm(`Möchtest du den Schüler "${name}" wirklich löschen?`)) return;
-    try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', studentId);
-      if (error) throw error;
-      setStudents(prev => prev.filter(s => s.id !== studentId));
-    } catch (err: any) {
-      setError('Fehler beim Löschen des Schülers.');
-    }
+  const handleDeleteStudent = (student: Student) => {
+    setDeleteStudentModalData({
+      id: student.id,
+      name: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Schüler',
+      instrument: student.instrument,
+      isCampusActive: student.is_campus_active,
+      isGroovelabActive: student.is_groovelab_active
+    });
   };
 
   // Calculate percentage used
@@ -441,7 +442,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                     )}
 
                     <button
-                      onClick={() => handleDeleteStudent(student.id, `${student.first_name} ${student.last_name}`)}
+                      onClick={() => handleDeleteStudent(student)}
                       className="p-3.5 rounded-xl border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex items-center justify-center shrink-0"
                       title="Schüler löschen"
                     >
@@ -454,7 +455,24 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
           </div>
         )}
       </div>
-      
+
+      <ConfirmDeleteStudentModal
+        isOpen={!!deleteStudentModalData}
+        student={deleteStudentModalData}
+        activePlatform="all"
+        onClose={() => setDeleteStudentModalData(null)}
+        onConfirm={async (studentId) => {
+          const res = await deleteStudentFully(studentId, {
+            activePlatform: 'all',
+            isCampusActive: deleteStudentModalData?.isCampusActive,
+            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+          });
+          if (!res.success) {
+            throw new Error(res.error);
+          }
+          setStudents(prev => prev.filter(s => s.id !== studentId));
+        }}
+      />
     </div>
   );
 }

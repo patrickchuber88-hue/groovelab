@@ -410,7 +410,11 @@ export default function CampusDirectMessages({
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
-  const isStudent = user?.role?.toLowerCase() === 'student';
+  const isTeacherOrStaff = 
+    user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' ||
+    (typeof window !== 'undefined' && ['teacher', 'admin', 'secretary'].includes((sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role') || '').toLowerCase()));
+
+  const isStudent = !isTeacherOrStaff && (user?.role?.toLowerCase() === 'student' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_user_role') === 'student'));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -420,49 +424,225 @@ export default function CampusDirectMessages({
   }, []);
 
   useEffect(() => {
-    if (!user || isStudent) return;
+    if (isStudent) return;
     const fetchAssignedStudents = async () => {
       try {
-        const teacherId = user.id;
-        const schoolId = user.school_id;
-
-        const [byTeacherRes, bySchoolRes, schedsRes, occsRes] = await Promise.all([
-          supabase.from('users').select('id, first_name, last_name, role, photo_url, teacher_id, instrument, status').eq('role', 'student').eq('teacher_id', teacherId),
-          supabase.from('users').select('id, first_name, last_name, role, photo_url, teacher_id, instrument, status').eq('role', 'student').eq('school_id', schoolId),
-          supabase.from('schedules').select('student_id, student:users!schedules_student_id_fkey(id, first_name, last_name, role, photo_url, teacher_id, instrument, status)').eq('teacher_id', teacherId),
-          supabase.from('schedule_occurrences').select('student_id, student:users!schedule_occurrences_student_id_fkey(id, first_name, last_name, role, photo_url, teacher_id, instrument, status)').eq('teacher_id', teacherId)
-        ]);
-
+        const teacherId = user?.id || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
         const studentMap = new Map<string, any>();
 
-        (byTeacherRes?.data || []).forEach((u: any) => {
-          if (u.id !== user.id) studentMap.set(u.id, { ...u, role: u.role || 'student' });
-        });
+        // 1. Unconditional direct queries for all non-staff users and pending_students
+        try {
+          const { data: allUsersInDb } = await supabase.from('users').select('*');
+          (allUsersInDb || []).forEach((u: any) => {
+            if (u && u.id && u.id !== teacherId) {
+              const r = (u.role || '').toLowerCase();
+              if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+                studentMap.set(u.id, u);
+              }
+            }
+          });
+        } catch (e) {}
 
-        (bySchoolRes?.data || []).forEach((u: any) => {
-          if (u.id !== user.id) studentMap.set(u.id, { ...u, role: u.role || 'student' });
-        });
+        try {
+          const { data: allPendingInDb } = await supabase.from('pending_students_decrypted').select('*');
+          (allPendingInDb || []).forEach((p: any) => {
+            if (p && p.id && p.id !== teacherId) {
+              studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
+            }
+          });
+        } catch (e) {}
 
-        (schedsRes?.data || []).forEach((s: any) => {
-          if (s.student && s.student.id !== user.id) {
-            studentMap.set(s.student.id, { ...s.student, role: s.student.role || 'student' });
+        // 1b. Fetch current user's profile to resolve exact school_id from all possible sources
+        let targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
+        if (!targetSchoolId && typeof window !== 'undefined') {
+          targetSchoolId = sessionStorage.getItem('groovelab_school_id') || 
+                           localStorage.getItem('groovelab_school_id') || 
+                           sessionStorage.getItem('school_id') || 
+                           localStorage.getItem('school_id');
+        }
+        if (!targetSchoolId && teacherId) {
+          try {
+            const { data: me } = await supabase.from('users').select('school_id').eq('id', teacherId).maybeSingle();
+            if (me?.school_id) targetSchoolId = me.school_id;
+          } catch (e) {}
+        }
+        if (!targetSchoolId) {
+          try {
+            const { data: anyUser } = await supabase.from('users').select('school_id').not('school_id', 'is', null).limit(1).maybeSingle();
+            if (anyUser?.school_id) targetSchoolId = anyUser.school_id;
+          } catch (e) {}
+        }
+
+        const schoolIds = new Set<string>();
+        if (targetSchoolId) schoolIds.add(targetSchoolId);
+        if (user?.school_id) schoolIds.add(user.school_id);
+        if (Array.isArray(user?.schools)) user.schools.forEach((s: any) => { if (s?.id) schoolIds.add(s.id); });
+
+        try {
+          const { data: allSchools } = await supabase.from('schools').select('id');
+          (allSchools || []).forEach(s => { if (s?.id) schoolIds.add(s.id); });
+        } catch (e) {}
+
+        // 1b. Direct teacher_id queries (Fetch all students assigned to this teacher regardless of onboarding or activation)
+        if (teacherId) {
+          try {
+            const { data: byTeacher } = await supabase.from('users').select('*').eq('teacher_id', teacherId);
+            (byTeacher || []).forEach(u => {
+              if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+            });
+          } catch (e) {}
+
+          try {
+            const { data: pByTeacher } = await supabase.from('pending_students_decrypted').select('*').eq('teacher_id', teacherId);
+            (pByTeacher || []).forEach(p => {
+              if (p && p.id && p.id !== teacherId) studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
+            });
+          } catch (e) {}
+
+          try {
+            const { data: schedByTeacher } = await supabase.from('schedules').select('*, student:users!student_id(*)').eq('teacher_id', teacherId);
+            (schedByTeacher || []).forEach((sc: any) => {
+              const u = sc.student || sc.users;
+              if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+            });
+          } catch (e) {}
+        }
+
+        // 2. Query each school using exact TeacherDashboard query pattern: eq('school_id', sid).eq('role', 'student')
+        for (const sid of Array.from(schoolIds)) {
+          try {
+            const { data: sExact } = await supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name');
+            (sExact || []).forEach(u => {
+              if (u && u.id && u.id !== teacherId) {
+                studentMap.set(u.id, u);
+              }
+            });
+          } catch (e) {}
+
+          try {
+            const { data: sData } = await supabase.from('users').select('*').eq('school_id', sid).order('first_name');
+            (sData || []).forEach(u => {
+              if (u && u.id && u.id !== teacherId) {
+                const r = (u.role || '').toLowerCase();
+                if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+                  studentMap.set(u.id, u);
+                }
+              }
+            });
+          } catch (e) {}
+
+          try {
+            const { data: scheds } = await supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid);
+            (scheds || []).forEach((sc: any) => {
+              const u = sc.student || sc.users;
+              if (u && u.id && u.id !== teacherId) {
+                const r = (u.role || '').toLowerCase();
+                if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+                  studentMap.set(u.id, u);
+                }
+              }
+            });
+          } catch (e) {}
+
+          try {
+            const { data: occs } = await supabase.from('schedule_occurrences').select('*, student:users!student_id(*)').eq('school_id', sid);
+            (occs || []).forEach((sc: any) => {
+              const u = sc.student || sc.users;
+              if (u && u.id && u.id !== teacherId) {
+                const r = (u.role || '').toLowerCase();
+                if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+                  studentMap.set(u.id, u);
+                }
+              }
+            });
+          } catch (e) {}
+        }
+
+        // 3. Global fallbacks across role = 'student' and all non-staff users
+        try {
+          const { data: sRoles } = await supabase.from('users').select('*').eq('role', 'student').order('first_name');
+          (sRoles || []).forEach(u => {
+            if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+          });
+        } catch (e) {}
+
+        try {
+          const { data: sAll } = await supabase.from('users').select('*').order('first_name');
+          (sAll || []).forEach(u => {
+            if (u && u.id && u.id !== teacherId) {
+              const r = (u.role || '').toLowerCase();
+              if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+                studentMap.set(u.id, u);
+              }
+            }
+          });
+        } catch (e) {}
+
+        // 4. Also fetch pending_students for each school and globally
+        for (const sid of Array.from(schoolIds)) {
+          try {
+            const { data: pStudents } = await supabase.from('pending_students_decrypted').select('*').eq('school_id', sid);
+            (pStudents || []).forEach(p => {
+              if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
+                studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
+              }
+            });
+          } catch (e) {}
+        }
+
+        try {
+          const { data: pAll } = await supabase.from('pending_students_decrypted').select('*');
+          (pAll || []).forEach(p => {
+            if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
+              studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
+            }
+          });
+        } catch (e) {}
+
+        // 5. Incorporate window.__groovelabAllStudents if set by TeacherDashboard
+        if (typeof window !== 'undefined' && Array.isArray((window as any).__groovelabAllStudents)) {
+          (window as any).__groovelabAllStudents.forEach((u: any) => {
+            if (u && u.id && u.id !== teacherId && !studentMap.has(u.id)) {
+              studentMap.set(u.id, u);
+            }
+          });
+        }
+
+        // Incorporate all users passed from parent schoolUsers
+        (schoolUsers || []).forEach((u: any) => {
+          if (u && u.id && u.id !== teacherId) {
+            const r = (u.role || '').toLowerCase();
+            if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+              studentMap.set(u.id, u);
+            }
           }
         });
 
-        (occsRes?.data || []).forEach((o: any) => {
-          if (o.student && o.student.id !== user.id) {
-            studentMap.set(o.student.id, { ...o.student, role: o.student.role || 'student' });
-          }
-        });
+        // Incorporate message partners from campusMessages
+        if (campusMessages && campusMessages.length > 0) {
+          campusMessages.forEach((m: any) => {
+            const partnerId = m.sender_id === user?.id ? m.recipient_id : m.sender_id;
+            if (partnerId && partnerId !== teacherId && !studentMap.has(partnerId)) {
+              const existingInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
+              if (existingInSchool) {
+                studentMap.set(partnerId, existingInSchool);
+              }
+            }
+          });
+        }
 
-        setAssignedStudents(Array.from(studentMap.values()));
+        const result = Array.from(studentMap.values());
+        console.log('[CampusDirectMessages] Total fetched students:', result.length, result.map(s => s.first_name));
+        setAssignedStudents(result);
       } catch (err) {
-        console.error('[CampusDirectMessages] Error fetching assigned students:', err);
+        console.error('[CampusDirectMessages] Unexpected error in fetchAssignedStudents:', err);
       }
     };
 
     fetchAssignedStudents();
-  }, [user?.id, user?.school_id, isStudent]);
+    const timer = setTimeout(fetchAssignedStudents, 800);
+    return () => clearTimeout(timer);
+  }, [user?.id, user?.school_id, user?.schools?.id, isStudent, schoolUsers]);
 
   const isSystemMessage = (msg: any) => {
     if (msg.occurrence_id) return true;
@@ -482,15 +662,17 @@ export default function CampusDirectMessages({
     return false;
   };
 
-  // Combine schoolUsers and assignedStudents for teachers
-  const allAvailableUsers = [...schoolUsers];
-  assignedStudents.forEach(st => {
-    if (!allAvailableUsers.some(u => u.id === st.id)) {
-      allAvailableUsers.push(st);
+  // Combine schoolUsers, window.__groovelabAllStudents, and assignedStudents
+  const windowStudents = (typeof window !== 'undefined' && Array.isArray((window as any).__groovelabAllStudents)) ? (window as any).__groovelabAllStudents : [];
+  const allAvailableUsersMap = new Map<string, any>();
+  [...schoolUsers, ...windowStudents, ...assignedStudents].forEach(u => {
+    if (u && u.id) {
+      allAvailableUsersMap.set(u.id, u);
     }
   });
+  const allAvailableUsers = Array.from(allAvailableUsersMap.values());
 
-  // Get potential chat partners (Includes ALL assigned students for teachers)
+  // Get potential chat partners (Includes ALL non-staff students in the school)
   const chatPartners = allAvailableUsers.filter(u => {
     if (u.id === user.id) return false;
     if (selectedRecipient && u.id === selectedRecipient.id) return true;
@@ -498,16 +680,15 @@ export default function CampusDirectMessages({
       return (u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'))) && 
         (String(u.id) === String(user.teacher_id) || (Array.isArray(user.teacher_ids) && user.teacher_ids.map(String).includes(String(u.id))));
     }
-    // Teachers see ONLY students/pupils
+
     const role = (u.role || '').toLowerCase();
     const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
-    
-    if (role === 'teacher' || role === 'admin' || role === 'secretary' ||
-        roles.includes('teacher') || roles.includes('admin') || roles.includes('secretary')) {
-      return false;
-    }
-    
-    return role === 'student' || role === 'pupil' || roles.includes('student') || roles.includes('pupil') || u.teacher_id === user.id;
+    const isStaffUser = role === 'teacher' || role === 'admin' || role === 'secretary' ||
+                        roles.includes('teacher') || roles.includes('admin') || roles.includes('secretary');
+
+    if (isStaffUser) return false;
+
+    return true;
   });
 
   // Filter partners based on search
@@ -535,7 +716,7 @@ export default function CampusDirectMessages({
     };
   });
 
-  // Filter based on Quick-Filters
+  // Filter based on Quick-Filters with deterministic sorting
   const finalPartnersList = partnersWithMetadata.filter(partner => {
     if (filterType === 'unread') {
       return partner.unreadCount > 0;
@@ -543,6 +724,11 @@ export default function CampusDirectMessages({
     return true;
   }).sort((a, b) => {
     if (a.unreadCount !== b.unreadCount) return b.unreadCount - a.unreadCount;
+    if (!a.lastMessageTime && !b.lastMessageTime) {
+      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.trim();
+      return nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
+    }
     if (!a.lastMessageTime) return 1;
     if (!b.lastMessageTime) return -1;
     return b.lastMessageTime.getTime() - a.lastMessageTime.getTime();
@@ -1324,7 +1510,7 @@ export default function CampusDirectMessages({
                 </h4>
 
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(210px, 1fr))', gap: '12px' }}>
-                  {finalPartnersList.slice(0, 6).map(partner => (
+                  {finalPartnersList.map(partner => (
                     <button
                       key={`hero-${partner.id}`}
                       onClick={() => setSelectedRecipient(partner)}
@@ -1418,19 +1604,7 @@ export default function CampusDirectMessages({
             </button>
 
             <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0' }}>
-              Neue Nachricht ({
-                schoolUsers.filter(u => {
-                  if (u.id === user.id) return false;
-                  if (isStudent) {
-                    return u.role === 'teacher' && String(u.id) === String(user.teacher_id);
-                  } else {
-                    if (user.role?.toLowerCase() === 'teacher') {
-                      return u.role === 'student' && u.teacher_id === user.id;
-                    }
-                    return u.role === 'student';
-                  }
-                }).length
-              })
+              Neue Nachricht ({chatPartners.length})
             </h3>
             
             <div style={{ position: 'relative' }}>
@@ -1455,18 +1629,7 @@ export default function CampusDirectMessages({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '45vh', paddingRight: '4px' }}>
-              {schoolUsers
-                .filter(u => {
-                  if (u.id === user.id) return false;
-                  if (isStudent) {
-                    return u.role === 'teacher' && String(u.id) === String(user.teacher_id);
-                  } else {
-                    if (user.role?.toLowerCase() === 'teacher') {
-                      return u.role === 'student' && u.teacher_id === user.id;
-                    }
-                    return u.role === 'student';
-                  }
-                })
+              {chatPartners
                 .filter(u => `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase().includes(newChatSearch.toLowerCase()))
                 .map(u => {
                   const avatarSrc = resolveCampusAvatar(u);

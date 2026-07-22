@@ -278,18 +278,29 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         alert('Vorname und Nachname dürfen nicht leer sein.');
         return;
       }
-      const { error } = await supabase
+      const cleanFirst = editFirstName.trim();
+      const cleanLast = editLastName.trim();
+
+      await supabase
         .from('users')
         .update({
-          first_name: editFirstName.trim(),
-          last_name: editLastName.trim()
+          first_name: cleanFirst,
+          last_name: cleanLast
         })
         .eq('id', student.id);
-      if (error) throw error;
-      setFirstName(editFirstName.trim());
-      setLastName(editLastName.trim());
-      student.first_name = editFirstName.trim();
-      student.last_name = editLastName.trim();
+
+      await supabase
+        .from('pending_students')
+        .update({
+          first_name: cleanFirst,
+          last_name: cleanLast
+        })
+        .eq('id', student.id);
+
+      setFirstName(cleanFirst);
+      setLastName(cleanLast);
+      student.first_name = cleanFirst;
+      student.last_name = cleanLast;
       setIsEditingName(false);
     } catch (err: any) {
       alert('Fehler beim Speichern des Namens: ' + err.message);
@@ -725,17 +736,23 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     try {
       const newGroupId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
       
-      const { error: err1 } = await supabase
+      await supabase
         .from('users')
         .update({ group_id: newGroupId })
         .eq('id', student.id);
-      if (err1) throw err1;
+      await supabase
+        .from('pending_students')
+        .update({ group_id: newGroupId })
+        .eq('id', student.id);
 
-      const { error: err2 } = await supabase
+      await supabase
         .from('users')
         .update({ group_id: newGroupId })
         .eq('id', selectedStudentToLink);
-      if (err2) throw err2;
+      await supabase
+        .from('pending_students')
+        .update({ group_id: newGroupId })
+        .eq('id', selectedStudentToLink);
 
       alert('Gruppenunterricht erfolgreich eingerichtet!');
       setSelectedStudentToLink('');
@@ -880,15 +897,45 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       }
 
       // Fetch other school students (for group setup dropdown list)
-      const targetSchoolId = latestUser?.school_id || student.school_id || student.schoolId;
+      const schoolIdFallback = sessionStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_school_id');
+      const targetSchoolId = latestUser?.school_id || student.school_id || student.schoolId || schoolIdFallback;
+
       if (targetSchoolId) {
-        const { data: allSchoolStudents } = await supabase
-          .from('users')
-          .select('id, first_name, last_name')
-          .eq('school_id', targetSchoolId)
-          .eq('role', 'student')
-          .neq('id', student.id);
-        setSchoolStudents(allSchoolStudents || []);
+        const [usersRes, pendingRes] = await Promise.all([
+          supabase
+            .from('users')
+            .select('id, first_name, last_name, role')
+            .eq('school_id', targetSchoolId)
+            .neq('id', student.id),
+          supabase
+            .from('pending_students')
+            .select('id, first_name, last_name')
+            .eq('school_id', targetSchoolId)
+            .neq('id', student.id)
+        ]);
+
+        const combinedStudents: any[] = [];
+        const addedIds = new Set<string>();
+
+        if (usersRes.data) {
+          usersRes.data.forEach((u: any) => {
+            if (!u.role || u.role === 'student') {
+              combinedStudents.push(u);
+              addedIds.add(u.id);
+            }
+          });
+        }
+
+        if (pendingRes.data) {
+          pendingRes.data.forEach((p: any) => {
+            if (!addedIds.has(p.id)) {
+              combinedStudents.push(p);
+              addedIds.add(p.id);
+            }
+          });
+        }
+
+        setSchoolStudents(combinedStudents);
       } else {
         setSchoolStudents([]);
       }
@@ -2932,6 +2979,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                                   type="text"
                                   placeholder="Name des Schülers suchen..."
                                   value={studentSearchQuery}
+                                  autoComplete="off"
+                                  name="disable_autofill_student_partner"
                                   onChange={e => {
                                     setStudentSearchQuery(e.target.value);
                                     setSelectedStudentToLink('');

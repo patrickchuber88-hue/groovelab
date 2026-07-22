@@ -8,6 +8,8 @@ import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { deleteStudentFully } from '../utils/studentDeletionService';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -1120,7 +1122,7 @@ export function TeacherDashboard({
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
   const [docStudent, setDocStudent] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches'>(initialTab || (hideHeader ? 'live' : 'briefing'));
+  const [activeTab, setActiveTab] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages'>(initialTab || (hideHeader ? 'live' : 'briefing'));
 
   // --- Guided Tour ---
   const tourSteps = useMemo<TourStep[]>(() => {
@@ -1155,6 +1157,7 @@ export function TeacherDashboard({
   const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentLetter, setStudentLetter] = useState<string | null>(null);
   const [studentInstrumentFilter, setStudentInstrumentFilter] = useState<string>('all');
@@ -4207,10 +4210,8 @@ export function TeacherDashboard({
           (activeTab === 'briefing' || activeTab === 'bands')
             ? Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // student list (also needed on live tab for checking in student roster modal)
-          (activeTab === 'live' || activeTab === 'briefing' || activeTab === 'students' || activeTab === 'bands' || activeTab === 'proposals')
-            ? Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e }))
-            : Promise.resolve({ data: [], error: null }),
+          // student list (always fetched to ensure student roster and messaging board are populated)
+          Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e })),
           // help requests
           ((activeTab === 'live' || activeTab === 'briefing') && viewMode !== 'student')
             ? Promise.resolve(supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })).catch(e => ({ data: [], error: e }))
@@ -4373,10 +4374,6 @@ export function TeacherDashboard({
 
         // 7. Students
         let filteredStudData = (studData || []).filter((student: any) => {
-          // If teacher is logged in, show students assigned to this teacher (or all if admin/secretary or if viewMode demands)
-          if (tData.role === 'teacher') {
-            return student.teacher_id === userId;
-          }
           return true;
         });
 
@@ -4390,6 +4387,9 @@ export function TeacherDashboard({
           });
         }
         setAllStudents(filteredStudData);
+        if (typeof window !== 'undefined') {
+          (window as any).__groovelabAllStudents = filteredStudData;
+        }
 
         // 8. Help
         setHelpRequests(helpData || []);
@@ -5493,51 +5493,21 @@ export function TeacherDashboard({
     }
   };
 
-  const handleDeleteStudent = async (id: string) => {
+  const handleDeleteStudent = (id: string) => {
     const studentToDelete = allStudents.find(s => s.id === id);
     if (!studentToDelete) return;
 
-    const actionText = activePlatform === 'campus' 
-      ? 'Möchtest du diesen Schüler wirklich vom Campus entfernen?' 
-      : 'Möchtest du diesen Schüler wirklich von GrooveLab entfernen?';
+    const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : undefined;
+    const studentName = `${studentToDelete.first_name || ''} ${studentToDelete.last_name || ''}`.trim() || 'Schüler';
 
-    if (window.confirm(actionText)) {
-      try {
-        const isCampus = activePlatform === 'campus';
-        const otherActive = isCampus ? studentToDelete.is_groovelab_active : studentToDelete.is_campus_active;
-
-        if (otherActive) {
-          const updatePayload = isCampus 
-            ? { is_campus_active: false } 
-            : { is_groovelab_active: false };
-          
-          const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
-          if (error) throw error;
-        } else {
-          // Physically purge assets from Supabase Storage
-          await deleteUserStorageAssets([id]);
-
-          await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id);
-          await supabase.from('user_song_skills').delete().eq('user_id', id);
-          await supabase.from('user_song_skills').update({ verified_by_id: null }).eq('verified_by_id', id);
-          await supabase.from('band_members').delete().eq('user_id', id);
-          await supabase.from('sessions').delete().eq('user_id', id);
-          await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
-          await supabase.from('lab_planning').delete().eq('user_id', id);
-          await supabase.from('band_shoutbox').delete().eq('user_id', id);
-          await supabase.from('band_song_slots').delete().eq('user_id', id);
-          await supabase.from('help_requests').delete().eq('user_id', id);
-          
-          const { error } = await supabase.from('users').delete().eq('id', id);
-          if (error) throw error;
-        }
-        
-        setAllStudents(prev => prev.filter(s => s.id !== id));
-        fetchData();
-      } catch (err: any) {
-        alert('Fehler beim Entfernen: ' + err.message);
-      }
-    }
+    setDeleteStudentModalData({
+      id: studentToDelete.id,
+      name: studentName,
+      instrument: studentToDelete.instrument,
+      teacherName,
+      isCampusActive: studentToDelete.is_campus_active,
+      isGroovelabActive: studentToDelete.is_groovelab_active
+    });
   };
 
   const handleInviteStudent = async (e: React.FormEvent) => {
@@ -5751,6 +5721,24 @@ export function TeacherDashboard({
           }}
         />
       )}
+      <ConfirmDeleteStudentModal
+        isOpen={!!deleteStudentModalData}
+        student={deleteStudentModalData}
+        activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
+        onClose={() => setDeleteStudentModalData(null)}
+        onConfirm={async (studentId) => {
+          const res = await deleteStudentFully(studentId, {
+            activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
+            isCampusActive: deleteStudentModalData?.isCampusActive,
+            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+          });
+          if (!res.success) {
+            throw new Error(res.error);
+          }
+          setAllStudents(prev => prev.filter(s => s.id !== studentId));
+          fetchData();
+        }}
+      />
        {docStudent && (
         <MeisterwerkDocumentationModal 
           student={docStudent} 

@@ -3865,36 +3865,98 @@ function App() {
           setLocationMode('home');
           sessionStorage.setItem('groovelab_location_mode', 'home');
         }
-        if (schoolId) {
-          fetchActiveStudentCount(schoolId).catch(err => console.error('Error fetching student count:', err));
-          supabase.from('users')
-            .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active')
-            .eq('school_id', schoolId)
-            .in('role', ['teacher', 'admin'])
-            .order('first_name')
-            .then(res => {
-              if (res.data) setTeachers(res.data);
-            });
+        // Always fetch school users and messages for staff
+        (async () => {
+          let sId = schoolId || userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
+          if (!sId && userData?.id) {
+            const { data: uData } = await supabase.from('users').select('school_id').eq('id', userData.id).maybeSingle();
+            if (uData?.school_id) sId = uData.school_id;
+          }
 
-          // Fetch school users and messages for staff
-          (async () => {
-            const { data: allUsers, error: allUsersError } = await supabase
-              .from('users')
-              .select('id, first_name, last_name, role, photo_url, teacher_id, instrument')
-              .eq('school_id', schoolId)
-              .order('first_name');
-            if (typeof window !== 'undefined') {
-              (window as any).debugAllUsersLength = allUsers?.length;
-              (window as any).debugAllUsersError = allUsersError ? JSON.stringify(allUsersError) : null;
+          const schoolIds = new Set<string>();
+          if (sId) schoolIds.add(sId);
+          try {
+            const { data: allSchools } = await supabase.from('schools').select('id');
+            (allSchools || []).forEach(s => { if (s?.id) schoolIds.add(s.id); });
+          } catch (e) {}
+
+          if (sId) {
+            fetchActiveStudentCount(sId).catch(err => console.error('Error fetching student count:', err));
+            supabase.from('users')
+              .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active')
+              .eq('school_id', sId)
+              .in('role', ['teacher', 'admin'])
+              .order('first_name')
+              .then(res => {
+                if (res.data) setTeachers(res.data);
+              });
+          }
+
+          const mergedUsersMap = new Map<string, any>();
+
+          for (const sid of Array.from(schoolIds)) {
+            const [uResExact, uResSchool, uScheds, uOccs] = await Promise.all([
+              supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name'),
+              supabase.from('users').select('*').eq('school_id', sid).order('first_name'),
+              supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid),
+              supabase.from('schedule_occurrences').select('*, student:users!student_id(*)').eq('school_id', sid)
+            ]);
+            (uResExact.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+            (uResSchool.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+            (uScheds.data || []).forEach((sc: any) => {
+              const u = sc.student || sc.users;
+              if (u && u.id) mergedUsersMap.set(u.id, u);
+            });
+            (uOccs.data || []).forEach((sc: any) => {
+              const u = sc.student || sc.users;
+              if (u && u.id) mergedUsersMap.set(u.id, u);
+            });
+          }
+
+          const [uRes2, uResAll, uAllScheds, uAllOccs] = await Promise.all([
+            supabase.from('users').select('*').eq('role', 'student').order('first_name'),
+            supabase.from('users').select('*').order('first_name'),
+            supabase.from('schedules').select('*, student:users!student_id(*)'),
+            supabase.from('schedule_occurrences').select('*, student:users!student_id(*)')
+          ]);
+
+          ((uRes2 as any).data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+          ((uResAll as any).data || []).forEach((u: any) => {
+            const r = (u.role || '').toLowerCase();
+            if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
+              if (!mergedUsersMap.has(u.id)) {
+                mergedUsersMap.set(u.id, u);
+              }
             }
-            if (allUsers) {
-              setSchoolUsers(allUsers);
-            }
-            checkAnnouncements(schoolId, userData);
-            fetchAnnouncements(schoolId);
-            fetchCampusMessages();
-          })().catch(err => console.error('Error in staff background fetches:', err));
-        }
+          });
+          ((uAllScheds as any).data || []).forEach((sc: any) => {
+            const u = sc.student || sc.users;
+            if (u && u.id) mergedUsersMap.set(u.id, u);
+          });
+          ((uAllOccs as any).data || []).forEach((sc: any) => {
+            const u = sc.student || sc.users;
+            if (u && u.id) mergedUsersMap.set(u.id, u);
+          });
+
+          try {
+            const { data: pAll } = await supabase.from('pending_students_decrypted').select('*');
+            (pAll || []).forEach((p: any) => {
+              if (p && p.id && !mergedUsersMap.has(p.id)) {
+                mergedUsersMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
+              }
+            });
+          } catch (e) {}
+
+          const allUsers = Array.from(mergedUsersMap.values());
+          if (allUsers.length > 0) {
+            setSchoolUsers(allUsers);
+          }
+          if (sId) {
+            checkAnnouncements(sId, userData);
+            fetchAnnouncements(sId);
+          }
+          fetchCampusMessages();
+        })().catch(err => console.error('Error in staff background fetches:', err));
         return;
       }
 
@@ -4733,17 +4795,21 @@ function App() {
       setStudentActivity(last7);
 
 
-      // Fetch school users for both student and teacher to support direct messaging
-      const { data: allUsers, error: allUsersError } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, role, photo_url, teacher_id, instrument')
-        .eq('school_id', schoolId)
-        .order('first_name');
+      // Fetch school users for both student and teacher to support direct messaging (matches TeacherDashboard pattern)
+      const [uResExact, uResSchool, uResRoleStudent] = await Promise.all([
+        supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student').order('first_name'),
+        supabase.from('users').select('*').eq('school_id', schoolId).order('first_name'),
+        supabase.from('users').select('*').eq('role', 'student').order('first_name')
+      ]);
+      const mergedUsersMap = new Map<string, any>();
+      (uResExact.data || []).forEach(u => mergedUsersMap.set(u.id, u));
+      (uResSchool.data || []).forEach(u => mergedUsersMap.set(u.id, u));
+      (uResRoleStudent.data || []).forEach(u => mergedUsersMap.set(u.id, u));
+      const allUsers = Array.from(mergedUsersMap.values());
       if (typeof window !== 'undefined') {
         (window as any).debugAllUsersLength = allUsers?.length;
-        (window as any).debugAllUsersError = allUsersError ? JSON.stringify(allUsersError) : null;
       }
-      if (allUsers) {
+      if (allUsers.length > 0) {
         setSchoolUsers(allUsers);
       }
 

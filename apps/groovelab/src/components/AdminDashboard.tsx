@@ -18,6 +18,8 @@ import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { deleteStudentFully } from '../utils/studentDeletionService';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -256,6 +258,7 @@ export function AdminDashboard({
   const schoolObj = Array.isArray((admin as any)?.schools) ? (admin as any)?.schools[0] : (admin as any)?.schools;
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [students, setStudents] = useState<any[]>([]);
+  const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [selectedTimetableStudent, setSelectedTimetableStudent] = useState<any | null>(null);
   const [allSchedulePreferences, setAllSchedulePreferences] = useState<Record<string, any[]>>({});
@@ -723,29 +726,29 @@ export function AdminDashboard({
       }
     }
     return [
-      // Rhythmus & Timing
-      { id: 'r1', label: '🥁 Puls-Master', text: 'Klatsche zuerst den Rhythmus und zähle laut mit, bevor du auf dem Instrument startest. Der Rhythmus ist das Herz der Musik!', type: 'both', category: 'rhythm', active: true },
-      { id: 'r2', label: '⏱️ Metronom-Buddy', text: 'Übe diese Passage mit dem Metronom bei langsamem Tempo. Steigere die Geschwindigkeit erst, wenn es 3-mal perfekt im Takt war.', type: 'both', category: 'rhythm', active: true },
-      { id: 'r3', label: '🐌 Schnecken-Tempo', text: 'Übe die schwierige Passage ganz langsam wie eine Schnecke. Erst wenn du den Ablauf im Schlaf beherrschst, schalten wir den Turbo an!', type: 'both', category: 'rhythm', active: true },
-      { id: 'r4', label: '🧩 Puzzle-Taktik', text: 'Teile das Stück in kleine Häppchen auf. Nimm dir einen einzelnen Takt vor und setze ihn als perfektes Puzzleteil zusammen!', type: 'both', category: 'rhythm', active: true },
-      { id: 'r5', label: '🚶‍♂️ Klatsch-Gehen', text: 'Gehe gleichmäßig im Puls des Stücks durch den Raum und klatsche den Rhythmus der Melodie dazu.', type: 'both', category: 'rhythm', active: false },
-      { id: 'r6', label: '⏳ Dehnungs-Übung', text: 'Wiederhole den Ablauf extrem gedehnt und langsam, um die genauen Abstände und Übergänge bewusst zu spüren.', type: 'both', category: 'rhythm', active: false },
+      // Rhythmus & Timing (Puls & Grooves)
+      { id: 'r1', label: '🥁 Puls-Master', text: 'Klopfe den Puls mit dem Fuß und klatsche den Rhythmus im Vorfeld. Spreche die Notenwerte laut mit – dein innerer Puls ist das Fundament jedes Grooves!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r2', label: '⏱️ Metronom-Buddy', text: 'Starte mit dem Metronom bei einem entspannten Entschleunigungs-Tempo. Erhöhe das Tempo erst in 5er-Schritten, wenn die Passage 3-mal in Folge makellos im Takt lag.', type: 'both', category: 'rhythm', active: true },
+      { id: 'r3', label: '🐌 Schnecken-Tempo', text: 'Zerlege die schwierige Stelle in echtes Lupen-Tempo. Wenn du jede Bewegung extrem langsam und präzise ausführst, schaltet dein Gehirn automatisch in den Turbo-Modus!', type: 'both', category: 'rhythm', active: true },
+      { id: 'r4', label: '🧩 Puzzle-Taktik', text: 'Verbinde Mikromodule: Übe nicht das ganze Stück auf einmal, sondern isoliere genau einen Takt. Erst wenn dieses Puzzleteil perfekt sitzt, baust du die Brücke zum nächsten Takt.', type: 'both', category: 'rhythm', active: true },
+      { id: 'r5', label: '🚶‍♂️ Klatsch-Gehen', text: 'Bewege deinen Körper im gleichmäßigen Gehtakt durch den Raum und klatsche die Melodie synchron dazu. So verankerst du das Rhythmusgefühl im ganzen Körper!', type: 'both', category: 'rhythm', active: false },
+      { id: 'r6', label: '⏳ Dehnungs-Übung', text: 'Spiele den Bewegungsablauf in doppelter Notenlänge vollkommen gedehnt durch. Spüre genau, wie deine Finger oder Hände den nächsten Ton vorausschauend vorbereiten.', type: 'both', category: 'rhythm', active: false },
 
-      // Finger & Technik
-      { id: 't1', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole den kniffligen Übergang dreimal hintereinander fehlerfrei. Schaffst du das, hast du die Stelle gemeistert!', type: 'both', category: 'technique', active: true },
-      { id: 't2', label: '👁️ Blind-Flug', text: 'Schließe beim Üben mal die Augen. Vertraue auf dein Gefühl und meistere die Stelle ganz blind auswendig!', type: 'both', category: 'technique', active: true },
-      { id: 't3', label: '🏋️‍♂️ Fokus-Gym', text: 'Trainiere die schwierige Stelle ganz fokussiert in Zeitlupe, um maximale Kontrolle und Präzision aufzubauen.', type: 'both', category: 'technique', active: true },
-      { id: 't4', label: '🕵️‍♂️ Detail-Detektiv', text: 'Lies den Text oder die Noten laut mit und achte genau auf jedes Detail. Sei wie ein Detektiv, dem kein Fehler entgeht!', type: 'lehrwerke', category: 'technique', active: true },
-      { id: 't5', label: '🚀 Hürden-Sprung', text: 'Konzentriere dich auf die Bewegung direkt vor und nach dem schwierigen Wechsel. Wiederhole diesen Sprung gezielt mehrmals.', type: 'both', category: 'technique', active: false },
-      { id: 't6', label: '🕸️ Relax-Übung', text: 'Achte darauf, dass alle Muskeln entspannt bleiben, die gerade Pause haben – so sparst du Energie und spielst flüssiger.', type: 'both', category: 'technique', active: false },
+      // Technik & Bewegungsökonomie
+      { id: 't1', label: '🔂 Ritter-Dreierspiel', text: 'Mastery-Regel: Wiederhole den kniffligen Übergang exakt dreimal hintereinander ohne den kleinsten Fehler. Das brennt die Bewegung direkt ins Muskelgedächtnis ein!', type: 'both', category: 'technique', active: true },
+      { id: 't2', label: '👁️ Blind-Flug', text: 'Schließe beim Spielen bewusst die Augen und aktiviere deine innere Klangvorstellung. Vertraue deinem Tastsinn und dem Raumgefühl deiner Hände!', type: 'both', category: 'technique', active: true },
+      { id: 't3', label: '🏋️‍♂️ Fokus-Gym', text: 'Führe die Bewegungsabläufe in Zeitlupe bei minimalem Kraftaufwand aus. Achte auf maximale Lockerheit in Schultern, Handgelenken und Fingern.', type: 'both', category: 'technique', active: true },
+      { id: 't4', label: '🕵️‍♂️ Detail-Detektiv', text: 'Verfolge das Notenbild mit geschärftem Blick: Prüfe Vorzeichen, Artikulation (Staccato/Legato) und Fingersätze haargenau. Kein akustisches Detail bleibt unentdeckt!', type: 'lehrwerke', category: 'technique', active: true },
+      { id: 't5', label: '🚀 Hürden-Sprung', text: 'Isoliere die kritische Bewegungsschnittstelle: Übe gezielt nur den Zielwechsel vom letzten Ton des alten Taktes auf den ersten Ton des neuen Taktes.', type: 'both', category: 'technique', active: false },
+      { id: 't6', label: '🕸️ Relax-Übung', text: 'Scanne deinen Körper während des Spiels auf unnötige Spannung. Lass alle Muskeln, die gerade nicht aktiv gebraucht werden, völlig entspannt und gelöst.', type: 'both', category: 'technique', active: false },
 
-      // Ausdruck & Performance
-      { id: 'p1', label: '🎵 Laut-Leise Zauber', text: 'Lass das Stück lebendig klingen! Mache deutliche Unterschiede zwischen Flüsterlautstärke (piano) und Löwenbrüllen (forte).', type: 'both', category: 'performance', active: true },
-      { id: 'p2', label: '🌟 Eigener Remix', text: 'Du beherrschst das Stück super! Überlege dir bis zum nächsten Mal eine eigene coole Rhythmus-Variante oder Verzierung für diesen Teil.', type: 'songs', category: 'performance', active: true },
-      { id: 'p3', label: '🎭 Storyteller', text: 'Welche Geschichte erzählt dieses Stück? Gestalte den Klang so, als würdest du ein trauriges, spannendes oder fröhliches Abenteuer vertonen.', type: 'both', category: 'performance', active: true },
-      { id: 'p4', label: '🌊 Atem-Fluss', text: 'Gestalte die Phrasen wie einen langen Atemzug. Verbinde die Töne weich und lasse die Musik atmen.', type: 'both', category: 'performance', active: true },
-      { id: 'p5', label: '🎤 Echo-Spiel', text: 'Stelle dir vor, die zweite Hälfte der Phrase ist das leise Echo aus den Bergen. Gestalte sie deutlich leiser.', type: 'both', category: 'performance', active: false },
-      { id: 'p6', label: '🎬 Scheinwerfer-An', text: 'Spiele das Stück einmal komplett durch, ohne bei Fehlern anzuhalten - genau so, als stündest du live auf einer großen Bühne!', type: 'both', category: 'performance', active: false }
+      // Ausdruck, Klangkultur & Performance
+      { id: 'p1', label: '🎵 Laut-Leise Zauber', text: 'Erschaffe dramaturgische Kontraste! Gestalte den dynamischen Bogen spürbar zwischen zartem Pianissimo und kraftvollem Forte – gib den Tönen Raum zum Atmen.', type: 'both', category: 'performance', active: true },
+      { id: 'p2', label: '🌟 Eigener Remix', text: 'Kreativitäts-Challenge: Überlege dir eine eigene stilistische Variation, ein cooles Lick oder eine kleine Verzierung für diesen Abschnitt. Bring deine eigene musikalische Handschrift ein!', type: 'songs', category: 'performance', active: true },
+      { id: 'p3', label: '🎭 Storyteller', text: 'Welche Emotion oder Geschichte steckt in diesen Takten? Forme jeden Ton so, als würdest du einer Zuhörerschaft ein spannendes oder berührendes Abenteuer erzählen.', type: 'both', category: 'performance', active: true },
+      { id: 'p4', label: '🌊 Atem-Fluss', text: 'Forme Phrasen wie ein erfahrener Sänger: Atme vor dem Phrasenbeginn ein und führe den Bogen organisch bis zum Entspannungspunkt der Phrase.', type: 'both', category: 'performance', active: true },
+      { id: 'p5', label: '🎤 Echo-Spiel', text: 'Spiel mit Klangschattierungen: Gestalte die Phrasenwiederholung als zartes, fernes Echo aus den Bergen mit reduzierter Anschlagsintensität.', type: 'both', category: 'performance', active: false },
+      { id: 'p6', label: '🎬 Scheinwerfer-An', text: 'Bühnen-Simulation: Spiele das Stück ohne Unterbrechung von Anfang bis Ende durch. Wenn ein kleiner Wackler passiert, spiele unbeeindruckt im Puls weiter – wie ein echter Profi auf der Bühne!', type: 'both', category: 'performance', active: false }
     ];
   });
 
@@ -3402,48 +3405,22 @@ export function AdminDashboard({
     }
   };
 
-  const handleDeleteStudent = async (id: string) => {
+  const handleDeleteStudent = (id: string) => {
     const studentToDelete = students.find(s => s.id === id);
     if (!studentToDelete) return;
 
-    const actionText = activePlatform === 'campus'
-      ? 'Möchtest du diesen Schüler wirklich von Campus-Groovelab (Campus) entfernen?'
-      : 'Möchtest du diesen Schüler wirklich von Campus-Groovelab (GrooveLab) entfernen?';
+    const teacher = teachers.find(t => t.id === studentToDelete.teacher_id);
+    const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : undefined;
+    const studentName = `${studentToDelete.first_name || ''} ${studentToDelete.last_name || ''}`.trim() || 'Schüler';
 
-    if (window.confirm(actionText)) {
-      try {
-        const isCampus = activePlatform === 'campus';
-        const otherActive = isCampus ? studentToDelete.is_groovelab_active : studentToDelete.is_campus_active;
-
-        if (otherActive) {
-          // Soft delete: only remove from this platform, keep the user for the other
-          const updatePayload = isCampus
-            ? { is_campus_active: false }
-            : { is_groovelab_active: false };
-          const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
-          if (error) throw error;
-        } else {
-          // Hard delete: student is only on this platform, remove completely
-          await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id);
-          await supabase.from('user_song_skills').delete().eq('user_id', id);
-          await supabase.from('user_song_skills').update({ verified_by_id: null }).eq('verified_by_id', id);
-          await supabase.from('band_members').delete().eq('user_id', id);
-          await supabase.from('sessions').delete().eq('user_id', id);
-          await supabase.from('band_songs').update({ suggested_by: null }).eq('suggested_by', id);
-          await supabase.from('lab_planning').delete().eq('user_id', id);
-          await supabase.from('band_shoutbox').delete().eq('user_id', id);
-          await supabase.from('band_song_slots').delete().eq('user_id', id);
-          await supabase.from('help_requests').delete().eq('user_id', id);
-          await deleteUserStorageAssets([id]);
-          const { error } = await supabase.from('users').delete().eq('id', id);
-          if (error) throw error;
-        }
-        
-        setStudents(students.filter(s => s.id !== id));
-      } catch (err: any) {
-        alert('Fehler beim Entfernen: ' + err.message);
-      }
-    }
+    setDeleteStudentModalData({
+      id: studentToDelete.id,
+      name: studentName,
+      instrument: studentToDelete.instrument,
+      teacherName,
+      isCampusActive: studentToDelete.is_campus_active,
+      isGroovelabActive: studentToDelete.is_groovelab_active
+    });
   };
 
   const handleCleanupPlanning = async () => {
@@ -11188,8 +11165,8 @@ export function AdminDashboard({
                         key={item.id} 
                         className="glass-panel hover-scale" 
                         onClick={() => {
-                          setSelectedLehrwerkForDetail(item);
-                          setStudentDetailSearch('');
+                          setEditingLehrwerk(item);
+                          setShowAddLehrwerk(false);
                         }}
                         style={{ 
                           padding: '16px 20px', 
@@ -11199,6 +11176,7 @@ export function AdminDashboard({
                           alignItems: 'center', 
                           borderRadius: '20px', 
                           border: editingLehrwerk?.id === item.id ? `2px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)', 
+                          borderLeft: `5px solid ${gradient.from}`,
                           boxShadow: editingLehrwerk?.id === item.id 
                             ? `0 10px 25px -5px ${brandColor}20` 
                             : '0 8px 30px -10px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.01)',
@@ -11209,25 +11187,54 @@ export function AdminDashboard({
                           boxSizing: 'border-box'
                         }}
                       >
-                        <div style={{ 
-                          width: '56px', 
-                          height: '72px', 
-                          background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                          borderRadius: '8px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          color: gradient.text, 
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                          flexShrink: 0
-                        }}>
-                          <BookOpen size={20} color={gradient.text} />
+                        {/* Book Pages peeking out + Book Cover Icon */}
+                        <div style={{ position: 'relative', width: '68px', height: '56px', flexShrink: 0 }}>
+                          {/* Pages peeking out from the right */}
+                          <div style={{
+                            position: 'absolute',
+                            right: '4px',
+                            top: '5px',
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '8px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1
+                          }}>
+                            <span style={{ fontSize: '0.75rem' }}>📖</span>
+                          </div>
+                          {/* Book Cover Sleeve */}
+                          <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: '56px',
+                            height: '56px',
+                            background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
+                            borderRadius: '16px',
+                            boxShadow: '0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 2,
+                            border: `1px solid ${gradient.text}18`
+                          }}>
+                            <BookOpen size={24} color={gradient.text} />
+                          </div>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <h4 style={{ margin: '0 0 3px 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
-                          {item.author && <p style={{ margin: '0 0 3px 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>von {item.author}</p>}
-                          <p style={{ margin: '0 0 3px 0', fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800 }}>📖 {item.totalPages || 50} Seiten</p>
+
+                        {/* Title and Author / Pages */}
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem', letterSpacing: '-0.02em', lineHeight: '1.2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.author ? `von ${item.author} • ` : ''}📖 {item.totalPages || 50} Seiten
+                          </div>
                         </div>
+
                         <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginLeft: '16px' }}>
                           <button 
                             type="button"
@@ -14067,6 +14074,23 @@ export function AdminDashboard({
       {activeTab === 'missions' && renderMissionsTab()}
 
       {renderStudentDetailModal()}
+      <ConfirmDeleteStudentModal
+        isOpen={!!deleteStudentModalData}
+        student={deleteStudentModalData}
+        activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
+        onClose={() => setDeleteStudentModalData(null)}
+        onConfirm={async (studentId) => {
+          const res = await deleteStudentFully(studentId, {
+            activePlatform: activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all',
+            isCampusActive: deleteStudentModalData?.isCampusActive,
+            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+          });
+          if (!res.success) {
+            throw new Error(res.error);
+          }
+          setStudents(prev => prev.filter(s => s.id !== studentId));
+        }}
+      />
       {renderQRModal()}
       {selectedTimetableStudent && (
         <StudentScheduleSlotsModal
@@ -14099,8 +14123,8 @@ export function AdminDashboard({
       {renderBatchiPadModal()}
       {renderLogoutDialog()}
 
-      {/* Notebook Lehrwerk Detail Modal */}
-      {selectedLehrwerkForDetail && (() => {
+      {/* Notebook Lehrwerk Detail Modal (Bypassed - edit mode triggered inline on click) */}
+      {false && selectedLehrwerkForDetail && (() => {
         const book = selectedLehrwerkForDetail;
         const gradient = getLehrwerkColor(book.title);
         
@@ -14957,7 +14981,7 @@ export function AdminDashboard({
                       const studentProgressObj = localProgress.find((p: any) => p.studentId === selectedStudentForProgress.id && p.lehrwerkId === book.id);
                       const pageStates = studentProgressObj?.pageStates || {};
                       
-                      // Calculate progress stats
+                      {/* Notebook Lehrwerk Detail Modal removed - edit mode triggered directly on click */}
                       const totalPages = book.totalPages || 50;
                       const masteredPagesCount = Object.entries(pageStates)
                         .filter(([_, state]: [string, any]) => state.status === 'mastered')
@@ -16307,7 +16331,7 @@ export function AdminDashboard({
 
       {showTextbausteinModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-panel animation-slide-up" style={{ background: 'white', padding: '32px', borderRadius: '32px', maxWidth: '950px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="animation-slide-up" style={{ background: '#ffffff', padding: '32px', borderRadius: '32px', maxWidth: '950px', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid #cbd5e1' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -16342,7 +16366,7 @@ export function AdminDashboard({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', minHeight: 0, flex: 1 }}>
               
               {/* Form Column */}
-              <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', justifyContent: 'space-between', height: '100%' }}>
+              <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#ffffff', padding: '20px', borderRadius: '20px', border: '1.5px solid #e2e8f0', justifyContent: 'space-between', height: '100%', boxShadow: '0 4px 14px rgba(0, 0, 0, 0.03)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b' }}>
                     {editingTextbaustein ? '✏️ Baustein bearbeiten' : '➕ Neuer Baustein'}
@@ -16712,7 +16736,7 @@ export function AdminDashboard({
 
       {showEmojiPicker && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 7000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-panel animation-scale-up" style={{ background: 'white', padding: '32px', borderRadius: '28px', maxWidth: '640px', width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)' }}>
+          <div className="animation-scale-up" style={{ background: '#ffffff', padding: '32px', borderRadius: '28px', maxWidth: '640px', width: '90vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: '1px solid #cbd5e1' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#1e293b' }}>Icon auswählen</h3>

@@ -23,6 +23,8 @@ import { getInstrumentAvatarUrl } from './StudioAvatar';
 import { QRCodeModal } from './QRCodeModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
+import { deleteStudentFully } from '../utils/studentDeletionService';
 function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
   let prefix = 'C';
   if (role === 'admin' || role === 'secretary') {
@@ -1283,6 +1285,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
+  const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [tickets, setTickets] = useState<any[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
   const [showAddEventModal, setShowAddEventModal] = useState<boolean>(false);
@@ -1595,9 +1598,15 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [studentFilterStatus, setStudentFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
   const [isStudentCsvExpanded, setIsStudentCsvExpanded] = useState<boolean>(false);
   const [studentCsvText, setStudentCsvText] = useState<string>('');
+  const [bulkImportDuration, setBulkImportDuration] = useState<number>(30);
   const [isAnonymizedImport, setIsAnonymizedImport] = useState<boolean>(true);
   const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
   const [studentPageSize, setStudentPageSize] = useState<number>(50);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
+  const [bulkDeletePin, setBulkDeletePin] = useState<string>('');
+  const [bulkDeleteStep, setBulkDeleteStep] = useState<1 | 2>(1);
+  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
 
   // ── 1.1: Memoized Student Filtering ──
   const filteredStudents = useMemo(() => {
@@ -5392,28 +5401,24 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
     }
   };
 
-  const handleDeleteStudentCampus = async (studentId: string, name: string) => {
-    if (!window.confirm(`Möchtest du den Schüler "${name}" wirklich unwiderruflich löschen?`)) return;
-    try {
-      // 1. Delete from users table (if the student has completed onboarding)
-      const { error: userError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', studentId);
-      if (userError) throw userError;
-
-      // 2. Delete from students table (cascades to names, activation_days, prefixes, suffixes)
-      const { error: studentError } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', studentId);
-      if (studentError) throw studentError;
-
-      alert(`Schüler "${name}" wurde gelöscht.`);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Löschen des Schülers: ' + err.message);
-    }
+  const handleDeleteStudentCampus = (
+    studentId: string, 
+    name: string, 
+    instrument?: string, 
+    teacherId?: string, 
+    isCampusActive?: boolean, 
+    isGroovelabActive?: boolean
+  ) => {
+    const teacher = allTeachers.find((t: any) => t.id === teacherId);
+    const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : undefined;
+    setDeleteStudentModalData({
+      id: studentId,
+      name,
+      instrument,
+      teacherName,
+      isCampusActive,
+      isGroovelabActive
+    });
   };
 
   const handleBulkStudentImport = async (e: React.FormEvent) => {
@@ -5531,6 +5536,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           });
 
           if (rpcError) throw rpcError;
+          if (data && bulkImportDuration) {
+            const sid = typeof data === 'string' ? data : (data as any)?.id;
+            if (sid) {
+              await supabase.from('users').update({ lesson_duration: bulkImportDuration }).eq('id', sid);
+            }
+          }
           successCount++;
         } catch (err: any) {
           console.error('Import error for line:', line, err);
@@ -5642,7 +5653,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
             status: 'active',
             ausweis_nummer: pin,
             qr_token: qrToken,
-            lesson_duration: 30 // 30 Min by default
+            lesson_duration: bulkImportDuration || 30
           })
           .select('id')
           .single();
@@ -8238,6 +8249,60 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             Instrument
                           </span>
                         </div>
+
+                        {/* Arrow */}
+                        <span style={{ fontSize: '0.8rem', color: '#34a853', fontWeight: 900 }}>&rarr;</span>
+
+                        {/* Duration Pill Dropdown */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
+                          padding: '3px 8px 3px 6px',
+                          borderRadius: '100px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                            color: '#0369a1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            fontFamily: 'Urbanist'
+                          }}>
+                            <Clock size={12} />
+                          </div>
+                          <select
+                            value={bulkImportDuration}
+                            onChange={(e) => setBulkImportDuration(parseInt(e.target.value))}
+                            style={{
+                              border: 'none',
+                              outline: 'none',
+                              background: 'transparent',
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                              fontFamily: 'Urbanist',
+                              cursor: 'pointer',
+                              paddingRight: '2px'
+                            }}
+                          >
+                            <option value={30}>30 Min</option>
+                            <option value={45}>45 Min</option>
+                            <option value={60}>60 Min</option>
+                            <option value={90}>90 Min</option>
+                          </select>
+                          <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Dauer
+                          </span>
+                        </div>
                       </div>
 
                       <span style={{ fontSize: '0.65rem', color: '#34a853', fontWeight: 900, background: '#e6f4ea', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
@@ -8323,7 +8388,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
                   </div>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: '6px' }}>
-                    {(activeCampusCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.
+                    {totalStudents > 0 ? Math.round((activeCampusCount / totalStudents) * 100) : 0}% der Schüler
                   </span>
                 </div>
               </div>
@@ -8350,25 +8415,31 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
                   </div>
                   <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: '6px' }}>
-                    {(activeGroovelabCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.
+                    {totalStudents > 0 ? Math.round((activeGroovelabCount / totalStudents) * 100) : 0}% der Schüler
                   </span>
                 </div>
               </div>
 
             </div>
 
-            {/* FILTER & SEARCH */}
+            {/* FILTER & SEARCH (Apple-like Control Bar) */}
             <div style={{ 
               display: 'flex', 
-              gap: '12px', 
-              background: '#f8fafc', 
-              padding: '8px', 
+              gap: '10px', 
+              background: 'rgba(255, 255, 255, 0.85)', 
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              padding: '10px 14px', 
               borderRadius: '16px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid rgba(226, 232, 240, 0.8)',
+              boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
               flexWrap: 'wrap',
-              alignItems: 'center'
+              alignItems: 'center',
+              width: '100%',
+              boxSizing: 'border-box'
             }}>
-              <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
+              {/* Apple Capsule Search Field */}
+              <div style={{ flex: '1.5', minWidth: '200px', position: 'relative' }}>
                 <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input 
                   type="text" 
@@ -8381,25 +8452,51 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    padding: '8px 12px 8px 34px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.78rem',
+                    height: '38px',
+                    padding: '0 32px 0 34px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(203, 213, 225, 0.8)',
+                    fontSize: '0.82rem',
                     outline: 'none',
-                    background: 'white',
-                    fontWeight: 700
+                    background: '#f8fafc',
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontFamily: 'Urbanist, -apple-system, sans-serif',
+                    transition: 'all 0.15s ease'
                   }}
                 />
+                {studentSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentSearchQuery('');
+                      setStudentCurrentPage(1);
+                    }}
+                    style={{
+                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                      background: '#cbd5e1', border: 'none', borderRadius: '50%', width: '16px', height: '16px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', padding: 0
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                )}
               </div>
 
-              <div style={{ flex: 1, minWidth: '130px' }}>
+              {/* Instrument Select */}
+              <div style={{ flex: '1', minWidth: '130px' }}>
                 <select 
                   value={studentFilterInstrument}
                   onChange={(e) => {
                     setStudentFilterInstrument(e.target.value);
                     setStudentCurrentPage(1);
                   }}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                  style={{ 
+                    width: '100%', height: '38px', padding: '0 12px', borderRadius: '10px', 
+                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.82rem', outline: 'none', 
+                    background: '#ffffff', color: '#334155', fontWeight: 700, fontFamily: 'Urbanist, -apple-system, sans-serif',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)', cursor: 'pointer' 
+                  }}
                 >
                   <option value="All">Alle Instrumente</option>
                   {uniqueInstruments.map(inst => (
@@ -8408,14 +8505,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 </select>
               </div>
 
-              <div style={{ flex: 1, minWidth: '130px' }}>
+              {/* Teacher Select */}
+              <div style={{ flex: '1', minWidth: '130px' }}>
                 <select 
                   value={studentFilterTeacher}
                   onChange={(e) => {
                     setStudentFilterTeacher(e.target.value);
                     setStudentCurrentPage(1);
                   }}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                  style={{ 
+                    width: '100%', height: '38px', padding: '0 12px', borderRadius: '10px', 
+                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.82rem', outline: 'none', 
+                    background: '#ffffff', color: '#334155', fontWeight: 700, fontFamily: 'Urbanist, -apple-system, sans-serif',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)', cursor: 'pointer' 
+                  }}
                 >
                   <option value="All">Alle Lehrer</option>
                   <option value="none">Allgemein (kein Lehrer)</option>
@@ -8425,14 +8528,20 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 </select>
               </div>
 
-              <div style={{ flex: 1, minWidth: '130px' }}>
+              {/* Status/Tariff Select */}
+              <div style={{ flex: '1', minWidth: '120px' }}>
                 <select
                   value={studentFilterStatus}
                   onChange={(e) => {
                     setStudentFilterStatus(e.target.value as any);
                     setStudentCurrentPage(1);
                   }}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                  style={{ 
+                    width: '100%', height: '38px', padding: '0 12px', borderRadius: '10px', 
+                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.82rem', outline: 'none', 
+                    background: '#ffffff', color: '#334155', fontWeight: 700, fontFamily: 'Urbanist, -apple-system, sans-serif',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)', cursor: 'pointer' 
+                  }}
                 >
                   <option value="all">Alle Tarife</option>
                   <option value="campus">Campus Aktiv</option>
@@ -8440,43 +8549,126 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 </select>
               </div>
 
-              {/* 👁️ Global Eye toggle to temporarily reveal names */}
-              <button
-                type="button"
-                onClick={() => toggleRealNames()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  borderRadius: '8px',
-                  padding: '8px 12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  background: showRealNames ? '#fee2e2' : '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: showRealNames ? '#ef4444' : '#64748b',
-                  cursor: 'pointer',
-                  fontFamily: 'Urbanist',
-                  transition: 'all 0.2s',
-                  height: '35px',
-                  boxSizing: 'border-box'
-                }}
-                title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
-              >
-                {showRealNames ? <EyeOff size={15} /> : <Eye size={15} />}
-                <span>{showRealNames ? "Sperren" : "Anzeigen"}</span>
-              </button>
+              {/* Action Controls Group */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                {/* Select All Filtered Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const filteredIds = filteredStudents.map((s: any) => s.id);
+                    const allSelected = filteredIds.length > 0 && filteredIds.every((id: string) => selectedStudentIds.includes(id));
+                    if (allSelected) {
+                      setSelectedStudentIds(prev => prev.filter((id: string) => !filteredIds.includes(id)));
+                    } else {
+                      setSelectedStudentIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+                    }
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '10px',
+                    padding: '0 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#334155',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist, -apple-system, sans-serif',
+                    height: '38px',
+                    boxSizing: 'border-box',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Alle gefilterten Schüler auswählen oder abwählen"
+                >
+                  <CheckSquare size={15} style={{ color: '#475569' }} />
+                  <span>
+                    {filteredStudents.length > 0 && filteredStudents.map((s: any) => s.id).every((id: string) => selectedStudentIds.includes(id))
+                      ? 'Auswahl aufheben'
+                      : 'Alle auswählen'}
+                  </span>
+                </button>
+
+                {/* 👁️ Global Eye toggle (Klarnamen-Sichtbarkeit) */}
+                <button
+                  type="button"
+                  onClick={() => toggleRealNames()}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    borderRadius: '10px',
+                    padding: '0 14px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    background: showRealNames ? '#ffffff' : '#fef3c7',
+                    border: showRealNames ? '1px solid #cbd5e1' : '1px solid #fcd34d',
+                    color: showRealNames ? '#475569' : '#b45309',
+                    cursor: 'pointer',
+                    fontFamily: 'Urbanist, -apple-system, sans-serif',
+                    transition: 'all 0.15s ease',
+                    height: '38px',
+                    boxSizing: 'border-box',
+                    boxShadow: showRealNames ? '0 1px 2px rgba(0,0,0,0.02)' : '0 2px 8px rgba(245, 158, 11, 0.2)',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={showRealNames ? "Klarnamen (vollständige Nachnamen) anzeigen" : "Nachnamen wieder maskieren (Datenschutz)"}
+                >
+                  {showRealNames ? <Eye size={15} /> : <EyeOff size={15} />}
+                  <span>{showRealNames ? "Klarnamen anzeigen" : "Klarnamen verbergen"}</span>
+                </button>
+
+                {/* Bulk Delete Action Button */}
+                {selectedStudentIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkDeleteStep(1);
+                      setBulkDeletePin('');
+                      setShowBulkDeleteModal(true);
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      borderRadius: '10px',
+                      padding: '0 16px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #ff3b30 0%, #dc2626 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'Urbanist, -apple-system, sans-serif',
+                      height: '38px',
+                      boxSizing: 'border-box',
+                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+                      whiteSpace: 'nowrap'
+                    }}
+                    className="hover-scale"
+                    title={`${selectedStudentIds.length} ausgewählte Schüler löschen`}
+                  >
+                    <Trash2 size={15} />
+                    <span>{selectedStudentIds.length} löschen</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* LIST ROW VIEW CONTAINER */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', overflowY: 'scroll', maxHeight: '550px', paddingRight: '6px', width: '100%' }}>
               {paginatedStudents.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700, minWidth: '850px' }}>
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700, minWidth: '920px' }}>
                   Keine Schüler mit diesen Filtereinstellungen gefunden.
                 </div>
               ) : (
                 paginatedStudents.map((student: any) => {
+                  const isSelected = selectedStudentIds.includes(student.id);
                   return (
                     <div 
                       key={student.id} 
@@ -8489,21 +8681,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       style={{ 
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '16px',
+                        gap: '12px',
                         padding: '10px 16px',
                         borderRadius: '16px',
-                        background: '#ffffff',
-                        border: '1px solid #f1f5f9',
+                        background: isSelected ? '#fef2f2' : '#ffffff',
+                        border: isSelected ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
                         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
-                        minWidth: '850px',
+                        minWidth: '920px',
                         cursor: 'grab',
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
                         contentVisibility: 'auto',
-                        containIntrinsicSize: '0 62px'
+                        containIntrinsicSize: '0 62px',
+                        transition: 'all 0.15s ease'
                       }}
                       className="student-drag-card"
                     >
+                      {/* Checkbox for Bulk Selection */}
+                      <div 
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: '4px', flexShrink: 0 }}
+                      >
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.checked) {
+                              setSelectedStudentIds(prev => [...prev, student.id]);
+                            } else {
+                              setSelectedStudentIds(prev => prev.filter(id => id !== student.id));
+                            }
+                          }}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#ea4335' }}
+                        />
+                      </div>
+
                       {/* Avatar & Name */}
                       <div 
                         onClick={() => setSelectedStudentForDetail(student)}
@@ -8545,7 +8758,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             }}
                             className="student-title-text"
                           >
-                            {student.first_name} {showRealNames ? student.last_name : maskLastName(student.last_name)}
+                            {student.first_name} {maskLastName(student.last_name, showRealNames)}
                           </span>
                           {student.nickname && (
                             <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
@@ -8635,7 +8848,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       </div>
 
                       {/* Micro status toggles */}
-                      <div style={{ flex: '1.5', display: 'flex', gap: '6px', minWidth: '150px' }}>
+                      <div style={{ flex: '1.2', display: 'flex', gap: '4px', minWidth: '140px' }}>
                         {/* Campus Toggle */}
                         <button
                           onClick={async () => {
@@ -8792,7 +9005,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       </div>
 
                       {/* Access / Copy Shareable Campus Pass Link */}
-                      <div style={{ flex: '1.5', minWidth: '180px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', paddingRight: '8px' }}>
+                      <div style={{ flex: '1.8', minWidth: '220px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', paddingRight: '4px' }}>
                         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
                           {student.is_app_user && (
                             <span style={{ 
@@ -8811,83 +9024,168 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             </span>
                           )}
                         </div>
-                        <div style={{ width: '90px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ width: '70px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                           {(() => {
                             const status = student.isPendingOnboarding ? 'ausstehend' : (student.status || 'aktiv');
                             if (status === 'aktiv') {
                               return (
                                 <span style={{
-                                  display: 'inline-block',
-                                  padding: '4px 10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '3px 7px',
                                   borderRadius: '20px',
                                   background: '#e6f4ea',
-                                  color: '#34a853',
-                                  fontSize: '0.7rem',
+                                  color: '#137333',
+                                  fontSize: '0.68rem',
                                   fontWeight: 800,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.02em'
-                                }}>Aktiv</span>
+                                  whiteSpace: 'nowrap'
+                                }}>🟢 Aktiv</span>
                               );
                             } else if (status === 'pausiert') {
                               return (
                                 <span style={{
-                                  display: 'inline-block',
-                                  padding: '4px 10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '3px 7px',
                                   borderRadius: '20px',
                                   background: '#fff3e0',
                                   color: '#e65100',
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.68rem',
                                   fontWeight: 800,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.02em'
-                                }}>Pausiert</span>
+                                  whiteSpace: 'nowrap'
+                                }}>🟠 Pausiert</span>
                               );
                             } else if (status === 'passiv') {
                               return (
                                 <span style={{
-                                  display: 'inline-block',
-                                  padding: '4px 10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '3px 7px',
                                   borderRadius: '20px',
                                   background: '#f1f5f9',
                                   color: '#475569',
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.68rem',
                                   fontWeight: 800,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.02em'
-                                }}>Passiv</span>
+                                  whiteSpace: 'nowrap'
+                                }}>⚪ Passiv</span>
                               );
                             } else {
                               return (
                                 <span style={{
-                                  display: 'inline-block',
-                                  padding: '4px 10px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '3px 7px',
                                   borderRadius: '20px',
                                   background: '#fef3c7',
                                   color: '#b45309',
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.68rem',
                                   fontWeight: 800,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.02em'
-                                }}>Ausstehend</span>
+                                  whiteSpace: 'nowrap'
+                                }} title="Ausstehendes Onboarding">⏳ Offen</span>
                               );
                             }
                           })()}
                         </div>
-                        <span style={{
-                          fontSize: '0.74rem',
-                          fontWeight: 700,
-                          color: '#475569',
-                          width: '24px',
-                          textAlign: 'center',
-                          flexShrink: 0
-                        }}>
-                          {student.day_of_birth || '1'}
-                        </span>
+                        <div 
+                          title="Geburtstagstag für Login/PIN ändern (Tag 1-31)"
+                          style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '4px',
+                            background: 'linear-gradient(180deg, #ffffff 0%, #f4f4f7 100%)',
+                            border: '1px solid rgba(0, 0, 0, 0.12)',
+                            borderRadius: '100px',
+                            padding: '3px 6px 3px 8px',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <select
+                            value={student.day_of_birth || 1}
+                            onChange={async (e) => {
+                              const newDay = parseInt(e.target.value, 10);
+                              try {
+                                const { data: existing } = await supabase
+                                  .from('activation_days')
+                                  .select('student_id')
+                                  .eq('student_id', student.id)
+                                  .maybeSingle();
+
+                                if (existing) {
+                                  const { error: err } = await supabase
+                                    .from('activation_days')
+                                    .update({ day_of_birth: newDay })
+                                    .eq('student_id', student.id);
+                                  if (err) throw err;
+                                } else {
+                                  const { error: err } = await supabase
+                                    .from('activation_days')
+                                    .insert({ student_id: student.id, day_of_birth: newDay });
+                                  if (err) throw err;
+                                }
+
+                                if (student.isPendingOnboarding) {
+                                  await supabase
+                                    .from('pending_students')
+                                    .update({ day_of_birth: newDay })
+                                    .eq('id', student.id);
+                                }
+
+                                fetchDashboardData();
+                              } catch (err: any) {
+                                console.error("Fehler beim Ändern des Geburtstagstags:", err);
+                                alert("Fehler beim Ändern des Geburtstagstags: " + err.message);
+                              }
+                            }}
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 800,
+                              color: '#1d1d1f',
+                              background: 'transparent',
+                              border: 'none',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Urbanist", sans-serif',
+                              paddingRight: '10px',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none'
+                            }}
+                          >
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                              <option key={d} value={d}>
+                                Tag {d}
+                              </option>
+                            ))}
+                          </select>
+                          <span style={{
+                            position: 'absolute',
+                            right: '6px',
+                            pointerEvents: 'none',
+                            fontSize: '0.52rem',
+                            color: '#86868b',
+                            fontWeight: 900
+                          }}>▼</span>
+                        </div>
 
                         {/* Delete Button */}
                         <div style={{ width: '28px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                           <button
-                            onClick={() => handleDeleteStudentCampus(student.id, `${student.first_name} ${student.last_name}`)}
+                            onClick={() => handleDeleteStudentCampus(
+                              student.id, 
+                              `${student.first_name} ${student.last_name}`,
+                              student.instrument,
+                              student.teacher_id,
+                              student.is_campus_active,
+                              student.is_groovelab_active
+                            )}
                             style={{ 
                               background: 'transparent', 
                               border: 'none', 
@@ -19911,7 +20209,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         ) : (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {activeCoachesForLayout.filter(Boolean).map((c, idx) => {
-                              const coachName = c.users ? `${c.users.first_name} ${showRealNames ? c.users.last_name : maskLastName(c.users.last_name)}` : 'Coach';
+                              const coachName = c.users ? `${c.users.first_name} ${maskLastName(c.users.last_name, showRealNames)}` : 'Coach';
                               return (
                                 <div
                                   key={c.id || idx}
@@ -19953,7 +20251,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           const instColor = getStationColor(sName, station.color);
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
                           const hasHelp = helpRequests.some(r => r.station_id === station.id);
-                          const studentName = sess?.users ? `${sess.users.first_name} ${showRealNames ? sess.users.last_name : maskLastName(sess.users.last_name)}` : '';
+                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
 
                           return (
                             <div
@@ -20685,7 +20983,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                 <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {student.first_name} {showRealNames ? student.last_name : maskLastName(student.last_name)}
+                                  {student.first_name} {maskLastName(student.last_name, showRealNames)}
                                 </span>
                                 {student.nickname && (
                                   <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
@@ -28013,6 +28311,186 @@ status: status,
             }
           }}
         />
+      )}
+      <ConfirmDeleteStudentModal
+        isOpen={!!deleteStudentModalData}
+        student={deleteStudentModalData}
+        activePlatform={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all'}
+        onClose={() => setDeleteStudentModalData(null)}
+        onConfirm={async (studentId) => {
+          const res = await deleteStudentFully(studentId, {
+            activePlatform: activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all',
+            isCampusActive: deleteStudentModalData?.isCampusActive,
+            isGroovelabActive: deleteStudentModalData?.isGroovelabActive
+          });
+          if (!res.success) {
+            throw new Error(res.error);
+          }
+          setStudents((prev: any[]) => prev.filter((s: any) => s.id !== studentId));
+          fetchDashboardData();
+        }}
+      />
+      {showBulkDeleteModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px'
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: '24px', width: '100%', maxWidth: '520px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden', border: '1px solid #e2e8f0'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+              padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '10px', borderRadius: '12px' }}>
+                  <Trash2 size={22} color="white" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, fontFamily: 'Urbanist' }}>
+                    Mehrere Schüler löschen ({selectedStudentIds.length})
+                  </h3>
+                  <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Sicherheitsabfrage für Sammellöschung</span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBulkDeleteModal(false);
+                  setBulkDeleteStep(1);
+                  setBulkDeletePin('');
+                }}
+                style={{ background: 'rgba(255, 255, 255, 0.2)', border: 'none', color: 'white', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {bulkDeleteStep === 1 ? (
+                <>
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                    <AlertCircle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ fontSize: '0.84rem', color: '#991b1b', lineHeight: 1.5 }}>
+                      Du bist dabei, <strong>{selectedStudentIds.length} Schüler</strong> gleichzeitig zu entfernen.
+                      <br /><br />
+                      - Schüler, die <strong>nur auf dem aktuellen Modul</strong> aktiv sind, werden <strong>unwiderruflich gelöscht</strong>.
+                      <br />
+                      - Schüler, die auch auf dem <strong>anderen Modul</strong> aktiv sind, bleiben dort erhalten und werden hier nur deaktiviert.
+                    </div>
+                  </div>
+
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '10px 14px', background: '#f8fafc' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Ausgewählte Schüler ({selectedStudentIds.length}):
+                    </span>
+                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '18px', fontSize: '0.84rem', color: '#1e293b', lineHeight: 1.6 }}>
+                      {students.filter((s: any) => selectedStudentIds.includes(s.id)).map((s: any) => (
+                        <li key={s.id}>
+                          <strong>{s.first_name} {maskLastName(s.last_name, showRealNames)}</strong> {s.instrument ? `(${s.instrument})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkDeleteModal(false)}
+                      style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBulkDeleteStep(2)}
+                      style={{ padding: '10px 20px', borderRadius: '12px', border: 'none', background: '#dc2626', color: '#ffffff', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      Weiter zur Sicherheits-PIN <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontWeight: 900, color: '#991b1b', fontSize: '0.95rem', marginBottom: '6px' }}>
+                      Zweite Sicherheitsstufe: PIN-Bestätigung
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#7f1d1d' }}>
+                      Gib den 3-stelligen Sicherheitscode <strong>489</strong> ein, um das Löschen der {selectedStudentIds.length} Schüler zu bestätigen.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Sicherheits-PIN (489)
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={3}
+                      placeholder="489"
+                      value={bulkDeletePin}
+                      onChange={(e) => setBulkDeletePin(e.target.value)}
+                      style={{
+                        width: '120px', textAlign: 'center', fontSize: '1.8rem', fontWeight: 900,
+                        letterSpacing: '0.2em', padding: '8px', borderRadius: '12px', border: '2px solid #ef4444', outline: 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setBulkDeleteStep(1)}
+                      style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Zurück
+                    </button>
+                    <button
+                      type="button"
+                      disabled={bulkDeletePin !== '489' || isBulkDeleting}
+                      onClick={async () => {
+                        setIsBulkDeleting(true);
+                        try {
+                          const currentPlatform = activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all';
+                          for (const studentId of selectedStudentIds) {
+                            const studentObj = students.find((s: any) => s.id === studentId);
+                            await deleteStudentFully(studentId, {
+                              activePlatform: currentPlatform,
+                              isCampusActive: studentObj?.is_campus_active,
+                              isGroovelabActive: studentObj?.is_groovelab_active
+                            });
+                          }
+                          const deletedIds = [...selectedStudentIds];
+                          setSelectedStudentIds([]);
+                          setShowBulkDeleteModal(false);
+                          setBulkDeleteStep(1);
+                          setBulkDeletePin('');
+                          setStudents((prev: any[]) => prev.filter((s: any) => !deletedIds.includes(s.id)));
+                          fetchDashboardData();
+                        } catch (err: any) {
+                          alert('Fehler beim Löschen: ' + err.message);
+                        } finally {
+                          setIsBulkDeleting(false);
+                        }
+                      }}
+                      style={{
+                        padding: '10px 20px', borderRadius: '12px', border: 'none',
+                        background: bulkDeletePin === '489' && !isBulkDeleting ? '#dc2626' : '#cbd5e1',
+                        color: '#ffffff', fontWeight: 900, cursor: bulkDeletePin === '489' && !isBulkDeleting ? 'pointer' : 'not-allowed',
+                        display: 'flex', alignItems: 'center', gap: '8px'
+                      }}
+                    >
+                      {isBulkDeleting ? 'Lösche...' : `Unwiderruflich ${selectedStudentIds.length} Schüler löschen`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       {selectedCoachProfile && (
         <TeacherDetailModal
