@@ -6838,10 +6838,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 }} />
 
                 {[
-                  { stage: 1, title: 'Fleiß-Pionier', desc: '50 Min', icon: '🐝', done: (totalFocusMinutes >= 50), current: (totalFocusMinutes < 50) },
-                  { stage: 2, title: 'Übe-Meister', desc: '250 Min', icon: '🦉', done: (totalFocusMinutes >= 250), current: (totalFocusMinutes >= 50 && totalFocusMinutes < 250) },
-                  { stage: 3, title: 'Übe-Legende', desc: '1000 Min', icon: '👑', done: (totalFocusMinutes >= 1000), current: (totalFocusMinutes >= 250 && totalFocusMinutes < 1000) },
-                  { stage: 4, title: 'Übe-Großmeister', desc: '2000 Min', icon: '🏆', done: (totalFocusMinutes >= 2000), current: (totalFocusMinutes >= 1000 && totalFocusMinutes < 2000) }
+                  { stage: 1, id: 'fleiss-pionier', title: 'Fleiß-Pionier', desc: '50 Min', icon: '🐝', done: (totalFocusMinutes >= 50), current: (totalFocusMinutes < 50) },
+                  { stage: 2, id: 'uebe-meister', title: 'Übe-Meister', desc: '250 Min', icon: '🦉', done: (totalFocusMinutes >= 250), current: (totalFocusMinutes >= 50 && totalFocusMinutes < 250) },
+                  { stage: 3, id: 'uebe-legende', title: 'Übe-Legende', desc: '1000 Min', icon: '👑', done: (totalFocusMinutes >= 1000), current: (totalFocusMinutes >= 250 && totalFocusMinutes < 1000) },
+                  { stage: 4, id: 'uebe-grossmeister', title: 'Übe-Großmeister', desc: '2000 Min', icon: '🏆', done: (totalFocusMinutes >= 2000), current: (totalFocusMinutes >= 1000 && totalFocusMinutes < 2000) }
                 ].map((node) => (
                   <div
                     key={node.stage}
@@ -6856,20 +6856,40 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     title={`${node.title}: ${node.desc}`}
                   >
                     <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      background: node.done ? '#34a853' : (node.current ? '#facc15' : 'rgba(255, 255, 255, 0.15)'),
-                      border: node.current ? '3px solid #ffffff' : '1.5px solid rgba(255, 255, 255, 0.3)',
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      background: node.done ? 'rgba(52, 168, 83, 0.25)' : (node.current ? 'rgba(250, 204, 21, 0.3)' : 'rgba(255, 255, 255, 0.1)'),
+                      border: node.current ? '2.5px solid #facc15' : (node.done ? '1.5px solid #34a853' : '1.5px solid rgba(255, 255, 255, 0.25)'),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '0.85rem',
-                      boxShadow: node.current ? '0 0 14px rgba(250, 204, 21, 0.6)' : (node.done ? '0 0 8px rgba(52, 168, 83, 0.4)' : 'none'),
+                      boxShadow: node.current ? '0 0 16px rgba(250, 204, 21, 0.7)' : (node.done ? '0 0 8px rgba(52, 168, 83, 0.4)' : 'none'),
                       transform: node.current ? 'scale(1.12)' : 'scale(1)',
-                      transition: 'all 0.3s ease'
+                      transition: 'all 0.3s ease',
+                      overflow: 'hidden',
+                      padding: '3px'
                     }}>
-                      {node.icon}
+                      <img
+                        src={`/stickers/${node.id}.png?v=1`}
+                        alt={node.title}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          filter: node.done || node.current ? 'none' : 'grayscale(100%) opacity(0.4)'
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const span = document.createElement('span');
+                            span.style.fontSize = '1.1rem';
+                            span.innerText = node.icon;
+                            parent.appendChild(span);
+                          }
+                        }}
+                      />
                     </div>
                     <span style={{
                       fontSize: '0.62rem',
