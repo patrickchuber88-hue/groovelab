@@ -14,9 +14,13 @@ conn.on('ready', () => {
   console.log('SSH connection established!');
 
   const sql = `
-    SELECT id, first_name, last_name, role, school_id, is_campus_active, is_groovelab_active, qr_token, is_pin_activated 
-    FROM public.users 
-    WHERE first_name LIKE 'Elisabeth%';
+    SELECT u.id, u.first_name, u.last_name, u.instrument, u.birth_date, s.status, sfn.first_name as sfn_name, sln.last_name as sln_name, ad.day_of_birth
+    FROM public.users u
+    LEFT JOIN public.students s ON s.id = u.id
+    LEFT JOIN public.student_first_names sfn ON sfn.student_id = u.id
+    LEFT JOIN public.student_last_names sln ON sln.student_id = u.id
+    LEFT JOIN public.activation_days ad ON ad.student_id = u.id
+    WHERE u.id = '497db9d7-0689-4c72-b5d5-ad033ac0eb29';
   `;
 
   conn.exec('docker exec -i supabase-db psql -U postgres -d postgres', (err, stream) => {
