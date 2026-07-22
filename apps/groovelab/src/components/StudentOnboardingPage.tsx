@@ -4,6 +4,7 @@ import { Download, Sliders, Smartphone, Copy, Check, ArrowRight, X, Calendar, Cl
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
+import { IDBadgeCard } from './IDBadgeCard';
 
 interface StudentOnboardingPageProps {
   token: string;
@@ -449,102 +450,14 @@ Deine Vorteile auf einen Blick:
         <p style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, margin: 0 }}>Dein persönlicher Onboarding-Assistent</p>
       </div>
 
-      {/* Standalone Ausweis Card (Exact Original Proportions 280px x 450px) */}
-      <div ref={passCardRef} style={{
-        width: '280px',
-        height: '450px',
-        background: '#ffffff',
-        borderRadius: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4), 0 10px 25px -5px rgba(0,0,0,0.1)',
-        overflow: 'hidden',
-        border: '1px solid rgba(0,0,0,0.05)',
-        boxSizing: 'border-box',
-        flexShrink: 0,
-        marginBottom: '24px'
-      }}>
-        {/* Lanyard Hole Mockup */}
-        <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-          <div style={{ width: '28px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
-        </div>
-
-        {/* Status Header */}
-        <div style={{ 
-          background: activeColor, 
-          padding: '6px', 
-          textAlign: 'center',
-          textTransform: 'uppercase'
-        }}>
-          <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-            {cardHeaderText}
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
-          {/* Portrait Avatar */}
-          <div style={{ 
-            width: '110px', 
-            height: '110px', 
-            borderRadius: '50%', 
-            border: `3px solid ${activeColor}`,
-            padding: '4px',
-            background: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden'
-          }}>
-            <img 
-              src={displayAvatar} 
-              alt="Profile"
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover',
-                borderRadius: '50%'
-              }} 
-            />
-          </div>
-
-          {/* Identity */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>
-              {student.first_name}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', fontWeight: 700 }}>
-              {student.last_name || 'Member'}
-            </div>
-          </div>
-
-          {/* QR Code Container */}
-          <div className="onboarding-qr-container" style={{ 
-            background: '#f8fafc', 
-            padding: '10px', 
-            borderRadius: '16px',
-            border: '1px solid #f1f5f9',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxSizing: 'border-box'
-          }}>
-            <QRCode value={`${window.location.origin}/qr/${student.qr_token || student.id}`} size={110} style={{ width: '110px', height: '110px' }} />
-          </div>
-
-          <p style={{ 
-            fontSize: '0.7rem', 
-            color: '#94a3b8', 
-            textAlign: 'center', 
-            margin: '0', 
-            fontWeight: 600, 
-            lineHeight: 1.3,
-            maxWidth: '220px'
-          }}>
-            Halte diesen Code vor die Kamera des iPads,<br/>um dich am Platz anzumelden.
-          </p>
-        </div>
-      </div>
+      {/* Standalone Reusable Ausweis Card */}
+      <IDBadgeCard 
+        user={student} 
+        activePlatform={isCampus ? 'campus' : 'groovelab'} 
+        qrValue={`${window.location.origin}/qr/${student.qr_token || student.id}`} 
+        cardRef={passCardRef} 
+        style={{ marginBottom: '24px' }} 
+      />
 
       {/* Single Action Panel Below (Max 440px Centered) */}
       <div style={{

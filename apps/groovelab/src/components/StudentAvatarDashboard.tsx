@@ -6482,13 +6482,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         </button>
       </div>
 
-      <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'flex-start' }} className="animation-slide-up">
+      <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch' }} className={`animation-slide-up practice-board-wrapper ${activeTab === 'practice_board' ? 'active-practice-tab' : ''}`}>
           
-          {/* Left Pane (2/3 width) - KPIs and Fokus-Timer */}
-          <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <style dangerouslySetInnerHTML={{__html: `
+            @media (min-width: 850px) {
+              .practice-board-wrapper.active-practice-tab {
+                display: grid !important;
+                grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
+                align-items: stretch !important;
+              }
+            }
+          `}} />
+
+          {/* Left Pane (2/3 width) - KPIs, Level Roadmap and Fokus-Timer */}
+          <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
-            {/* KPI Cards Grid */}
-            <div style={{ display: 'flex', flexDirection: 'row', gap: '14px', width: '100%' }} className="kpi-row-container">
+            {/* KPI Cards Grid (Row 1 - Top) */}
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '12px', width: '100%' }} className="kpi-row-container">
               
               {/* Card 1: XP */}
               {xpActive && (
@@ -6496,19 +6506,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   flex: '1 1 0px',
                   minWidth: 0,
                   background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
-                  borderRadius: '20px', 
+                  borderRadius: '18px', 
                   color: 'white', 
-                  padding: '16px', 
+                  padding: '13px 16px', 
                   boxShadow: '0 4px 15px rgba(99, 102, 241, 0.15)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesammelte XP</span>
-                    <Star size={16} fill="currentColor" />
+                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Gesammelte XP</span>
+                    <Star size={15} fill="currentColor" />
                   </div>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{avatar?.xp || 0} XP</span>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{avatar?.xp || 0} XP</span>
                 </div>
               )}
 
@@ -6518,19 +6528,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   flex: '1 1 0px',
                   minWidth: 0,
                   background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', 
-                  borderRadius: '20px', 
+                  borderRadius: '18px', 
                   color: 'white', 
-                  padding: '16px', 
+                  padding: '13px 16px', 
                   boxShadow: '0 4px 15px rgba(52, 168, 83, 0.15)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Übeminuten</span>
-                    <Clock size={16} />
+                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Übeminuten</span>
+                    <Clock size={15} />
                   </div>
-                  <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{totalFocusMinutes || 0} Min.</span>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{totalFocusMinutes || 0} Min.</span>
                 </div>
               )}
 
@@ -6539,19 +6549,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 flex: '1 1 0px',
                 minWidth: 0,
                 background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', 
-                borderRadius: '20px', 
+                borderRadius: '18px', 
                 color: 'white', 
-                padding: '16px', 
+                padding: '13px 16px', 
                 boxShadow: '0 4px 15px rgba(234, 179, 8, 0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '6px'
               }} className="kpi-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
-                  <Activity size={16} />
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Fokus Heute</span>
+                  <Activity size={15} />
                 </div>
-                <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '6px' }} className="kpi-card-value">{(() => {
+                <span style={{ fontSize: '1.2rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '5px' }} className="kpi-card-value">{(() => {
                   const todayStr = new Date().toISOString().split('T')[0];
                   const todayLogs = fokusLogs.filter(log => log.created_at && log.created_at.startsWith(todayStr));
                   
@@ -6582,7 +6592,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     return (
                       <>
                         <span>{focusMin}m</span>
-                        <span style={{ fontSize: '0.85rem', opacity: 0.9, fontWeight: 800 }}>({extraMin}m Extra)</span>
+                        <span style={{ fontSize: '0.8rem', opacity: 0.9, fontWeight: 800 }}>({extraMin}m Ex)</span>
                       </>
                     );
                   }
@@ -6596,23 +6606,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   flex: '1 1 0px',
                   minWidth: 0,
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
-                  borderRadius: '20px', 
+                  borderRadius: '18px', 
                   color: 'white', 
-                  padding: '16px', 
+                  padding: '13px 16px', 
                   boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  minHeight: '100px'
+                  minHeight: '76px'
                 }} className="kpi-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Streak-Pfad</span>
-                    <Flame size={16} fill="currentColor" />
+                    <span style={{ fontSize: '0.66rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.05em' }} className="kpi-card-title">Streak-Pfad</span>
+                    <Flame size={15} fill="currentColor" />
                   </div>
                   
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }} className="kpi-streak-footer">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }} className="kpi-streak-footer">
                     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
-                      <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }} className="kpi-card-value">
+                      <span style={{ fontSize: '1.3rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1 }} className="kpi-card-value">
                         {avatar?.streak_flame || 0} Tage
                       </span>
                     </div>
@@ -6624,7 +6634,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       
                       return (
                         <span style={{ 
-                          fontSize: '0.62rem', 
+                          fontSize: '0.6rem', 
                           fontWeight: 800, 
                           background: isJokerAvailable 
                             ? 'rgba(255, 255, 255, 0.16)' 
@@ -6635,17 +6645,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             ? '1px solid rgba(255, 255, 255, 0.4)' 
                             : '1px solid rgba(255, 255, 255, 0.08)',
                           color: isJokerAvailable ? '#ffffff' : 'rgba(255, 255, 255, 0.45)',
-                          padding: '6px 10px', 
-                          borderRadius: '12px',
+                          padding: '5px 9px', 
+                          borderRadius: '10px',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          lineHeight: '1.2',
+                          lineHeight: '1.1',
                           textAlign: 'center',
-                          boxShadow: isJokerAvailable 
-                            ? '0 4px 12px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.15)' 
-                            : 'none',
                           letterSpacing: '0.04em',
                           textTransform: 'uppercase',
                           flexShrink: 0
@@ -6668,242 +6675,404 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
               )}
 
-
-
             </div>
 
-            {/* Fokus-Timer Box */}
-            <div style={sessionActive ? {
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9998,
-              background: isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #022c22 100%)' : '#000000',
+            {/* Interactive Level Roadmap Banner (Row 2 - Below KPIs) */}
+            <div style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              borderRadius: '22px',
+              padding: '16px 22px',
+              color: 'white',
+              boxShadow: '0 12px 30px -10px rgba(15, 23, 42, 0.3)',
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              boxSizing: 'border-box',
-              padding: '24px'
-            } : {
-              background: 'rgba(255, 255, 255, 0.75)',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
-              borderRadius: '32px',
-              padding: '36px 30px',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '28px',
-              alignItems: 'center',
+              gap: '12px',
               position: 'relative',
               overflow: 'hidden',
-              color: 'inherit',
-              transition: 'all 0.5s ease'
+              boxSizing: 'border-box'
             }}>
-              {/* Inner wrapper to keep size consistent and centered on black screen */}
+              {/* Ambient Background Glow */}
               <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '28px',
-                alignItems: 'center',
-                width: '100%',
-                maxWidth: sessionActive ? '380px' : 'none'
-              }}>
-              {/* Header */}
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '14px', 
-                width: '100%', 
-                borderBottom: sessionActive ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(241, 245, 249, 0.6)', 
-                paddingBottom: '18px' 
-              }}>
-                <div style={{ 
-                  background: sessionActive ? 'rgba(255, 255, 255, 0.12)' : '#e6f4ea', 
-                  color: sessionActive ? '#ffffff' : '#34a853', 
-                  padding: '10px', 
-                  borderRadius: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: sessionActive ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.08)'
-                }}>
-                  <Clock size={20} />
-                </div>
-                <div>
-                  <h4 style={{ 
-                    fontWeight: 800, 
-                    fontSize: '20px', 
-                    color: sessionActive ? '#ffffff' : '#0f172a', 
-                    margin: 0, 
-                    letterSpacing: '-0.02em' 
-                  }}>Fokus-Timer</h4>
-                  <p style={{ 
-                    fontSize: '0.78rem', 
-                    color: sessionActive ? 'rgba(255, 255, 255, 0.6)' : '#64748b', 
-                    margin: '4px 0 0 0', 
-                    fontWeight: 550, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '6px' 
+                position: 'absolute',
+                top: '-40px',
+                right: '-40px',
+                width: '180px',
+                height: '180px',
+                background: 'radial-gradient(circle, rgba(52, 168, 83, 0.35) 0%, rgba(0,0,0,0) 70%)',
+                borderRadius: '50%',
+                pointerEvents: 'none'
+              }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '12px',
+                    background: '#34a853',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.4)',
+                    flexShrink: 0
                   }}>
-                    {isExtraTime ? (
-                      <>
-                        <Award size={14} style={{ color: '#ffffff', flexShrink: 0 }} />
-                        <span style={{ color: '#ffffff', fontWeight: 600 }}>Du bist in der Extra-Zeit!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Smartphone size={14} style={{ color: sessionActive ? '#ffffff' : '#34a853', flexShrink: 0 }} />
-                        <span>Handy mit dem Display nach unten hinlegen</span>
-                      </>
-                    )}
-                  </p>
+                    <Award size={20} color="#ffffff" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Dein Sticker-Pfad & Übe-Level
+                    </div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff' }}>
+                      {(() => {
+                        if (totalFocusMinutes >= 2000) return 'Stufe 4: Übe-Großmeister 🏆';
+                        if (totalFocusMinutes >= 1000) return 'Stufe 3: Übe-Legende 👑';
+                        if (totalFocusMinutes >= 250) return 'Stufe 2: Übe-Meister 🦉';
+                        if (totalFocusMinutes >= 50) return 'Stufe 1: Fleiß-Pionier 🐝';
+                        return 'Stufe 0: Übe-Starter 🚀';
+                      })()}
+                    </h3>
+                  </div>
                 </div>
 
-                {/* Level progression inside the header on the right */}
-                {!sessionActive && (() => {
-                  const { practicedDays, targetDays, nextLevel, progressPercentage, isMaxLevel } = getTrimesterProgressDetails();
+                {(() => {
+                  let nextStickerName = 'Fleiß-Pionier';
+                  let targetMin = 50;
+                  let prevMin = 0;
+                  if (totalFocusMinutes >= 1000) {
+                    nextStickerName = 'Übe-Großmeister';
+                    targetMin = 2000;
+                    prevMin = 1000;
+                  } else if (totalFocusMinutes >= 250) {
+                    nextStickerName = 'Übe-Legende';
+                    targetMin = 1000;
+                    prevMin = 250;
+                  } else if (totalFocusMinutes >= 50) {
+                    nextStickerName = 'Übe-Meister';
+                    targetMin = 250;
+                    prevMin = 50;
+                  }
+
+                  const isMax = totalFocusMinutes >= 2000;
+                  const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((totalFocusMinutes - prevMin) / (targetMin - prevMin)) * 100));
+
                   return (
-                    <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        {isMaxLevel ? 'Stufe Max' : `Weg zu Level ${nextLevel}`}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255, 255, 255, 0.08)', padding: '5px 12px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#e2e8f0' }}>
+                        {isMax ? '🏆 Großmeister-Status!' : `${totalFocusMinutes}/${targetMin} Min. zu ${nextStickerName}`}
                       </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#125026', fontFamily: "'Urbanist', sans-serif" }}>
-                          {practicedDays} / {targetDays} Tage
-                        </span>
-                        <div style={{ width: '60px', height: '5px', background: '#e6f4ea', borderRadius: '100px', overflow: 'hidden' }}>
-                          <div style={{ width: `${progressPercentage}%`, height: '100%', background: '#34a853', borderRadius: '100px' }} />
-                        </div>
+                      <div style={{ width: '60px', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '999px', overflow: 'hidden' }}>
+                        <div style={{ width: `${progressPct}%`, height: '100%', background: '#34a853', borderRadius: '999px', transition: 'width 0.5s ease' }} />
                       </div>
                     </div>
                   );
                 })()}
               </div>
 
-              {/* Active Anchor Banner (placed directly under the header line) */}
-              {!sessionActive && practiceAnchor && (
+              {/* Visual Level Stage Path Nodes */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'relative',
+                marginTop: '4px',
+                padding: '2px 6px',
+                zIndex: 1,
+                overflowX: 'auto',
+                gap: '10px'
+              }}>
+                {/* Line connection behind nodes */}
                 <div style={{
-                  width: '100%',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '10px 18px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  boxSizing: 'border-box',
-                  marginTop: '12px',
-                  marginBottom: '-4px'
-                }}>
-                  <span style={{ 
-                    fontSize: '0.85rem', 
-                    fontWeight: 600, 
-                    color: '#334155',
-                    lineHeight: 1.4,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    <Anchor size={14} style={{ color: '#34a853', flexShrink: 0 }} />
-                    <span>
-                      <span style={{ color: '#64748b', fontWeight: 600 }}>Dein Übe-Anker:</span> „{practiceAnchor.replace(/^Direct nach/, 'Direkt nach')}“
-                    </span>
-                  </span>
-                  <button
-                    onClick={() => setPracticeAnchor(null)}
+                  position: 'absolute',
+                  top: '19px',
+                  left: '28px',
+                  right: '28px',
+                  height: '3px',
+                  background: 'linear-gradient(90deg, #34a853 0%, #34a853 50%, rgba(255,255,255,0.2) 100%)',
+                  zIndex: 0
+                }} />
+
+                {[
+                  { stage: 1, title: 'Fleiß-Pionier', desc: '50 Min', icon: '🐝', done: (totalFocusMinutes >= 50), current: (totalFocusMinutes < 50) },
+                  { stage: 2, title: 'Übe-Meister', desc: '250 Min', icon: '🦉', done: (totalFocusMinutes >= 250), current: (totalFocusMinutes >= 50 && totalFocusMinutes < 250) },
+                  { stage: 3, title: 'Übe-Legende', desc: '1000 Min', icon: '👑', done: (totalFocusMinutes >= 1000), current: (totalFocusMinutes >= 250 && totalFocusMinutes < 1000) },
+                  { stage: 4, title: 'Übe-Großmeister', desc: '2000 Min', icon: '🏆', done: (totalFocusMinutes >= 2000), current: (totalFocusMinutes >= 1000 && totalFocusMinutes < 2000) }
+                ].map((node) => (
+                  <div
+                    key={node.stage}
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                      padding: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '5px',
+                      zIndex: 1,
+                      minWidth: '70px'
+                    }}
+                    title={`${node.title}: ${node.desc}`}
+                  >
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: node.done ? '#34a853' : (node.current ? '#facc15' : 'rgba(255, 255, 255, 0.15)'),
+                      border: node.current ? '3px solid #ffffff' : '1.5px solid rgba(255, 255, 255, 0.3)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      borderRadius: '6px',
-                      transition: 'all 0.2s',
-                      flexShrink: 0
-                    }}
-                    title="Anker bearbeiten"
-                    onMouseOver={e => e.currentTarget.style.color = '#dc2626'}
-                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
-                  >
-                    <Pencil size={14} />
-                  </button>
-                </div>
-              )}
+                      fontSize: '0.85rem',
+                      boxShadow: node.current ? '0 0 14px rgba(250, 204, 21, 0.6)' : (node.done ? '0 0 8px rgba(52, 168, 83, 0.4)' : 'none'),
+                      transform: node.current ? 'scale(1.12)' : 'scale(1)',
+                      transition: 'all 0.3s ease'
+                    }}>
+                      {node.icon}
+                    </div>
+                    <span style={{
+                      fontSize: '0.62rem',
+                      fontWeight: node.current ? 900 : 700,
+                      color: node.current ? '#facc15' : (node.done ? '#ffffff' : 'rgba(255,255,255,0.6)'),
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {node.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-              {!sessionActive ? (
-                /* Timer setup before starting */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '350px', width: '100%', alignItems: 'center' }}>
-                  
-                  {practiceAnchor ? (
-                    <>
+            {/* Row 3 - Desktop 2-Column Row: Fokus-Timer & Nächste Sticker-Auszeichnung */}
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flexWrap: 'wrap', width: '100%', alignItems: 'stretch' }}>
 
-                      {/* Circular visual timer representation (static state) */}
-                      <div style={{ 
-                        position: 'relative', 
-                        width: '210px', 
-                        height: '210px', 
-                        margin: '10px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <svg width="210" height="210" viewBox="0 0 210 210" style={{ transform: 'rotate(-90deg)' }}>
-                          <circle cx="105" cy="105" r="95" fill="none" stroke="#f1f5f9" strokeWidth="4" />
-                          <circle 
-                            cx="105" 
-                            cy="105" 
-                            r="95" 
-                            fill="none" 
-                            stroke="url(#blueGradient)" 
-                            strokeWidth="4" 
-                            strokeDasharray={2 * Math.PI * 95}
-                            strokeDashoffset={2 * Math.PI * 95}
-                            strokeLinecap="round"
-                          />
-                          <defs>
-                            <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#3b82f6" />
-                              <stop offset="100%" stopColor="#1d4ed8" />
-                            </linearGradient>
-                          </defs>
-                        </svg>
-                        <div style={{
-                          position: 'absolute',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <span style={{ fontSize: '2.8rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                            {String(getTargetMinutes(avatar?.streak_flame || 0)).padStart(2, '0')}:00
+              {/* Fokus-Timer Box (Left Side) */}
+              <div style={sessionActive ? {
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9998,
+                background: isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #022c22 100%)' : '#000000',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxSizing: 'border-box',
+                padding: '24px'
+              } : {
+                flex: '1 1 300px',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                borderRadius: '24px',
+                padding: '20px 24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                alignItems: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                color: 'inherit',
+                transition: 'all 0.5s ease'
+              }}>
+                {/* Inner wrapper to keep size consistent and centered on black screen */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  alignItems: 'center',
+                  width: '100%',
+                  maxWidth: sessionActive ? '380px' : 'none'
+                }}>
+                {/* Header */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  width: '100%', 
+                  borderBottom: sessionActive ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(241, 245, 249, 0.6)', 
+                  paddingBottom: '12px' 
+                }}>
+                  <div style={{ 
+                    background: sessionActive ? 'rgba(255, 255, 255, 0.12)' : '#e6f4ea', 
+                    color: sessionActive ? '#ffffff' : '#34a853', 
+                    padding: '10px', 
+                    borderRadius: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: sessionActive ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.08)'
+                  }}>
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <h4 style={{ 
+                      fontWeight: 800, 
+                      fontSize: '18px', 
+                      color: sessionActive ? '#ffffff' : '#0f172a', 
+                      margin: 0, 
+                      letterSpacing: '-0.02em' 
+                    }}>Fokus-Timer</h4>
+                    <p style={{ 
+                      fontSize: '0.76rem', 
+                      color: sessionActive ? 'rgba(255, 255, 255, 0.6)' : '#64748b', 
+                      margin: '3px 0 0 0', 
+                      fontWeight: 550, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '5px' 
+                    }}>
+                      {isExtraTime ? (
+                        <>
+                          <Award size={13} style={{ color: '#ffffff', flexShrink: 0 }} />
+                          <span style={{ color: '#ffffff', fontWeight: 600 }}>Du bist in der Extra-Zeit!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Smartphone size={13} style={{ color: sessionActive ? '#ffffff' : '#34a853', flexShrink: 0 }} />
+                          <span>Handy mit dem Display nach unten hinlegen</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Level progression inside the header on the right */}
+                  {!sessionActive && (() => {
+                    const { practicedDays, targetDays, nextLevel, progressPercentage, isMaxLevel } = getTrimesterProgressDetails();
+                    return (
+                      <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                        <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {isMaxLevel ? 'Stufe Max' : `Weg zu Level ${nextLevel}`}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#125026', fontFamily: "'Urbanist', sans-serif" }}>
+                            {practicedDays} / {targetDays} Tage
                           </span>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '6px' }}>Ziel Fokuszeit</span>
+                          <div style={{ width: '55px', height: '5px', background: '#e6f4ea', borderRadius: '100px', overflow: 'hidden' }}>
+                            <div style={{ width: `${progressPercentage}%`, height: '100%', background: '#34a853', borderRadius: '100px' }} />
+                          </div>
                         </div>
                       </div>
+                    );
+                  })()}
+                </div>
 
-                      <div style={{ 
-                        textAlign: 'center', 
-                        background: 'rgba(248, 250, 252, 0.6)', 
-                        padding: '14px 18px', 
-                        borderRadius: '20px', 
-                        width: '100%', 
-                        border: '1px solid rgba(226, 232, 240, 0.8)',
-                        boxSizing: 'border-box',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.01)'
-                      }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tages-Herausforderung</div>
-                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                          {getFlameLevelName(avatar?.streak_flame || 0)} ({getTargetMinutes(avatar?.streak_flame || 0)} Min)
+                {!sessionActive ? (
+                  /* Timer setup before starting */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '380px', width: '100%', alignItems: 'center' }}>
+                    
+                    {practiceAnchor ? (
+                      <>
+
+                        {/* Pulsating Neon-Emerald Studio Ring Center */}
+                        <div style={{ 
+                          position: 'relative', 
+                          width: '180px', 
+                          height: '180px', 
+                          margin: '6px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '50%',
+                          background: 'radial-gradient(circle, rgba(52, 168, 83, 0.08) 0%, rgba(255,255,255,0) 70%)',
+                          boxShadow: '0 10px 35px -8px rgba(52, 168, 83, 0.25)'
+                        }}>
+                          {/* Audio wave pulse background effect */}
+                          <div style={{
+                            position: 'absolute',
+                            inset: '-7px',
+                            borderRadius: '50%',
+                            border: '1.5px dashed rgba(52, 168, 83, 0.3)',
+                            animation: 'spinSlow 20s linear infinite'
+                          }} />
+
+                          <svg width="180" height="180" viewBox="0 0 180 180" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                            <circle cx="90" cy="90" r="80" fill="none" stroke="#e6f4ea" strokeWidth="5.5" />
+                            <circle 
+                              cx="90" 
+                              cy="90" 
+                              r="80" 
+                              fill="none" 
+                              stroke="url(#emeraldStudioGradient)" 
+                              strokeWidth="5.5" 
+                              strokeDasharray={2 * Math.PI * 80}
+                              strokeDashoffset={0}
+                              strokeLinecap="round"
+                              style={{ filter: 'drop-shadow(0 0 7px rgba(52, 168, 83, 0.4))' }}
+                            />
+                            <defs>
+                              <linearGradient id="emeraldStudioGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#34a853" />
+                                <stop offset="50%" stopColor="#10b981" />
+                                <stop offset="100%" stopColor="#059669" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+
+                          <div style={{
+                            position: 'absolute',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            textAlign: 'center'
+                          }}>
+                            <span style={{
+                              fontSize: '2.5rem',
+                              fontWeight: 900,
+                              color: '#0f172a',
+                              letterSpacing: '-0.04em',
+                              lineHeight: 1,
+                              fontFamily: "'Urbanist', sans-serif"
+                            }}>
+                              {String(getTargetMinutes(avatar?.streak_flame || 0)).padStart(2, '0')}:00
+                            </span>
+                            <span style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              color: '#34a853',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.09em',
+                              marginTop: '5px',
+                              background: '#e6f4ea',
+                              padding: '3px 10px',
+                              borderRadius: '999px'
+                            }}>
+                              Ziel-Fokuszeit
+                            </span>
+                          </div>
                         </div>
-                      </div>
+
+                        {/* Integrated Studio Bottom Bar (Übe-Anker & Tages-Herausforderung) */}
+                        <div style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: 'rgba(248, 250, 252, 0.85)', 
+                          padding: '10px 16px', 
+                          borderRadius: '16px', 
+                          width: '100%', 
+                          border: '1px solid rgba(226, 232, 240, 0.9)',
+                          boxSizing: 'border-box',
+                          gap: '10px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                            <Anchor size={14} style={{ color: '#34a853', flexShrink: 0 }} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span style={{ color: '#64748b' }}>Anker:</span> „{practiceAnchor.replace(/^Direct nach/, 'Direkt nach')}“
+                            </span>
+                            <button
+                              onClick={() => setPracticeAnchor(null)}
+                              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '3px', display: 'flex', flexShrink: 0 }}
+                              title="Bearbeiten"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </div>
+                          
+                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#34a853', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: '#64748b' }}>🎯 Ziel:</span> {getTargetMinutes(avatar?.streak_flame || 0)} Min
+                          </div>
+                        </div>
 
                       <button
                         onClick={async () => {
@@ -7848,6 +8017,171 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
             </div>
 
+            {/* Nächste Sticker-Auszeichnung Card (Right Side of Row 3) */}
+            {!sessionActive && (() => {
+              let stickerEmoji = '🐝';
+              let stickerTitle = 'Fleiß-Pionier';
+              let stickerDesc = 'Für insgesamt 50 Minuten fleißiges Üben.';
+              let targetMin = 50;
+              let prevMin = 0;
+              let stickerColor = '#34a853';
+              let rarityLabel = 'Standard';
+
+              if (totalFocusMinutes >= 1000) {
+                stickerEmoji = '🏆';
+                stickerTitle = 'Übe-Großmeister';
+                stickerDesc = 'Für grandiose 2000 Minuten Übezeit!';
+                targetMin = 2000;
+                prevMin = 1000;
+                stickerColor = '#eab308';
+                rarityLabel = 'Legendär';
+              } else if (totalFocusMinutes >= 250) {
+                stickerEmoji = '👑';
+                stickerTitle = 'Übe-Legende';
+                stickerDesc = 'Für unglaubliche 1000 Minuten Übezeit!';
+                targetMin = 1000;
+                prevMin = 250;
+                stickerColor = '#af52de';
+                rarityLabel = 'Episch';
+              } else if (totalFocusMinutes >= 50) {
+                stickerEmoji = '🦉';
+                stickerTitle = 'Übe-Meister';
+                stickerDesc = 'Für insgesamt 250 Minuten ausdauerndes Üben.';
+                targetMin = 250;
+                prevMin = 50;
+                stickerColor = '#3b82f6';
+                rarityLabel = 'Selten';
+              }
+
+              const remainingMin = Math.max(0, targetMin - totalFocusMinutes);
+              const estDays = Math.ceil(remainingMin / 5); // 5 min / day avg
+              const isMax = totalFocusMinutes >= 2000;
+              const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((totalFocusMinutes - prevMin) / (targetMin - prevMin)) * 100));
+
+              return (
+                <div style={{
+                  flex: '1 1 240px',
+                  background: 'rgba(255, 255, 255, 0.75)',
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  borderRadius: '24px',
+                  padding: '20px 22px',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  boxSizing: 'border-box'
+                }}>
+                  {/* Sticker Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(241, 245, 249, 0.8)', paddingBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Award size={18} color="#eab308" />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>Nächster Sticker</span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.6rem',
+                      fontWeight: 800,
+                      color: stickerColor,
+                      background: `${stickerColor}15`,
+                      padding: '3px 9px',
+                      borderRadius: '999px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {rarityLabel}
+                    </span>
+                  </div>
+
+                  {/* Glowing 3D Sticker Showcase */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '20px',
+                      background: `radial-gradient(circle, ${stickerColor}25 0%, rgba(255,255,255,0) 70%)`,
+                      border: `2px solid ${stickerColor}40`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '2.5rem',
+                      boxShadow: `0 8px 24px ${stickerColor}30`,
+                      flexShrink: 0
+                    }}>
+                      {stickerEmoji}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                        {stickerTitle}
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
+                        {stickerDesc}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Remaining Days & Progress Meter */}
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
+                        {isMax ? 'Maximum erreicht!' : `Noch ${remainingMin} Min. (ca. ${estDays} Übetage)`}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: stickerColor, fontFamily: "'Urbanist', sans-serif" }}>
+                        {Math.round(progressPct)}%
+                      </span>
+                    </div>
+
+                    <div style={{ width: '100%', height: '7px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${progressPct}%`, height: '100%', background: stickerColor, borderRadius: '999px', transition: 'width 0.5s ease' }} />
+                    </div>
+                  </div>
+
+                  {/* Action Button to Open Sticker Album */}
+                  <button
+                    onClick={() => setActiveTab('homework_book')}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(241, 245, 249, 0.8)',
+                      border: '1px solid #cbd5e1',
+                      color: '#334155',
+                      borderRadius: '14px',
+                      padding: '9px 14px',
+                      fontWeight: 800,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = '#e2e8f0';
+                      e.currentTarget.style.color = '#0f172a';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(241, 245, 249, 0.8)';
+                      e.currentTarget.style.color = '#334155';
+                    }}
+                  >
+                    <BookOpen size={14} />
+                    <span>Sticker-Album öffnen</span>
+                  </button>
+                </div>
+              );
+            })()}
+
+            </div>
           </div>
 
           {/* Right Pane (1/3 width) - Flammen Log-Buch & Jahres-Statistik Sidebar */}
@@ -7856,15 +8190,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             background: '#ffffff', 
             border: '1px solid #e2e8f0', 
             borderRadius: '24px', 
-            padding: '24px', 
+            padding: '20px 22px', 
             boxShadow: '0 4px 20px rgba(0,0,0,0.01)',
             minWidth: '280px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '18px'
+            gap: '16px'
           }}>
             {/* Sidebar View Switcher Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ 
                   background: sidebarTab === 'logbook' ? '#fff7ed' : '#e6f4ea', 

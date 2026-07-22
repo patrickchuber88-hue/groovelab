@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName } from '../utils/nameHelper';
 
@@ -81,6 +81,8 @@ interface ProfileData {
   parent_allow_leaderboard?: boolean;
   parent_allow_groups?: boolean;
   parent_allow_proposals?: boolean;
+  streak_flame?: number;
+  total_practice_minutes?: number;
 }
 
 export function QRLandingPage({ token }: QRLandingPageProps) {
@@ -3861,29 +3863,64 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             {profile.is_campus_active ? (
               // ACTIVE STUDENT WIDGETS
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
-                {/* Fokus-Timer Card */}
-                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #e6f4ea', background: '#e6f4ea', textAlign: 'center'}}>
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                    <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
-                      <Timer size={20} color="#34a853" /> Fokus-Timer
-                    </h3>
-                    <p style={{margin: 0, fontSize: '0.82rem', color: '#34a853', lineHeight: 1.5, fontWeight: 550}}>
-                      Starte deine tägliche Übe-Session direkt hier, um deine Streaks fortzusetzen und Abzeichen zu sammeln!
-                    </p>
+                {/* Level Roadmap & Fokus-Timer Mobile Card */}
+                <div style={{...styles.card, padding: '20px', gap: '16px', border: '1.5px solid #a7f3d0', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: 'white', textAlign: 'center', borderRadius: '24px', boxShadow: '0 10px 25px rgba(15,23,42,0.25)'}}>
+                  
+                  {/* Smartphone Level Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Award size={18} color="#ffffff" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Übe-Pfad</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#ffffff' }}>Level 1: Übe-Pionier 🚀</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '4px 8px', borderRadius: '999px' }}>
+                      <Flame size={14} fill="#ef4444" color="#ef4444" />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#ffffff' }}>{profile.streak_flame || 0} Tage</span>
+                    </div>
                   </div>
+
+                  {/* Stage Nodes Mini Roadmap for Smartphone */}
+                  <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '4px 0' }}>
+                    {[
+                      { icon: '🚀', title: 'Start', active: true },
+                      { icon: '⏱️', title: '30 Min', active: ((profile.total_practice_minutes || 0) >= 30) },
+                      { icon: '🔥', title: '7 Tage', active: ((profile.streak_flame || 0) >= 7) },
+                      { icon: '🏆', title: 'Level 2', active: ((profile.total_practice_minutes || 0) >= 100) }
+                    ].map((stg, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <div style={{
+                          width: '30px', height: '30px', borderRadius: '50%',
+                          background: stg.active ? '#34a853' : 'rgba(255,255,255,0.15)',
+                          border: stg.active ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem'
+                        }}>
+                          {stg.icon}
+                        </div>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: stg.active ? '#a7f3d0' : 'rgba(255,255,255,0.5)' }}>
+                          {stg.title}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
                   <button
                     onClick={handleStartTimer}
                     style={{
                       width: '100%',
-                      padding: '16px 20px',
+                      padding: '15px 20px',
                       borderRadius: '16px',
                       background: '#34a853',
                       color: 'white',
                       border: 'none',
-                      fontWeight: 800,
+                      fontWeight: 900,
                       fontSize: '0.95rem',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+                      boxShadow: '0 4px 15px rgba(52, 168, 83, 0.35)',
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',

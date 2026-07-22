@@ -10,6 +10,7 @@ import {
 import { renderInstrumentIcon } from '../utils/instruments';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { IDBadgeCard } from './IDBadgeCard';
 
 const brandColor = 'var(--primary-color)';
 
@@ -262,6 +263,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     };
     fetchCurrentUser();
   }, []);
+
+  const handleOpenHausaufgabenheft = () => {
+    if (onOpenTageskompass) {
+      onOpenTageskompass(student);
+    } else {
+      setShowTageskompassModal(true);
+    }
+  };
 
   const handleSaveName = async () => {
     try {
@@ -1765,30 +1774,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
               <Calendar size={14} /> Member seit {memberSince}
             </div>
-            {onOpenTageskompass && (
-              <button 
-                onClick={() => onOpenTageskompass(student)}
-                style={{
-                  background: activeColor,
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '6px 14px',
-                  fontSize: '0.8rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: `0 4px 12px ${activeColor}33`,
-                  transition: 'transform 0.15s ease'
-                }}
-                className="hover-scale"
-              >
-                <BookOpen size={14} />
-                <span>Schüler-Aufgabenheft</span>
-              </button>
-            )}
           </div>
 
           {/* Instrument challenge counters (only in GrooveLab mode) */}
@@ -2087,28 +2072,6 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
                       <BookOpen size={16} /> Songs &amp; Lehrwerke
                     </h4>
-                    {onOpenTageskompass && (
-                      <button 
-                        onClick={() => onOpenTageskompass(student)}
-                        style={{
-                          background: '#34a853',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '10px',
-                          padding: '6px 12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <BookOpen size={13} />
-                        <span>Schüler-Aufgabenheft</span>
-                      </button>
-                    )}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -2450,6 +2413,110 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
           {/* Right Column: Sidebar Widgets */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Hero Card: Digitales Hausaufgabenheft */}
+            <section style={{
+              background: localTab === 'campus' 
+                ? 'linear-gradient(135deg, #34a853 0%, #059669 45%, #4f46e5 100%)' 
+                : 'linear-gradient(135deg, #eab308 0%, #d97706 45%, #ea4335 100%)',
+              borderRadius: '24px',
+              padding: '22px 20px',
+              color: '#ffffff',
+              boxShadow: localTab === 'campus' 
+                ? '0 12px 30px rgba(52, 168, 83, 0.28), 0 4px 12px rgba(79, 70, 229, 0.15)' 
+                : '0 12px 30px rgba(234, 179, 8, 0.28), 0 4px 12px rgba(234, 67, 53, 0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              boxSizing: 'border-box'
+            }}>
+              {/* Decorative background sheen */}
+              <div style={{
+                position: 'absolute',
+                top: '-30px', right: '-30px',
+                width: '120px', height: '120px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.12)',
+                pointerEvents: 'none'
+              }} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '14px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}>
+                  <BookOpen size={22} color="#ffffff" />
+                </div>
+                <div>
+                  <div style={{ 
+                    fontSize: '0.68rem', 
+                    fontWeight: 900, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.12em', 
+                    color: 'rgba(255, 255, 255, 0.85)' 
+                  }}>
+                    LERNFORTSCHRITT &amp; PROTOKOLL
+                  </div>
+                  <h3 style={{ 
+                    margin: 0, 
+                    fontSize: '1.1rem', 
+                    fontWeight: 900, 
+                    fontFamily: "'Outfit', sans-serif", 
+                    color: '#ffffff',
+                    lineHeight: 1.1 
+                  }}>
+                    Digitales Hausaufgabenheft
+                  </h3>
+                </div>
+              </div>
+
+              <p style={{ 
+                margin: 0, 
+                fontSize: '0.78rem', 
+                lineHeight: 1.4, 
+                color: 'rgba(255, 255, 255, 0.9)', 
+                fontWeight: 600,
+                zIndex: 1 
+              }}>
+                Wochenziele, Übungs-Streaks, Audio-Aufnahmen &amp; Meisterwerke des Schülers direkt einsehen.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleOpenHausaufgabenheft}
+                style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  color: localTab === 'campus' ? '#047857' : '#92400e',
+                  border: 'none',
+                  borderRadius: '14px',
+                  padding: '12px 16px',
+                  fontSize: '0.85rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
+                  transition: 'all 0.15s ease',
+                  zIndex: 1
+                }}
+                className="hover-scale"
+              >
+                <BookOpen size={16} />
+                <span>Hausaufgabenheft öffnen</span>
+              </button>
+            </section>
+
             {isPlatformCampus ? (
               /* ---- CAMPUS Sidebar: Lesson Card ---- */
               <section style={{
@@ -3670,331 +3737,91 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <div 
             style={{
               position: 'relative',
-              width: '100%',
-              maxWidth: '380px'
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '20px',
+              maxWidth: '380px',
+              width: '100%'
             }}
             onClick={e => e.stopPropagation()}
           >
+            {/* Standalone Ausweis Card (Exact Original Proportions 280px x 450px) */}
+            <IDBadgeCard 
+              user={student} 
+              activePlatform={localTab} 
+              qrValue={`${window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'https://app.campus-groovelab.de' : window.location.origin}/qr/${localQrToken || student.qr_token || student.id || ''}`} 
+            />
 
-            {qrOverlayTab === 'campus' ? (
-              /* ============ CAMPUS PASS OVERLAY ============ */
+            {/* Actions Panel below */}
+            {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
               <div style={{ 
-                background: 'radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)', 
-                borderRadius: '32px', 
-                padding: '32px', 
-                color: 'white',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(16, 185, 129, 0.15)',
-                border: '1.5px solid rgba(16, 185, 129, 0.25)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
-                boxSizing: 'border-box',
-                gap: '24px'
-              }}>
-                {/* Sheen effect */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(255, 255, 255, 0.02) 100%)',
-                  pointerEvents: 'none'
-                }} />
-
-                {/* CAMPUS PASS Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
-                  <span style={{ 
-                    fontSize: '0.7rem', 
-                    fontWeight: 900, 
-                    color: '#34d399', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.22em',
-                  }}>
-                    CAMPUS PASS
-                  </span>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '20px' }}>
-                    Aktiv
-                  </span>
-                </div>
-
-                {/* Top Info Section */}
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', zIndex: 1, flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between' }}>
-                  <img 
-                    src={getCampusAvatarSrc()} 
-                    alt="Avatar" 
-                    style={{ 
-                      width: '76px', 
-                      height: '76px', 
-                      borderRadius: '24px', 
-                      objectFit: 'cover', 
-                      border: '3px solid rgba(16, 185, 129, 0.4)',
-                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
-                    }} 
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div>
-                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.1' }}>
-                        {student.first_name} {student.last_name ? student.last_name.charAt(0) + '.' : ''}
-                      </div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, lineHeight: '1.2' }}>
-                        {schoolName}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-
-                {/* QR Code Container */}
-                <div style={{ 
-                  background: 'white', 
-                  padding: '16px', 
-                  borderRadius: '24px', 
-                  boxShadow: '0 15px 35px rgba(0,0,0,0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '8px 0',
-                  zIndex: 1
-                }}>
-                  <QRCode value={`${window.location.origin}/qr/${localQrToken || student.qr_token || student.id || ''}`} size={150} style={{ width: '150px', height: '150px' }} />
-                </div>
-
-                {/* Actions */}
-                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 1 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`;
-                        navigator.clipboard.writeText(link);
-                        alert('Campus-Onboarding-Link in die Zwischenablage kopiert! 📋');
-                      }}
-                      style={{
-                        width: '100%',
-                        background: 'rgba(255, 255, 255, 0.15)',
-                        color: '#ffffff',
-                        border: '1.5px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '16px',
-                        padding: '12px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.45)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                      }}
-                    >
-                      <Copy size={14} />
-                      Campus PWA Link kopieren
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRegenerateQrToken();
-                      }}
-                      style={{
-                        width: '100%',
-                        background: 'rgba(255, 255, 255, 0.12)',
-                        color: '#ffffff',
-                        border: '1.5px solid rgba(255, 255, 255, 0.25)',
-                        borderRadius: '16px',
-                        padding: '12px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-                      }}
-                    >
-                      <RefreshCw size={14} />
-                      QR-Code sperren &amp; neu generieren
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* ============ GROOVELAB MEMBER PASS OVERLAY ============ */
-              <div style={{
-                background: 'white',
-                borderRadius: '32px',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
-                overflow: 'hidden',
-                border: '1.5px solid #e2e8f0',
+                width: '100%', 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '16px', 
+                boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '10px',
                 boxSizing: 'border-box'
               }}>
-                {/* Lanyard Hole Mockup */}
-                <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-                  <div style={{ width: '28px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
-                </div>
-
-                {/* Status Header */}
-                <div style={{ 
-                  background: student.role === 'student' ? 'var(--primary-color)' : '#f59e0b', 
-                  padding: '8px', 
-                  textAlign: 'center',
-                  textTransform: 'uppercase'
-                }}>
-                  <div style={{ color: 'white', fontSize: '0.65rem', fontWeight: 900, letterSpacing: '0.2em' }}>
-                    {student.role === 'student' ? 'Member Access' : 'Staff / Coach'}
-                  </div>
-                </div>
-
-                {/* Content Area */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 28px', gap: '16px' }}>
-                  {/* Portrait */}
-                  <div style={{ 
-                    width: '92px', 
-                    height: '92px', 
-                    borderRadius: '50%', 
-                    border: `3px solid ${student.role === 'student' ? 'var(--primary-color)' : '#f59e0b'}`,
-                    padding: '3px',
-                    background: 'white',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.05)',
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=${localTab}`;
+                    navigator.clipboard.writeText(link);
+                    alert(`${localTab === 'campus' ? 'Campus' : 'GrooveLab'}-Onboarding-Link in die Zwischenablage kopiert! 📋`);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: localTab === 'campus' ? '#e6f4ea' : '#fefce8',
+                    color: localTab === 'campus' ? '#137333' : '#854d0e',
+                    border: `1.5px solid ${localTab === 'campus' ? '#ceead6' : '#fef3c7'}`,
+                    borderRadius: '14px',
+                    padding: '12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    overflow: 'hidden'
-                  }}>
-                    <img 
-                      src={getGroovelabAvatarSrc()} 
-                      alt="Profile"
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        borderRadius: '50%'
-                      }} 
-                    />
-                  </div>
-
-                  {/* Identity */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.1, letterSpacing: '-0.02em' }}>{student.first_name} {student.last_name ? student.last_name.charAt(0) + '.' : ''}</div>
-                  </div>
-
-
-                  {/* QR Code Container */}
-                  <div style={{ 
-                    background: 'white', 
-                    padding: '14px', 
-                    borderRadius: '20px',
-                    border: '1px solid #f1f5f9',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale"
+                >
+                  <Copy size={14} />
+                  Onboarding-Link kopieren
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRegenerateQrToken();
+                  }}
+                  style={{
+                    width: '100%',
+                    background: '#fff1f2',
+                    color: '#e11d48',
+                    border: '1.5px solid #fecdd3',
+                    borderRadius: '14px',
+                    padding: '12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '100%'
-                  }}>
-                    <QRCode value={`${window.location.origin}/qr/${localQrToken || student.qr_token || student.id || ''}`} size={150} style={{ width: '150px', height: '150px' }} />
-                  </div>
-
-                  <p style={{ 
-                    fontSize: '0.7rem', 
-                    color: '#94a3b8', 
-                    textAlign: 'center', 
-                    margin: '0', 
-                    fontWeight: 600, 
-                    lineHeight: 1.3,
-                    maxWidth: '220px'
-                  }}>
-                    Halte diesen Code vor die Kamera des iPads,<br/>um dich automatisch am Platz anzumelden.
-                  </p>
-                </div>
-
-                {/* Actions */}
-                {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                  <div style={{ padding: '0 28px 24px 28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}`;
-                        navigator.clipboard.writeText(link);
-                        alert('GrooveLab-Onboarding-Link in die Zwischenablage kopiert! 📋');
-                      }}
-                      style={{
-                        width: '100%',
-                        background: '#fefce8',
-                        color: '#854d0e',
-                        border: '1.5px solid #fef3c7',
-                        borderRadius: '16px',
-                        padding: '12px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.background = '#fef9c3'}
-                      onMouseOut={e => e.currentTarget.style.background = '#fefce8'}
-                    >
-                      <Copy size={14} />
-                      Onboarding-Link kopieren
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRegenerateQrToken();
-                      }}
-                      style={{
-                        width: '100%',
-                        background: '#fff1f2',
-                        color: '#e11d48',
-                        border: '1.5px solid #fecdd3',
-                        borderRadius: '16px',
-                        padding: '12px',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.background = '#ffe4e6'}
-                      onMouseOut={e => e.currentTarget.style.background = '#fff1f2'}
-                    >
-                      <RefreshCw size={14} />
-                      QR-Code sperren &amp; neu generieren
-                    </button>
-                  </div>
-                )}
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover-scale"
+                >
+                  <RefreshCw size={14} />
+                  QR-Code sperren &amp; neu generieren
+                </button>
               </div>
             )}
           </div>
@@ -4289,7 +4116,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           }}
           onClose={() => setShowTageskompassModal(false)}
           teacherId={currentTeacherId}
-          isTeacherTools={true}
+          initialViewMode="document"
+          isTeacherTools={false}
         />
       )}
     </div>

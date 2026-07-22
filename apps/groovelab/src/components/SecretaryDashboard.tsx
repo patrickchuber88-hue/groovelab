@@ -12023,7 +12023,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         </div>
 
         {/* Profile Info at bottom of sidebar */}
-        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #e6f4ea' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '20px' }}>
+        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #e6f4ea' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div 
             onClick={() => setShowOwnQrModal(true)}
             style={{ 
@@ -12034,8 +12034,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               borderRadius: '16px',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
-              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#e6f4ea' : (activeTab === 'secretary' ? '#fff1f2' : '#fffbeb')) : 'transparent',
-              marginBottom: '8px'
+              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#e6f4ea' : (activeTab === 'secretary' ? '#fff1f2' : '#fffbeb')) : '#f8fafc',
+              border: '1px solid #f1f5f9'
             }}
           >
             <div style={{ position: 'relative' }}>
@@ -12057,24 +12057,54 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               </div>
             </div>
           </div>
+
+          {/* Ausweis Button - Always Red for Verwaltung/Sekretariat */}
+          <button 
+            type="button"
+            onClick={() => setShowOwnQrModal(true)}
+            style={{ 
+              width: '100%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              gap: '8px', 
+              padding: '10px 12px', 
+              borderRadius: '12px', 
+              border: '1.5px solid rgba(234, 67, 53, 0.25)', 
+              background: 'rgba(234, 67, 53, 0.08)', 
+              color: '#ea4335', 
+              fontWeight: 800, 
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(234, 67, 53, 0.05)',
+              transition: 'all 0.2s ease'
+            }}
+            className="hover-scale"
+          >
+            <QrCode size={16} color="#ea4335" /> Ausweis zeigen
+          </button>
           
           {onLogout && (
             <button 
+              type="button"
               onClick={onLogout}
               style={{ 
                 width: '100%', 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '10px', 
+                justifyContent: 'center',
+                gap: '8px', 
                 padding: '10px 12px', 
                 borderRadius: '12px', 
                 border: 'none', 
-                background: 'transparent', 
+                background: '#fff1f2', 
                 color: '#ef4444', 
                 fontWeight: 800, 
+                fontSize: '0.82rem',
                 cursor: 'pointer',
-                transition: 'background-color 0.2s'
+                transition: 'background-color 0.2s ease'
               }}
+              className="hover-scale"
             >
               <LogOut size={16} color="#ef4444" /> Abmelden
             </button>
@@ -12372,58 +12402,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                 )}
               </div>
             </div>
-
-            {/* Ausweis Button (Desktop only) */}
-            {window.innerWidth > 1024 && (
-              <button 
-                onClick={() => setShowOwnQrModal(true)} 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '10px', 
-                  background: 'white', 
-                  padding: '8px 14px', 
-                  borderRadius: '12px', 
-                  border: `1.5px solid ${activeTab === 'secretary' ? 'rgba(234, 67, 53, 0.25)' : activeTab === 'campus' ? 'rgba(52, 168, 83, 0.25)' : 'rgba(250, 204, 21, 0.3)'}`, 
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)', 
-                  cursor: 'pointer',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  color: activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#eab308'
-                }}
-              >
-                <span>Ausweis</span>
-                <QrCode size={16} color={activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#eab308'} />
-              </button>
-            )}
-
-            {/* Elegant Logout Button */}
-            {onLogout && (
-              <button 
-                onClick={onLogout}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  background: '#fff1f2', 
-                  border: '1px solid #ffe4e6', 
-                  padding: '8px 14px', 
-                  borderRadius: '12px', 
-                  color: '#f43f5e', 
-                  fontWeight: 800, 
-                  fontSize: '0.8rem', 
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.08)',
-                  flexShrink: 0
-                }}
-                className="hover-scale"
-                title="Abmelden"
-              >
-                <LogOut size={14} color="#f43f5e" />
-                <span>Abmelden</span>
-              </button>
-            )}
           </div>
         </div>
         
@@ -29466,7 +29444,7 @@ status: status,
       )}
       {/* Modal: QR Code anzeigen */}
       {showOwnQrModal && currentUserProfile && (
-        <QRCodeModal user={currentUserProfile} activePlatform="campus" onClose={() => setShowOwnQrModal(false)} />
+        <QRCodeModal user={currentUserProfile} activePlatform="secretary" onClose={() => setShowOwnQrModal(false)} />
       )}
       {showPilotAgreementModalFromDashboard && userId && (
         <PilotOnboardingModal

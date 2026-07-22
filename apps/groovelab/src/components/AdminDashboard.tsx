@@ -16,6 +16,7 @@ import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
+import { IDBadgeCard } from './IDBadgeCard';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
 const cleanRoomName = (name: string | null | undefined): string => {
@@ -13450,77 +13451,11 @@ export function AdminDashboard({
                 </div>
               </>
             ) : (
-              <>
-                {/* Lanyard Hole Mockup */}
-                <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-                  <div style={{ width: '30px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
-                </div>
-
-                {/* Status Header */}
-                {(() => {
-                  const isQRAdminOrSec = selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary';
-                  const cardHeaderColor = isQRAdminOrSec ? '#ea4335' : (selectedQRUser.role === 'student' ? '#eab308' : '#34a853');
-                  const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (selectedQRUser.role === 'student' ? 'Member Access' : 'Staff / Coach');
-                  return (
-                    <div style={{ 
-                      background: cardHeaderColor, 
-                      padding: '6px', 
-                      textAlign: 'center',
-                      textTransform: 'uppercase'
-                    }}>
-                      <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-                        {cardBadgeLabel}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Content Area */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
-                  {/* Portrait */}
-                  <div style={{ 
-                    width: '130px', 
-                    height: '130px', 
-                    borderRadius: '100px', 
-                    border: `4px solid ${selectedQRUser.role === 'student' ? '#eab308' : (selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary') ? '#ea4335' : '#34a853'}`,
-                    padding: '6px',
-                    background: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      borderRadius: '50%', 
-                      overflow: 'hidden'
-                    }}>
-                      <StudioAvatar src={selectedQRUser.photo_url} user={selectedQRUser} activePlatform={activePlatform} />
-                    </div>
-                  </div>
-
-                  {/* Identity */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>{selectedQRUser.first_name}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{selectedQRUser.last_name || 'Member'}</div>
-                  </div>
-
-                  {/* QR Code Container */}
-                  <div style={{ 
-                    marginTop: 'auto', 
-                    background: '#f8fafc', 
-                    padding: '12px', 
-                    borderRadius: '16px',
-                    border: '1px solid #f1f5f9',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={110} />
-                  </div>
-                </div>
-              </>
+              <IDBadgeCard 
+                user={selectedQRUser} 
+                activePlatform={activePlatform} 
+                qrValue={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} 
+              />
             )}
           </div>
 
@@ -17552,124 +17487,16 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
         
         <div className="id-gallery-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '32px' }}>
           {filteredUsers.map(u => (
-            <div 
-              key={u.id} 
-              className="id-card id-card-hover"
-              style={{ 
-                background: 'white', 
-                borderRadius: '24px', 
-                boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-                aspectRatio: '0.62',
-                cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.1)'
-              }}
-              onClick={() => onShowQR(u)}
-            >
-              {/* Checkbox overlay for printing */}
-              <div 
-                onClick={(e) => toggleSelectForPrint(u.id, e)}
-                style={{
-                  position: 'absolute',
-                  top: '16px',
-                  right: '16px',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  background: selectedPrintIds[u.id] ? '#ea4335' : 'rgba(255,255,255,0.85)',
-                  border: `2px solid ${selectedPrintIds[u.id] ? '#ea4335' : '#cbd5e1'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  zIndex: 20,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  transition: 'all 0.2s',
-                  opacity: selectedPrintIds[u.id] ? 1 : 0.8
-                }}
-              >
-                {selectedPrintIds[u.id] && <Check size={16} color="white" strokeWidth={3} />}
-              </div>
-
-              {/* Lanyard Hole Mockup */}
-              <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-                <div style={{ width: '30px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
-              </div>
-
-              {/* Status Header */}
-              {(() => {
-                const isQRAdminOrSec = u.role === 'admin' || u.role === 'secretary';
-                const cardHeaderColor = isQRAdminOrSec ? '#ea4335' : (u.role === 'student' ? '#eab308' : '#34a853');
-                const cardBadgeLabel = isQRAdminOrSec ? 'Admin / Control' : (u.role === 'student' ? 'Member Access' : 'Staff / Coach');
-                return (
-                  <div style={{ 
-                    background: cardHeaderColor, 
-                    padding: '6px', 
-                    textAlign: 'center',
-                    textTransform: 'uppercase'
-                  }}>
-                    <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-                      {cardBadgeLabel}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Content Area */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
-                {/* Portrait */}
-                <div style={{ 
-                  width: '130px', 
-                  height: '130px', 
-                  borderRadius: '100px', 
-                  border: `4px solid ${u.role === 'student' ? '#eab308' : (u.role === 'admin' || u.role === 'secretary') ? '#ea4335' : '#34a853'}`,
-                  padding: '6px',
-                  background: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    borderRadius: '50%', 
-                    overflow: 'hidden'
-                  }}>
-                    <StudioAvatar src={u.photo_url} user={u} activePlatform={activePlatform} />
-                  </div>
-                </div>
-
-                {/* Identity */}
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>{u.first_name}</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b', marginTop: '4px' }}>{u.last_name || 'Member'}</div>
-                </div>
-
-                {/* QR Code Container */}
-                <div style={{ 
-                  marginTop: 'auto', 
-                  background: '#f8fafc', 
-                  padding: '12px', 
-                  borderRadius: '16px',
-                  border: '1px solid #f1f5f9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <QRCode value={`${window.location.origin}/qr/${u.qr_token || u.id || ''}`} size={110} />
-                </div>
-              </div>
-
-              {/* Bottom Brand Stripe */}
-              <div style={{ 
-                height: '10px', 
-                background: `linear-gradient(90deg, ${u.role === 'student' ? '#eab308' : '#34a853'}, #1e293b, ${u.role === 'student' ? '#eab308' : '#34a853'})` 
-              }}></div>
-            </div>
+            <IDBadgeCard 
+              key={u.id}
+              user={u} 
+              activePlatform={activePlatform} 
+              selectedPrint={selectedPrintIds[u.id]} 
+              onToggleSelectPrint={(e) => toggleSelectForPrint(u.id, e)} 
+              onClick={() => onShowQR(u)} 
+              style={{ width: '100%', height: 'auto', aspectRatio: '0.62', cursor: 'pointer' }} 
+              showSubtext={false} 
+            />
           ))}
         </div>
       </div>

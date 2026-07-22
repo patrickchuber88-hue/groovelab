@@ -8461,37 +8461,59 @@ function App() {
           </button>
 
           {/* Ausweis button */}
-          {(user?.qr_token || user?.teacher_qr_token) && (
-            <button 
-              type="button"
-              onClick={() => setShowQR(true)}
-              style={{ 
-                width: '100%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '8px', 
-                padding: '12px 14px', 
-                borderRadius: '14px', 
-                border: `1.5px solid ${activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.18)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.18)' : 'rgba(234, 179, 8, 0.25)'}`, 
-                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.05)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(234, 179, 8, 0.05)', 
-                color: activePlatform === 'campus' ? '#34a853' : activePlatform === 'ensembles' ? '#2563eb' : '#a16207', 
-                fontWeight: 800, 
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.1)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(234, 179, 8, 0.1)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.05)' : activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.05)' : 'rgba(234, 179, 8, 0.05)';
-              }}
-            >
-              <QrCode size={16} /> Ausweis zeigen
-            </button>
-          )}
+          {(user?.qr_token || user?.teacher_qr_token) && (() => {
+            const isPureAdminOrSec = (user?.role === 'admin' || user?.role === 'secretary') && (!user?.roles || !user.roles.includes('teacher'));
+            const buttonBorder = isPureAdminOrSec 
+              ? '1.5px solid rgba(234, 67, 53, 0.25)'
+              : activePlatform === 'campus' 
+                ? '1.5px solid rgba(52, 168, 83, 0.25)' 
+                : activePlatform === 'ensembles' 
+                  ? '1.5px solid rgba(59, 130, 246, 0.25)' 
+                  : '1.5px solid rgba(234, 179, 8, 0.3)';
+
+            const buttonBg = isPureAdminOrSec 
+              ? 'rgba(234, 67, 53, 0.08)'
+              : activePlatform === 'campus' 
+                ? 'rgba(52, 168, 83, 0.08)' 
+                : activePlatform === 'ensembles' 
+                  ? 'rgba(59, 130, 246, 0.08)' 
+                  : 'rgba(234, 179, 8, 0.08)';
+
+            const buttonColor = isPureAdminOrSec 
+              ? '#ea4335'
+              : activePlatform === 'campus' 
+                ? '#34a853' 
+                : activePlatform === 'ensembles' 
+                  ? '#2563eb' 
+                  : '#a16207';
+
+            return (
+              <button 
+                type="button"
+                onClick={() => setShowQR(true)}
+                style={{ 
+                  width: '100%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '8px', 
+                  padding: '12px 14px', 
+                  borderRadius: '14px', 
+                  border: buttonBorder, 
+                  background: buttonBg, 
+                  color: buttonColor, 
+                  fontWeight: 800, 
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  transition: 'all 0.2s'
+                }}
+                className="hover-scale"
+              >
+                <QrCode size={16} color={buttonColor} /> Ausweis zeigen
+              </button>
+            );
+          })()}
 
           {/* Abmelden button */}
           <button 
