@@ -11190,7 +11190,7 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 detectionTime = ctx!.currentTime + (bestIndex / sampleRate);
                 const latencyMs = Math.round((detectionTime - playTime) * 1000);
                 
-                const estimatedLatency = Math.max(-150, Math.min(350, latencyMs - 15));
+                const estimatedLatency = Math.max(-50, Math.min(450, latencyMs - 15));
                 measurements.push(estimatedLatency);
                 
                 // Capture first transient buffer for visual waveform feedback
@@ -15834,8 +15834,8 @@ const targetVol = isActive ? vol : 0;
                         </div>
                         <input
                           type="range"
-                          min="-150"
-                          max="350"
+                          min="-50"
+                          max="450"
                           value={syncOffsetMs}
                           onChange={(e) => {
                             setSyncOffsetMs(parseInt(e.target.value));
@@ -15843,6 +15843,76 @@ const targetVol = isActive ? vol : 0;
                           }}
                           style={{ width: '100%', accentColor: '#34a853', height: '4px', cursor: 'pointer' }}
                         />
+
+                        {/* Tactile Nudge Buttons (-10ms, -1ms, +1ms, +10ms) */}
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'space-between', marginTop: '6px', width: '100%' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSyncOffsetMs(prev => Math.max(-50, prev - 10));
+                              isManualLatencyAdjustmentRef.current = true;
+                            }}
+                            style={{ flex: 1, padding: '4px 0', background: '#2c3545', color: '#ffffff', border: '1px solid #3b475c', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            -10 ms
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSyncOffsetMs(prev => Math.max(-50, prev - 1));
+                              isManualLatencyAdjustmentRef.current = true;
+                            }}
+                            style={{ flex: 1, padding: '4px 0', background: '#2c3545', color: '#ffffff', border: '1px solid #3b475c', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            -1 ms
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSyncOffsetMs(prev => Math.min(450, prev + 1));
+                              isManualLatencyAdjustmentRef.current = true;
+                            }}
+                            style={{ flex: 1, padding: '4px 0', background: '#2c3545', color: '#ffffff', border: '1px solid #3b475c', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            +1 ms
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSyncOffsetMs(prev => Math.min(450, prev + 10));
+                              isManualLatencyAdjustmentRef.current = true;
+                            }}
+                            style={{ flex: 1, padding: '4px 0', background: '#2c3545', color: '#ffffff', border: '1px solid #3b475c', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            +10 ms
+                          </button>
+                        </div>
+
+                        {/* Quick Presets for Smartphones */}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px', width: '100%', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.52rem', color: '#86868b', fontWeight: 800 }}>PRESETS:</span>
+                          <button
+                            type="button"
+                            onClick={() => { setSyncOffsetMs(85); isManualLatencyAdjustmentRef.current = true; }}
+                            style={{ background: 'rgba(52, 168, 83, 0.15)', color: '#34a853', border: 'none', borderRadius: '6px', padding: '2px 8px', fontSize: '0.56rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            iPhone (85ms)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSyncOffsetMs(185); isManualLatencyAdjustmentRef.current = true; }}
+                            style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04', border: 'none', borderRadius: '6px', padding: '2px 8px', fontSize: '0.56rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            Android (~185ms)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setSyncOffsetMs(0); isManualLatencyAdjustmentRef.current = true; }}
+                            style={{ background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '6px', padding: '2px 8px', fontSize: '0.56rem', fontWeight: 800, cursor: 'pointer' }}
+                          >
+                            Reset (0ms)
+                          </button>
+                        </div>
                       </div>
 
                       {/* Accordion Trigger */}
