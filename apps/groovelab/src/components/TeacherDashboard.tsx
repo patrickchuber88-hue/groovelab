@@ -5925,7 +5925,7 @@ export function TeacherDashboard({
 
       <div style={{
         flex: 1,
-        padding: hideHeader ? '0' : (activeTab === 'briefing' ? (windowWidth < 768 ? '12px 10px 90px 10px' : '24px 10px 10px 10px') : '10px'),
+        padding: hideHeader ? '0' : (windowWidth < 768 ? '10px 10px 90px 10px' : '10px'),
         overflowY: (activeTab === 'briefing' && windowWidth >= 768) ? 'hidden' : 'auto',
         height: windowWidth < 768 ? 'auto' : '100vh',
         minHeight: '100vh',
@@ -5995,7 +5995,7 @@ export function TeacherDashboard({
           </header>
         )}
         {activeTab === 'briefing' && !hideHeader ? (
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '32px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '10px', alignItems: 'start', width: '100%' }} className="dashboard-main-grid">
             
             <div style={{ 
               flex: '1 1 600px',
@@ -6003,17 +6003,17 @@ export function TeacherDashboard({
               maxWidth: '100%',
               display: 'flex', 
               flexDirection: 'column', 
-              gap: '16px',
+              gap: '10px',
               maxHeight: 'calc(100vh - 60px)',
               overflowY: 'auto',
-              paddingRight: '16px',
+              paddingRight: '10px',
               paddingBottom: '80px',
               boxSizing: 'border-box'
             }}>
               {briefingLoading ? (
                 <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Briefing wird geladen...</div>
               ) : briefingData ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {/* Planning Active Banners */}
                   {activePlanningEvents.map(ev => {
                     if (dismissedBanners[ev.id]) return null;
@@ -6391,7 +6391,7 @@ export function TeacherDashboard({
                     <>
                       {/* Gamified KPI Cards row */}
                       {(!teacher?.sick_until || bypassSickView) && (
-                        <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '12px' }}>
+                        <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth <= 1024 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
 
                       {/* Card 1: Heutige Schüler (Blue-purple matching Level XP) */}
                       <div style={{

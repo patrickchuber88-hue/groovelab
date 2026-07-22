@@ -4498,11 +4498,11 @@ export function AdminDashboard({
             background: 'white', 
             borderRadius: '20px', 
             border: '1px solid rgba(0, 0, 0, 0.05)', 
-            padding: '24px', 
+            padding: '10px', 
             boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
             display: 'flex', 
             flexDirection: 'column', 
-            gap: '24px' 
+            gap: '10px' 
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -10006,7 +10006,7 @@ export function AdminDashboard({
             background: 'linear-gradient(135deg, #ffffff, #f8fafc)', 
             border: '1px solid #e2e8f0', 
             borderRadius: '24px', 
-            padding: '24px', 
+            padding: '10px', 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center', 
@@ -12477,11 +12477,11 @@ export function AdminDashboard({
             background: 'white', 
             borderRadius: '20px', 
             border: '1px solid rgba(0, 0, 0, 0.05)', 
-            padding: '24px', 
+            padding: '10px', 
             boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
             display: 'flex', 
             flexDirection: 'column', 
-            gap: '20px' 
+            gap: '10px' 
           }}
         >
           {/* Header */}
@@ -14009,9 +14009,7 @@ export function AdminDashboard({
   return (
     <div style={{ 
       flex: 1, 
-      padding: hideHeader ? '0px' : (activePlatform === 'campus' 
-        ? (activeTab === 'live' ? '0px 10px 10px 10px' : '24px 10px 10px 10px') 
-        : '14px 10px 10px 10px'), 
+      padding: hideHeader ? '0px' : (activeTab === 'live' ? '0px 10px 10px 10px' : '10px'), 
       overflowY: activeTab === 'live' ? 'hidden' : 'auto',
       height: activeTab === 'live' ? '100%' : 'auto',
       display: 'flex',

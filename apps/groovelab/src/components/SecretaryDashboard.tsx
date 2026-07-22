@@ -12489,7 +12489,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         )}
 
         {/* Main scrollable body content */}
-        <div id="secretary-main-scroll-container" style={{ padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: '32px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
+        <div id="secretary-main-scroll-container" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
 
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

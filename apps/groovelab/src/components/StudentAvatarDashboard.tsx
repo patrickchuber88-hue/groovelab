@@ -6332,7 +6332,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const strokeDashoffset = circleCircumference - (xpPercentage / 100) * circleCircumference;
 
   return (
-    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', paddingTop: '24px' }}>
+    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', padding: '10px', boxSizing: 'border-box' }}>
       
       {/* Holiday Banner */}
       {isTodayHoliday && (
@@ -6527,23 +6527,24 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         </button>
       </div>
 
-      <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'row', flexWrap: 'wrap', gap: '24px', alignItems: 'stretch' }} className={`animation-slide-up practice-board-wrapper ${activeTab === 'practice_board' ? 'active-practice-tab' : ''}`}>
+      <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'row', flexWrap: 'wrap', gap: '10px', alignItems: 'stretch' }} className={`animation-slide-up practice-board-wrapper ${activeTab === 'practice_board' ? 'active-practice-tab' : ''}`}>
           
           <style dangerouslySetInnerHTML={{__html: `
             @media (min-width: 850px) {
               .practice-board-wrapper.active-practice-tab {
                 display: grid !important;
                 grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
+                gap: 10px !important;
                 align-items: stretch !important;
               }
             }
           `}} />
 
           {/* Left Pane (2/3 width) - KPIs, Level Roadmap and Fokus-Timer */}
-          <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ flex: '2 1 500px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             
             {/* KPI Cards Grid (Row 1 - Top) */}
-            <div style={{ display: 'flex', flexDirection: 'row', gap: '12px', width: '100%' }} className="kpi-row-container">
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '10px', width: '100%' }} className="kpi-row-container">
               
               {/* Card 1: XP */}
               {xpActive && (
@@ -8281,7 +8282,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             minWidth: '280px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: '10px'
           }}>
             {/* Sidebar View Switcher Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', gap: '10px' }}>
@@ -10105,7 +10106,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         )}
       </div>
 
-      <div style={{ display: (activeTab === 'homework_book' && studentUser) ? 'block' : 'none', marginTop: '24px', width: '100%' }}>
+      <div style={{ display: (activeTab === 'homework_book' && studentUser) ? 'block' : 'none', marginTop: '0px', width: '100%' }}>
         {activeTab === 'homework_book' && studentUser && (
           <MeisterwerkDocumentationModal
             student={{
@@ -13296,7 +13297,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       </div>
 
       {/* Settings Tab */}
-      <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '24px', flexDirection: 'column', gap: '24px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0 20px' }}>
+      <div style={{ display: (activeTab === 'settings' && studentUser) ? 'flex' : 'none', marginTop: '0px', flexDirection: 'column', gap: '10px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: '0' }}>
         {activeTab === 'settings' && studentUser && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ 

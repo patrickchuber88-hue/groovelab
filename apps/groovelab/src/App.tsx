@@ -8624,14 +8624,14 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: windowWidth <= 1024 ? '0 16px' : '0 32px', height: windowWidth <= 768 ? '56px' : '80px', background: 'transparent' }}>
+        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', height: '56px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'flex-end', 
             gap: windowWidth <= 640 ? '2px' : (windowWidth <= 1024 ? '4px' : '6px'), 
             height: '100%',
-            paddingTop: windowWidth <= 768 ? '10px' : '20px',
+            paddingTop: '10px',
             boxSizing: 'border-box'
           }}>
             {/* Campus Tab */}
@@ -9261,7 +9261,7 @@ function App() {
               ? '#fbbc05'
               : '#0b57d0',
           flexShrink: 0,
-          marginBottom: activePlatform === 'campus' ? '0px' : '10px'
+          marginBottom: '0px'
         }} />
 
 
@@ -9271,8 +9271,8 @@ function App() {
         display: 'flex', 
         flexDirection: 'column', 
         height: activeStudentTab === 'live' ? '100%' : 'auto',
-        paddingLeft: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : '20px',
-        paddingRight: (activePlatform === 'campus' && windowWidth <= 768) ? '0px' : '20px',
+        padding: windowWidth <= 768 ? '10px 10px 90px 10px' : '10px',
+        boxSizing: 'border-box',
         minWidth: 0
       }}>
         {/* Ensemble & Bands Platform View */}

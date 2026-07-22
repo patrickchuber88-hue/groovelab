@@ -4084,11 +4084,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
-        padding: '24px',
+        padding: '10px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '10px',
         height: 'calc(100vh - 120px)',
         overflow: 'hidden'
       }}>
@@ -4533,11 +4533,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
-        padding: '24px',
+        padding: '10px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '10px',
         height: 'calc(100vh - 120px)',
         overflow: 'hidden'
       }}>
@@ -4716,11 +4716,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
-        padding: '24px',
+        padding: '10px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '10px',
         height: 'calc(100vh - 120px)',
         overflowY: 'auto'
       }}>
@@ -5127,11 +5127,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         background: '#ffffff',
         border: '1px solid rgba(0, 0, 0, 0.05)',
         borderRadius: '24px',
-        padding: '24px',
+        padding: '10px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '10px',
         height: 'calc(100vh - 120px)',
         overflowY: 'auto'
       }}>
@@ -5439,11 +5439,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           background: '#ffffff',
           border: isDragOverPlanning ? `2px dashed ${brandColor}` : '1px solid rgba(0, 0, 0, 0.05)',
           borderRadius: '24px',
-          padding: '24px',
+          padding: '10px',
           boxShadow: isDragOverPlanning ? `0 12px 40px ${brandColor}15` : '0 8px 32px rgba(0,0,0,0.02)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
+          gap: '10px',
           height: 'calc(100vh - 120px)',
           overflowY: 'auto',
           transition: 'all 0.2s ease',
@@ -10746,7 +10746,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       gridTemplateColumns: showLessons 
         ? 'minmax(320px, 1.2fr) minmax(360px, 1.5fr) minmax(300px, 1.2fr)' 
         : 'minmax(360px, 1.5fr) minmax(380px, 1.8fr) minmax(300px, 1.2fr)',
-      gap: '24px',
+      gap: '10px',
       alignItems: 'start',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       width: '100%',

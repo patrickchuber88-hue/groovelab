@@ -240,7 +240,7 @@ export default function CampusDirectMessages({
         transition: 'all 0.3s ease'
       }}>
         {/* Search & Header */}
-        <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '10px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b', margin: '0' }}>Direct Chat</h2>

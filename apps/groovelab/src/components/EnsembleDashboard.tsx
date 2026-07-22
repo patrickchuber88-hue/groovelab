@@ -389,7 +389,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
   );
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ padding: '10px', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
       
       {/* CSS Styles for Interactive Animations */}
       <style dangerouslySetInnerHTML={{ __html: `
