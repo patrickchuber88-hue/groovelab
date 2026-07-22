@@ -1,7 +1,6 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
 import { Check } from 'lucide-react';
-import { StudioAvatar } from './StudioAvatar';
 
 export const urlToDataUrl = async (url: string): Promise<string> => {
   if (!url) return '';
@@ -105,48 +104,39 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
 }) => {
   const currentPlatform = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab') || 'groovelab';
 
-  const isVerwaltung = 
-    currentPlatform === 'secretary' || 
-    currentPlatform === 'admin' || 
-    ((user.role === 'admin' || user.role === 'secretary') && currentPlatform !== 'groovelab' && currentPlatform !== 'campus');
+  const userRolesList = user.roles || (user.role ? [user.role] : []);
+  const hasVerwaltung = userRolesList.includes('admin') || userRolesList.includes('secretary') || user.role === 'admin' || user.role === 'secretary';
+  
+  const schoolObj = (user as any)?.schools || (user as any)?.school;
+  const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
+  const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
-  const isTeacher = user.role === 'teacher' || user.roles?.includes('teacher');
-  const isCampus = currentPlatform === 'campus';
+  const hasCampus = schoolHasCampus;
+  const hasGrooveLab = schoolHasGroove;
 
-  let headerBg = '#eab308';
-  let badgeText = 'SCHÜLER';
-  let avatarBorder = '#eab308';
-  let bottomStripeBg = 'linear-gradient(90deg, #eab308, #1e293b, #eab308)';
-
-  if (isVerwaltung) {
-    headerBg = '#ea4335';
-    badgeText = 'VERWALTUNG';
-    avatarBorder = '#ea4335';
-    bottomStripeBg = 'linear-gradient(90deg, #ea4335, #1e293b, #ea4335)';
-  } else if (isCampus) {
-    headerBg = '#34a853';
-    badgeText = 'CAMPUS AUSWEIS';
-    avatarBorder = '#34a853';
-    bottomStripeBg = 'linear-gradient(90deg, #34a853, #1e293b, #34a853)';
-  } else if (isTeacher) {
-    // GrooveLab Coach -> Yellow-to-Green Gradient bridging GrooveLab & Campus
-    headerBg = 'linear-gradient(135deg, #eab308 0%, #34a853 100%)';
-    badgeText = 'LEHRER';
-    avatarBorder = '#eab308';
-    bottomStripeBg = 'linear-gradient(90deg, #eab308, #34a853, #1e293b, #34a853, #eab308)';
+  // Multi-Color Spectrum Stripe (Tri-Tone)
+  let spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #eab308 100%)';
+  if (hasVerwaltung && hasCampus && hasGrooveLab) {
+    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #eab308 66.6%, #eab308 100%)';
+  } else if (hasVerwaltung && hasCampus) {
+    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #34a853 50%, #34a853 100%)';
+  } else if (hasVerwaltung && hasGrooveLab) {
+    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #eab308 50%, #eab308 100%)';
+  } else if (hasCampus && hasGrooveLab) {
+    spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
+  } else if (hasVerwaltung) {
+    spectrumGradient = '#ea4335';
+  } else if (hasCampus) {
+    spectrumGradient = '#34a853';
   } else {
-    // GrooveLab Student
-    headerBg = '#eab308';
-    badgeText = 'SCHÜLER';
-    avatarBorder = '#eab308';
-    bottomStripeBg = 'linear-gradient(90deg, #eab308, #1e293b, #eab308)';
+    spectrumGradient = '#eab308';
   }
 
   const effectiveQrValue = qrValue || (typeof window !== 'undefined' ? `${window.location.origin}/qr/${user.qr_token || user.id || ''}` : '');
-  const avatarSrc = isVerwaltung ? '/campus_login_hero.png' : user.photo_url;
-  const avatarUser = isVerwaltung ? { ...user, photo_url: '/campus_login_hero.png' } : user;
-
   const formattedLastName = user.last_name || user.instrument || 'Member';
+
+  const isTeacherRole = user.role === 'teacher' || userRolesList.includes('teacher');
+  const isStudentRole = user.role === 'student' || userRolesList.includes('student');
 
   return (
     <div 
@@ -197,7 +187,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
       )}
 
       {/* Lanyard Hole Mockup (Centered for straight hanging) */}
-      <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b', position: 'relative' }}>
+      <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b', position: 'relative', flexShrink: 0 }}>
         {/* Centered Lanyard Slot with Metallic Ring */}
         <div style={{ 
           width: '42px', 
@@ -214,50 +204,91 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
         </div>
       </div>
 
-      {/* Status Header Badge */}
+      {/* Multi-Module Spectrum Stripe */}
+      <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
+
+      {/* Role Pill Badges Header */}
       <div style={{ 
-        background: headerBg, 
-        padding: '6px', 
-        textAlign: 'center',
-        textTransform: 'uppercase'
+        padding: '10px 14px 4px 14px', 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        flexWrap: 'wrap'
       }}>
-        <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-          {badgeText}
-        </div>
+        {hasVerwaltung && (
+          <span style={{ 
+            background: '#fce8e6', 
+            color: '#ea4335', 
+            border: '1px solid #fad2cf',
+            padding: '3px 8px', 
+            borderRadius: '6px', 
+            fontSize: '0.58rem', 
+            fontWeight: 1000, 
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase'
+          }}>
+            VERWALTUNG
+          </span>
+        )}
+        {hasCampus && (
+          <span style={{ 
+            background: '#e6f4ea', 
+            color: '#34a853', 
+            border: '1px solid #ceebd6',
+            padding: '3px 8px', 
+            borderRadius: '6px', 
+            fontSize: '0.58rem', 
+            fontWeight: 1000, 
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase'
+          }}>
+            CAMPUS
+          </span>
+        )}
+        {hasGrooveLab && (
+          <span style={{ 
+            background: '#fefce8', 
+            color: '#ca8a04', 
+            border: '1px solid #fef08a',
+            padding: '3px 8px', 
+            borderRadius: '6px', 
+            fontSize: '0.58rem', 
+            fontWeight: 1000, 
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase'
+          }}>
+            GROOVELAB
+          </span>
+        )}
+        {!hasVerwaltung && !hasCampus && !hasGrooveLab && (
+          <span style={{ 
+            background: '#f1f5f9', 
+            color: '#475569', 
+            padding: '3px 8px', 
+            borderRadius: '6px', 
+            fontSize: '0.58rem', 
+            fontWeight: 1000, 
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase'
+          }}>
+            {isTeacherRole ? 'LEHRER' : (isStudentRole ? 'SCHÜLER' : 'MEMBER')}
+          </span>
+        )}
       </div>
 
-      {/* Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 24px 20px', gap: '16px' }}>
-        {/* Portrait Avatar */}
-        <div style={{ 
-          width: '125px', 
-          height: '125px', 
-          borderRadius: '100px', 
-          border: `4px solid ${avatarBorder}`,
-          padding: '5px',
-          background: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-        }}>
-          <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden' }}>
-            <StudioAvatar 
-              src={avatarSrc} 
-              user={avatarUser} 
-              activePlatform={isVerwaltung ? 'secretary' : activePlatform} 
-            />
-          </div>
-        </div>
-
-        {/* Identity */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>
+      {/* Main Content Area — Minimalist & Spacious */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 20px 20px 20px', gap: '14px', boxSizing: 'border-box' }}>
+        {/* Large Identity Typography */}
+        <div style={{ textAlign: 'center', marginTop: '6px' }}>
+          <div style={{ fontSize: '2.1rem', fontWeight: 1000, color: '#0f172a', lineHeight: 1.05, fontFamily: "'Urbanist', 'Outfit', sans-serif", letterSpacing: '-0.03em' }}>
             {user.first_name || 'Member'}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px', fontWeight: 700 }}>
+          <div style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '4px', fontWeight: 800 }}>
             {formattedLastName}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {isTeacherRole ? 'Lehrkraft' : (isStudentRole ? 'Schüler' : 'Mitglied')}
           </div>
         </div>
 
@@ -265,40 +296,21 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
         <div className="onboarding-qr-container" style={{ 
           marginTop: 'auto',
           background: '#f8fafc', 
-          padding: '10px', 
-          borderRadius: '16px',
+          padding: '14px', 
+          borderRadius: '22px',
           border: '1px solid #f1f5f9',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.03)'
         }}>
-          <QRCode value={effectiveQrValue} size={105} style={{ width: '105px', height: '105px' }} />
+          <QRCode value={effectiveQrValue} size={135} style={{ width: '135px', height: '135px' }} />
         </div>
-
-        {showSubtext && (
-          <p style={{ 
-            fontSize: '0.68rem', 
-            color: '#94a3b8', 
-            textAlign: 'center', 
-            margin: '0', 
-            fontWeight: 600, 
-            lineHeight: 1.25,
-            maxWidth: '220px'
-          }}>
-            Halte diesen Code vor die Kamera des iPads,<br/>um dich am Platz anzumelden.
-          </p>
-        )}
       </div>
 
-      {/* Bottom Brand Stripe (Linear Gradient Bar) */}
-      <div style={{ 
-        height: '10px', 
-        width: '100%',
-        background: bottomStripeBg 
-      }} />
+      {/* Bottom Spectrum Stripe */}
+      <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
     </div>
   );
 };
-
-export default IDBadgeCard;
