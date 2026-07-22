@@ -54,7 +54,12 @@ export const cleanNotesText = (text: string | null | undefined): string => {
     .split('\n')
     .filter(line => {
       const trimmed = line.trim();
-      return !trimmed.startsWith('STICKER:') && !trimmed.startsWith('AUDIO:');
+      return !trimmed.startsWith('STICKER:') && 
+             !trimmed.startsWith('AUDIO:') &&
+             !trimmed.startsWith('LOOP:') &&
+             !trimmed.startsWith('LATENCY:') &&
+             !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') &&
+             !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
     })
     .join('\n')
     .trim();
@@ -203,9 +208,73 @@ export const getCleanPageNotes = (notes: any): string => {
   }
   return text
     .split('\n')
-    .filter((line: string) => !line.trim().startsWith('AUDIO:') && !line.trim().startsWith('STICKER:'))
+    .filter((line: string) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('AUDIO:') && 
+             !trimmed.startsWith('STICKER:') && 
+             !trimmed.startsWith('LOOP:') &&
+             !trimmed.startsWith('LATENCY:') &&
+             !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') && 
+             !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
+    })
     .join('\n')
     .trim();
+};
+
+export const getCleanTeacherHomeworkText = (notes: any): string => {
+  if (!notes) return '';
+  let text = '';
+  if (typeof notes === 'string') {
+    if (notes.startsWith('[') || notes.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(notes);
+        if (Array.isArray(parsed)) {
+          text = parsed.join('\n');
+        } else {
+          text = String(parsed);
+        }
+      } catch {
+        text = notes;
+      }
+    } else {
+      text = notes;
+    }
+  } else if (Array.isArray(notes)) {
+    text = notes.join('\n');
+  } else {
+    text = String(notes);
+  }
+  return text
+    .split('\n')
+    .filter((line: string) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('AUDIO:') && 
+             !trimmed.startsWith('STICKER:') && 
+             !trimmed.startsWith('LOOP:') &&
+             !trimmed.startsWith('LATENCY:') &&
+             !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') && 
+             !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
+    })
+    .join('\n')
+    .trim();
+};
+
+export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean; isPrivate: boolean; text: string } => {
+  if (!note) return { isStudentNote: false, isPrivate: false, text: '' };
+  
+  if (note.startsWith('STUDENT_NOTE_PUBLIC:')) {
+    const raw = note.replace(/^STUDENT_NOTE_PUBLIC:[^|]*\|/, '').trim();
+    const clean = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+    return { isStudentNote: true, isPrivate: false, text: clean || raw };
+  }
+  
+  if (note.startsWith('STUDENT_NOTE_PRIVATE:')) {
+    const raw = note.replace(/^STUDENT_NOTE_PRIVATE:[^|]*\|/, '').trim();
+    const clean = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+    return { isStudentNote: true, isPrivate: true, text: clean || raw };
+  }
+  
+  return { isStudentNote: false, isPrivate: false, text: note };
 };
 
 const SKILL_TAGS = [
@@ -2736,8 +2805,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
 
       if (response.ok) {
-        const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
-        await syncHomeworkNotes(parsedNotes);
+        if (!isLehrwerkPage && !isSong) {
+          const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
+          await syncHomeworkNotes(parsedNotes);
+        }
 
         if (targetHomework && !isCurrentHomework) {
           setIsCurrentHomework(true);
@@ -2745,7 +2816,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         await fetchProgress();
         notifyHomeworkChange();
-        setHomeworkNotes('');
+        setStudentNotesSavedToast(true);
+        setTimeout(() => setStudentNotesSavedToast(false), 2500);
+
         if (!keepOpen) {
           if (activeSubView === 'hub') {
             onClose();
@@ -2765,9 +2838,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const currentWeek = getISOWeek();
 
       const parsedNotes = JSON.parse(combinedHomeworkNotes || '[]');
-      const rowHomeworkNotes = finalTopicName.startsWith('Hausaufgabe KW ')
-        ? combinedHomeworkNotes
-        : JSON.stringify(parsedNotes.filter((n: string) => !n.startsWith('AUDIO:')));
+      const rowHomeworkNotes = (isLehrwerkPage || isSong)
+        ? homeworkNotes.trim()
+        : (finalTopicName.startsWith('Hausaufgabe KW ')
+            ? combinedHomeworkNotes
+            : JSON.stringify(parsedNotes.filter((n: string) => !n.startsWith('AUDIO:'))));
 
       const row = {
         student_id: student.id,
@@ -2811,10 +2886,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       if (dbError) throw dbError;
 
-      await syncHomeworkNotes(parsedNotes);
+      if (!isLehrwerkPage && !isSong) {
+        await syncHomeworkNotes(parsedNotes);
+      }
 
       await fetchProgress();
       notifyHomeworkChange();
+      setStudentNotesSavedToast(true);
+      setTimeout(() => setStudentNotesSavedToast(false), 2500);
       if (!keepOpen) {
         if (activeSubView === 'hub') {
           onClose();
@@ -6332,11 +6411,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
 
                   {/* 7. Color buttons inline, right aligned */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
                     {[
-                      { mode: 'LOCKED', color: 'hsl(355, 75%, 84%)', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', false); } },
-                      { mode: 'HOMEWORK', color: 'hsl(47, 85%, 84%)', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true); } },
-                      { mode: 'MASTERED', color: 'hsl(130, 65%, 82%)', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'MASTERED', false); } }
+                      { mode: 'LOCKED', color: '#fca5a5', label: 'Rot (unbearbeitet)', getActive: () => status === 'IN_PROGRESS' && !isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', false); } },
+                      { mode: 'HOMEWORK', color: '#fde047', label: 'Gelb (Hausaufgabe)', getActive: () => status === 'IN_PROGRESS' && isCurrentHomework, action: () => { setStatus('IN_PROGRESS'); setIsCurrentHomework(true); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true); } },
+                      { mode: 'MASTERED', color: '#86efac', label: 'Grün (erledigt)', getActive: () => status === 'MASTERED', action: () => { setStatus('MASTERED'); setIsCurrentHomework(false); setHasChanges(true); if (activeLehrwerkId && activePageNumber) triggerDirectSave(activeLehrwerkId, activePageNumber, 'MASTERED', false); } }
                     ].map(b => {
                       const isActive = b.getActive();
                       return (
@@ -6348,16 +6427,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             b.action();
                           }}
                           style={{
-                            width: '24px',
-                            height: '24px',
+                            width: '28px',
+                            height: '28px',
                             borderRadius: '50%',
                             background: b.color,
-                            border: isActive ? '3.5px solid #0f172a' : '1px solid rgba(0,0,0,0.15)',
+                            border: isActive ? '3px solid #0f172a' : '1.5px solid rgba(0,0,0,0.18)',
                             cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            transform: isActive ? 'scale(1.1)' : 'none',
+                            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            transform: isActive ? 'scale(1.25)' : 'scale(1)',
                             outline: 'none',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                            boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.2)' : '0 2px 4px rgba(0,0,0,0.06)'
                           }}
                           title={b.label}
                         />
@@ -6383,18 +6462,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         }}
                         style={{
                           width: '100%',
-                          height: '160px',
-                          padding: '16px',
-                          borderRadius: '20px',
+                          height: '95px',
+                          padding: '12px 14px',
+                          borderRadius: '16px',
                           border: '1.5px solid #cbd5e1',
-                          fontSize: '0.88rem',
+                          fontSize: '0.84rem',
                           fontWeight: 650,
-                          lineHeight: '1.5',
+                          lineHeight: '1.45',
                           outline: 'none',
                           resize: 'none',
                           background: '#fefdf8',
                           color: '#1e293b',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.02), inset 0 2px 4px rgba(0,0,0,0.02)',
                           transition: 'all 0.2s ease'
                         }}
                         onFocus={e => {
@@ -6407,9 +6486,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         }}
                       />
                       
-                      {/* Schnell-Textbausteine & Speichern für Lehrer */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                      {/* Schnell-Textbausteine & Speichern für Lehrer (iPad-optimierte Touch-Buttons) */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           {[
                             { label: '⏱️ Tempo halten', text: 'Achte diese Woche besonders darauf, das Metronom bei X BPM zu halten.', hasPrompt: true },
                             { label: '✨ Sauber spielen', text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.' },
@@ -6431,35 +6510,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 setHasChanges(true);
                               }}
                               style={{
-                                background: '#ffffff', color: '#475569', border: '1px solid #e2e8f0',
-                                padding: '4px 8px', borderRadius: '9999px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer'
+                                background: '#ffffff',
+                                color: '#334155',
+                                border: '1.5px solid #cbd5e1',
+                                padding: '8px 14px',
+                                minHeight: '38px',
+                                borderRadius: '12px',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+                                transition: 'all 0.15s ease',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
                               }}
                             >
                               {tpl.label}
                             </button>
                           ))}
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleSave(true)}
-                          style={{
-                            background: '#34a853',
-                            color: 'white',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            fontSize: '0.74rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                          }}
-                        >
-                          Notizen speichern
-                        </button>
                       </div>
 
                       {/* Display Student Note to Teacher if visible */}
@@ -6486,24 +6556,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   ) : (
                     /* Student View: Read-Only Teacher Homework + Student Practice Notes & Tagebuch Widget */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                      {homeworkNotes && (
-                        <div style={{
-                          background: '#fefdf8',
-                          border: '1.5px solid #fde68a',
-                          borderRadius: '16px',
-                          padding: '14px 16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px'
-                        }}>
-                          <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>👨‍🏫 Hausaufgabe von deiner Lehrkraft:</span>
+                      {(() => {
+                        const cleanTeacherNotes = getCleanTeacherHomeworkText(homeworkNotes);
+                        if (!cleanTeacherNotes) return null;
+                        return (
+                          <div style={{
+                            background: '#fefdf8',
+                            border: '1.5px solid #fde68a',
+                            borderRadius: '16px',
+                            padding: '14px 16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>👨‍🏫 Hausaufgabe von deiner Lehrkraft:</span>
+                            </div>
+                            <div style={{ fontSize: '0.86rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                              {cleanTeacherNotes}
+                            </div>
                           </div>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 650, color: '#1e293b', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                            {homeworkNotes}
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       <div style={{
                         background: '#f8fafc',
@@ -6654,79 +6728,130 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
 
 
-                    {/* Live Preview Box */}
-                    <div style={{
-                      marginTop: '12px',
-                      background: 'rgba(251, 191, 36, 0.05)',
-                      border: '1.5px dashed rgba(251, 191, 36, 0.3)',
-                      borderRadius: '16px',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px'
-                    }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span>👁️ Live-Vorschau (im Hausaufgaben-Widget):</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ fontSize: '0.86rem', color: '#09090b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {(() => {
-                            const book = globalLehrwerke.find(b => b.id === activeLehrwerkId);
-                            const bookColor = getLehrwerkColor(book?.title || '');
-                            return (
-                              <div style={{
-                                width: '14px',
-                                height: '18px',
-                                background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                borderRadius: '3px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                <BookOpen size={8} color={bookColor.text} />
+                    {/* Live Preview Box (Teacher Only: Summarizes all active homework pages for this book) */}
+                    {!readOnly && (
+                      <div style={{
+                        marginTop: '12px',
+                        background: 'rgba(251, 191, 36, 0.05)',
+                        border: '1.5px dashed rgba(251, 191, 36, 0.3)',
+                        borderRadius: '16px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>👁️ Live-Vorschau (im Hausaufgaben-Widget des Schülers):</span>
+                        </div>
+                        {(() => {
+                          const book = globalLehrwerke.find(b => b.id === activeLehrwerkId);
+                          const bookColor = getLehrwerkColor(book?.title || '');
+                          const assignedBook = assignedLehrwerke.find(a => a.lehrwerkId === activeLehrwerkId);
+                          const pageStates = assignedBook?.pageStates || {};
+
+                          // Collect all pages assigned as homework for this book
+                          const homeworkPagesSet = new Set<number>();
+                          Object.entries(pageStates).forEach(([pNumStr, pState]: [string, any]) => {
+                            if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+                              const num = parseInt(pNumStr, 10);
+                              if (!isNaN(num)) homeworkPagesSet.add(num);
+                            }
+                          });
+
+                          // Include active page if marked as homework in current form state
+                          if (activePageNumber !== null && (isCurrentHomework || status === 'IN_PROGRESS')) {
+                            homeworkPagesSet.add(activePageNumber);
+                          }
+
+                          const homeworkPagesList = Array.from(homeworkPagesSet).sort((a, b) => a - b);
+                          const pagesToRender = homeworkPagesList.length > 0 ? homeworkPagesList : (activePageNumber !== null ? [activePageNumber] : [1]);
+                          const formattedPagesStr = formatPageNumbers(pagesToRender);
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ fontSize: '0.88rem', color: '#09090b', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{
+                                  width: '14px',
+                                  height: '18px',
+                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                  borderRadius: '3px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  <BookOpen size={8} color={bookColor.text} />
+                                </div>
+                                <span>{book?.title || 'Lehrwerk'}</span>
+                                {formattedPagesStr && (
+                                  <span style={{ color: '#4b5563', fontWeight: 700 }}>· {formattedPagesStr}</span>
+                                )}
                               </div>
-                            );
-                          })()}
-                          <span>{globalLehrwerke.find(b => b.id === activeLehrwerkId)?.title}</span> · <span style={{ color: '#4b5563', fontWeight: 700 }}>S. {activePageNumber}</span>
-                        </div>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          background: '#ffffff',
-                          color: '#475569',
-                          padding: '4px 10px 4px 12px',
-                          borderRadius: '999px',
-                          fontSize: '0.74rem',
-                          fontWeight: 900,
-                          border: '1px solid rgba(251, 191, 36, 0.3)',
-                          boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.2)',
-                          alignSelf: 'flex-start'
-                        }}>
-                          <span>📄 S. {activePageNumber}</span>
-                        </div>
-                        <div style={{ 
-                          display: 'flex', 
-                          gap: '6px', 
-                          alignItems: 'flex-start', 
-                          fontSize: '0.74rem', 
-                          color: '#475569', 
-                          lineHeight: '1.4',
-                          background: '#ffffff',
-                          border: '1px solid rgba(251, 191, 36, 0.15)',
-                          borderRadius: '12px',
-                          padding: '8px 12px',
-                          marginTop: '2px',
-                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                        }}>
-                          <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {activePageNumber}:</span>
-                          <span style={{ fontWeight: 650, color: cleanNotesText(homeworkNotes) ? '#1e293b' : '#94a3b8', fontStyle: cleanNotesText(homeworkNotes) ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                            {cleanNotesText(homeworkNotes) || 'Keine Hausaufgabe eingetragen'}
-                          </span>
-                        </div>
+
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: '#ffffff',
+                                color: '#475569',
+                                padding: '4px 12px',
+                                borderRadius: '999px',
+                                fontSize: '0.74rem',
+                                fontWeight: 900,
+                                border: '1px solid rgba(251, 191, 36, 0.3)',
+                                boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.2)',
+                                alignSelf: 'flex-start'
+                              }}>
+                                <span>📄 {formattedPagesStr ? formattedPagesStr : `S. ${activePageNumber}`}</span>
+                              </div>
+
+                              {/* Stacked notes for all homework pages in this book */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                                {pagesToRender.map(pNum => {
+                                  let pageNoteText = '';
+                                  if (pNum === activePageNumber) {
+                                    pageNoteText = cleanNotesText(homeworkNotes);
+                                  } else {
+                                    const savedPageState = pageStates[pNum];
+                                    const rawSavedNote = savedPageState?.homeworkNotes || savedPageState?.notes || '';
+                                    pageNoteText = cleanNotesText(rawSavedNote);
+                                    
+                                    if (!pageNoteText) {
+                                      // Fallback search in progressItems
+                                      const matchProgress = progressItems.find(pi => pi.topic_name === `${book?.title} - Seite ${pNum}`);
+                                      if (matchProgress?.homework_notes) {
+                                        pageNoteText = cleanNotesText(matchProgress.homework_notes);
+                                      }
+                                    }
+                                  }
+
+                                  return (
+                                    <div key={pNum} style={{ 
+                                      display: 'flex', 
+                                      gap: '6px', 
+                                      alignItems: 'flex-start', 
+                                      fontSize: '0.75rem', 
+                                      color: '#475569', 
+                                      lineHeight: '1.4',
+                                      background: '#ffffff',
+                                      border: pNum === activePageNumber ? '1.5px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(251, 191, 36, 0.18)',
+                                      borderRadius: '12px',
+                                      padding: '8px 12px',
+                                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                    }}>
+                                      <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {pNum}:</span>
+                                      <span style={{ fontWeight: 650, color: pageNoteText ? '#1e293b' : '#94a3b8', fontStyle: pageNoteText ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                                        {pageNoteText || 'Keine Hausaufgabe eingetragen'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                    </div>
+                    )}
 
                   {!readOnly && (
 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -6741,8 +6866,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         setHasChanges(true);
                       }}
                       style={{
-                        width: '100%', height: '70px', padding: '12px 14px', borderRadius: '16px',
-                        border: '1px solid #cbd5e1', fontSize: '0.8rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
+                        width: '100%', height: '50px', padding: '8px 12px', borderRadius: '12px',
+                        border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 600, outline: 'none', resize: 'none', background: 'white'
                       }}
                     />
                   </div>
@@ -7425,6 +7550,56 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                           {textNotes.map((item) => {
                                             const isLoop = item.note.startsWith("LOOP:");
+                                            const studentNoteInfo = formatStudentNoteDisplay(item.note);
+
+                                            if (studentNoteInfo.isStudentNote) {
+                                              return (
+                                                <div key={item.idx} style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  background: studentNoteInfo.isPrivate ? 'rgba(239, 68, 68, 0.05)' : 'rgba(52, 168, 83, 0.08)',
+                                                  border: studentNoteInfo.isPrivate ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(52, 168, 83, 0.25)',
+                                                  padding: '6px 12px',
+                                                  borderRadius: '12px',
+                                                  fontSize: '0.76rem',
+                                                  color: '#1e293b',
+                                                  lineHeight: '1.4',
+                                                  marginTop: '2px'
+                                                }}>
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                                                    <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>💬</span>
+                                                    <span style={{ fontWeight: 800, color: studentNoteInfo.isPrivate ? '#dc2626' : '#166534', flexShrink: 0 }}>
+                                                      {studentNoteInfo.isPrivate ? 'Private Schüler-Notiz:' : 'Schüler-Frage:'}
+                                                    </span>
+                                                    <span style={{ color: '#334155', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                      {studentNoteInfo.text}
+                                                    </span>
+                                                  </div>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteNote(item.idx)}
+                                                    style={{
+                                                      border: 'none',
+                                                      background: 'none',
+                                                      color: '#ef4444',
+                                                      cursor: 'pointer',
+                                                      fontSize: '0.74rem',
+                                                      fontWeight: 800,
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      padding: '2px',
+                                                      marginLeft: '8px',
+                                                      flexShrink: 0
+                                                    }}
+                                                  >
+                                                    ✕
+                                                  </button>
+                                                </div>
+                                              );
+                                            }
+
                                             return (
                                               <div key={item.idx} style={{
                                                 display: 'flex',

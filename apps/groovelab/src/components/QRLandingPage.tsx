@@ -3838,9 +3838,49 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           );
                         }
                         
+                        const trimmedNote = (note || '').trim();
+                        const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
+                        const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
+
+                        if (isStudentNotePublic || isStudentNotePrivate) {
+                          const raw = trimmedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').trim();
+                          const cleanText = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                          return (
+                            <div key={`note-${i}`} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: isStudentNotePrivate ? 'rgba(239, 68, 68, 0.05)' : 'rgba(52, 168, 83, 0.08)',
+                              border: isStudentNotePrivate ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(52, 168, 83, 0.25)',
+                              padding: '6px 12px',
+                              borderRadius: '12px',
+                              fontSize: '0.76rem',
+                              color: '#1e293b',
+                              lineHeight: '1.4'
+                            }}>
+                              <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>💬</span>
+                              <span style={{ fontWeight: 800, color: isStudentNotePrivate ? '#dc2626' : '#166534', flexShrink: 0 }}>
+                                {isStudentNotePrivate ? 'Deine private Notiz:' : 'Deine Frage:'}
+                              </span>
+                              <span style={{ color: '#334155', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {cleanText || raw}
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        const cleanRegularNote = trimmedNote
+                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                          .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                          .trim();
+
+                        if (!cleanRegularNote) return null;
+
                         return (
-                          <div key={`note-${i}`} style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#475569', fontWeight: 550, background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', borderLeft: '3px solid #34a853'}}>
-                            <span>{note}</span>
+                          <div key={`note-${i}`} style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', fontWeight: 600, background: '#f8fafc', padding: '6px 10px', borderRadius: '0 8px 8px 0', borderLeft: '3.5px solid #34a853'}}>
+                            <FileText size={12} style={{ color: '#34a853', flexShrink: 0 }} />
+                            <span>{cleanRegularNote}</span>
                           </div>
                         );
                       });

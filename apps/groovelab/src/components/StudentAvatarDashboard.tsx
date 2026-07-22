@@ -899,9 +899,50 @@ function MobileBriefingView({
                               </div>
                             );
                           }
+                          
+                          const trimmedNote = (note || '').trim();
+                          const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
+                          const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
+
+                          if (isStudentNotePublic || isStudentNotePrivate) {
+                            const raw = trimmedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').trim();
+                            const cleanText = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                            return (
+                              <div key={nIdx} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: isStudentNotePrivate ? 'rgba(239, 68, 68, 0.05)' : 'rgba(52, 168, 83, 0.08)',
+                                border: isStudentNotePrivate ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(52, 168, 83, 0.25)',
+                                padding: '6px 12px',
+                                borderRadius: '12px',
+                                fontSize: '0.76rem',
+                                color: '#1e293b',
+                                lineHeight: '1.4'
+                              }}>
+                                <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>💬</span>
+                                <span style={{ fontWeight: 800, color: isStudentNotePrivate ? '#dc2626' : '#166534', flexShrink: 0 }}>
+                                  {isStudentNotePrivate ? 'Deine private Notiz:' : 'Deine Frage:'}
+                                </span>
+                                <span style={{ color: '#334155', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {cleanText || raw}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          // Clean teacher/regular note from any metadata keys
+                          const cleanRegularNote = trimmedNote
+                            .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                            .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                            .trim();
+
+                          if (!cleanRegularNote) return null;
+
                           return (
-                            <div key={nIdx} style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 550, fontStyle: 'italic', background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3px solid #3b82f6', lineHeight: '1.3', whiteSpace: 'pre-line' }}>
-                              {note}
+                            <div key={nIdx} style={{ fontSize: '0.76rem', color: '#334155', fontWeight: 600, background: '#f8fafc', padding: '8px 12px', borderRadius: '12px', borderLeft: '3.5px solid #34a853', lineHeight: '1.4', whiteSpace: 'pre-line' }}>
+                              📝 {cleanRegularNote}
                             </div>
                           );
                         })}
@@ -10507,9 +10548,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           groupedLehrwerke[bookTitle] = { pages: [] };
                         }
                         if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.some(p => p.num === pageNum)) {
+                          const rawNotesText = item.homework_notes || item.teacher_notes || '';
+                          let cleanNote = rawNotesText;
+                          if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
+                            try {
+                              const parsed = JSON.parse(cleanNote);
+                              if (Array.isArray(parsed)) {
+                                cleanNote = parsed
+                                  .filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:'))
+                                  .join(' ');
+                              }
+                            } catch {}
+                          }
+                          cleanNote = cleanNote
+                            .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                            .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                            .trim();
+
                           groupedLehrwerke[bookTitle].pages.push({
                             num: pageNum,
-                            notes: item.teacher_notes || '',
+                            notes: cleanNote,
                             status: item.status
                           });
                         }
@@ -10559,10 +10617,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       const formattedPages = formatPageNumbers(pageNums);
                       
                       const textNotes = info.pages
-                        .map(p => p.notes)
+                        .map(p => {
+                          if (!p.notes) return null;
+                          return `S. ${p.num}: ${p.notes}`;
+                        })
                         .filter(Boolean)
-                        .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
-                        .join('; ');
+                        .filter(n => !n?.includes('Inhalte in der Premium-Version freischalten') && !n?.includes('AUDIO:') && !n?.includes('STICKER:'))
+                        .join(' · ');
 
                       const allDone = info.pages.every(p => p.status === 'MASTERED' || p.status === 'THEORY_DONE');
                       return {
@@ -10691,22 +10752,68 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         </div>
                                       );
                                     }
+
+                                    const trimmedNote = (note || '').trim();
+                                    const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
+                                    const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
+
+                                    if (isStudentNotePublic || isStudentNotePrivate) {
+                                      const raw = trimmedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').trim();
+                                      const cleanText = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                                      return (
+                                        <div key={`curr-note-${idx}`} style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          background: isStudentNotePrivate ? 'rgba(239, 68, 68, 0.05)' : 'rgba(52, 168, 83, 0.08)',
+                                          border: isStudentNotePrivate ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(52, 168, 83, 0.25)',
+                                          padding: '6px 10px',
+                                          borderRadius: '10px',
+                                          fontSize: '0.74rem',
+                                          color: '#1e293b',
+                                          lineHeight: '1.4',
+                                          margin: '2px 0'
+                                        }}>
+                                          <MessageSquare size={12} style={{ color: isStudentNotePrivate ? '#dc2626' : '#166534', flexShrink: 0 }} />
+                                          <span style={{ fontWeight: 800, color: isStudentNotePrivate ? '#dc2626' : '#166534', fontSize: '0.72rem', flexShrink: 0 }}>
+                                            {isStudentNotePrivate ? 'Deine private Notiz:' : 'Deine Frage:'}
+                                          </span>
+                                          <span style={{ color: '#334155', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {cleanText || raw}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+
+                                    const cleanRegularNote = trimmedNote
+                                      .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                                      .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                                      .trim();
+
+                                    if (!cleanRegularNote) return null;
+
+                                    // Skip if this note is already shown inside any book item's notes (e.g. S. 4: hi)
+                                    const isAlreadyInBook = formattedCurrentWeekItems?.some((b: any) => b.notes && b.notes.includes(cleanRegularNote));
+                                    if (isAlreadyInBook) return null;
+
                                     return (
                                       <div key={`curr-note-${idx}`} style={{ 
-                                        fontSize: '0.78rem', 
-                                        color: '#475569', 
-                                        fontWeight: 650, 
-                                        fontStyle: 'italic', 
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        fontSize: '0.74rem', 
+                                        color: '#334155', 
+                                        fontWeight: 600, 
                                         borderLeft: '3px solid #34a853', 
-                                        paddingLeft: '8px', 
-                                        margin: '2px 4px',
                                         lineHeight: 1.4,
                                         background: '#f8fafc',
-                                        padding: '6px 8px',
+                                        padding: '6px 10px',
                                         borderRadius: '0 8px 8px 0',
-                                        whiteSpace: 'pre-line'
+                                        margin: '2px 0'
                                       }}>
-                                        📝 {note}
+                                        <FileText size={12} style={{ color: '#34a853', flexShrink: 0 }} />
+                                        <span>{cleanRegularNote}</span>
                                       </div>
                                     );
                                   });
@@ -10781,19 +10888,67 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                         </div>
                                       );
                                     }
+                                    const trimmedNote = (note || '').trim();
+                                    const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
+                                    const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
+
+                                    if (isStudentNotePublic || isStudentNotePrivate) {
+                                      const raw = trimmedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').trim();
+                                      const cleanText = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                                      return (
+                                        <div key={`prev-note-${idx}`} style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          background: 'rgba(241, 245, 249, 0.6)',
+                                          border: '1px solid #e2e8f0',
+                                          padding: '5px 8px',
+                                          borderRadius: '8px',
+                                          fontSize: '0.72rem',
+                                          color: '#64748b',
+                                          lineHeight: '1.3',
+                                          margin: '2px 0'
+                                        }}>
+                                          <MessageSquare size={11} style={{ color: '#64748b', flexShrink: 0 }} />
+                                          <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.7rem', flexShrink: 0 }}>
+                                            {isStudentNotePrivate ? 'Private Notiz:' : 'Frage:'}
+                                          </span>
+                                          <span style={{ color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {cleanText || raw}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+
+                                    const cleanRegularNote = trimmedNote
+                                      .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
+                                      .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
+                                      .trim();
+
+                                    if (!cleanRegularNote) return null;
+
+                                    // Skip if this note is already shown inside any book item's notes (e.g. S. 4: hi)
+                                    const isAlreadyInBook = formattedPrevWeekItems?.some((b: any) => b.notes && b.notes.includes(cleanRegularNote));
+                                    if (isAlreadyInBook) return null;
+
                                     return (
                                       <div key={`prev-note-${idx}`} style={{ 
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
                                         fontSize: '0.72rem', 
                                         color: '#64748b', 
-                                        fontWeight: 650, 
-                                        fontStyle: 'italic', 
+                                        fontWeight: 600, 
                                         borderLeft: '2px solid #cbd5e1', 
-                                        paddingLeft: '6px', 
-                                        margin: '2px 4px',
                                         lineHeight: 1.3,
-                                        whiteSpace: 'pre-line'
+                                        background: '#f8fafc',
+                                        padding: '4px 8px',
+                                        borderRadius: '0 6px 6px 0',
+                                        margin: '2px 0'
                                       }}>
-                                        {note}
+                                        <FileText size={11} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                        <span>{cleanRegularNote}</span>
                                       </div>
                                     );
                                   });
@@ -12394,7 +12549,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </div>
 
               <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#ffffff', margin: '0 0 12px 0', letterSpacing: '-0.03em', fontFamily: "'Urbanist', sans-serif" }}>
-                Hausaufgabenheft
+                {(() => {
+                  const firstName = (studentUser.first_name || (studentUser.name ? studentUser.name.split(' ')[0] : '') || '').trim();
+                  const lastName = (studentUser.last_name || (studentUser.name && studentUser.name.split(' ').length > 1 ? studentUser.name.split(' ').slice(1).join(' ') : '') || '').trim();
+                  
+                  if (firstName && lastName) {
+                    return `${firstName} ${lastName.charAt(0).toUpperCase()}.`;
+                  }
+                  if (firstName) {
+                    return firstName;
+                  }
+                  return 'Mein Profil';
+                })()}
               </h1>
 
               {/* Active Instruments Badge List */}

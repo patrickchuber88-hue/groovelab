@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -2552,6 +2552,38 @@ function App() {
     });
   }, [user?.id]);
 
+  // Auto-refresh bands for staff profile and GrooveLab view
+  useEffect(() => {
+    if (user?.id && (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary')) {
+      const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
+      if (!schoolId) return;
+
+      supabase
+        .from('bands')
+        .select('*, songs(id, title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role, teacher_id)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id(id, first_name, last_name, photo_url)')
+        .eq('school_id', schoolId)
+        .order('name', { ascending: true })
+        .then(({ data: freshBands, error }) => {
+          if (!error && freshBands) {
+            const realBands = freshBands.filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_'));
+            setAllBands(realBands);
+            
+            const teacherCoachedBands = realBands.filter((band: any) => {
+              const isCoach = band.coach_id === user.id || (band.coach && band.coach.id === user.id);
+              const isMember = (band.band_members || []).some((m: any) => m.user_id === user.id);
+              const hasMyStudent = (band.band_members || []).some((m: any) => {
+                const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+                return u && u.teacher_id === user.id;
+              });
+              return isCoach || isMember || hasMyStudent;
+            });
+
+            setUserBands(teacherCoachedBands);
+          }
+        });
+    }
+  }, [user?.id, activePlatform, activeStudentTab]);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth < 1024;
@@ -4644,14 +4676,23 @@ function App() {
 
       // School bands and teachers are already loaded in Stage 2!
       if (bandsData && bandsData.length > 0) {
+        const realBands = bandsData.filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_'));
+        setAllBands(realBands);
 
-        // We show all bands that have at least one song assigned, even if incomplete,
-        // so that the Vocal-Finder and other joining tools can find them.
-        const validBands = bandsData.filter((band: any) => {
-          const song = band?.songs ? (Array.isArray(band.songs) ? band.songs[0] : band.songs) : null;
-          return !!song;
-        });
-        setAllBands(validBands);
+        // Couple all coached and student bands for teachers/coaches
+        if (userData?.role === 'teacher' || userData?.role === 'admin' || userData?.role === 'secretary') {
+          const teacherCoachedBands = realBands.filter((band: any) => {
+            const isCoach = band.coach_id === userId || (band.coach && band.coach.id === userId);
+            const isMember = (band.band_members || []).some((m: any) => m.user_id === userId);
+            const hasMyStudent = (band.band_members || []).some((m: any) => {
+              const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+              return u && u.teacher_id === userId;
+            });
+            return isCoach || isMember || hasMyStudent;
+          });
+
+          setUserBands(teacherCoachedBands);
+        }
 
         // Fallback: If selectedBandForProfile wasn't found in uniqueBands (e.g. teacher viewing student band)
         // try to restore it from all bands.
@@ -9323,7 +9364,7 @@ function App() {
         {/* Profile Tab */}
         {activeStudentTab === 'profile' && !(user.role?.toLowerCase() === 'student' && activePlatform === 'campus') && (
           <ErrorBoundary>
-            {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? (
+            {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') && activePlatform === 'campus' ? (
               /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
               <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%', paddingTop: '24px' }}>
                 {/* Hero Header Card — Briefing-style: image left panel, content right */}
@@ -9668,13 +9709,14 @@ function App() {
                   {/* Badge row */}
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
                     <span style={{
-                      background: (user.role === 'teacher' || user.role === 'admin') ? '#6366f1' : '#f59e0b',
+                      background: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'linear-gradient(135deg, #eab308, #ca8a04)' : '#f59e0b',
                       color: 'white', padding: '4px 12px', borderRadius: '8px',
-                      fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em'
+                      fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
+                      boxShadow: '0 4px 10px rgba(234, 179, 8, 0.25)'
                     }}>
-                      {(user.role === 'teacher' || user.role === 'admin') ? 'Coach' : 'Pro Artist'}
+                      {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'GrooveLab Coach' : 'Pro Artist'}
                     </span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Groovelab Academy'}</span>
+                    <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 700 }}>{user.schools?.name || 'Campus-Groovelab'}</span>
                     <span style={{ color: '#94a3b8', fontSize: '0.875rem', fontWeight: 500 }}>• Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}</span>
 
                     {/* XP only for students */}
@@ -9704,7 +9746,7 @@ function App() {
                         }}
                       >
                         <QrCode size={12} />
-                        <span>CAMPUS-AUSWEIS</span>
+                        <span>CAMPUS-GROOVELAB AUSWEIS</span>
                       </button>
                     )}
                   </div>
@@ -9713,36 +9755,101 @@ function App() {
                     {user.role === 'student' ? (activePlatform === 'groovelab' ? user.first_name : 'Hausaufgabenheft') : (activePlatform === 'groovelab' ? `${user.first_name} ${user.last_name || ''}` : `${user.first_name} ${user.last_name?.[0] || ''}.`)}
                   </h1>
 
-                  {/* Instrument Icons */}
-                  {(user.role === 'teacher' || user.role === 'admin') ? (
-                    // COACH: show only selected instruments, no count
+                  {/* GrooveLab Instrument Selection Buttons for Coach */}
+                  {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? (
                     (() => {
-                      const teacherInstruments = (user.groovelab_instrument || '')
-                        .split(',')
-                        .map((s: string) => s.trim())
-                        .filter(Boolean);
-                      // Map German names to icon keys
-                      const iconKeyMap: Record<string, string> = {
-                        'Gitarre': 'Guitar', 'Bass': 'Bass', 'Drums': 'Drums',
-                        'Vocals': 'Vocals', 'Piano / Keys': 'Keys'
+                      const groovelabInstDefs = [
+                        { key: 'Gitarre', altKey: 'E-Gitarre', label: 'E-Gitarre', Icon: Music },
+                        { key: 'Piano / Keys', altKey: 'E-Piano', label: 'E-Piano', Icon: Music },
+                        { key: 'Drums', altKey: 'E-Drum', label: 'E-Drum', Icon: Disc },
+                        { key: 'Bass', altKey: 'E-Bass', label: 'E-Bass', Icon: Music },
+                        { key: 'Vocals', altKey: 'Gesang', label: 'Gesang', Icon: Mic }
+                      ];
+
+                      const currentRaw = (user.groovelab_instrument || '');
+                      const currentInstList = currentRaw.split(',').map((s: string) => s.trim()).filter(Boolean);
+
+                      const toggleGrooveLabInstrument = async (instDef: typeof groovelabInstDefs[0]) => {
+                        const isCurrentlySelected = currentInstList.some((s: string) => 
+                          s === instDef.key || s === instDef.altKey || s === instDef.label
+                        );
+
+                        let nextList: string[];
+                        if (isCurrentlySelected) {
+                          nextList = currentInstList.filter((s: string) => 
+                            s !== instDef.key && s !== instDef.altKey && s !== instDef.label
+                          );
+                        } else {
+                          nextList = [...currentInstList, instDef.key];
+                        }
+
+                        const newStr = nextList.join(', ');
+
+                        // Instant local state update
+                        setUser((prev: any) => prev ? { ...prev, groovelab_instrument: newStr } : prev);
+
+                        // Persist to Supabase
+                        try {
+                          await supabase.from('users').update({ groovelab_instrument: newStr }).eq('id', user.id);
+                        } catch (err) {
+                          console.error('[GrooveLab] Error saving groovelab_instrument:', err);
+                        }
                       };
-                      return teacherInstruments.length > 0 ? (
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                          {teacherInstruments.map((inst: string) => (
-                            <div key={inst} style={{
-                              display: 'flex', alignItems: 'center', gap: '8px',
-                              background: '#f8fafc', padding: '8px 16px', borderRadius: '14px',
-                              border: '1px solid #f1f5f9'
-                            }}>
-                              <span style={{ fontSize: '1.25rem' }}>
-                                {APP_INSTRUMENT_ICONS[iconKeyMap[inst] as keyof typeof APP_INSTRUMENT_ICONS] ||
-                                 APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '🎵'}
-                              </span>
-                              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>{inst}</span>
-                            </div>
-                          ))}
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            GrooveLab-Instrumente (Klicke zum Aktivieren):
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            {groovelabInstDefs.map((instDef) => {
+                              const isActive = currentInstList.some((s: string) => 
+                                s === instDef.key || s === instDef.altKey || s === instDef.label
+                              );
+                              const InstIcon = instDef.Icon;
+
+                              return (
+                                <button
+                                  key={instDef.label}
+                                  type="button"
+                                  onClick={() => toggleGrooveLabInstrument(instDef)}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 16px',
+                                    borderRadius: '14px',
+                                    fontSize: '0.82rem',
+                                    fontWeight: isActive ? 900 : 700,
+                                    border: isActive ? 'none' : '1.5px dashed #cbd5e1',
+                                    background: isActive ? 'linear-gradient(135deg, #eab308, #ca8a04)' : '#f8fafc',
+                                    color: isActive ? 'white' : '#64748b',
+                                    cursor: 'pointer',
+                                    boxShadow: isActive ? '0 4px 14px rgba(234, 179, 8, 0.35)' : 'none',
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                  onMouseOver={(e) => {
+                                    if (!isActive) {
+                                      e.currentTarget.style.borderColor = '#eab308';
+                                      e.currentTarget.style.color = '#ca8a04';
+                                    }
+                                  }}
+                                  onMouseOut={(e) => {
+                                    if (!isActive) {
+                                      e.currentTarget.style.borderColor = '#cbd5e1';
+                                      e.currentTarget.style.color = '#64748b';
+                                    }
+                                  }}
+                                >
+                                  <InstIcon size={16} style={{ color: isActive ? 'white' : '#64748b' }} />
+                                  <span>{instDef.label}</span>
+                                  {isActive && <span style={{ fontSize: '0.75rem', marginLeft: '2px' }}>✓</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      ) : null;
+                      );
                     })()
                   ) : (
                     // STUDENT: show instrument challenge counters
@@ -9786,7 +9893,7 @@ function App() {
                             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.expertise}</div>
                           </div>
                         )}
-                        {user.bands && (
+                        {user.bands && activePlatform === 'campus' && (
                           <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '10px 14px', border: '1px solid #f1f5f9', flex: 1, minWidth: '140px' }}>
                             <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Bands & Projekte</div>
                             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{user.bands}</div>
@@ -10260,6 +10367,247 @@ function App() {
               )}
               {user.role !== 'student' && (
                 <>
+                  {/* Professional GrooveLab Coach Metrics Grid (3 columns) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+                    {/* Metric 1: Betreute Bands */}
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(234, 179, 8, 0.04)' }}>
+                      <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(234, 179, 8, 0.12)', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Users size={22} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Betreute Bands</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                          {(() => {
+                            const coached = (allBands || []).filter((b: any) => {
+                              const isReal = b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_');
+                              if (!isReal) return false;
+                              const isCoach = b.coach_id === user.id || (b.coach && b.coach.id === user.id);
+                              const isMember = (b.band_members || []).some((m: any) => m.user_id === user.id);
+                              const hasMyStudent = (b.band_members || []).some((m: any) => {
+                                const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+                                return u && u.teacher_id === user.id;
+                              });
+                              return isCoach || isMember || hasMyStudent;
+                            });
+                            const map = new Map();
+                            coached.forEach((b: any) => map.set(b.id, b));
+                            (userBands || []).filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_')).forEach((b: any) => map.set(b.id, b));
+                            const count = map.size;
+                            return `${count} ${count === 1 ? 'Band' : 'Bands'}`;
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Metric 2: Präsenztage */}
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(234, 179, 8, 0.04)' }}>
+                      <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Calendar size={22} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Präsenztage</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                          {(() => {
+                            const mySlots = (globalPlannedSlots || []).filter((s: any) => s.user_id === user.id);
+                            const uniqueDays = new Set(mySlots.map((s: any) => s.day)).size;
+                            return `${uniqueDays} ${uniqueDays === 1 ? 'Tag' : 'Tage'}`;
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Metric 3: GrooveLab-Instrumente */}
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(234, 179, 8, 0.04)' }}>
+                      <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(202, 138, 4, 0.12)', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Music size={22} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>GrooveLab-Instrumente</div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Urbanist', sans-serif" }}>
+                          {(user.groovelab_instrument || user.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean).length} Instrumente
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Teaching Days & Coached Bands Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px' }}>
+                    {/* Day Availability Calendar Planner */}
+                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(234, 179, 8, 0.03)' }}>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Calendar size={20} style={{ color: '#eab308' }} />
+                        Anwesenheitszeiten & Startzeiten
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {(() => {
+                          const dayNames: { [key: string]: string } = {
+                            'Mo': 'Montag',
+                            'Di': 'Dienstag',
+                            'Mi': 'Mittwoch',
+                            'Do': 'Donnerstag',
+                            'Fr': 'Freitag',
+                            'Sa': 'Samstag',
+                            'So': 'Sonntag'
+                          };
+
+                          const mySlots = (globalPlannedSlots || []).filter((s: any) => s.user_id === user.id);
+                          
+                          const slotsByDay: { [day: string]: string[] } = {};
+                          mySlots.forEach((s: any) => {
+                            if (!slotsByDay[s.day]) slotsByDay[s.day] = [];
+                            slotsByDay[s.day].push(s.time);
+                          });
+
+                          const dayOrder: { [day: string]: number } = { 'Mo': 1, 'Di': 2, 'Mi': 3, 'Do': 4, 'Fr': 5, 'Sa': 6, 'So': 7 };
+                          
+                          const add15 = (t: string) => {
+                            let [h, m] = t.split(':').map(Number);
+                            m += 15;
+                            if (m >= 60) { h += 1; m = 0; }
+                            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                          };
+
+                          const toMin = (t: string) => {
+                            const [h, m] = t.split(':').map(Number);
+                            return h * 60 + m;
+                          };
+
+                          const presences: { dayCode: string; dayName: string; rangeStr: string }[] = [];
+
+                          Object.entries(slotsByDay)
+                            .sort(([a], [b]) => (dayOrder[a] || 99) - (dayOrder[b] || 99))
+                            .forEach(([day, times]) => {
+                              times.sort();
+                              const ranges: { start: string; end: string }[] = [];
+                              let currentRange: { start: string; end: string } | null = null;
+
+                              times.forEach(t => {
+                                if (!currentRange) {
+                                  currentRange = { start: t, end: add15(t) };
+                                } else {
+                                  if (toMin(t) === toMin(currentRange.end)) {
+                                    currentRange.end = add15(t);
+                                  } else {
+                                    ranges.push(currentRange);
+                                    currentRange = { start: t, end: add15(t) };
+                                  }
+                                }
+                              });
+                              if (currentRange) ranges.push(currentRange);
+
+                              const rangeStr = ranges.map(r => `${r.start} bis ${r.end} Uhr`).join(', ');
+                              presences.push({
+                                dayCode: day,
+                                dayName: dayNames[day] || day,
+                                rangeStr
+                              });
+                            });
+
+                          return presences.length > 0 ? (
+                            presences.map((p) => (
+                              <div key={p.dayCode} style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between', 
+                                padding: '14px 18px', 
+                                background: '#f8fafc', 
+                                borderRadius: '16px', 
+                                border: '1px solid #f1f5f9' 
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ height: '36px', width: '36px', borderRadius: '10px', background: '#ffffff', border: '1px solid rgba(234, 179, 8, 0.15)', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Calendar size={18} />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
+                                      {p.dayName}s
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
+                                      Präsenzzeit: {p.rangeStr}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ background: 'rgba(234, 179, 8, 0.12)', color: '#ca8a04', padding: '4px 10px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                                    Aktiv
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2.5px dashed #cbd5e1', borderRadius: '20px' }}>
+                              Bisher keine Präsenzzeiten im Wochen-Planner eingetragen.
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Coached Bands Overview */}
+                    {(() => {
+                      const coached = (allBands || []).filter((b: any) => {
+                        const isReal = b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_');
+                        if (!isReal) return false;
+                        const isCoach = b.coach_id === user.id || (b.coach && b.coach.id === user.id);
+                        const isMember = (b.band_members || []).some((m: any) => m.user_id === user.id);
+                        const hasMyStudent = (b.band_members || []).some((m: any) => {
+                          const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
+                          return u && u.teacher_id === user.id;
+                        });
+                        return isCoach || isMember || hasMyStudent;
+                      });
+                      const map = new Map();
+                      coached.forEach((b: any) => map.set(b.id, b));
+                      (userBands || []).filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_')).forEach((b: any) => map.set(b.id, b));
+                      const teacherBandsList = Array.from(map.values());
+
+                      return (
+                        <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: '0 8px 30px rgba(234, 179, 8, 0.03)' }}>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Users size={20} style={{ color: '#eab308' }} />
+                            Betreute Band-Projekte ({teacherBandsList.length})
+                          </h3>
+                          {teacherBandsList.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                              {teacherBandsList.map((band: any) => {
+                                const songTitle = band.song?.title || (band.songs ? (Array.isArray(band.songs) ? band.songs[0]?.title : band.songs.title) : null) || 'Noch kein Song zugewiesen';
+                                const memberCount = Array.isArray(band.band_members) ? band.band_members.length : (Array.isArray(band.members) ? band.members.length : 0);
+                                return (
+                                  <div key={band.id || band.name} style={{
+                                    background: '#f8fafc',
+                                    border: '1px solid #f1f5f9',
+                                    borderRadius: '18px',
+                                    padding: '16px 20px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                  }}>
+                                    <div>
+                                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.98rem', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Users size={16} style={{ color: '#ca8a04' }} />
+                                        <span>{band.name || band.band_name || 'Unbenannte Band'}</span>
+                                      </div>
+                                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Music size={12} style={{ color: '#eab308' }} /> {songTitle}
+                                      </div>
+                                    </div>
+                                    <span style={{ background: 'rgba(234, 179, 8, 0.12)', color: '#ca8a04', padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                      {memberCount} {memberCount === 1 ? 'Mitglied' : 'Mitglieder'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', border: '2.5px dashed #cbd5e1', borderRadius: '20px' }}>
+                              Bisher keine betreuten Bands in GrooveLab.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1.5fr 1fr', gap: '24px', paddingBottom: '32px' }}>
                     {/* Wochen-Planner */}
                     <div className="glass-panel" style={{ background: 'white', borderRadius: '32px', padding: '32px' }}>
