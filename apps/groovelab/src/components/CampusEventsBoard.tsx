@@ -11665,36 +11665,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   {/* Badges */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                     <span style={{
-                      padding: '3px 8px',
+                      padding: '4px 10px',
                       borderRadius: '8px',
                       background: 'rgba(255, 255, 255, 0.2)',
                       color: '#ffffff',
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
                       backdropFilter: 'blur(4px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      gap: '5px',
                       whiteSpace: 'nowrap'
                     }}>
-                      <Calendar size={11} color="#ffffff" />
-                      <span>Termingekoppelt</span>
-                    </span>
-                    <span style={{
-                      padding: '3px 8px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: '#ffffff',
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      backdropFilter: 'blur(4px)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      <ShieldCheck size={12} color="#ffffff" />
-                      <span>100% DSGVO-konform</span>
+                      <ShieldCheck size={13} color="#ffffff" />
+                      <span>100% DSGVO-konformer Schulchat</span>
                     </span>
                   </div>
                 </div>
@@ -11765,22 +11749,22 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                         gap: '2px'
                       }}>
                         <div style={{
-                          background: isMe ? `linear-gradient(135deg, ${brandColor || '#34a853'}, #34a853)` : '#ffffff',
-                          color: isMe ? '#ffffff' : '#1e293b',
+                          background: isMe ? '#e6f4ea' : '#ffffff',
+                          color: '#0f172a',
                           padding: '10px 14px',
                           borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
                           fontSize: '0.85rem',
                           lineHeight: 1.4,
                           wordBreak: 'break-word',
-                          border: isMe ? 'none' : '1px solid #e2e8f0',
+                          border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
                           boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
                         }}>
                           {msg.content}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.62rem', color: isMe ? 'rgba(255,255,255,0.85)' : '#64748b', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 600 }}>
                               {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            {isMe && <CheckCheck size={14} color="#ffffff" style={{ marginLeft: '2px', opacity: 0.9 }} />}
+                            {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
                           </div>
                         </div>
                       </div>

@@ -1,5 +1,5 @@
 import QRCode from 'react-qr-code';
-import { X, Download, RefreshCw, Calendar, CheckCircle2, Check, Copy } from 'lucide-react';
+import { X, Download, RefreshCw, Calendar, CheckCircle2, Check, Copy, ExternalLink } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { StudioAvatar } from './StudioAvatar';
@@ -757,6 +757,42 @@ ${link}`;
                   {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
                   {copied ? 'Zugangs-Link in Zwischenablage kopiert!' : 'Zugangs-Link kopieren'}
                 </button>
+
+                {/* Entwickler Button: QR-Landingpage testen */}
+                <button
+                  onClick={() => {
+                    const qrUrl = `${window.location.origin}/qr/${localTeacherQrToken || localQrToken || user.id}`;
+                    window.open(qrUrl, '_blank');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '11px',
+                    borderRadius: '14px',
+                    border: '1px dashed #cbd5e1',
+                    background: '#f1f5f9',
+                    color: '#0f172a',
+                    fontWeight: 750,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e2e8f0';
+                    e.currentTarget.style.borderColor = '#94a3b8';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f1f5f9';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                >
+                  <ExternalLink size={14} color="#0f172a" />
+                  🛠️ QR-Landingpage testen ↗
+                </button>
+
 
                 {/* 6. Navigation: Direkt zur App / Login */}
                 <button 

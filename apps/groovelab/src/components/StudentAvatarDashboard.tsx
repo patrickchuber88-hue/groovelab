@@ -5,7 +5,7 @@ import {
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, School, Calendar, Check, Target, MessageSquare, Send,
-  Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor
+  Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -14,6 +14,7 @@ import { createPortal } from 'react-dom';
 import { QRCodeModal } from './QRCodeModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
+import { cleanHomeworkNotesText } from '../utils/nameHelper';
 
 const showMissionsFeature = false;
 
@@ -905,29 +906,31 @@ function MobileBriefingView({
                           const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
 
                           if (isStudentNotePublic || isStudentNotePrivate) {
-                            const raw = trimmedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').trim();
-                            const cleanText = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                            let rawContent = trimmedNote;
+                            if (rawContent.includes('|')) {
+                              rawContent = rawContent.split('|').slice(1).join('|');
+                            } else {
+                              rawContent = rawContent.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
+                            }
+                            const cleanQuestionText = rawContent.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                            if (!cleanQuestionText) return null;
 
                             return (
                               <div key={nIdx} style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '8px',
-                                background: isStudentNotePrivate ? 'rgba(239, 68, 68, 0.05)' : 'rgba(52, 168, 83, 0.08)',
-                                border: isStudentNotePrivate ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(52, 168, 83, 0.25)',
-                                padding: '6px 12px',
-                                borderRadius: '12px',
-                                fontSize: '0.76rem',
-                                color: '#1e293b',
-                                lineHeight: '1.4'
+                                gap: '6px',
+                                fontSize: '0.8rem',
+                                color: isStudentNotePrivate ? '#dc2626' : '#166534',
+                                fontWeight: 750,
+                                background: isStudentNotePrivate ? '#fef2f2' : '#f0fdf4',
+                                border: isStudentNotePrivate ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                                padding: '5px 10px',
+                                borderRadius: '8px'
                               }}>
-                                <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>💬</span>
-                                <span style={{ fontWeight: 800, color: isStudentNotePrivate ? '#dc2626' : '#166534', flexShrink: 0 }}>
-                                  {isStudentNotePrivate ? 'Deine private Notiz:' : 'Deine Frage:'}
-                                </span>
-                                <span style={{ color: '#334155', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {cleanText || raw}
-                                </span>
+                                <span style={{ fontSize: '0.85rem' }}>{isStudentNotePrivate ? '🔒' : '💬'}</span>
+                                <span>{isStudentNotePrivate ? 'Notiz:' : 'Frage:'} {cleanQuestionText}</span>
                               </div>
                             );
                           }
@@ -2422,7 +2425,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
   const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
-  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'billing'>('notifications');
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'security' | 'billing'>('notifications');
+  const [pinFormNew, setPinFormNew] = useState('');
+  const [pinFormConfirm, setPinFormConfirm] = useState('');
+  const [pinFormError, setPinFormError] = useState('');
+  const [pinFormSuccess, setPinFormSuccess] = useState('');
+  const [isSavingPin, setIsSavingPin] = useState(false);
 
   const [isAppUser, setIsAppUser] = useState(false);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
@@ -10679,11 +10687,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       
                       const textNotes = info.pages
                         .map(p => {
-                          if (!p.notes) return null;
-                          return `S. ${p.num}: ${p.notes}`;
+                          const cleaned = cleanHomeworkNotesText(p.notes);
+                          if (!cleaned) return null;
+                          return `S. ${p.num}: ${cleaned}`;
                         })
                         .filter(Boolean)
-                        .filter(n => !n?.includes('Inhalte in der Premium-Version freischalten') && !n?.includes('AUDIO:') && !n?.includes('STICKER:'))
                         .join(' · ');
 
                       const allDone = info.pages.every(p => p.status === 'MASTERED' || p.status === 'THEORY_DONE');
@@ -10701,7 +10709,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       ...otherItems.map(item => ({
                         title: cleanTitle(item.title || item.topic_name || ''),
                         subtitle: '',
-                        notes: item.teacher_notes || '',
+                        notes: cleanHomeworkNotesText(item.teacher_notes || ''),
                         status: item.status,
                         isBook: false
                       }))
@@ -13325,6 +13333,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <h3 style={{ margin: '0 0 16px 8px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Einstellungen</h3>
                 {[
                   { id: 'notifications', label: 'System & Push-Benachrichtigungen' },
+                  { id: 'security', label: 'PIN & Sicherheit' },
                   { id: 'billing', label: 'Abrechnung & Rechnungen' }
                 ].map((item) => {
                   const isSelected = settingsSubTab === item.id;
@@ -13334,6 +13343,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   const renderIcon = () => {
                     switch (item.id) {
                       case 'notifications': return <Bell size={14} color={activeColor} />;
+                      case 'security': return <Lock size={14} color={activeColor} />;
                       case 'billing': return <FileText size={14} color={activeColor} />;
                       default: return null;
                     }
@@ -13529,6 +13539,176 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       >
                         <RotateCcw size={14} /> Lokalen Cache leeren
                       </button>
+                    </div>
+                  </div>
+                ) : settingsSubTab === 'security' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>PIN & Sicherheit</h3>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Erstelle oder ändere deine persönliche 4-stellige PIN für deinen Campus-Login.</p>
+                    </div>
+
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '20px',
+                      padding: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '20px',
+                      maxWidth: '480px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ padding: '10px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853' }}>
+                          <Shield size={20} />
+                        </div>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>4-stellige PIN festlegen</h4>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Schützt deinen Stundenplan und dein persönliches Konto.</p>
+                        </div>
+                      </div>
+
+                      {pinFormError && (
+                        <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
+                          {pinFormError}
+                        </div>
+                      )}
+
+                      {pinFormSuccess && (
+                        <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
+                          {pinFormSuccess}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Neue 4-stellige PIN
+                          </label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            pattern="[0-9]*"
+                            inputMode="numeric"
+                            placeholder="z. B. 1234"
+                            value={pinFormNew}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              setPinFormNew(val);
+                              setPinFormError('');
+                              setPinFormSuccess('');
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '12px 16px',
+                              borderRadius: '12px',
+                              border: '1.5px solid #cbd5e1',
+                              fontSize: '1.2rem',
+                              fontWeight: 800,
+                              letterSpacing: '0.25em',
+                              textAlign: 'center',
+                              background: '#ffffff',
+                              color: '#0f172a',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            PIN bestätigen
+                          </label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            pattern="[0-9]*"
+                            inputMode="numeric"
+                            placeholder="PIN wiederholen"
+                            value={pinFormConfirm}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              setPinFormConfirm(val);
+                              setPinFormError('');
+                              setPinFormSuccess('');
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '12px 16px',
+                              borderRadius: '12px',
+                              border: '1.5px solid #cbd5e1',
+                              fontSize: '1.2rem',
+                              fontWeight: 800,
+                              letterSpacing: '0.25em',
+                              textAlign: 'center',
+                              background: '#ffffff',
+                              color: '#0f172a',
+                              outline: 'none',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
+                          onClick={async () => {
+                            if (pinFormNew.length !== 4) {
+                              setPinFormError('Bitte gib eine vollständige 4-stellige PIN ein.');
+                              return;
+                            }
+                            if (pinFormNew !== pinFormConfirm) {
+                              setPinFormError('Die eingegebenen PINs stimmen nicht überein.');
+                              return;
+                            }
+
+                            setIsSavingPin(true);
+                            setPinFormError('');
+
+                            try {
+                              const { error } = await supabase
+                                .from('users')
+                                .update({
+                                  personal_pin: pinFormNew,
+                                  parent_pin: pinFormNew,
+                                  is_pin_activated: true
+                                })
+                                .eq('id', studentId);
+
+                              if (error) {
+                                setPinFormError('Fehler beim Speichern der PIN: ' + error.message);
+                              } else {
+                                setPinFormSuccess('Deine 4-stellige PIN wurde erfolgreich gespeichert! 🔒');
+                                setPinFormNew('');
+                                setPinFormConfirm('');
+                              }
+                            } catch (err: any) {
+                              setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
+                            } finally {
+                              setIsSavingPin(false);
+                            }
+                          }}
+                          style={{
+                            marginTop: '8px',
+                            padding: '14px 20px',
+                            borderRadius: '14px',
+                            background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#34a853' : '#e2e8f0',
+                            color: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#ffffff' : '#94a3b8',
+                            border: 'none',
+                            fontWeight: 800,
+                            fontSize: '0.875rem',
+                            cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4 && !isSavingPin) ? 'pointer' : 'not-allowed',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                          }}
+                        >
+                          <Lock size={16} />
+                          {isSavingPin ? 'Speichere PIN...' : 'Neue PIN jetzt speichern'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -14445,7 +14625,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </div>
                 </div>
               </div>
-
             {/* Joker Info */}
             <div style={{ background: '#e6f4ea', border: '1px solid #e6f4ea', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#34a853', fontWeight: 800, fontSize: '0.85rem', marginBottom: '6px' }}>
@@ -14484,74 +14663,160 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         } catch (e) {}
 
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: 'white', padding: '24px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', width: '420px', maxWidth: '90vw', border: '1px solid rgba(255,255,255,0.5)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', height: '520px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div
+            onClick={() => setShowAppointmentChat(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1100,
+              background: 'rgba(15,23,42,0.65)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              animation: 'fadeIn 0.15s ease'
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px',
+                width: '100%',
+                maxWidth: '480px',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                maxHeight: '85vh'
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                padding: '20px 24px',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    Shoutbox – Terminabsprache {isFrozen && '🔒'}
-                  </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: isFrozen ? '#ef4444' : '#64748b', fontWeight: 700 }}>
-                    {isFrozen ? 'Eingefroren (48h nach Termin)' : '1:1 Absprache mit deiner Lehrkraft'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>💬</span> 1:1 Shoutbox: Absprache
+                    </h3>
+                  </div>
+                  <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                    Termin am {new Date(appointmentChatData.date).toLocaleDateString('de-DE')} um {appointmentChatData.start_time.substring(0, 5)} Uhr
                   </p>
+                  
+                  {/* Badges */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      color: '#ffffff',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      backdropFilter: 'blur(4px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      <ShieldCheck size={13} color="#ffffff" />
+                      <span>100% DSGVO-konformer Schulchat</span>
+                    </span>
+                  </div>
                 </div>
-                <button 
+
+                <button
+                  type="button"
                   onClick={() => setShowAppointmentChat(false)}
-                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                  style={{
+                    border: 'none',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    transition: 'all 0.2s',
+                    alignSelf: 'flex-start'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
                 >
-                  <X size={20} />
+                  <X size={16} />
                 </button>
               </div>
 
-
-              {/* Chat messages viewport */}
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', paddingRight: '4px' }}>
+              {/* Messages Viewport */}
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '24px',
+                background: '#fafbfc',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                minHeight: '280px',
+                maxHeight: '400px'
+              }} className="custom-scrollbar">
                 {isFrozen && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', textAlign: 'center', justifyContent: 'center' }}>
-                    🔒 Shoutbox eingefroren (Schreibschutz aktiv)
+                  <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
+                    🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                   </div>
                 )}
                 {chatMessages.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem', textAlign: 'center', padding: '16px' }}>
-                    Noch keine Nachrichten. Schreib deiner Lehrkraft für eine schnelle Absprache.
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', padding: '24px 16px', gap: '8px', background: 'rgba(255,255,255,0.7)', border: '1.5px dashed #cbd5e1', borderRadius: '16px', margin: 'auto 0' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                      <Calendar size={20} />
+                    </div>
+                    <h5 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                      Termingekoppelter Schulchat
+                    </h5>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4, maxWidth: '240px' }}>
+                      Geschützte Direktnachrichten für diesen Unterrichtstermin – 100% DSGVO- & datenschutzkonform.
+                    </p>
                   </div>
                 ) : (
                   chatMessages.map((msg, idx) => {
                     const isMe = msg.sender_id === studentId;
-                    const isTerminMsg = msg.content.startsWith('[Termin');
-                    let displayedContent = msg.content;
-                    let prefixText = '';
-                    if (isTerminMsg) {
-                      const closeBracketIdx = msg.content.indexOf(']');
-                      if (closeBracketIdx !== -1) {
-                        prefixText = msg.content.substring(1, closeBracketIdx);
-                        displayedContent = msg.content.substring(closeBracketIdx + 1).trim();
-                      }
-                    }
-
                     return (
-                      <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', textAlign: 'left' }}>
-                        {prefixText && (
-                          <span style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
-                            📅 {prefixText}
-                          </span>
-                        )}
-                        <div style={{ 
-                          background: isMe ? '#4f46e5' : '#f1f5f9', 
-                          color: isMe ? 'white' : '#1e293b', 
-                          padding: '8px 12px', 
-                          borderRadius: '12px', 
-                          borderBottomRightRadius: isMe ? '2px' : '12px',
-                          borderBottomLeftRadius: isMe ? '12px' : '2px',
-                          fontSize: '0.82rem',
+                      <div key={msg.id || idx} style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        maxWidth: '82%',
+                        alignItems: isMe ? 'flex-end' : 'flex-start',
+                        gap: '2px'
+                      }}>
+                        <div style={{
+                          background: isMe ? '#e6f4ea' : '#ffffff',
+                          color: '#0f172a',
+                          padding: '10px 14px',
+                          borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          fontSize: '0.85rem',
                           lineHeight: 1.4,
-                          wordBreak: 'break-word'
+                          wordBreak: 'break-word',
+                          border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
                         }}>
-                          {displayedContent}
+                          {msg.content}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
+                            <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#64748b', fontWeight: 600 }}>
+                              {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
+                          </div>
                         </div>
-                        <span style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
-                          {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
                       </div>
                     );
                   })
@@ -14559,17 +14824,91 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <div ref={chatMessagesEndRef} />
               </div>
 
-              {/* Send Input Form */}
-              <form onSubmit={handleSendChatMessage} style={{ display: 'flex', gap: '8px', marginTop: 'auto', width: '100%' }}>
-                <input 
-                  type="text" 
-                  placeholder={isFrozen ? "Shoutbox nach 48h eingefroren..." : "Nachricht senden..."}
+              {/* Music Pedagogical Quick Reply Chips */}
+              {!isFrozen && (
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 20px 4px 20px', background: '#fafbfc' }}>
+                  {[
+                    '👍 Ja, geht klar!',
+                    '❌ Nein, geht leider nicht',
+                    '⏳ Bin 5 Min. später',
+                    '📅 Termin bestätigt',
+                    '🎹 Alles klar!'
+                  ].map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setChatTypedMessage(chip)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        background: '#ffffff',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        color: '#475569',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = '#f1f5f9';
+                        e.currentTarget.style.color = '#0f172a';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = '#ffffff';
+                        e.currentTarget.style.color = '#475569';
+                      }}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Send Form */}
+              <form onSubmit={handleSendChatMessage} style={{
+                padding: '16px 20px',
+                borderTop: '1px solid #f1f5f9',
+                background: '#ffffff',
+                display: 'flex',
+                gap: '10px'
+              }}>
+                <input
+                  type="text"
+                  placeholder={isFrozen ? "Eingefroren..." : "Schreibe eine Nachricht..."}
                   disabled={isFrozen}
                   value={chatTypedMessage}
                   onChange={e => setChatTypedMessage(e.target.value)}
-                  style={{ flex: 1, padding: '12px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', background: isFrozen ? '#f1f5f9' : '#ffffff', minHeight: '44px', boxSizing: 'border-box' }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    background: isFrozen ? '#f1f5f9' : '#ffffff',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    fontWeight: 650
+                  }}
                 />
-                <button type="submit" disabled={isFrozen} style={{ background: isFrozen ? '#cbd5e1' : '#4f46e5', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isFrozen ? 'not-allowed' : 'pointer', boxShadow: isFrozen ? 'none' : '0 4px 12px rgba(79, 70, 229, 0.15)', minHeight: '44px', flexShrink: 0 }}>
+                <button
+                  type="submit"
+                  disabled={isFrozen || !chatTypedMessage.trim()}
+                  style={{
+                    border: 'none',
+                    background: isFrozen || !chatTypedMessage.trim() ? '#cbd5e1' : 'linear-gradient(135deg, #34a853, #137333)',
+                    color: '#ffffff',
+                    borderRadius: '12px',
+                    width: '42px',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: isFrozen || !chatTypedMessage.trim() ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: isFrozen || !chatTypedMessage.trim() ? 'none' : '0 4px 12px rgba(52, 168, 83, 0.25)',
+                    flexShrink: 0
+                  }}
+                >
                   <Send size={16} />
                 </button>
               </form>

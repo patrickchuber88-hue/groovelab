@@ -46,8 +46,11 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   let qrToken = sessionStorage.getItem('groovelab_qr_token');
   if (!qrToken && typeof window !== 'undefined') {
     const onboardingMatch = window.location.pathname.match(/^\/onboarding\/([^/?#]+)/);
+    const qrMatch = window.location.pathname.match(/^\/qr\/([^/?#]+)/);
     if (onboardingMatch) {
       qrToken = onboardingMatch[1];
+    } else if (qrMatch) {
+      qrToken = qrMatch[1];
     }
   }
   if (qrToken) {

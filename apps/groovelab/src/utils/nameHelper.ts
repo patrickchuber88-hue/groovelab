@@ -79,3 +79,30 @@ export function useRealNamesVisibility() {
 
   return { visible: privacyMode, toggleVisibility };
 }
+
+/**
+ * Clean internal metadata markers (LATENCY:xxx, STICKER:xxx, AUDIO:xxx)
+ * from user-facing notes and comments.
+ */
+export function cleanHomeworkNotesText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .map(line => {
+      let l = line.trim();
+      if (!l) return '';
+      if (l.startsWith('LATENCY:') || l.startsWith('STICKER:') || l.startsWith('AUDIO:') || l === 'Inhalte in der Premium-Version freischalten') {
+        return '';
+      }
+      l = l.replace(/LATENCY:\s*\d+/gi, '')
+           .replace(/STICKER:[^\s\n·]*/gi, '')
+           .replace(/\s*:\s*(?=·|$|\n)/g, '')
+           .replace(/\s*·\s*·\s*/g, ' · ')
+           .replace(/^\s*[·\s:]+/, '')
+           .replace(/[·\s:]+$/, '')
+           .trim();
+      return l;
+    })
+    .filter(Boolean)
+    .join('; ');
+}

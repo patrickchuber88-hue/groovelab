@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { maskLastName } from '../utils/nameHelper';
+import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -613,21 +613,69 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           localStorage.setItem(`${DEVICE_KEY_PREFIX}${token}`, 'paired');
         }
 
-        // Vorab Namen des Schülers holen
+        // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
-        let query = supabase
-          .from('users')
-          .select('id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals');
+        const upperToken = token.toUpperCase();
+        const selectFields = 'id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
 
-        if (isUuid) {
-          query = query.or(`qr_token.eq.${token},id.eq.${token}`);
-        } else {
-          query = query.eq('qr_token', token);
+        let userData: any = null;
+
+        // Stage 1: Try combined OR query
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select(selectFields)
+            .or(`id.eq.${token},qr_token.eq.${token},teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
+            .maybeSingle();
+
+          if (!error && data) {
+            userData = data;
+          }
+        } catch (e) {
+          console.warn('[QRLanding] Stage 1 OR query warning:', e);
         }
 
-        const { data: userData, error: userError } = await query.single();
+        // Stage 2: Fallback direct query by ID (if UUID)
+        if (!userData && isUuid) {
+          const { data } = await supabase
+            .from('users')
+            .select(selectFields)
+            .eq('id', token)
+            .maybeSingle();
+          if (data) userData = data;
+        }
 
-        if (userError || !userData) {
+        // Stage 3: Fallback direct query by teacher_qr_token
+        if (!userData) {
+          const { data } = await supabase
+            .from('users')
+            .select(selectFields)
+            .eq('teacher_qr_token', token)
+            .maybeSingle();
+          if (data) userData = data;
+        }
+
+        // Stage 4: Fallback direct query by qr_token
+        if (!userData) {
+          const { data } = await supabase
+            .from('users')
+            .select(selectFields)
+            .eq('qr_token', token)
+            .maybeSingle();
+          if (data) userData = data;
+        }
+
+        // Stage 5: Fallback direct query by ausweis_nummer
+        if (!userData) {
+          const { data } = await supabase
+            .from('users')
+            .select(selectFields)
+            .or(`ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
+            .maybeSingle();
+          if (data) userData = data;
+        }
+
+        if (!userData) {
           sessionStorage.removeItem('groovelab_qr_token');
           setErrorMsg('Dieser QR-Code ist ungültig oder gehört keinem Nutzer.');
           setPageState('error');
@@ -654,7 +702,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           }
         }
 
-        if (!hasCampusSub && !hasGroovelabSub && !isTrial) {
+        const isStaff = userData.role === 'admin' || userData.role === 'teacher' || userData.role === 'secretary' || (Array.isArray(userData.roles) && (userData.roles.includes('admin') || userData.roles.includes('teacher') || userData.roles.includes('secretary')));
+
+        if (!hasCampusSub && !hasGroovelabSub && !isTrial && !isStaff) {
           setErrorMsg('Der Zugang für diese Musikschule ist aktuell nicht aktiv (Setup-Modus).');
           setPageState('error');
           return;
@@ -696,13 +746,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_groups: userData.parent_allow_groups ?? true,
           parent_allow_proposals: userData.parent_allow_proposals ?? true
         });
-
-        // 1. Wenn der Benutzer bereits auf diesem Gerät voll eingeloggt ist -> Sofort ins Dashboard weiterleiten
-        const currentUserId = localStorage.getItem('groovelab_user_id') || sessionStorage.getItem('groovelab_user_id');
-        if (currentUserId === userData.id) {
-          await redirectToCampus(userData);
-          return;
-        }
 
         // Check if parents unlocked preview previously on this device
         const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
@@ -785,7 +828,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── Lehrkräfte-Daten laden (Heutiger Stundenplan) ──────────────────────────
   useEffect(() => {
-    if (profile && profile.role === 'teacher') {
+    const rolesArray = profile && Array.isArray(profile.roles) ? profile.roles : [];
+    const isTeacherRole = profile && (profile.role === 'teacher' || rolesArray.includes('teacher'));
+    if (profile && isTeacherRole) {
       const fetchTeacherSchedule = async () => {
         setLoadingTeacherSchedule(true);
         try {
@@ -1041,16 +1086,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       if (statsData && statsData.last_practice_date === todayStr) {
         setPracticeLoggedToday(true);
-        // Get today's logged minutes
-        const { data: latestLog } = await supabase
+        // Get total logged minutes for today across all sessions
+        const { data: todayLogs } = await supabase
           .from('fokus_logs')
           .select('duration_minutes')
           .eq('user_id', profile.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (latestLog) {
-          setLoggedMinutesToday(latestLog.duration_minutes);
+          .gte('created_at', todayStr + 'T00:00:00');
+        if (todayLogs && todayLogs.length > 0) {
+          const totalMins = todayLogs.reduce((sum, log) => sum + (log.duration_minutes || 0), 0);
+          setLoggedMinutesToday(totalMins);
         }
       }
     } catch (err) {
@@ -2176,7 +2220,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   const handleAcknowledgeOccurrence = async (occ: any) => {
     try {
-      const isRescheduled = occ.status === 'pending_reschedule';
+      const isRescheduled = occ.status === 'pending_reschedule' || (occ.original_date && occ.original_date !== occ.date && occ.status !== 'rescheduled_confirmed');
       const updateData: any = { student_acknowledged: true };
       if (isRescheduled) {
         updateData.status = 'rescheduled_confirmed';
@@ -2191,6 +2235,82 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       await fetchDashboardData();
     } catch (err) {
       console.error('Error acknowledging occurrence:', err);
+    }
+  };
+
+  const handleRejectReschedule = async (occ: any) => {
+    try {
+      const originalDate = occ.original_date || occ.date;
+      const originalStartTime = occ.original_start_time || occ.start_time;
+      const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
+
+      if (occ.id.toString().startsWith('virtual-') || occ.is_virtual) {
+        const { error: insertErr } = await supabase
+          .from('schedule_occurrences')
+          .insert({
+            schedule_id: occ.schedule_id,
+            student_id: occ.student_id,
+            teacher_id: occ.teacher_id,
+            date: originalDate,
+            start_time: originalStartTime,
+            duration: occ.duration || 45,
+            status: 'cancelled',
+            student_acknowledged: true
+          });
+        if (insertErr) throw insertErr;
+      } else {
+        const { error: updateErr } = await supabase
+          .from('schedule_occurrences')
+          .update({
+            date: originalDate,
+            start_time: originalStartTime,
+            status: 'cancelled',
+            student_acknowledged: true
+          })
+          .eq('id', occ.id);
+        if (updateErr) throw updateErr;
+      }
+
+      // Add system alert for teacher
+      try {
+        const userName = `${profile?.first_name || 'Schüler'} ${maskLastName(profile?.last_name)}`;
+        await supabase.from('system_alerts').insert({
+          school_id: profile?.school_id || null,
+          teacher_id: occ.teacher_id,
+          type: 'Verschiebung abgelehnt',
+          message: `❌ Verschiebung abgelehnt: Schüler ${userName} hat den Verschiebungstermin am ${formattedDate} um ${occ.start_time?.substring(0, 5)} Uhr abgelehnt. Der Termin wurde auf den Originaltermin zurückgesetzt und für diese Woche abgesagt.`
+        });
+      } catch (alertErr) {
+        console.warn('Could not create system alert:', alertErr);
+      }
+
+      // Send chat message
+      try {
+        await supabase.from('campus_direct_messages').insert({
+          sender_id: profile?.id,
+          recipient_id: occ.teacher_id,
+          content: `❌ Verschiebung am ${formattedDate} abgelehnt.`,
+          occurrence_id: occ.id
+        });
+      } catch (chatErr) {
+        console.warn('Could not send chat msg:', chatErr);
+      }
+
+      await fetchDashboardData();
+    } catch (err: any) {
+      console.error('Error rejecting reschedule:', err);
+      alert('Fehler beim Ablehnen der Verschiebung: ' + err.message);
+    }
+  };
+
+  const handleOpenFullWebApp = async () => {
+    if (!profile) return;
+    const isUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true' || parentUnlocked;
+    if (isUnlocked) {
+      await redirectToCampus(profile);
+    } else {
+      setPinPurpose('unlock_app');
+      setPageState('pin_required');
     }
   };
 
@@ -2368,13 +2488,43 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           boxSizing: 'border-box'
         }}>
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', position: 'relative' }}>
               <Lock size={22} />
+              {occurrences.some(occ => {
+                const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+                const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
+                const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
+                return needsAck || hasUnreadMsg;
+              }) && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-3px',
+                  right: '-3px',
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: '#ef4444',
+                  border: '2px solid #ffffff'
+                }} />
+              )}
             </div>
             <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>🔒 Bereich geschützt</h3>
             <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
               Gib deine 4-stellige Sicherheits-PIN ein, um deine Termine und Chats freizuschalten.
             </p>
+            {occurrences.some(occ => {
+              const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+              const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+              const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
+              const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
+              return needsAck || hasUnreadMsg;
+            }) && (
+              <div style={{ background: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '6px 12px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span>🔔</span>
+                <span>Du hast neue Termin-Änderungen oder Nachrichten!</span>
+              </div>
+            )}
           </div>
 
           {/* PIN Display circles */}
@@ -2515,8 +2665,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
       pastMonthGroups[monthKey].items.push(occ);
     });
-
-    // Sort past occurrences descending inside their groups
     Object.keys(pastMonthGroups).forEach(key => {
       pastMonthGroups[key].items.sort((a, b) => {
         const dateCompare = b.date.localeCompare(a.date);
@@ -2537,11 +2685,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const sortedUpcomingMonthKeys = Object.keys(upcomingMonthGroups).sort();
     const sortedPastMonthKeys = Object.keys(pastMonthGroups).sort((a, b) => b.localeCompare(a));
 
-    const toggleMonth = (monthKey: string) => {
-      setCollapsedMonths(prev => ({
-        ...prev,
-        [monthKey]: !prev[monthKey]
-      }));
+    const toggleMonth = (monthKey: string, defaultCollapsed: boolean) => {
+      setCollapsedMonths(prev => {
+        const isCurrentlyCollapsed = prev[monthKey] !== undefined ? prev[monthKey] : defaultCollapsed;
+        return {
+          ...prev,
+          [monthKey]: !isCurrentlyCollapsed
+        };
+      });
     };
 
     const formatDateGerman = (dateStr: string) => {
@@ -2566,13 +2717,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     };
 
     const renderMonthGroup = (monthKey: string, group: any, defaultCollapsed: boolean) => {
-      const isCollapsed = collapsedMonths[monthKey] ?? defaultCollapsed;
+      const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : defaultCollapsed;
       const monthHasUpdate = group.items.some((occ: any) => hasUnreadUpdate(occ));
 
       return (
         <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div 
-            onClick={() => toggleMonth(monthKey)}
+            onClick={() => toggleMonth(monthKey, defaultCollapsed)}
             style={{
               fontSize: '0.85rem',
               fontWeight: 900,
@@ -2625,6 +2776,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
                 const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
                 const hasMessages = activeChatOccIds.has(occ.id);
+                const isUnread = unreadMessageOccurrences.includes(occ.id);
 
                 let rowBg = '#ffffff';
                 let rowBorder = '1px solid #e2e8f0';
@@ -2633,14 +2785,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                 if (isCanceled) {
                   rowBg = '#fef2f2';
-                  rowBorder = '1px solid #fee2e2';
+                  rowBorder = '1px solid #fecaca';
                   textColor = '#991b1b';
-                  subColor = '#ef4444';
-                } else if (hasMessages) {
-                  rowBg = '#fef9c3';
-                  rowBorder = '1px solid #fef08a';
-                  textColor = '#854d0e';
-                  subColor = '#ca8a04';
+                  subColor = '#dc2626';
                 } else if (isRescheduled) {
                   rowBg = '#fffbeb';
                   rowBorder = '1px solid #fef3c7';
@@ -2660,78 +2807,73 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                 const teacherName = `Lehrkraft: ${occ.teacher?.first_name || 'Lehrer'} ${occ.teacher?.last_name || ''}`;
 
-                return (
-                  <div
-                    key={occ.id}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      padding: '12px',
-                      borderRadius: '16px',
-                      background: rowBg,
-                      border: rowBorder,
-                      gap: '8px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: isCanceled ? '#fee2e2' : hasMessages ? '#fef9c3' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f1f5f9',
-                          borderRadius: '8px',
-                          width: '36px',
-                          height: '36px',
-                          border: '1px solid rgba(0,0,0,0.03)',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
-                            {formatWeekday(occ.date)}
-                          </span>
-                          <span style={{ fontSize: '13px', fontWeight: 900, color: textColor, marginTop: '-2px' }}>
-                            {occ.date.substring(8, 10)}
-                          </span>
-                        </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: textColor }}>
-                            {teacherName}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: subColor, fontWeight: 700 }}>
-                            <span>{formatDateGerman(occ.date)}</span>
-                            <span>•</span>
-                            <span>{occ.start_time.substring(0, 5)} Uhr</span>
-                            <span>•</span>
-                            <span>{occ.duration} Min</span>
+                if (needsAcknowledge && isRescheduled && !isCanceled) {
+                  const origDateStr = occ.original_date ? `${formatWeekday(occ.original_date)}, ${formatDateGerman(occ.original_date)} • ${(occ.original_start_time || occ.start_time || '').substring(0, 5)} Uhr` : null;
+                  const newDateStr = `${formatWeekday(occ.date)}, ${formatDateGerman(occ.date)} • ${(occ.start_time || '').substring(0, 5)} Uhr`;
+
+                  return (
+                    <div
+                      key={occ.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        padding: '14px 16px',
+                        borderRadius: '18px',
+                        background: 'linear-gradient(135deg, #fffdf0 0%, #fefce8 100%)',
+                        border: '1px solid #fde047',
+                        gap: '12px',
+                        boxShadow: '0 4px 16px rgba(234, 179, 8, 0.08)',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {/* Header Row: Teacher Info + Status Badge + Chat */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '10px',
+                            background: '#fef08a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            flexShrink: 0
+                          }}>
+                            🗓️
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
+                              {teacherName}
+                            </span>
+                            <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              ⏳ Verschiebung angefragt
+                            </span>
                           </div>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button
                           type="button"
                           onClick={() => setActiveChatOcc(occ)}
                           style={{
-                            border: 'none',
-                            background: unreadMessageOccurrences.includes(occ.id) ? '#fee2e2' : '#f1f5f9',
-                            color: unreadMessageOccurrences.includes(occ.id) ? '#ef4444' : '#475569',
+                            border: isUnread ? '1px solid #fca5a5' : hasMessages ? '1px solid #fef08a' : '1px solid #e2e8f0',
+                            background: isUnread ? '#fee2e2' : '#ffffff',
+                            color: isUnread ? '#dc2626' : hasMessages ? '#ca8a04' : '#475569',
                             width: '32px',
                             height: '32px',
-                            borderRadius: '8px',
+                            borderRadius: '10px',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            position: 'relative'
+                            position: 'relative',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.04)',
+                            flexShrink: 0
                           }}
                           title="Shoutbox öffnen"
                         >
                           <MessageSquare size={14} />
-                          {unreadMessageOccurrences.includes(occ.id) && (
+                          {isUnread && (
                             <span style={{
                               position: 'absolute',
                               top: '-2px',
@@ -2745,11 +2887,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           )}
                         </button>
                       </div>
-                    </div>
 
-                    {/* Action buttons for student confirmations/cancellations */}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                      {needsAcknowledge && (
+                      {/* Visual Time Difference Banner */}
+                      <div style={{
+                        background: '#ffffff',
+                        border: '1px solid #fef08a',
+                        borderRadius: '12px',
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                      }}>
+                        {origDateStr && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#64748b' }}>
+                            <span style={{ fontWeight: 650 }}>Ursprünglich:</span>
+                            <span>{origDateStr}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', color: '#854d0e', fontWeight: 800 }}>
+                          <span style={{ fontSize: '0.7rem', background: '#fef9c3', padding: '2px 6px', borderRadius: '5px', color: '#a16207', fontWeight: 800 }}>Neu:</span>
+                          <span>{newDateStr}</span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons Row */}
+                      <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                         <button
                           type="button"
                           onClick={() => handleAcknowledgeOccurrence(occ)}
@@ -2758,28 +2920,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             background: '#34a853',
                             color: '#ffffff',
                             border: 'none',
-                            borderRadius: '8px',
-                            padding: '8px 12px',
-                            fontSize: '0.78rem',
+                            borderRadius: '12px',
+                            padding: '10px 12px',
+                            fontSize: '0.82rem',
                             fontWeight: 800,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px'
+                            gap: '5px',
+                            boxShadow: '0 3px 10px rgba(52, 168, 83, 0.25)',
+                            transition: 'all 0.2s'
                           }}
                         >
-                          <Check size={12} /> Bestätigen
+                          <Check size={15} /> Verschiebung annehmen
                         </button>
-                      )}
-                      
-                      {!isCanceled ? (
-                        pendingCancelOccId === occ.id ? (
-                          <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+
+                        {pendingCancelOccId === occ.id ? (
+                          <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
                             <button
                               type="button"
                               onClick={() => {
-                                handleCancelOccurrence(occ);
+                                handleRejectReschedule(occ);
                                 setPendingCancelOccId(null);
                               }}
                               style={{
@@ -2787,39 +2949,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 background: '#ef4444',
                                 color: '#ffffff',
                                 border: 'none',
-                                borderRadius: '8px',
-                                padding: '8px 12px',
-                                fontSize: '0.78rem',
+                                borderRadius: '12px',
+                                padding: '10px 8px',
+                                fontSize: '0.76rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px'
+                                whiteSpace: 'nowrap'
                               }}
                             >
-                              Ja, sicher absagen
+                              Ja, ablehnen
                             </button>
                             <button
                               type="button"
                               onClick={() => setPendingCancelOccId(null)}
                               style={{
-                                flex: 1,
-                                background: '#e2e8f0',
+                                background: '#f1f5f9',
                                 color: '#475569',
                                 border: 'none',
-                                borderRadius: '8px',
-                                padding: '8px 12px',
-                                fontSize: '0.78rem',
+                                borderRadius: '12px',
+                                padding: '10px 10px',
+                                fontSize: '0.76rem',
                                 fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px'
+                                cursor: 'pointer'
                               }}
                             >
-                              Behalten
+                              Abbrechen
                             </button>
                           </div>
                         ) : (
@@ -2827,72 +2981,255 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             type="button"
                             onClick={() => setPendingCancelOccId(occ.id)}
                             style={{
-                              flex: 1,
-                              background: '#f1f5f9',
-                              color: '#475569',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              padding: '8px 12px',
-                              fontSize: '0.78rem',
+                              background: '#fef2f2',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              fontSize: '0.82rem',
                               fontWeight: 800,
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '4px'
+                              gap: '4px',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.2s'
                             }}
                           >
-                            <X size={12} /> Absagen
+                            <X size={15} /> Ablehnen
                           </button>
-                        )
-                      ) : (
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={occ.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      padding: '8px 12px',
+                      borderRadius: '14px',
+                      background: rowBg,
+                      border: rowBorder,
+                      gap: '4px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', width: '100%' }}>
+                      {/* Left side: Date Badge & Teacher Info */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: isCanceled ? '#fee2e2' : '#f1f5f9',
+                          borderRadius: '8px',
+                          width: '34px',
+                          height: '34px',
+                          border: isCanceled ? '1px solid #fca5a5' : '1px solid rgba(0,0,0,0.04)',
+                          flexShrink: 0
+                        }}>
+                          <span style={{ fontSize: '6.5px', fontWeight: 900, textTransform: 'uppercase', color: isCanceled ? '#ef4444' : subColor }}>
+                            {formatWeekday(occ.date)}
+                          </span>
+                          <span style={{ fontSize: '12px', fontWeight: 900, color: isCanceled ? '#b91c1c' : textColor, marginTop: '-2px' }}>
+                            {occ.date.substring(8, 10)}
+                          </span>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: textColor, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {teacherName}
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: subColor, fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: isCanceled ? 'line-through' : 'none' }}>
+                            {formatDateGerman(occ.date)} • {occ.start_time.substring(0, 5)} Uhr ({occ.duration} Min)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right side: Action Buttons & Shoutbox */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                        {needsAcknowledge && (
+                          <button
+                            type="button"
+                            onClick={() => handleAcknowledgeOccurrence(occ)}
+                            style={{
+                              background: '#34a853',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '4px 8px',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              whiteSpace: 'nowrap',
+                              boxShadow: '0 1px 3px rgba(52, 168, 83, 0.3)'
+                            }}
+                            title={isRescheduled ? 'Verschiebung bestätigen' : 'Änderung als gelesen markieren'}
+                          >
+                            <Check size={12} /> {isRescheduled ? 'Bestätigen' : 'Gelesen'}
+                          </button>
+                        )}
+
                         <button
                           type="button"
-                          onClick={() => handleUndoCancel(occ)}
+                          onClick={() => setActiveChatOcc(occ)}
                           style={{
-                            flex: 1,
-                            background: '#f1f5f9',
-                            color: '#475569',
-                            border: '1px solid #cbd5e1',
+                            border: isUnread ? '1px solid #fca5a5' : hasMessages ? '1px solid #fef08a' : '1px solid #e2e8f0',
+                            background: isUnread ? '#fee2e2' : hasMessages ? '#fefce8' : '#f8fafc',
+                            color: isUnread ? '#dc2626' : hasMessages ? '#ca8a04' : '#475569',
+                            width: '30px',
+                            height: '30px',
                             borderRadius: '8px',
-                            padding: '8px 12px',
-                            fontSize: '0.78rem',
-                            fontWeight: 800,
                             cursor: 'pointer',
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px'
+                            position: 'relative'
                           }}
+                          title="Shoutbox öffnen"
                         >
-                          Reaktivieren
+                          <MessageSquare size={13} />
+                          {isUnread && (
+                            <span style={{
+                              position: 'absolute',
+                              top: '-2px',
+                              right: '-2px',
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              background: '#ef4444',
+                              border: '1.5px solid #ffffff'
+                            }} />
+                          )}
                         </button>
-                      )}
+
+                        {!isCanceled ? (
+                          pendingCancelOccId === occ.id ? (
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isRescheduled) {
+                                    handleRejectReschedule(occ);
+                                  } else {
+                                    handleCancelOccurrence(occ);
+                                  }
+                                  setPendingCancelOccId(null);
+                                }}
+                                style={{
+                                  background: '#ef4444',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {isRescheduled ? 'Ja, ablehnen' : 'Ja, absagen'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPendingCancelOccId(null)}
+                                style={{
+                                  background: '#e2e8f0',
+                                  color: '#475569',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                Abbrechen
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setPendingCancelOccId(occ.id)}
+                              style={{
+                                background: '#f8fafc',
+                                color: isRescheduled ? '#dc2626' : '#64748b',
+                                border: isRescheduled ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                padding: '5px 9px',
+                                fontSize: '0.72rem',
+                                fontWeight: 750,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <X size={12} /> {isRescheduled ? 'Ablehnen' : 'Absagen'}
+                            </button>
+                          )
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#dc2626', background: '#fee2e2', border: '1px solid #fca5a5', padding: '3px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              Abgesagt
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUndoCancel(occ)}
+                              style={{
+                                background: '#ffffff',
+                                color: '#dc2626',
+                                border: '1px solid #fca5a5',
+                                borderRadius: '8px',
+                                padding: '4px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              Reaktivieren
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    
-                    {/* Visual status labels */}
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {isPendingReview && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                          ⏳ In Prüfung
-                        </span>
-                      )}
-                      {isRescheduled && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                          Verschoben
-                        </span>
-                      )}
-                      {isCanceled && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fee2e2', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                          Abgesagt
-                        </span>
-                      )}
-                      {needsAcknowledge && (
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                          ⏳ Bestätigung ausstehend
-                        </span>
-                      )}
-                    </div>
+
+                    {/* Status badges row (for pending review / reschedule / acknowledge) */}
+                    {(isPendingReview || isRescheduled || needsAcknowledge) && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '1px' }}>
+                        {isPendingReview && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#fffbeb', color: '#b45309', border: '1px solid #fef3c7', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                            ⏳ In Prüfung
+                          </span>
+                        )}
+                        {isRescheduled && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                            Verschoben
+                          </span>
+                        )}
+                        {needsAcknowledge && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, background: '#fff7ed', color: '#ea580c', border: '1px solid #ffedd5', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                            ⏳ Bestätigung ausstehend
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2904,6 +3241,63 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+        {/* Lock / PIN Protection & WebApp Login Header Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: '-4px', gap: '8px' }}>
+          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Shield size={13} color="#34a853" /> PIN-geschützt
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={handleOpenFullWebApp}
+              style={{
+                background: '#e6f4ea',
+                color: '#288d45',
+                border: '1px solid #ceebd6',
+                borderRadius: '10px',
+                padding: '5px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                transition: 'all 0.2s'
+              }}
+            >
+              In WebApp öffnen <ExternalLink size={12} />
+            </button>
+            {profile?.has_parent_pin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLessonsUnlocked(false);
+                  sessionStorage.removeItem(`groovelab_lessons_unlocked_${profile.id}`);
+                  showToastMsg('Termine-Tab wieder per PIN geschützt', 'success');
+                }}
+                style={{
+                  background: '#ffffff',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  borderRadius: '10px',
+                  padding: '5px 10px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Lock size={12} /> Sperren
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Upcoming appointments month groups */}
         {sortedUpcomingMonthKeys.length > 0 ? (
           sortedUpcomingMonthKeys.map(monthKey => 
@@ -3047,12 +3441,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {activeBooks.map(([bookTitle, pages]) => {
               const formattedPages = formatPageNumbers(pages.map(p => p.num));
-              const textNotes = compressed ? '' : pages
-                .map(p => p.notes)
-                .filter(Boolean)
-                .map(n => n.split('\n').filter((l: string) => !l.trim().startsWith('STICKER:') && !l.trim().startsWith('AUDIO:') && l.trim() !== 'Inhalte in der Premium-Version freischalten').join('\n').trim())
-                .filter(Boolean)
-                .join('; ');
+              const textNotes = compressed ? '' : cleanHomeworkNotesText(pages.map(p => p.notes).filter(Boolean).join('\n'));
               return (
                 <div key={bookTitle} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
@@ -3074,50 +3463,90 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         {otherHWs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: activeBooks.length > 0 ? '1px solid #f1f5f9' : 'none', paddingTop: activeBooks.length > 0 ? '12px' : 0 }}>
-            {otherHWs.map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                  <Music size={15} color="#64748b" style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} /> {item.topic_name}
-                </span>
-                {!compressed && item.teacher_notes && (
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
-                    Bemerkung: {item.teacher_notes}
+            {otherHWs.map((item, idx) => {
+              const cleanedOtherNote = cleanHomeworkNotesText(item.teacher_notes);
+              return (
+                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                    <Music size={15} color="#64748b" style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} /> {item.topic_name}
                   </span>
-                )}
-              </div>
-            ))}
+                  {!compressed && cleanedOtherNote && (
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginLeft: '22px' }}>
+                      Bemerkung: {cleanedOtherNote}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
         {!compressed && notesList.length > 0 && (() => {
           let audioCount = 0;
-          const filteredNotes = notesList.filter(note => !note.startsWith("STICKER:"));
+          const filteredNotes = notesList.filter(note => {
+            const t = (note || '').trim();
+            return !t.includes("STICKER:") && !t.includes("LATENCY:");
+          });
           if (filteredNotes.length === 0) return null;
           
           return (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
+              gap: '6px',
               borderTop: hasAnyHWItems ? '1px solid #f1f5f9' : 'none',
-              paddingTop: hasAnyHWItems ? '12px' : 0
+              paddingTop: hasAnyHWItems ? '10px' : 0
             }}>
               {filteredNotes.map((note, idx) => {
-                const isAudio = note.startsWith("AUDIO:");
-                if (isAudio) {
+                const trimmed = (note || '').trim();
+                if (trimmed.startsWith("AUDIO:")) {
                   audioCount++;
-                  const parts = note.substring(6).split('|');
+                  const parts = trimmed.substring(6).split('|');
                   return (
                     <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along #${audioCount}`} />
                     </div>
                   );
                 }
+
+                const isPublic = trimmed.includes('STUDENT_NOTE_PUBLIC:');
+                const isPrivate = trimmed.includes('STUDENT_NOTE_PRIVATE:');
+
+                let cleanText = trimmed;
+                if (isPublic || isPrivate) {
+                  if (cleanText.includes('|')) {
+                    cleanText = cleanText.split('|').slice(1).join('|');
+                  } else {
+                    cleanText = cleanText.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
+                  }
+                }
+                cleanText = cleanText.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                if (!cleanText) return null;
+
+                if (isPublic) {
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '5px 10px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.85rem' }}>💬</span>
+                      <span>Frage: {cleanText}</span>
+                    </div>
+                  );
+                }
+
+                if (isPrivate) {
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.8rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: '1px solid #fecaca', padding: '5px 10px', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.85rem' }}>🔒</span>
+                      <span>Notiz: {cleanText}</span>
+                    </div>
+                  );
+                }
+
                 return (
-                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <FileText size={15} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 650, lineHeight: '1.3rem' }}>
-                      {note}
+                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <FileText size={14} color="#64748b" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 650 }}>
+                      {cleanText}
                     </span>
                   </div>
                 );
@@ -3295,22 +3724,38 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         >
           <Calendar size={14} style={{ marginRight: 6 }} />
           <span>Termine</span>
-          {occurrences.some(occ => {
-            const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-            const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student';
-            const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
-            const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
-            return needsAck || hasUnreadMsg;
-          }) && (
-            <span style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: '#ef4444',
-              display: 'inline-block',
-              marginLeft: '4px'
-            }} />
-          )}
+          {(() => {
+            const pendingCount = occurrences.filter(occ => {
+              const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
+              const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+              const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
+              const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
+              return needsAck || hasUnreadMsg;
+            }).length;
+
+            if (pendingCount === 0) return null;
+
+            return (
+              <span style={{
+                minWidth: '16px',
+                height: '16px',
+                padding: '0 4px',
+                borderRadius: '8px',
+                background: '#ef4444',
+                color: '#ffffff',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: '2px',
+                boxShadow: '0 1px 3px rgba(239, 68, 68, 0.4)',
+                lineHeight: 1
+              }}>
+                {pendingCount}
+              </span>
+            );
+          })()}
         </button>
       </div>
     );
@@ -3321,16 +3766,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     return (
       <div style={{
-        background: '#e6f4ea',
-        border: '1.5px solid #e6f4ea',
-        borderRadius: '24px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '28px',
         padding: '28px 16px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: '20px',
         textAlign: 'center',
-        boxShadow: '0 10px 25px rgba(52, 168, 83, 0.06)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
         width: '100%',
         boxSizing: 'border-box'
       }}>
@@ -3360,7 +3805,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               cy="80"
               r="70"
               fill="transparent"
-              stroke="#e2e8f0"
+              stroke="#f1f5f9"
               strokeWidth="8"
             />
             {/* Foreground Progress */}
@@ -3410,7 +3855,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               {stats?.streak_flame || avatar?.streak_flame || 0}
             </span>
             <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '1px' }}>
-              Tage Streak
+              {(stats?.streak_flame || avatar?.streak_flame || 0) === 1 ? 'Tag Streak' : 'Tage Streak'}
             </span>
           </div>
         </div>
@@ -3420,15 +3865,49 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#34a853' }}>
             {isGoalMet ? 'Tagesziel erreicht!' : 'Übung eingetragen!'}
           </h3>
-          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#34a853', fontWeight: 650, lineHeight: 1.4 }}>
-            Heute geübt: <strong style={{ color: '#34a853', fontSize: '0.9rem' }}>{loggedMinutesToday}</strong> von <strong style={{ color: '#34a853', fontSize: '0.9rem' }}>{dailyGoal}</strong> Min.
+          <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#0f172a', fontWeight: 650, lineHeight: 1.4 }}>
+            Heute geübt: <strong style={{ color: '#34a853', fontSize: '0.95rem' }}>{loggedMinutesToday} Min.</strong> {isGoalMet && '(Tagesziel erfüllt ✓)'}
           </p>
-          <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#4f5e53', fontWeight: 650, lineHeight: 1.4 }}>
+          <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
             {isGoalMet 
-              ? 'Hervorragend! Du hast dein Tagesziel voll erreicht und die Funken sprühen lassen! ✨' 
+              ? 'Hervorragend! Dein Streak ist gesichert. Jede weitere Minute wird als Extra-Übezeit gutgeschrieben! ✨' 
               : 'Super! Jede Minute zählt. Dein täglicher Streak ist für heute gesichert! 🔥'}
           </p>
         </div>
+
+        {/* Multi-Session Re-Practice Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setPracticeLoggedToday(false);
+            setElapsedSeconds(0);
+            setTimerRunning(false);
+            setIsExtraTime(false);
+          }}
+          style={{
+            marginTop: '4px',
+            padding: '14px 20px',
+            borderRadius: '16px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+            color: '#ffffff',
+            fontSize: '0.88rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(234, 179, 8, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            width: '100%',
+            transition: 'transform 0.15s ease'
+          }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          <Sparkles size={16} color="#ffffff" />
+          Noch eine Session einlegen (Bonus-Zeit sammeln)
+        </button>
       </div>
     );
   };
@@ -3901,7 +4380,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 {activeHWs.length > 0 || notesList.length > 0 ? (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                     {activeHWs.map((hw, i) => {
-                      const textNotes = hw.teacher_notes || hw.notes || '';
+                      const textNotes = cleanHomeworkNotesText(hw.teacher_notes || hw.notes || '');
                       return (
                         <div key={i} style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
                           <div style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#334155', fontWeight: 600}}>
@@ -3919,12 +4398,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     {(() => {
                       let audioCount = 0;
                       return notesList.map((note, i) => {
-                        if (note.startsWith("STICKER:") || note.startsWith("LATENCY:")) return null;
+                        const trimmedNote = (note || '').trim();
+                        if (trimmedNote.includes("STICKER:") || trimmedNote.includes("LATENCY:")) return null;
                         
-                        const isAudio = note.startsWith("AUDIO:");
+                        const isAudio = trimmedNote.startsWith("AUDIO:");
                         if (isAudio) {
                           audioCount++;
-                          const parts = note.substring(6).split('|');
+                          const parts = trimmedNote.substring(6).split('|');
                           return (
                             <div key={`note-${i}`} style={{display: 'flex', justifyContent: 'center', padding: '4px 0'}}>
                               <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along #${audioCount}`} />
@@ -3932,34 +4412,42 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           );
                         }
                         
-                        const trimmedNote = (note || '').trim();
                         const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
                         const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
 
                         if (isStudentNotePublic || isStudentNotePrivate) {
-                          const raw = trimmedNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').trim();
-                          const cleanText = raw.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                          let rawContent = trimmedNote;
+                          if (rawContent.includes('|')) {
+                            rawContent = rawContent.split('|').slice(1).join('|');
+                          } else {
+                            rawContent = rawContent.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
+                          }
+                          const cleanQuestionText = rawContent.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+                          if (!cleanQuestionText) return null;
 
                           return (
                             <div key={`note-${i}`} style={{
                               display: 'flex',
-                              alignItems: 'center',
+                              alignItems: 'flex-start',
                               gap: '8px',
-                              background: isStudentNotePrivate ? 'rgba(239, 68, 68, 0.05)' : 'rgba(52, 168, 83, 0.08)',
-                              border: isStudentNotePrivate ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(52, 168, 83, 0.25)',
-                              padding: '6px 12px',
+                              background: isStudentNotePrivate ? '#fef2f2' : '#f0fdf4',
+                              border: isStudentNotePrivate ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                              padding: '8px 12px',
                               borderRadius: '12px',
-                              fontSize: '0.76rem',
+                              fontSize: '0.78rem',
                               color: '#1e293b',
                               lineHeight: '1.4'
                             }}>
-                              <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>💬</span>
-                              <span style={{ fontWeight: 800, color: isStudentNotePrivate ? '#dc2626' : '#166534', flexShrink: 0 }}>
-                                {isStudentNotePrivate ? 'Deine private Notiz:' : 'Deine Frage:'}
-                              </span>
-                              <span style={{ color: '#334155', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {cleanText || raw}
-                              </span>
+                              <MessageSquare size={15} style={{ color: isStudentNotePrivate ? '#dc2626' : '#166534', marginTop: '2px', flexShrink: 0 }} />
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 900, color: isStudentNotePrivate ? '#dc2626' : '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                  {isStudentNotePrivate ? 'Deine private Notiz' : 'Deine Frage für den Unterricht'}
+                                </span>
+                                <span style={{ color: '#0f172a', fontWeight: 700, wordBreak: 'break-word' }}>
+                                  {cleanQuestionText}
+                                </span>
+                              </div>
                             </div>
                           );
                         }
@@ -3969,7 +4457,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
                           .trim();
 
-                        if (!cleanRegularNote) return null;
+                        if (!cleanRegularNote || cleanRegularNote.includes('LATENCY:')) return null;
 
                         return (
                           <div key={`note-${i}`} style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', fontWeight: 600, background: '#f8fafc', padding: '6px 10px', borderRadius: '0 8px 8px 0', borderLeft: '3.5px solid #34a853'}}>
@@ -4399,7 +4887,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     );
   }
 
-  // ── Render: Profile (10-Sekunden-Interface) ───────────────────────────────
   if (pageState === 'profile' && profile) {
     // ── 1. GrooveLab-only Schüler Abfangen ──────────────────────────────────
     if (profile.role === 'student' && !profile.is_campus_active && profile.is_groovelab_active) {
@@ -4411,69 +4898,55 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       return (
         <div style={{
-          ...styles.fullScreen,
-          background: '#f8fafc',
-          padding: '20px',
+          position: 'fixed',
+          inset: 0,
+          background: '#f2f2f7',
+          padding: '16px',
           boxSizing: 'border-box',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: '"Outfit", "Inter", sans-serif'
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif'
         }}>
           <div style={{
-            ...styles.card,
-            maxWidth: '420px',
+            maxWidth: '380px',
             width: '100%',
             background: '#ffffff',
-            border: '1.5px solid #fde68a',
-            boxShadow: '0 20px 40px -15px rgba(217, 119, 6, 0.12), 0 1px 3px rgba(0,0,0,0.04)',
-            borderRadius: '24px',
-            padding: '28px',
-            color: '#0f172a',
+            borderRadius: '28px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04)',
+            padding: '28px 22px',
+            color: '#1c1c1e',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             textAlign: 'center',
-            gap: '20px'
+            gap: '18px',
+            boxSizing: 'border-box'
           }}>
             <div style={{
               background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-              width: '54px',
-              height: '54px',
+              width: '52px',
+              height: '52px',
               borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 10px 25px rgba(234, 179, 8, 0.25)'
+              boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)'
             }}>
               <Sparkles size={26} color="#ffffff" />
             </div>
 
             <div>
-              <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                 GrooveLab Modul
               </span>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.02em', color: '#0f172a' }}>
-                Lernen an den Musikschul-Stationen
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '4px 0 0 0', letterSpacing: '-0.02em', color: '#1c1c1e' }}>
+                Musikschul-Stationen
               </h1>
             </div>
 
-            <div style={{
-              background: '#fefce8',
-              border: '1px solid #fde68a',
-              borderRadius: '16px',
-              padding: '16px',
-              fontSize: '0.82rem',
-              color: '#475569',
-              lineHeight: 1.5,
-              textAlign: 'left'
-            }}>
-              <strong style={{ color: '#b45309', display: 'block', marginBottom: '4px', fontWeight: 800 }}>Kein Hausaufgabenheft verfügbar</strong>
-              GrooveLab ist für das gemeinsame Band- und Songlernen vor Ort an den Musikschul-Stationen entwickelt worden. Für GrooveLab-Schüler gibt es kein mobiles Online-Hausaufgabenheft.
-            </div>
-
-            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: 0, lineHeight: 1.45 }}>
-              Falls du auch Einzelunterricht hast und dein Hausaufgabenheft nutzen möchtest, bitte deine Musikschule, deinen <strong style={{ color: '#0f172a' }}>Campus-Zugang</strong> zu aktivieren.
+            <p style={{ fontSize: '0.84rem', color: '#8e8e93', margin: 0, lineHeight: 1.5 }}>
+              GrooveLab ist für das gemeinsame Bandlernen vor Ort an den Stationen konzipiert. Für Einzelunterricht kontaktiere bitte deine Musikschule zur Aktivierung deines <strong style={{ color: '#1c1c1e' }}>Campus-Zugangs</strong>.
             </p>
 
             <button
@@ -4481,25 +4954,24 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               style={{
                 width: '100%',
                 padding: '14px',
-                borderRadius: '14px',
+                borderRadius: '16px',
                 background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
                 border: 'none',
                 color: '#ffffff',
                 fontWeight: 800,
-                fontSize: '0.88rem',
+                fontSize: '0.9rem',
                 cursor: 'pointer',
-                boxShadow: '0 8px 20px rgba(234, 179, 8, 0.3)',
-                transition: 'all 0.2s ease'
+                boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)'
               }}
             >
-              Zur Musikschul-Anmeldung →
+              Zur Anmeldeseite →
             </button>
           </div>
         </div>
       );
     }
 
-    // ── 2. Mitarbeiter- & Lehrer-Rollen (Verwaltung / Campus / GrooveLab / Hybrid) ──
+    // ── 2. Mitarbeiter- & Lehrer-Rollen (Native Mobile Wallet Pass) ─────────
     const rolesArray = Array.isArray(profile.roles) ? profile.roles : [];
     const isAdminOrSecretary = profile.role === 'admin' || profile.role === 'secretary' || rolesArray.includes('admin') || rolesArray.includes('secretary');
     const isTeacher = profile.role === 'teacher' || rolesArray.includes('teacher');
@@ -4538,21 +5010,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         setTimeout(() => setCopiedLink(false), 2000);
       };
 
-      // Avatar Policy: Admin/Secretary MUST display /campus_login_hero.png across all modules
-      const profileAvatar = isAdminOrSecretary
+      // Primary Campus Theme Color
+      const primaryColor = '#34a853';
+      const gradientBg = 'linear-gradient(135deg, #34a853 0%, #288d45 100%)';
+
+      // Profile avatar
+      const profileAvatar = (profile.role === 'admin' || profile.role === 'secretary')
         ? '/campus_login_hero.png'
         : (profile.photo_url || getInstrumentAvatarUrl(profile.instrument));
-
-      // Primary theme color
-      const primaryColor = isAdminOrSecretary
-        ? '#ea4335'
-        : (isGroovelabTeacher && !isCampusTeacher ? '#d97706' : '#34a853');
-
-      const gradientBg = isAdminOrSecretary
-        ? 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)'
-        : (isGroovelabTeacher && !isCampusTeacher
-            ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
-            : 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)');
 
       // Filter lessons for Kombi-Lehrer
       const filteredLessons = teacherTodayLessons.filter(lesson => {
@@ -4561,261 +5026,186 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         return true;
       });
 
+      // Role subtitle text
+      const roleTitles = [];
+      if (isCampusTeacher) roleTitles.push('Campus Lehrkraft');
+      if (isGroovelabTeacher) roleTitles.push('GrooveLab Coach');
+      if (isAdminOrSecretary && roleTitles.length === 0) roleTitles.push('Schulleitung');
+      const roleSubtitle = roleTitles.join(' · ');
+
+      // Spectrum Gradient Multi-Color Stripe (Tri-Tone)
+      const hasVerwaltung = isAdminOrSecretary;
+      const hasCampus = profile.is_campus_active;
+      const hasGrooveLab = profile.is_groovelab_active;
+
+      let spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #eab308 100%)';
+      if (hasVerwaltung && hasCampus && hasGrooveLab) {
+        spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #eab308 66.6%, #eab308 100%)';
+      } else if (hasVerwaltung && hasCampus) {
+        spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #34a853 50%, #34a853 100%)';
+      } else if (hasVerwaltung && hasGrooveLab) {
+        spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #eab308 50%, #eab308 100%)';
+      } else if (hasCampus && hasGrooveLab) {
+        spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
+      } else if (hasVerwaltung) {
+        spectrumGradient = '#ea4335';
+      } else if (hasCampus) {
+        spectrumGradient = '#34a853';
+      } else {
+        spectrumGradient = '#eab308';
+      }
+
       return (
         <div style={{
-          ...styles.fullScreen,
-          background: '#f8fafc',
-          padding: '20px',
-          boxSizing: 'border-box',
+          position: 'fixed',
+          inset: 0,
+          background: '#f2f2f7',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: '"Outfit", "Inter", sans-serif'
+          boxSizing: 'border-box',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif'
         }}>
-          <div style={{
-            ...styles.card,
-            maxWidth: '420px',
-            width: '100%',
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03)',
-            borderRadius: '24px',
-            padding: '24px',
-            color: '#0f172a',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px'
-          }}>
-            {/* Header / Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                background: gradientBg,
-                width: '38px',
-                height: '38px',
-                borderRadius: '11px',
+          {/* Dynamic Full Smartphone Responsive CSS */}
+          <style>{`
+            .qr-pass-card {
+              width: 100%;
+              height: 100%;
+              max-width: 430px;
+              max-height: 880px;
+              border-radius: 32px;
+              background: #ffffff;
+              box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.22), 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+              display: flex;
+              flex-direction: column;
+              box-sizing: border-box;
+              position: relative;
+              overflow: hidden;
+              border: 1px solid rgba(0, 0, 0, 0.06);
+            }
+            @media (max-width: 640px) {
+              .qr-pass-card {
+                max-width: calc(100vw - 20px) !important;
+                max-height: calc(100dvh - 20px) !important;
+                height: calc(100dvh - 20px) !important;
+                border-radius: 28px !important;
+                margin: 10px auto !important;
+              }
+            }
+          `}</style>
+
+          {/* Standalone Ausweis Card Container */}
+          <div className="qr-pass-card">
+            {/* Top Multi-Module Spectrum Stripe */}
+            <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
+
+            {/* Card Content Area */}
+            <div style={{ padding: 'max(16px, env(safe-area-inset-top, 16px)) 22px 20px 22px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              
+              {/* Role Pill Badges Header */}
+              <div style={{ 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: `0 6px 16px ${primaryColor}30`
+                gap: '6px',
+                flexWrap: 'wrap'
               }}>
-                {isAdminOrSecretary ? <Shield size={18} color="#ffffff" /> : <Music size={18} color="#ffffff" />}
-              </div>
-              <div>
-                <h1 style={{ fontSize: '1.15rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#0f172a' }}>
-                  Campus-Groovelab
-                </h1>
-                <span style={{ fontSize: '0.64rem', color: primaryColor, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  {isAdminOrSecretary ? 'Mobiles Leitstand-Dashboard' : 'Mobiles Lehrkraft-Pass'}
-                </span>
-              </div>
-            </div>
-
-            {/* Profile Card */}
-            <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '16px',
-              padding: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '14px'
-            }}>
-              <img
-                src={profileAvatar}
-                alt="Profile Avatar"
-                style={{
-                  width: '54px',
-                  height: '54px',
-                  borderRadius: '14px',
-                  objectFit: 'cover',
-                  border: `2px solid ${primaryColor}40`
-                }}
-              />
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {profile.first_name} {profile.last_name || ''}
-                </h2>
-                
-                {/* Badges */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '4px' }}>
-                  {isAdminOrSecretary && (
-                    <span style={{
-                      fontSize: '0.62rem',
-                      background: '#fef2f2',
-                      color: '#ea4335',
-                      border: '1px solid #fecaca',
-                      padding: '2px 7px',
-                      borderRadius: '6px',
-                      fontWeight: 800,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase'
-                    }}>
-                      {profile.role === 'admin' || rolesArray.includes('admin') ? 'Schulleitung' : 'Sekretariat'}
-                    </span>
-                  )}
-                  {isCampusTeacher && (
-                    <span style={{
-                      fontSize: '0.62rem',
-                      background: '#f0fdf4',
-                      color: '#34a853',
-                      border: '1px solid #bbf7d0',
-                      padding: '2px 7px',
-                      borderRadius: '6px',
-                      fontWeight: 800,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase'
-                    }}>
-                      Campus Lehrkraft
-                    </span>
-                  )}
-                  {isGroovelabTeacher && (
-                    <span style={{
-                      fontSize: '0.62rem',
-                      background: '#fefce8',
-                      color: '#d97706',
-                      border: '1px solid #fde68a',
-                      padding: '2px 7px',
-                      borderRadius: '6px',
-                      fontWeight: 800,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase'
-                    }}>
-                      GrooveLab Coach
-                    </span>
-                  )}
-                  {!isAdminOrSecretary && profile.instrument && (
-                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
-                      · {profile.instrument}
-                    </span>
-                  )}
-                </div>
-
-                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {profile.school_name}
-                </div>
-              </div>
-            </div>
-
-            {/* Direct Login Button */}
-            <button
-              onClick={() => {
-                setPinPurpose('unlock_app');
-                setPageState('pin_required');
-              }}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '14px',
-                background: gradientBg,
-                border: 'none',
-                color: '#ffffff',
-                fontWeight: 800,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                boxShadow: `0 8px 20px ${primaryColor}35`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Direkt in Campus-Groovelab anmelden →
-            </button>
-
-            {/* Section 1: Admin KPIs (Rendered if Admin / Secretary / Hybrid) */}
-            {isAdminOrSecretary && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {adminStats.pendingActivations > 0 ? (
-                  <div style={{
-                    background: '#fffbeb',
-                    border: '1px solid #fde68a',
-                    borderRadius: '16px',
-                    padding: '14px',
-                    display: 'flex',
-                    gap: '12px',
-                    alignItems: 'flex-start'
+                {hasVerwaltung && (
+                  <span style={{ 
+                    background: '#fce8e6', 
+                    color: '#ea4335', 
+                    border: '1px solid #fad2cf',
+                    padding: '3px 8px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.6rem', 
+                    fontWeight: 900, 
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase'
                   }}>
-                    <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
-                    <div>
-                      <strong style={{ display: 'block', fontSize: '0.82rem', color: '#b45309', fontWeight: 800, marginBottom: '2px' }}>
-                        Registrierungen ausstehend!
-                      </strong>
-                      <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 550, lineHeight: 1.4 }}>
-                        Es warten <strong style={{ color: '#0f172a' }}>{adminStats.pendingActivations}</strong> neue Profile auf Freischaltung.
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{
-                    background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '16px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    gap: '10px',
-                    alignItems: 'center'
-                  }}>
-                    <CheckCircle size={16} color="#34a853" />
-                    <span style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 600 }}>
-                      Alle Profile sind aktuell freigeschaltet.
-                    </span>
-                  </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '14px',
-                    padding: '12px',
-                    textAlign: 'center'
-                  }}>
-                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Schüler</span>
-                    {loadingAdminStats ? (
-                      <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #cbd5e1', borderTopColor: '#0f172a', borderRadius: '50%' }}></div>
-                      </div>
-                    ) : (
-                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', display: 'block', marginTop: '2px' }}>{adminStats.activeStudents}</strong>
-                    )}
-                  </div>
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '14px',
-                    padding: '12px',
-                    textAlign: 'center'
-                  }}>
-                    <span style={{ display: 'block', fontSize: '0.65rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Lehrkräfte</span>
-                    {loadingAdminStats ? (
-                      <div style={{ height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="animate-spin" style={{ width: '10px', height: '10px', border: '1.5px solid #cbd5e1', borderTopColor: '#0f172a', borderRadius: '50%' }}></div>
-                      </div>
-                    ) : (
-                      <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', display: 'block', marginTop: '2px' }}>{adminStats.activeTeachers}</strong>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Section 2: Teacher Schedule (Rendered if Teacher / Hybrid) */}
-            {isTeacher && (
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Heutiger Unterrichtsplan
+                    VERWALTUNG
                   </span>
-                  <span style={{ fontSize: '0.68rem', color: primaryColor, fontWeight: 800 }}>
+                )}
+                {hasCampus && (
+                  <span style={{ 
+                    background: '#e6f4ea', 
+                    color: '#34a853', 
+                    border: '1px solid #ceebd6',
+                    padding: '3px 8px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.6rem', 
+                    fontWeight: 900, 
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase'
+                  }}>
+                    CAMPUS
+                  </span>
+                )}
+                {hasGrooveLab && (
+                  <span style={{ 
+                    background: '#fefce8', 
+                    color: '#ca8a04', 
+                    border: '1px solid #fef08a',
+                    padding: '3px 8px', 
+                    borderRadius: '6px', 
+                    fontSize: '0.6rem', 
+                    fontWeight: 900, 
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase'
+                  }}>
+                    GROOVELAB
+                  </span>
+                )}
+              </div>
+
+              {/* Large Identity Typography Section */}
+              <div style={{ textAlign: 'center', marginTop: '2px' }}>
+                <div style={{ fontSize: '2.1rem', fontWeight: 1000, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-0.03em' }}>
+                  {profile.first_name || 'Member'}
+                </div>
+                <div style={{ fontSize: '1.05rem', color: '#64748b', marginTop: '4px', fontWeight: 800 }}>
+                  {profile.last_name || profile.instrument || 'Lehrkraft'}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {isTeacher ? 'LEHRKRAFT' : 'MITGLIED'}
+                </div>
+              </div>
+
+              {/* Primary Action Button (Campus Green Master Button) */}
+              <button
+                onClick={() => {
+                  setPinPurpose('unlock_app');
+                  setPageState('pin_required');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '15px 20px',
+                  borderRadius: '18px',
+                  background: 'linear-gradient(135deg, #34a853 0%, #288d45 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(52, 168, 83, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'transform 0.15s ease'
+                }}
+                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
+                onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                Direkt in Campus-Groovelab anmelden →
+              </button>
+
+              {/* Teacher Schedule Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8e8e93', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    Unterrichtsplan
+                  </span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#34a853' }}>
                     {new Date().toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                   </span>
                 </div>
@@ -4825,23 +5215,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr 1fr',
-                    gap: '4px',
-                    background: '#e2e8f0',
+                    gap: '3px',
+                    background: '#f2f2f7',
                     padding: '3px',
                     borderRadius: '10px'
                   }}>
                     <button
                       onClick={() => setTeacherModuleFilter('all')}
                       style={{
-                        padding: '6px',
+                        padding: '5px',
                         borderRadius: '8px',
                         border: 'none',
                         background: teacherModuleFilter === 'all' ? '#ffffff' : 'transparent',
-                        color: teacherModuleFilter === 'all' ? '#0f172a' : '#64748b',
+                        color: teacherModuleFilter === 'all' ? '#1c1c1e' : '#8e8e93',
                         fontSize: '0.68rem',
-                        fontWeight: 800,
+                        fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: teacherModuleFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        boxShadow: teacherModuleFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
                       }}
                     >
                       Alle
@@ -4849,15 +5239,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <button
                       onClick={() => setTeacherModuleFilter('campus')}
                       style={{
-                        padding: '6px',
+                        padding: '5px',
                         borderRadius: '8px',
                         border: 'none',
                         background: teacherModuleFilter === 'campus' ? '#34a853' : 'transparent',
-                        color: teacherModuleFilter === 'campus' ? '#ffffff' : '#64748b',
+                        color: teacherModuleFilter === 'campus' ? '#ffffff' : '#8e8e93',
                         fontSize: '0.68rem',
-                        fontWeight: 800,
+                        fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: teacherModuleFilter === 'campus' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        boxShadow: teacherModuleFilter === 'campus' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
                       }}
                     >
                       Campus
@@ -4865,15 +5255,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <button
                       onClick={() => setTeacherModuleFilter('groovelab')}
                       style={{
-                        padding: '6px',
+                        padding: '5px',
                         borderRadius: '8px',
                         border: 'none',
                         background: teacherModuleFilter === 'groovelab' ? '#eab308' : 'transparent',
-                        color: teacherModuleFilter === 'groovelab' ? '#ffffff' : '#64748b',
+                        color: teacherModuleFilter === 'groovelab' ? '#1c1c1e' : '#8e8e93',
                         fontSize: '0.68rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: teacherModuleFilter === 'groovelab' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                        boxShadow: teacherModuleFilter === 'groovelab' ? '0 1px 3px rgba(234, 179, 8, 0.3)' : 'none'
                       }}
                     >
                       GrooveLab
@@ -4882,42 +5272,41 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 )}
 
                 {loadingTeacherSchedule ? (
-                  <div style={{ padding: '16px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
-                    Lade Stundenplan...
+                  <div style={{ padding: '12px', textAlign: 'center', color: '#8e8e93', fontSize: '0.78rem' }}>
+                    Lade Plan...
                   </div>
                 ) : filteredLessons.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #f2f2f7', overflowY: 'auto', flex: 1 }}>
                     {filteredLessons.map((item, idx) => {
                       const isGL = item.module === 'groovelab';
-                      const badgeColor = isGL ? '#b45309' : '#166534';
+                      const badgeColor = isGL ? '#d97706' : '#34a853';
                       const badgeBg = isGL ? '#fefce8' : '#f0fdf4';
                       const badgeBorder = isGL ? '#fde68a' : '#bbf7d0';
 
                       return (
                         <div key={item.id || idx} style={{
-                          background: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '12px',
-                          padding: '10px 12px',
+                          padding: '10px 0',
+                          borderBottom: '1px solid #f2f2f7',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                          justifyContent: 'space-between'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{
-                              background: badgeBg,
-                              color: badgeColor,
-                              border: `1px solid ${badgeBorder}`,
+                            <span style={{
                               fontSize: '0.75rem',
                               fontWeight: 800,
-                              padding: '4px 8px',
-                              borderRadius: '6px'
+                              color: badgeColor,
+                              background: badgeBg,
+                              border: `1px solid ${badgeBorder}`,
+                              padding: '3px 7px',
+                              borderRadius: '6px',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}>
                               {item.time}
-                            </div>
+                            </span>
                             <div>
-                              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {item.student_name}
                                 {isCampusTeacher && isGroovelabTeacher && (
                                   <span style={{ fontSize: '0.58rem', background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}`, padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
@@ -4925,14 +5314,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.72rem', color: '#8e8e93' }}>
                                 {item.instrument}
                               </div>
                             </div>
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 600, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 7px', borderRadius: '6px' }}>
                             {item.room_name}
-                          </div>
+                          </span>
                         </div>
                       );
                     })}
@@ -4943,98 +5332,57 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     border: '1px solid #bbf7d0',
                     borderRadius: '12px',
                     padding: '14px',
+                    fontSize: '0.85rem',
+                    color: '#166534',
+                    fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
-                    color: '#166534',
-                    fontSize: '0.78rem',
-                    fontWeight: 600
+                    justifyContent: 'center',
+                    gap: '8px',
+                    margin: 'auto 0'
                   }}>
-                    <CheckCircle size={18} color="#34a853" style={{ flexShrink: 0 }} />
+                    <CheckCircle size={18} color="#34a853" />
                     Heute kein Unterricht geplant.
                   </div>
                 )}
               </div>
-            )}
 
-            {/* School Registration Link Card */}
-            <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '16px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}>
-              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Registrierungs-Link
-              </span>
-              <button
-                onClick={handleCopyLink}
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  background: copiedLink ? primaryColor : '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: copiedLink ? '#ffffff' : '#0f172a',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {copiedLink ? 'Kopiert ✓' : 'Anmeldelink kopieren'}
-              </button>
+              {/* Bottom Actions (Anmeldelink kopieren & Abmelden only) */}
+              <div style={{ borderTop: '1px solid #f2f2f7', paddingTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+                <button
+                  onClick={handleCopyLink}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: copiedLink ? '#34a853' : '#007aff',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  {copiedLink ? 'Link kopiert ✓' : 'Anmeldelink kopieren'}
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ff3b30',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  Abmelden
+                </button>
+              </div>
             </div>
 
-            {/* Desktop Hint for Staff */}
-            {isAdminOrSecretary && (
-              <div style={{
-                background: '#f8fafc',
-                borderRadius: '14px',
-                padding: '12px',
-                border: '1.5px dashed #cbd5e1',
-                fontSize: '0.68rem',
-                color: '#64748b',
-                lineHeight: 1.4,
-                textAlign: 'center'
-              }}>
-                Die vollumfängliche Verwaltung (Stundenpläne, Abrechnung, Banking) ist für <strong style={{ color: '#0f172a' }}>Desktop-Computer</strong> optimiert.
-              </div>
-            )}
-
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '12px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#dc2626',
-                fontWeight: 800,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#ef4444';
-                e.currentTarget.style.color = '#ffffff';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#fef2f2';
-                e.currentTarget.style.color = '#dc2626';
-              }}
-            >
-              Abmelden
-            </button>
+            {/* Bottom Spectrum Stripe */}
+            <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
           </div>
         </div>
       );
@@ -5132,57 +5480,111 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     const isLessonDay = isTodayLessonScheduled && !isCanceled;
 
+    const hasCampusStudent = profile.is_campus_active;
+    const hasGrooveLabStudent = profile.is_groovelab_active;
+    let studentSpectrumGradient = 'linear-gradient(90deg, #34a853 0%, #eab308 100%)';
+    if (hasCampusStudent && hasGrooveLabStudent) {
+      studentSpectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
+    } else if (hasCampusStudent) {
+      studentSpectrumGradient = '#34a853';
+    } else {
+      studentSpectrumGradient = '#eab308';
+    }
+
     return (
       <div style={{
-        ...styles.fullScreen,
+        position: 'fixed',
+        inset: 0,
         background: timerRunning ? '#000000' : '#f2f2f7',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
         transition: 'background 0.5s ease'
       }}>
-        <div style={{ 
-          ...styles.card, 
-          maxWidth: '380px', 
-          gap: '0', 
-          padding: 0, 
-          overflow: 'hidden',
-          background: timerRunning ? '#000000' : 'white',
-          border: timerRunning ? 'none' : '1px solid #e5e5ea',
-          boxShadow: timerRunning ? 'none' : '0 10px 40px rgba(0,0,0,0.04)',
-          transition: 'all 0.5s ease'
+        {/* Dynamic Full Smartphone Responsive CSS */}
+        <style>{`
+          .qr-pass-card {
+            width: 100%;
+            height: 100%;
+            max-width: 430px;
+            max-height: 880px;
+            border-radius: 32px;
+            background: #ffffff;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.22), 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+          }
+          @media (max-width: 640px) {
+            .qr-pass-card {
+              max-width: calc(100vw - 20px) !important;
+              max-height: calc(100dvh - 20px) !important;
+              height: calc(100dvh - 20px) !important;
+              border-radius: 28px !important;
+              margin: 10px auto !important;
+            }
+          }
+        `}</style>
+
+        <div className="qr-pass-card" style={{ 
+          borderRadius: timerRunning ? 0 : '32px',
+          background: timerRunning ? '#000000' : '#ffffff',
+          boxShadow: timerRunning ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.22), 0 10px 25px -5px rgba(0, 0, 0, 0.08)',
+          border: timerRunning ? 'none' : '1px solid rgba(0, 0, 0, 0.06)'
         }}>
-          {/* Header Banner */}
+          {/* Header Section with Spectrum Gradient */}
           {!timerRunning && (
-            <div style={{
-              background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-              padding: 'calc(env(safe-area-inset-top, 0px) + 24px) 20px 24px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              position: 'relative'
-            }}>
-              <div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
-                  Campus-Groovelab
-                </span>
-                <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
-                  Mein Übe-Profil
-                </h1>
-              </div>
+            <>
+              {/* Top Multi-Module Spectrum Stripe */}
+              <div style={{ height: '8px', width: '100%', background: studentSpectrumGradient, flexShrink: 0 }} />
+
+              {/* Ultra-Compact 36px Smart Header Section */}
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
+                background: '#ffffff',
+                padding: 'max(10px, env(safe-area-inset-top, 10px)) 16px 10px 16px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                border: '1px solid rgba(255, 255, 255, 0.3)'
+                justifyContent: 'space-between',
+                borderBottom: '1px solid #f2f2f7'
               }}>
-                <Music size={18} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '8px',
+                    background: '#e6f4ea',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#34a853',
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <Music size={14} />
+                  </div>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Urbanist', 'Outfit', sans-serif" }}>
+                    Campus-Groovelab
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  {hasCampusStudent && (
+                    <span style={{ background: '#e6f4ea', color: '#34a853', border: '1px solid #ceebd6', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      CAMPUS
+                    </span>
+                  )}
+                  {hasGrooveLabStudent && (
+                    <span style={{ background: '#fefce8', color: '#ca8a04', border: '1px solid #fef08a', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      GROOVELAB
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {!timerRunning && profile.app_usage_mode === 'parent_hybrid' && (
@@ -5315,10 +5717,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <div>
                     <h3 style={{ margin: '0 0 8px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                       <Lock size={18} />
-                      Neue Eltern-PIN vergeben
+                      4-stellige PIN festlegen / ändern
                     </h3>
                     <p style={{ margin: '0 0 16px 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
-                      Um fortzufahren, musst du die standardmäßige PIN (0000) durch eine persönliche, sichere 4-stellige Nummer ersetzen.
+                      Gib deine persönliche 4-stellige Sicherheits-PIN für dein Profil ein und bestätige sie.
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
                       <div>
@@ -5921,70 +6323,91 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     
                     {/* Gamification Streak/XP Row */}
+                    {/* Gamification Streak/XP Row (Rich App-Style Gradient Cards) */}
                     {!timerRunning && (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        {/* Streak flame */}
+                        {/* Tagesserie flame card (Red Gradient) */}
                         <div style={{
-                          background: '#ffffff',
-                          border: '1px solid #e5e5ea',
+                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                           borderRadius: '20px',
                           padding: '16px 14px',
                           display: 'flex',
                           flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                          justifyContent: 'space-between',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.25)',
+                          color: '#ffffff',
+                          minHeight: '86px',
+                          boxSizing: 'border-box'
                         }}>
                           <div style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '10px',
+                            background: 'rgba(255, 255, 255, 0.22)',
+                            backdropFilter: 'blur(4px)',
+                            WebkitBackdropFilter: 'blur(4px)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: '#f1f5f9'
+                            justifyContent: 'center'
                           }}>
-                            <Flame size={18} color="#475569" />
+                            <Flame size={16} color="#ffffff" />
                           </div>
                           <div>
-                            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
-                              {stats?.streak_flame || avatar?.streak_flame || 0} Tage
+                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                              Tagesserie
                             </span>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                              Übungs-Streak
+                          </div>
+                          <div style={{ marginTop: '10px' }}>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>
+                              {(stats?.streak_flame || avatar?.streak_flame || 0) === 1 ? '1 Tag' : `${stats?.streak_flame || avatar?.streak_flame || 0} Tage`}
                             </span>
                           </div>
                         </div>
 
-                        {/* XP points */}
+                        {/* XP points card (Purple/Indigo Gradient) */}
                         <div style={{
-                          background: '#ffffff',
-                          border: '1px solid #e5e5ea',
+                          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                           borderRadius: '20px',
                           padding: '16px 14px',
                           display: 'flex',
                           flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                          justifyContent: 'space-between',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          boxShadow: '0 4px 14px rgba(99, 102, 241, 0.25)',
+                          color: '#ffffff',
+                          minHeight: '86px',
+                          boxSizing: 'border-box'
                         }}>
                           <div style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            width: '30px',
+                            height: '30px',
+                            borderRadius: '10px',
+                            background: 'rgba(255, 255, 255, 0.22)',
+                            backdropFilter: 'blur(4px)',
+                            WebkitBackdropFilter: 'blur(4px)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: '#f1f5f9'
+                            justifyContent: 'center'
                           }}>
-                            <Sparkles size={18} color="#475569" />
+                            <Sparkles size={16} color="#ffffff" />
                           </div>
                           <div>
-                            <span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#000000', display: 'block' }}>
-                              {stats?.current_xp || 0} XP
-                            </span>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
                               Erfahrungspunkte
+                            </span>
+                          </div>
+                          <div style={{ marginTop: '10px' }}>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>
+                              {stats?.current_xp || 0} <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>XP</span>
                             </span>
                           </div>
                         </div>
@@ -6265,11 +6688,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
-              marginTop: '4px'
+              marginTop: '4px',
+              paddingBottom: '12px'
             }}>
               <Shield size={12} color="#94a3b8" />
               <span>Sichere passwortlose Verbindung</span>
             </div>
+
+            {/* Bottom Spectrum Stripe */}
+            {!timerRunning && <div style={{ height: '8px', width: '100%', background: studentSpectrumGradient, flexShrink: 0, marginTop: 'auto' }} />}
 
           </div>
         </div>
@@ -6638,11 +7065,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>Rückfragen</span> {titleText}
+                        <span>💬</span> {titleText}
                       </h3>
-                      <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                      <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
                         Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
                       </p>
+
+                      {/* Badges */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          background: 'rgba(255, 255, 255, 0.2)',
+                          color: '#ffffff',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          backdropFilter: 'blur(4px)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          <ShieldCheck size={13} color="#ffffff" />
+                          <span>100% DSGVO-konformer Schulchat</span>
+                        </span>
+                      </div>
                     </div>
                     <button
                       onClick={() => setActiveChatOcc(null)}
@@ -6678,7 +7125,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   }}>
                     {isFrozen && (
                       <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', textAlign: 'center' }}>
-                        Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
+                        🔒 Shoutbox eingefroren (Schreibschutz nach 48h aktiv)
                       </div>
                     )}
                     {chatMessages.length === 0 ? (
@@ -6699,21 +7146,24 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             gap: '2px'
                           }}>
                             <div style={{
-                              background: isMe ? 'linear-gradient(135deg, #34a853, #34a853)' : '#ffffff',
-                              color: isMe ? '#ffffff' : '#1e293b',
+                              background: isMe ? '#e6f4ea' : '#ffffff',
+                              color: '#0f172a',
                               padding: '10px 14px',
                               borderRadius: isMe ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
                               fontSize: '0.85rem',
                               lineHeight: 1.4,
                               wordBreak: 'break-word',
-                              border: isMe ? 'none' : '1px solid #e2e8f0',
+                              border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
                               boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
                             }}>
                               {msg.content}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', marginTop: '4px' }}>
+                                <span style={{ fontSize: '0.62rem', color: isMe ? '#15803d' : '#86868b' }}>
+                                  {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {isMe && <CheckCheck size={14} color="#15803d" style={{ marginLeft: '2px' }} />}
+                              </div>
                             </div>
-                            <span style={{ fontSize: '0.62rem', color: '#86868b', marginTop: '2px' }}>
-                              {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
                           </div>
                         );
                       })

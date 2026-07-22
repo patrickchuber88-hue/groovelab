@@ -1728,6 +1728,20 @@ export function ScheduleCalendarView({
         console.warn('DB fetch failed', err);
       }
 
+      // Helper function to check if a database occurrence matches a template student
+      const matchesTemplateStudent = (occ: any, s: any) => {
+        if (!s || !occ) return false;
+        if (occ.student_id && (occ.student_id === s.id || occ.student_id === s.student_id || occ.student_id === s.studentId)) return true;
+        if (occ.student?.first_name && s.first_name) {
+          const oFirst = occ.student.first_name.trim().toLowerCase();
+          const sFirst = s.first_name.trim().toLowerCase();
+          const oLast = (occ.student.last_name || '').trim().toLowerCase();
+          const sLast = (s.last_name || '').trim().toLowerCase();
+          if (oFirst === sFirst && oLast === sLast) return true;
+        }
+        return false;
+      };
+
       // Dynamically detect rescheduling by comparing database records with template boards
       if (boards && boards.length > 0) {
         fetchedData = fetchedData.map(occ => {
@@ -1737,7 +1751,7 @@ export function ScheduleCalendarView({
           let templateTime = '';
           
           boards.forEach(board => {
-            const found = board.students?.find((s: any) => s.id === occ.student_id);
+            const found = board.students?.find((s: any) => matchesTemplateStudent(occ, s));
             if (found) {
               templateDayOfWeek = board.dayOfWeek;
               templateTime = found.assignedTime || '';
@@ -1824,11 +1838,16 @@ export function ScheduleCalendarView({
                   o.start_time.substring(0, 5) === (student.assignedTime || '').substring(0, 5)
                 );
               } else {
-                dbRecord = fetchedData.find(o => o.student_id === student.id);
+                dbRecord = fetchedData.find(o => matchesTemplateStudent(o, student));
               }
               
-              // If there is no DB record, OR if the DB record has been rescheduled/moved away from this template day/time
-              const isRescheduledAway = dbRecord && (dbRecord.date !== dateStr || (dbRecord.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5));
+              // Check if the student has an active record that was rescheduled away from this template day/time
+              const rescheduledAwayRecord = fetchedData.find(o => 
+                matchesTemplateStudent(o, student) && 
+                (o.date !== dateStr || (o.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5))
+              );
+
+              const isRescheduledAway = !!rescheduledAwayRecord || (!!dbRecord && (dbRecord.date !== dateStr || (dbRecord.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5)));
               
               if (!dbRecord || isRescheduledAway) {
                 // If the student was rescheduled away, project a vacant placeholder to anchor the original time slot
@@ -2698,6 +2717,22 @@ export function ScheduleCalendarView({
 
     if (sourceOcc) {
       const roomId = sourceOcc.schedules?.room_id || null;
+      const existingStudentOcc = occurrences.find(o => 
+        o.id !== sourceId && 
+        o.student_id && 
+        o.student_id !== 'vacant' && 
+        o.date === targetDateStr && 
+        o.start_time.substring(0, 5) === targetStartTime.substring(0, 5) && 
+        (o.schedules?.room_id || null) === roomId &&
+        !['cancelled', 'canceled_by_student'].includes(o.status)
+      );
+
+      if (existingStudentOcc) {
+        setDropDecisionState({ sourceId, targetId: existingStudentOcc.id });
+        setDraggedId(null);
+        return;
+      }
+
       const conflict = getRoomConflict(sourceId, targetDateStr, targetStartTime, sourceOcc.duration, roomId);
       if (conflict) {
         const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
@@ -2733,6 +2768,22 @@ export function ScheduleCalendarView({
     const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
 
     const roomId = sourceOcc.schedules?.room_id || null;
+    const existingStudentOcc = occurrences.find(o => 
+      o.id !== sourceId && 
+      o.student_id && 
+      o.student_id !== 'vacant' && 
+      o.date === targetDateStr && 
+      o.start_time.substring(0, 5) === targetStartTime.substring(0, 5) && 
+      (o.schedules?.room_id || null) === roomId &&
+      !['cancelled', 'canceled_by_student'].includes(o.status)
+    );
+
+    if (existingStudentOcc) {
+      setDropDecisionState({ sourceId, targetId: existingStudentOcc.id });
+      setDraggedId(null);
+      return;
+    }
+
     const conflict = getRoomConflict(sourceId, targetDateStr, targetStartTime, sourceOcc.duration, roomId);
     if (conflict) {
       const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
@@ -6489,6 +6540,31 @@ export function ScheduleCalendarView({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
                 <button
                   onClick={async () => {
+                    const { sourceId, targetId } = dropDecisionState;
+                    setDropDecisionState(null);
+                    executeOccurrenceSwap(sourceId, targetId);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: primaryColor,
+                    color: '#ffffff',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: `0 4px 12px ${primaryColor}33`
+                  }}
+                  onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
+                  onMouseOut={e => e.currentTarget.style.filter = 'none'}
+                >
+                  🔄 Termine tauschen (Empfohlen)
+                </button>
+
+                <button
+                  onClick={async () => {
                     const targetRoomId = targetOcc.schedules?.room_id || null;
                     const isSourceGroup = occurrences.some(o => 
                       o.id !== sourceOcc.id && 
@@ -6532,31 +6608,6 @@ export function ScheduleCalendarView({
                     width: '100%',
                     padding: '12px 20px',
                     borderRadius: '12px',
-                    border: 'none',
-                    background: '#0b57d0',
-                    color: '#ffffff',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 4px 12px rgba(11, 87, 208, 0.2)'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
-                  onMouseOut={e => e.currentTarget.style.filter = 'none'}
-                >
-                  👥 Zusammenführen (Ensembles/Bands)
-                </button>
-
-                <button
-                  onClick={async () => {
-                    const { sourceId, targetId } = dropDecisionState;
-                    setDropDecisionState(null);
-                    executeOccurrenceSwap(sourceId, targetId);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px 20px',
-                    borderRadius: '12px',
                     border: '1.5px solid #cbd5e1',
                     background: 'transparent',
                     color: '#1d1d1f',
@@ -6568,7 +6619,7 @@ export function ScheduleCalendarView({
                   onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  🔄 Tauschen / Platzieren
+                  👥 Zusammenführen (Ensemble/Band-Gruppe)
                 </button>
 
                 <button

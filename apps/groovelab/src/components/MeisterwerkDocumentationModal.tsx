@@ -2054,7 +2054,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (!confirm("Lehrwerk wirklich entfernen?")) return;
     try {
       const book = globalLehrwerke.find(g => g.id === lehrwerkId);
-      if (book) {
+      if (book && book.title) {
         // Set is_current_homework to false for all pages of this book
         const { error } = await supabase
           .from('progress_matrix')
@@ -2064,11 +2064,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         if (error) console.error('Error updating progress matrix:', error);
       }
 
+      if (lehrwerkId.startsWith('custom-') || book?.is_custom) {
+        try {
+          await supabase
+            .from('lehrwerke')
+            .delete()
+            .eq('id', lehrwerkId);
+        } catch (err) {
+          console.warn('Error deleting custom lehrwerk from DB:', err);
+        }
+
+        const globalStored = localStorage.getItem('campus_lehrwerke');
+        if (globalStored) {
+          try {
+            const parsedGlobal = JSON.parse(globalStored);
+            const updatedGlobal = parsedGlobal.filter((b: any) => b.id !== lehrwerkId);
+            localStorage.setItem('campus_lehrwerke', JSON.stringify(updatedGlobal));
+          } catch (err) {
+            console.error(err);
+          }
+        }
+      }
+
       const stored = localStorage.getItem('student_lehrwerke_progress');
       const parsed = stored ? JSON.parse(stored) : [];
       const updated = parsed.filter((item: any) => !(item.studentId === student.id && item.lehrwerkId === lehrwerkId));
       localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
-      loadLehrwerke();
+      await loadLehrwerke();
       if (activeLehrwerkId === lehrwerkId) {
         setActiveLehrwerkId(null);
         setActivePageNumber(null);
@@ -6022,7 +6044,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {book.title}
                               </h4>
-                              {!readOnly && !(assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
+                              {(!readOnly || assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -6043,6 +6065,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   }}
                                   onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
                                   onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
+                                  title="Lehrwerk entfernen"
                                 >
                                   <X size={14} strokeWidth={2.5} />
                                 </button>
