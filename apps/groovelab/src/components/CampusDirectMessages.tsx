@@ -592,52 +592,88 @@ export default function CampusDirectMessages({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Composer */}
+            {/* Input Composer with Quick Replies */}
             {isStudent && user?.app_usage_mode === 'parent_hybrid' && !user?.parent_allow_chat ? (
               <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#fef2f2', color: '#b91c1c', fontSize: '0.85rem', fontWeight: 700, textAlign: 'center' }}>
                 🔒 Eltern-Sperre: Das Senden von Chat-Nachrichten wurde von deinen Eltern deaktiviert.
               </div>
             ) : (
-              <form onSubmit={handleSend} style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', gap: '12px' }}>
-                <input 
-                  type="text" 
-                  placeholder="Deine Nachricht..."
-                  value={typedMessage}
-                  onChange={e => setTypedMessage(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '12px 18px',
-                    borderRadius: '16px',
-                    border: '1px solid #e2e8f0',
-                    background: 'white',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
-                  }}
-                />
-                <button
-                  type="submit"
-                  style={{
-                    background: '#34a853',
-                    color: 'white',
-                    border: 'none',
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                    transition: 'all 0.2s',
-                    flexShrink: 0
-                  }}
-                  className="hover-scale"
-                >
-                  <Send size={18} />
-                </button>
-              </form>
+              <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px 12px 12px' : '12px 24px' }}>
+                {/* Quick Replies Pill Bar */}
+                <div style={{
+                  display: 'flex',
+                  gap: '6px',
+                  overflowX: 'auto',
+                  paddingBottom: '8px',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}>
+                  {['👍 Daumen hoch', '🎶 Passt, danke!', '⏳ 5 Min später', '📅 Termin bestätigt', '🎹 Alles klar!'].map((reply, idx) => (
+                    <button
+                      key={`qr-${idx}`}
+                      type="button"
+                      onClick={() => setTypedMessage(reply)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '100px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        color: '#475569',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        flexShrink: 0
+                      }}
+                      className="hover-scale"
+                    >
+                      {reply}
+                    </button>
+                  ))}
+                </div>
+
+                <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Deine Nachricht..."
+                    value={typedMessage}
+                    onChange={e => setTypedMessage(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '12px 18px',
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      background: 'white',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      background: '#34a853',
+                      color: 'white',
+                      border: 'none',
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+                      transition: 'all 0.2s',
+                      flexShrink: 0
+                    }}
+                    className="hover-scale"
+                  >
+                    <Send size={18} />
+                  </button>
+                </form>
+              </div>
             )}
           </div>
         ) : (

@@ -71,6 +71,7 @@ interface MeisterwerkDocumentationModalProps {
   teacherId?: string;
   initialLehrwerkId?: string;
   initialViewMode?: 'document' | 'recordings' | 'loopstation' | 'practice';
+  initialModalTab?: 'document' | 'logbook' | 'stickeralbum';
   onProfileClick?: (student: Student) => void;
   readOnly?: boolean;
   isEmbed?: boolean;
@@ -288,7 +289,7 @@ const SKILL_TAGS = [
   { key: 'selbststaendigkeit', label: 'Selbst geübt', icon: '💪' },
 ];
 
-export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false }) => {
+export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, initialModalTab, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
@@ -629,13 +630,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [selectedSimSticker, setSelectedSimSticker] = useState<string>('fleiss-pionier');
   const [simStickerContext, setSimStickerContext] = useState<string>('Simulation');
   const [selectedPreviewSticker, setSelectedPreviewSticker] = useState<any | null>(null);
+  const [selectedStickerDetailIdx, setSelectedStickerDetailIdx] = useState<number | null>(null);
   const [isDevSimulationActive, setIsDevSimulationActive] = useState<boolean>(false);
   const [awardedStickerToAnimate, setAwardedStickerToAnimate] = useState<any | null>(null);
   const [schoolName, setSchoolName] = useState<string>('Campus-Groovelab');
   const [shareCardLayout, setShareCardLayout] = useState<'dark' | 'light'>('dark');
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1);
-  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
+  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>(initialModalTab || 'document');
+
+  useEffect(() => {
+    if (initialModalTab) {
+      setActiveModalTab(initialModalTab);
+    }
+  }, [initialModalTab]);
   const [simulatedStickers, setSimulatedStickers] = useState<Record<string, { count: number; details: { topic: string; date: string }[] }>>({});
   const currentSchoolYear = useMemo(() => getSchoolYearString(), []);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(currentSchoolYear);
@@ -1119,7 +1127,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const { data: songsData, error: songsError } = await sq.order('title', { ascending: true });
 
           if (songsError) throw songsError;
-          setSongs(songsData || []);
+          const cleanSongs = (songsData || []).filter(s => {
+            const t = (s.title || '').toLowerCase().trim();
+            return t !== 'test' && t !== 'test - test' && t !== 'test-test';
+          });
+          setSongs(cleanSongs);
         }
       } catch (err) {
         console.error('Error loading catalog songs:', err);
@@ -1208,7 +1220,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         .eq('user_id', student.id);
       
       if (error) throw error;
-      setActiveSongSkills(skillsData || []);
+
+      // Filter to songs belonging to the current teacher's mediathek if teacherId is provided
+      const filteredSkills = (skillsData || []).filter((skill: any) => {
+        if (!teacherId) return true;
+        if (!skill.songs) return true;
+        return !skill.songs.teacher_id || skill.songs.teacher_id === teacherId;
+      });
+
+      // Deduplicate song skills so each unique song appears only once
+      const uniqueMap = new Map<string, any>();
+      filteredSkills.forEach((skill: any) => {
+        const key = String(skill.song_id || skill.songs?.id || skill.songs?.title || skill.id);
+        const existing = uniqueMap.get(key);
+        if (!existing || (skill.progress_percent || 0) > (existing.progress_percent || 0)) {
+          uniqueMap.set(key, skill);
+        }
+      });
+
+      setActiveSongSkills(Array.from(uniqueMap.values()));
     } catch (e) {
       console.error('Error loading active songs in modal:', e);
     }
@@ -1442,14 +1472,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  const downloadShareCard = (sticker: any) => {
+  const downloadShareCard = (sticker: any, topicOverride?: string) => {
     const canvas = document.createElement('canvas');
     canvas.width = 1200;
     canvas.height = 1200;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const medalCenterY = 430;
+    const medalCenterY = 410;
     const tX = 160;
     const tY = 80;
     const tW = 880;
@@ -1548,51 +1578,60 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.restore();
 
     // 8. Student Details (Guaranteed ACTUAL student name, NEVER "Hausaufgabenheft")
-    let textY = tY + 680;
+    let textY = tY + 630;
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 54px "Helvetica Neue", Inter, sans-serif';
+    ctx.font = '900 52px "Helvetica Neue", Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(actualStudentName, 600, textY);
 
     if (studentInstrument) {
-      textY += 45;
+      textY += 38;
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '900 24px "Helvetica Neue", Inter, sans-serif';
+      ctx.font = '900 22px "Helvetica Neue", Inter, sans-serif';
       ctx.fillText(studentInstrument.toUpperCase(), 600, textY);
     }
 
-    textY += 60;
+    textY += 52;
     ctx.fillStyle = themeColor;
-    ctx.font = 'italic 900 46px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = 'italic 900 44px "Helvetica Neue", Arial, sans-serif';
     ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
-    textY += 45;
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = 'bold 24px "Helvetica Neue", Inter, sans-serif';
-    ctx.fillText(sticker.desc, 600, textY);
+    const cardTopic = topicOverride || (collectedStickers[sticker.id]?.details?.slice(-1)[0]?.topic);
 
-    if (sticker.equiv) {
-      textY += 42;
-      ctx.fillStyle = '#38bdf8'; // Sky blue highlight accent for tangible equivalencies
-      ctx.font = '900 22px "Helvetica Neue", Inter, sans-serif';
-      ctx.fillText(sticker.equiv, 600, textY);
+    if (sticker.id === 'song-master' || cardTopic) {
+      textY += 46;
+      ctx.fillStyle = '#facc15';
+      ctx.font = '900 28px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(`🎵 ${cardTopic || 'Song gemeistert'}`, 600, textY);
+    } else {
+      textY += 40;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 22px "Helvetica Neue", Inter, sans-serif';
+      ctx.fillText(sticker.desc, 600, textY);
+
+      if (sticker.equiv) {
+        textY += 36;
+        ctx.fillStyle = '#38bdf8'; // Sky blue highlight accent for tangible equivalencies
+        ctx.font = '900 20px "Helvetica Neue", Inter, sans-serif';
+        ctx.fillText(sticker.equiv, 600, textY);
+      }
     }
 
-    // 9. Translucent Badge Pill for School Name
+    // 9. Translucent Badge Pill for School Name (dynamically positioned below text with zero overlap)
     const badgeText = schoolName.toUpperCase();
     ctx.font = 'bold 20px "Helvetica Neue", Inter, sans-serif';
     const textWidth = ctx.measureText(badgeText).width;
     const badgeW = textWidth + 60;
-    const badgeH = 52;
+    const badgeH = 50;
     const badgeX = 600 - badgeW / 2;
-    const badgeY = tY + 910;
+    const badgeY = Math.max(tY + 860, textY + 36);
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 26);
+      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 25);
     } else {
       ctx.rect(badgeX, badgeY, badgeW, badgeH);
     }
@@ -1609,7 +1648,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.fillStyle = themeColor;
     ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('campus-groovelab.de', 600, tY + 990);
+    ctx.fillText('campus-groovelab.de', 600, badgeY + badgeH + 42);
 
     // Helper stenciled sticker asset loader
     const drawStickerAsset = (imgOrEmoji: HTMLImageElement | string, isImg: boolean) => {
@@ -1622,72 +1661,63 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 10;
 
-      const stickerRad = 175;
+      // Circle sticker background
+      ctx.fillStyle = sticker.bg || 'rgba(52, 168, 83, 0.2)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 150, 0, Math.PI * 2);
+      ctx.fill();
 
-      if (isImg && typeof imgOrEmoji !== 'string') {
-        // Draw backing white die-cut border for vinyl sticker effect
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, stickerRad + 10, 0, Math.PI * 2);
-        ctx.fill();
+      // Outer sticker ring border
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 8;
+      ctx.stroke();
 
-        ctx.save();
+      if (isImg) {
         ctx.beginPath();
-        ctx.arc(0, 0, stickerRad, 0, Math.PI * 2);
+        ctx.arc(0, 0, 146, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(imgOrEmoji, -stickerRad, -stickerRad, stickerRad * 2, stickerRad * 2);
-        ctx.restore();
-
-        // Sticker outline border
-        ctx.shadowColor = 'transparent';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(0, 0, stickerRad, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.drawImage(imgOrEmoji as HTMLImageElement, -146, -146, 292, 292);
       } else {
-        // Fallback emoji
-        ctx.shadowColor = 'transparent';
-        ctx.font = '200px sans-serif';
+        ctx.font = '120px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(sticker.emoji || '🏆', 0, 0);
       }
+
       ctx.restore();
-      triggerDownload(canvas, sticker.id);
+      
+      const filename = (topicOverride || sticker.title).toLowerCase().replace(/[^a-z0-9]/gi, '_');
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `campus_auszeichnung_${filename}.png`;
+      link.href = dataUrl;
+      link.click();
     };
 
     // Load sticker asset
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = `/stickers/${sticker.id}.png?v=1`;
     img.onload = () => {
       drawStickerAsset(img, true);
     };
     img.onerror = () => {
       drawStickerAsset(sticker.emoji || '🏆', false);
     };
+    img.src = `/stickers/${sticker.id}.png?v=1`;
   };
 
-  const triggerDownload = (canvas: HTMLCanvasElement, filename: string) => {
-    const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `campus_auszeichnung_${filename}.png`;
-    link.href = dataUrl;
-    link.click();
-  };
-
-  const shareCard = async (sticker: any) => {
+  const shareCard = async (sticker: any, topicOverride?: string) => {
     try {
       if (navigator.share) {
-        downloadShareCard(sticker);
+        downloadShareCard(sticker, topicOverride);
         await navigator.share({
-          title: `Campus-Groovelab Auszeichnung: ${sticker.title}`,
-          text: `Schau dir meine Auszeichnung "${sticker.title}" an der ${schoolName} auf Campus-Groovelab an! 🎵🏆`,
+          title: `Campus-Groovelab Auszeichnung: ${sticker.title}${topicOverride ? ` - ${topicOverride}` : ''}`,
+          text: `Schau dir meine Auszeichnung "${sticker.title}" ${topicOverride ? `(${topicOverride}) ` : ''}an der ${schoolName} auf Campus-Groovelab an! 🎵🏆`,
           url: 'https://campus-groovelab.de'
         });
       } else {
-        downloadShareCard(sticker);
+        downloadShareCard(sticker, topicOverride);
         alert("Auszeichnung heruntergeladen! Du kannst das Bild jetzt in WhatsApp oder Instagram teilen. 📲");
       }
     } catch (err) {
@@ -2337,6 +2367,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } catch (e) {
           // Ignore parse errors
         }
+      }
+    });
+
+    // Automatically include all MASTERED songs from progressItems in song-master sticker details
+    const masteredSongsFromItems = progressItems.filter(item => {
+      const t = item.topic_name.toLowerCase().trim();
+      return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && item.status === 'MASTERED';
+    });
+    masteredSongsFromItems.forEach(item => {
+      const topicName = item.topic_name;
+      const dateStr = item.updated_at ? new Date(item.updated_at).toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
+
+      const alreadyPresent = counts['song-master']?.details.some(d => d.topic.toLowerCase().trim() === topicName.toLowerCase().trim());
+      if (!alreadyPresent && counts['song-master']) {
+        counts['song-master'].count += 1;
+        counts['song-master'].details.push({ topic: topicName, date: dateStr });
       }
     });
 
@@ -5376,6 +5422,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 finger: 100,
                                 expression: 100
                               }));
+
+                              if (selectedActiveSongId) {
+                                const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
+                                const songTitle = skill?.songs?.title || skill?.title || skill?.song_title || 'Unbenannter Song';
+                                const songArtist = skill?.songs?.artist || skill?.artist || '';
+                                const songTopic = songArtist ? `${songArtist} – ${songTitle}` : songTitle;
+                                awardSticker('song-master', songTopic);
+                              }
                             }}
                             style={{
                               display: 'flex',
@@ -5407,17 +5461,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       {/* Claim Mastery Sticker Button */}
                       {(() => {
                         const skill = activeSongSkills.find(s => s.id === selectedActiveSongId);
-                        const songTitle = skill?.songs?.title || '';
+                        const songTitle = skill?.songs?.title || skill?.title || skill?.song_title || '';
+                        const songArtist = skill?.songs?.artist || skill?.artist || '';
+                        const songTopic = songArtist ? `${songArtist} – ${songTitle}` : songTitle;
                         const songMasterInfo = collectedStickers['song-master'];
-                        const isSongMasterStickerAwarded = songTitle && songMasterInfo?.details.some(
-                          d => d.topic.toLowerCase().trim() === songTitle.toLowerCase().trim()
+                        const isSongMasterStickerAwarded = songTopic && songMasterInfo?.details.some(
+                          d => d.topic.toLowerCase().trim() === songTopic.toLowerCase().trim()
                         );
                         
-                        if ((songProgressPercent === 100 || status === 'MASTERED') && songTitle && !isSongMasterStickerAwarded) {
+                        if ((songProgressPercent === 100 || status === 'MASTERED') && songTopic && !isSongMasterStickerAwarded) {
                           return (
                             <button
                               type="button"
-                              onClick={() => awardSticker('song-master', songTitle)}
+                              onClick={() => awardSticker('song-master', songTopic)}
                               style={{
                                 marginTop: '12px',
                                 width: '100%',
@@ -5438,7 +5494,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               }}
                               className="hover-scale"
                             >
-                              <span>🏆 Neuen Sticker erhalten</span>
+                              <span>🏆 Song-Master Sticker erhalten ({songTopic})</span>
                             </button>
                           );
                         }
@@ -5682,9 +5738,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>
 
                 {(() => {
-                    const activeSongs = activeSongSkills.filter(skill =>
+                    const activeSongsRaw = activeSongSkills.filter(skill =>
                       !skill.is_stage_ready && (skill.progress_percent || 0) < 100
                     );
+
+                    // Deduplicate active songs so each unique song is only listed once
+                    const uniqueActiveMap = new Map<string, any>();
+                    activeSongsRaw.forEach(skill => {
+                      const key = String(skill.song_id || skill.songs?.id || skill.songs?.title || skill.title || skill.id);
+                      const existing = uniqueActiveMap.get(key);
+                      if (!existing || (skill.progress_percent || 0) > (existing.progress_percent || 0)) {
+                        uniqueActiveMap.set(key, skill);
+                      }
+                    });
+                    const activeSongs = Array.from(uniqueActiveMap.values());
+
                     if (activeSongs.length === 0) return (
                       <div style={{ padding: '40px 16px', textAlign: 'center', border: '2px dashed #e8e8ed', borderRadius: '24px', color: '#7d7d82', fontSize: '0.82rem', fontWeight: 600 }}>
                         Keine aktiven Songs eingetragen.
@@ -5694,7 +5762,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {activeSongs.map(skill => {
                       const progress = skill.is_stage_ready ? 100 : (skill.progress_percent || 0);
-                      const songColor = getSongColor(skill.songs?.title || 'Song');
+                      const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Unbenannter Song';
+                      const songArtist = skill.songs?.artist || skill.artist || 'Song-Projekt';
+                      const songColor = getSongColor(songTitle);
 
                       return (
                         <div
@@ -5757,10 +5827,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
                                   <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {skill.songs?.title}
+                                    {songTitle}
                                   </h4>
                                   <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#7d7d82', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {skill.songs?.artist} • <span style={{ color: '#000', fontWeight: 800 }}>{progress}%</span>
+                                    {songArtist} • <span style={{ color: '#000', fontWeight: 800 }}>{progress}%</span>
                                   </p>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -5964,10 +6034,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       boxShadow: '0 8px 24px rgba(0,0,0,0.06)'
                     }}>
                       {(() => {
-                        const filtered = songs.filter(s => 
-                          s.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
-                          s.artist?.toLowerCase().includes(songSearch.toLowerCase())
-                        );
+                        const filtered = songs.filter(s => {
+                          const t = (s.title || '').toLowerCase().trim();
+                          if (t === 'test' || t === 'test - test' || t === 'test-test') return false;
+                          return s.title?.toLowerCase().includes(songSearch.toLowerCase()) || 
+                                 s.artist?.toLowerCase().includes(songSearch.toLowerCase());
+                        });
                         
                         if (filtered.length === 0) {
                           return (
@@ -7515,11 +7587,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 )}
 
                                 {(() => {
-                                  const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("STICKER:"));
+                                  const visibleNotes = homeworkNotesList.filter(note => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:"));
                                   if (visibleNotes.length === 0) return null;
 
                                   const audioNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("AUDIO:"));
-                                  const textNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:"));
+                                  const textNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:") && !item.note.startsWith("LATENCY:"));
 
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
@@ -8911,8 +8983,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const st = selectedPreviewSticker;
             const info = collectedStickers[st.id] || { count: 0, details: [] };
             const isCollected = info.count > 0;
-            const displayDate = info.details?.[0]?.date || new Date().toLocaleDateString('de-DE');
-            const displayTopic = info.details?.[0]?.topic || 'Herausforderung gemeistert';
+            const details = info.details || [];
+            
+            const activeIdx = (selectedStickerDetailIdx !== null && selectedStickerDetailIdx >= 0 && selectedStickerDetailIdx < details.length)
+              ? selectedStickerDetailIdx
+              : (details.length > 0 ? details.length - 1 : 0);
+
+            const activeDetail = details[activeIdx];
+            const activeTopic = activeDetail?.topic || details.slice(-1)[0]?.topic;
+            const displayDate = activeDetail?.date || info.details?.[0]?.date || new Date().toLocaleDateString('de-DE');
+            const displayTopic = activeTopic || 'Herausforderung gemeistert';
             const isLegendary = st.rarity === 'legendary';
             const isEpic = st.rarity === 'epic';
 
@@ -9036,26 +9116,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     zIndex: 2,
                     margin: '8px 0'
                   }}>
-                    {isCollected ? (
-                      <img 
-                        src={`/stickers/${st.id}.png?v=1`} 
-                        alt={st.title} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            const span = document.createElement('span');
-                            span.style.fontSize = '4.5rem';
-                            span.innerText = st.emoji;
-                            parent.appendChild(span);
-                          }
-                        }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: '4.5rem', filter: 'grayscale(100%) opacity(0.3)' }}>
-                        {st.emoji}
-                      </span>
+                    <img 
+                      src={`/stickers/${st.id}.png?v=1`} 
+                      alt={st.title} 
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover',
+                        filter: isCollected ? 'none' : 'grayscale(80%) opacity(0.75)'
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const span = document.createElement('span');
+                          span.style.fontSize = '4.5rem';
+                          span.innerText = st.emoji;
+                          span.style.filter = isCollected ? 'none' : 'grayscale(80%) opacity(0.5)';
+                          parent.appendChild(span);
+                        }
+                      }}
+                    />
+                    {!isCollected && (
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.35)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        pointerEvents: 'none'
+                      }}>
+                        <span style={{ fontSize: '2.5rem', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.6))' }}>🔒</span>
+                      </div>
                     )}
                   </div>
 
@@ -9070,6 +9163,67 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </span>
                     )}
                   </div>
+
+                  {/* Song Master Interpret & Title Badge */}
+                  {(st.id === 'song-master' || activeTopic) && (
+                    <div style={{
+                      width: '100%',
+                      textAlign: 'center',
+                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(234, 179, 8, 0.35) 100%)',
+                      border: '1.5px solid #facc15',
+                      borderRadius: '16px',
+                      padding: '10px 14px',
+                      margin: '10px 0 4px 0',
+                      boxShadow: '0 4px 15px rgba(245, 158, 11, 0.2)',
+                      zIndex: 2
+                    }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block' }}>
+                        Gemeisterter Song (Interpret & Titel):
+                      </span>
+                      <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'block', marginTop: '2px', wordBreak: 'break-word' }}>
+                        🎵 {activeTopic || 'Song gemeistert'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Multi-song Dropdown Selector if student mastered multiple songs */}
+                  {details.length > 1 && (
+                    <div style={{
+                      width: '100%',
+                      margin: '4px 0 0 0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      zIndex: 3
+                    }}>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Ausgewählter Song ({details.length} gemeistert):
+                      </label>
+                      <select
+                        value={activeIdx}
+                        onChange={(e) => setSelectedStickerDetailIdx(Number(e.target.value))}
+                        style={{
+                          width: '100%',
+                          background: '#0f172a',
+                          border: '2px solid #eab308',
+                          borderRadius: '14px',
+                          color: '#ffffff',
+                          padding: '10px 14px',
+                          fontSize: '0.88rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 14px rgba(250, 204, 21, 0.25)',
+                          outline: 'none'
+                        }}
+                      >
+                        {details.map((d: any, idx: number) => (
+                          <option key={idx} value={idx}>
+                            🎵 {d.topic}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Description Box */}
                   <div style={{ 
@@ -9114,27 +9268,47 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
 
                   {/* Collection Timeline Details */}
-                  {isCollected && info.details.length > 0 && (
+                  {isCollected && details.length > 0 && (
                     <div style={{ 
                       width: '100%', 
                       display: 'flex', 
                       flexDirection: 'column', 
                       gap: '8px', 
-                      maxHeight: '120px', 
+                      maxHeight: '130px', 
                       overflowY: 'auto',
-                      background: 'rgba(0,0,0,0.2)',
+                      background: 'rgba(0,0,0,0.25)',
                       padding: '12px 16px',
                       borderRadius: '16px',
-                      border: '1px solid rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.08)',
                       zIndex: 2
                     }}>
                       <span style={{ fontSize: '0.66rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        Erhalten am:
+                        Erhalten am (Klick zum Auswählen):
                       </span>
-                      {info.details.map((dt, dIdx) => (
-                        <div key={dIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 600 }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>{dt.topic}</span>
-                          <span style={{ color: '#94a3b8' }}>{dt.date}</span>
+                      {details.map((dt: any, dIdx: number) => (
+                        <div 
+                          key={dIdx} 
+                          onClick={() => setSelectedStickerDetailIdx(dIdx)}
+                          style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            fontSize: '0.74rem', 
+                            color: dIdx === activeIdx ? '#facc15' : '#cbd5e1', 
+                            fontWeight: dIdx === activeIdx ? 900 : 600,
+                            background: dIdx === activeIdx ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
+                            border: dIdx === activeIdx ? '1px solid rgba(250, 204, 21, 0.5)' : '1px solid transparent',
+                            padding: '6px 10px',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale"
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>
+                            {dIdx === activeIdx ? '✓ ' : ''}{dt.topic}
+                          </span>
+                          <span style={{ color: dIdx === activeIdx ? '#facc15' : '#94a3b8' }}>{dt.date}</span>
                         </div>
                       ))}
                     </div>
@@ -9145,7 +9319,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     {isCollected && (
                       <button
                         type="button"
-                        onClick={() => shareCard(st)}
+                        onClick={() => shareCard(st, activeTopic)}
                         style={{
                           width: '100%',
                           background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
@@ -10779,6 +10953,73 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     await syncHomeworkNotes(updatedList);
   };
 
+  const [activeDeviceName, setActiveDeviceName] = useState<string>('Standard Audio');
+  const [activeDeviceHash, setActiveDeviceHash] = useState<string>('default');
+  const [isDeviceCalibrated, setIsDeviceCalibrated] = useState<boolean>(false);
+  const [showCalibrationPromptModal, setShowCalibrationPromptModal] = useState<boolean>(false);
+
+  const getAudioDeviceFingerprint = async (): Promise<{ hash: string, name: string }> => {
+    let deviceName = 'Audio-Gerät';
+    let rawString = 'default';
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(d => d.kind === 'audioinput').map(d => d.label || d.deviceId).join('|');
+        const audioOutputs = devices.filter(d => d.kind === 'audiooutput').map(d => d.label || d.deviceId).join('|');
+        const sampleRate = audioContextRef.current ? audioContextRef.current.sampleRate : 44100;
+        rawString = `${audioInputs}_${audioOutputs}_${sampleRate}`;
+
+        const primaryInput = devices.find(d => d.kind === 'audioinput' && d.label);
+        const primaryOutput = devices.find(d => d.kind === 'audiooutput' && d.label);
+        if (primaryInput?.label) {
+          deviceName = primaryInput.label;
+        } else if (primaryOutput?.label) {
+          deviceName = primaryOutput.label;
+        }
+      } catch (e) {}
+    }
+    let hash = 0;
+    for (let i = 0; i < rawString.length; i++) {
+      const char = rawString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0;
+    }
+    return { hash: Math.abs(hash).toString(36), name: deviceName };
+  };
+
+  const checkDeviceCalibrationStatus = async () => {
+    const { hash, name } = await getAudioDeviceFingerprint();
+    setActiveDeviceHash(hash);
+    setActiveDeviceName(name);
+
+    const savedPerDevice = localStorage.getItem(`groovelab_latency_dev_${hash}`);
+    if (savedPerDevice !== null) {
+      const parsed = parseInt(savedPerDevice, 10);
+      if (!isNaN(parsed)) {
+        setSyncOffsetMs(parsed);
+        setIsDeviceCalibrated(true);
+        isManualLatencyAdjustmentRef.current = true;
+        return;
+      }
+    }
+    const globalSaved = localStorage.getItem('groovelab_sync_offset_ms');
+    if (globalSaved !== null && localStorage.getItem('groovelab_latency_calibrated') === 'true') {
+      setIsDeviceCalibrated(true);
+    } else {
+      setIsDeviceCalibrated(false);
+    }
+  };
+
+  useEffect(() => {
+    checkDeviceCalibrationStatus();
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', checkDeviceCalibrationStatus);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', checkDeviceCalibrationStatus);
+      };
+    }
+  }, []);
+
   const [calibrationWaveform, setCalibrationWaveform] = useState<number[] | null>(null);
   const [loopstationMetronomeVolume, setLoopstationMetronomeVolume] = useState<number>(100);
   const [timeSignature, setTimeSignature] = useState<'4/4' | '3/4'>('4/4');
@@ -11268,6 +11509,11 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       setSyncOffsetMs(finalAvg);
       setAutoLatencyResult(finalAvg);
       isManualLatencyAdjustmentRef.current = true;
+      setIsDeviceCalibrated(true);
+      if (activeDeviceHash) {
+        localStorage.setItem(`groovelab_latency_dev_${activeDeviceHash}`, finalAvg.toString());
+      }
+      localStorage.setItem('groovelab_latency_calibrated', 'true');
       setCalibrationPhaseState('result');
       
       try {
@@ -11819,6 +12065,10 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
     }
+    if (!isDeviceCalibrated && !isManualLatencyAdjustmentRef.current) {
+      setShowCalibrationPromptModal(true);
+      return;
+    }
     handleReset();
     setIsAutoSequenceActive(true);
     isAutoSequenceActiveRef.current = true;
@@ -12301,6 +12551,9 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           if (!event || event.type !== 'TICK') continue;
           
           const tickIndex = event.data.tickIndex;
+          const isDownbeat = tickIndex % 4 === 0;
+          setActiveBeatPulse(isDownbeat ? 'downbeat' : 'upbeat');
+          setTimeout(() => setActiveBeatPulse(null), 140);
 
           // captureClickTemplate extracts the high/low acoustic signature of the metronome
           const captureClickTemplate = (expectedClickTime: number, isHigh: boolean) => {
@@ -15014,8 +15267,23 @@ const targetVol = isActive ? vol : 0;
                 border: '1.5px solid rgba(0, 0, 0, 0.04)'
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '0.52rem', color: '#1d1d1f', fontWeight: 800, letterSpacing: '0.04em' }}>LATENZ-AUSGLEICH</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.52rem', color: '#1d1d1f', fontWeight: 800, letterSpacing: '0.04em' }}>LATENZ-AUSGLEICH</span>
+                      <span style={{
+                        fontSize: '0.48rem',
+                        fontWeight: 800,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: isDeviceCalibrated ? '#e6f4ea' : '#fef3c7',
+                        color: isDeviceCalibrated ? '#34a853' : '#d97706',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}>
+                        {isDeviceCalibrated ? '🎯 Kalibriert' : '⚠️ Nicht kalibriert'}
+                      </span>
+                    </div>
                     <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 800, fontFamily: 'SF Mono, monospace' }}>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms</span>
                   </div>
                   <input 
@@ -15527,6 +15795,102 @@ const targetVol = isActive ? vol : 0;
       </div>
       </div>
       )}
+
+        {/* --- PRE-RECORDING UNCALIBRATED DEVICE PROMPT MODAL --- */}
+        {showCalibrationPromptModal && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(40px)',
+              WebkitBackdropFilter: 'blur(40px)',
+              border: '1px solid rgba(255, 255, 255, 0.6)',
+              borderRadius: '24px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.8)',
+              padding: '28px',
+              width: '100%',
+              maxWidth: '440px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              animation: 'fadeInScale 0.25s ease-out'
+            }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853', fontSize: '1.4rem' }}>
+                🎯
+              </div>
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>Neues Audio-Gerät erkannt</h3>
+                <span style={{ fontSize: '0.68rem', color: '#86868b', fontWeight: 700 }}>{activeDeviceName}</span>
+              </div>
+              <p style={{ fontSize: '0.74rem', color: '#515154', textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
+                Für 100% sample-genaue Spuren-Synchronität empfehlen wir vor deiner ersten Aufnahme eine kurze Latenz-Kalibrierung (ca. 10 Sekunden).
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCalibrationPromptModal(false);
+                    setIsCalibratingLatency(true);
+                    setCalibrationPhaseState('idle');
+                  }}
+                  className="tactile-btn"
+                  style={{
+                    background: '#34a853',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '12px 20px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    width: '100%',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                  }}
+                >
+                  🚀 Jetzt kalibrieren (Empfohlen)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCalibrationPromptModal(false);
+                    isManualLatencyAdjustmentRef.current = true;
+                    setIsDeviceCalibrated(true);
+                    startAutoSequence();
+                  }}
+                  className="tactile-btn"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.04)',
+                    color: '#515154',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 20px',
+                    fontSize: '0.70rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    width: '100%'
+                  }}
+                >
+                  ▶ Mit Auto-Latenz fortfahren ({syncOffsetMs}ms)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Auto-Calibration Glassmorphism Overlay */}
         {isCalibratingLatency && (

@@ -10368,17 +10368,18 @@ export function AdminDashboard({
     };
 
     return (
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%', flexWrap: 'nowrap' }}>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%', flexWrap: 'wrap' }}>
         {/* Left Side: Main Mediathek Area */}
         <div 
           className="glass-panel" 
           style={{ 
-            flex: 1,
-            minWidth: '480px',
+            flex: '1 1 300px',
+            minWidth: '0',
+            width: '100%',
             background: 'white', 
             borderRadius: '20px', 
             border: '1px solid rgba(0, 0, 0, 0.05)', 
-            padding: '24px 30px', 
+            padding: '20px', 
             boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
             display: 'flex', 
             flexDirection: 'column', 

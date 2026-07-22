@@ -5925,9 +5925,10 @@ export function TeacherDashboard({
 
       <div style={{
         flex: 1,
-        padding: hideHeader ? '0' : (activeTab === 'briefing' ? '24px 10px 10px 10px' : '10px'),
-        overflowY: activeTab === 'briefing' ? 'hidden' : 'auto',
-        height: '100vh',
+        padding: hideHeader ? '0' : (activeTab === 'briefing' ? (windowWidth < 768 ? '12px 10px 90px 10px' : '24px 10px 10px 10px') : '10px'),
+        overflowY: (activeTab === 'briefing' && windowWidth >= 768) ? 'hidden' : 'auto',
+        height: windowWidth < 768 ? 'auto' : '100vh',
+        minHeight: '100vh',
         boxSizing: 'border-box',
         width: '100%'
       }}>
@@ -6501,23 +6502,25 @@ export function TeacherDashboard({
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: (isWeekend || isFreeDay) ? '300px' : '200px',
+                          minHeight: windowWidth < 768 ? 'auto' : ((isWeekend || isFreeDay) ? '300px' : '200px'),
                           flex: (isFreeDay || isWeekend) ? 1 : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                            {/* Full Height Avatar on the left */}
+                            {/* Avatar: Compact Circle on mobile, Full height on desktop */}
                             <div style={{
-                              width: (isWeekend || isFreeDay) ? '420px' : '190px',
-                              height: '100%',
+                              width: windowWidth < 768 ? '54px' : ((isWeekend || isFreeDay) ? '420px' : '190px'),
+                              height: windowWidth < 768 ? '54px' : '100%',
+                              borderRadius: windowWidth < 768 ? '50%' : '0',
+                              margin: windowWidth < 768 ? '12px 0 12px 14px' : '0',
                               flexShrink: 0,
                               position: 'relative',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               overflow: 'hidden',
-                              borderRight: '1px solid rgba(0, 0, 0, 0.05)'
+                              borderRight: windowWidth < 768 ? 'none' : '1px solid rgba(0, 0, 0, 0.05)'
                             }}
                             className="hover-scale"
                             >
@@ -6529,11 +6532,11 @@ export function TeacherDashboard({
                                   height: '100%', 
                                   objectFit: 'cover'
                                 }} 
-                                              />
+                              />
                             </div>
                             
                             <div style={{ 
-                              padding: isWeekend ? '32px 48px' : '24px 32px', 
+                              padding: windowWidth < 768 ? '12px 14px' : (isWeekend ? '32px 48px' : '24px 32px'), 
                               display: 'flex', 
                               flexDirection: 'column', 
                               justifyContent: 'center',
@@ -6551,7 +6554,7 @@ export function TeacherDashboard({
                                 padding: '4px 10px',
                                 boxShadow: 'none',
                                 alignSelf: 'flex-start',
-                                marginBottom: '6px',
+                                marginBottom: windowWidth < 768 ? '2px' : '6px',
                                 flexShrink: 0
                               }}>
                                 <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
@@ -6559,10 +6562,10 @@ export function TeacherDashboard({
                                   {currentTimeStr || '13:00'} UHR
                                 </span>
                               </div>
- 
+
                               <h3 style={{ 
                                 margin: 0, 
-                                fontSize: isWeekend ? '36px' : '30px', 
+                                fontSize: windowWidth < 768 ? '1.25rem' : (isWeekend ? '36px' : '30px'), 
                                 fontWeight: 950, 
                                 color: '#0f172a', 
                                 fontFamily: "'Plus Jakarta Sans', sans-serif", 
@@ -6579,12 +6582,14 @@ export function TeacherDashboard({
                                   ☀️
                                 </span>
                               </h3>
-                              <p style={{ margin: isWeekend ? '14px 0 0 0' : '6px 0 0 0', fontSize: isWeekend ? '1rem' : '0.82rem', color: isWeekend ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: isWeekend ? 1.5 : 1.25, maxWidth: isWeekend ? '650px' : undefined }}>
-                                {isWeekend 
-                                  ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche. ✨'
-                                  : (isFreeDay ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : dynamicGreeting.subtitle)
-                                }
-                              </p>
+                              {windowWidth >= 768 && (
+                                <p style={{ margin: isWeekend ? '14px 0 0 0' : '6px 0 0 0', fontSize: isWeekend ? '1rem' : '0.82rem', color: isWeekend ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: isWeekend ? 1.5 : 1.25, maxWidth: isWeekend ? '650px' : undefined }}>
+                                  {isWeekend 
+                                    ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche. ✨'
+                                    : (isFreeDay ? 'Heute hast du frei! Genieße deinen freien Tag. ✨' : dynamicGreeting.subtitle)
+                                  }
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -8421,16 +8426,16 @@ export function TeacherDashboard({
 
             {/* briefing-right-sidebar */}
             <aside style={{ 
-              flex: '1 1 320px',
-              maxWidth: '320px',
+              flex: windowWidth < 768 ? '1 1 100%' : '1 1 320px',
+              maxWidth: windowWidth < 768 ? '100%' : '320px',
               width: '100%',
               display: 'flex', 
               flexDirection: 'column', 
               gap: '20px',
-              maxHeight: 'calc(100vh - 80px)',
-              overflowY: 'auto',
-              paddingRight: '6px',
-              paddingBottom: '80px',
+              maxHeight: windowWidth < 768 ? 'none' : 'calc(100vh - 80px)',
+              overflowY: windowWidth < 768 ? 'visible' : 'auto',
+              paddingRight: windowWidth < 768 ? '0' : '6px',
+              paddingBottom: windowWidth < 768 ? '20px' : '80px',
               boxSizing: 'border-box'
             }} className="briefing-right-sidebar">
               
@@ -12795,9 +12800,9 @@ export function TeacherDashboard({
           )}
         </div>
       ) : activeTab === 'students' ? (
-        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
+        <div style={{ display: 'flex', gap: windowWidth < 768 ? '16px' : '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
           {/* Main Column */}
-          <div style={{ flex: 3, minWidth: '400px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ flex: '1 1 300px', minWidth: '0', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Search & Actions Bar */}
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -13499,7 +13504,7 @@ export function TeacherDashboard({
                     <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Deine hinterlegten Daten im Campus-Groovelab.</p>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : '1fr 1fr', gap: '16px', background: '#f8fafc', padding: windowWidth < 768 ? '16px' : '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
                       <input 

@@ -3135,18 +3135,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.day_of_birth = actDay?.day_of_birth || null;
       }
 
-      // Two-step QR-Login logic: require a second scan to finalize login on standard Campus logins to prevent alerts on first scan.
-      // GrooveLab Kiosk mode (yellow screen) is a single-scan check-in platform, so it bypasses this prompt.
-      if (!qrScanPrompt && !isGroovelabKiosk) {
-        if (!userSchool) {
-          throw new Error('Für diesen Nutzer konnte keine Musikschule gefunden werden.');
-        }
-        
-        // 1. Set school state directly to transition the UI branding & color schemes
+      // Update school context if not yet active, so UI branding aligns with user's school
+      if (!schoolData && userSchool) {
         setSchoolData(userSchool);
         setSchoolName(userSchool.name);
 
-        // 2. Update URL query parameter without triggering full reload, so refresh keeps the school
         const slugify = (name: string) => {
           return name
             .toLowerCase()
@@ -3167,17 +3160,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         } catch (e) {
           console.warn("Failed to update window URL state", e);
         }
-
-        // 3. Prompt user for the second secure scan
-        setQrScanPrompt(`Schule "${userSchool.name}" erkannt. Bitte scanne deinen QR-Code erneut.`);
-        setLoading(false);
-        return;
       }
 
-      // If a school context is already active, strictly enforce school matching
-      const isSchoolMatch = user.school_id === schoolData?.id || (isMusaekSchool(user.school_id) && isMusaekSchool(schoolData?.id));
-      if (schoolData && !isSchoolMatch) {
-        throw new Error(`Login verweigert. Dieser QR-Code gehört nicht zur Schule "${schoolName}".`);
+      // Enforce school matching: user must belong to the active school context
+      const activeSchool = schoolData || userSchool;
+      if (activeSchool?.id) {
+        const isSchoolMatch = user.school_id === activeSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(activeSchool.id));
+        if (!isSchoolMatch) {
+          throw new Error(`Login verweigert. Dieser QR-Code gehört nicht zur Schule "${activeSchool.name || schoolName}".`);
+        }
       }
 
       if (user.role === 'student') {

@@ -3541,6 +3541,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (initial === 'termine' || initial === 'all_appointments') initial = 'events';
     return (initial as any) || 'briefing';
   });
+  const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum'>('document');
 
   // ── Asset Preloading Hook (3.2) ──
   useEffect(() => {
@@ -8060,6 +8061,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
             {/* Nächste Sticker-Auszeichnung Card (Right Side of Row 3) */}
             {!sessionActive && (() => {
+              let stickerId = 'fleiss-pionier';
               let stickerEmoji = '🐝';
               let stickerTitle = 'Fleiß-Pionier';
               let stickerDesc = 'Für insgesamt 50 Minuten fleißiges Üben.';
@@ -8069,6 +8071,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               let rarityLabel = 'Standard';
 
               if (totalFocusMinutes >= 1000) {
+                stickerId = 'uebe-grossmeister';
                 stickerEmoji = '🏆';
                 stickerTitle = 'Übe-Großmeister';
                 stickerDesc = 'Für grandiose 2000 Minuten Übezeit!';
@@ -8077,6 +8080,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 stickerColor = '#eab308';
                 rarityLabel = 'Legendär';
               } else if (totalFocusMinutes >= 250) {
+                stickerId = 'uebe-legende';
                 stickerEmoji = '👑';
                 stickerTitle = 'Übe-Legende';
                 stickerDesc = 'Für unglaubliche 1000 Minuten Übezeit!';
@@ -8085,6 +8089,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 stickerColor = '#af52de';
                 rarityLabel = 'Episch';
               } else if (totalFocusMinutes >= 50) {
+                stickerId = 'uebe-meister';
                 stickerEmoji = '🦉';
                 stickerTitle = 'Übe-Meister';
                 stickerDesc = 'Für insgesamt 250 Minuten ausdauerndes Üben.';
@@ -8146,11 +8151,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '2.5rem',
                       boxShadow: `0 8px 24px ${stickerColor}30`,
-                      flexShrink: 0
+                      flexShrink: 0,
+                      overflow: 'hidden'
                     }}>
-                      {stickerEmoji}
+                      <img 
+                        src={`/stickers/${stickerId}.png?v=1`} 
+                        alt={stickerTitle} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            const span = document.createElement('span');
+                            span.style.fontSize = '2.5rem';
+                            span.innerText = stickerEmoji;
+                            parent.appendChild(span);
+                          }
+                        }}
+                      />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -8189,7 +8208,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                   {/* Action Button to Open Sticker Album */}
                   <button
-                    onClick={() => setActiveTab('homework_book')}
+                    onClick={() => {
+                      setHomeworkBookTab('stickeralbum');
+                      setActiveTab('homework_book');
+                    }}
                     style={{
                       width: '100%',
                       background: 'rgba(241, 245, 249, 0.8)',
@@ -9358,7 +9380,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       🏆 Gemeisterte Songs
                     </h5>
                     {(() => {
-                      const masteredSongs = progressItems.filter(item => !item.topic_name.includes(' - Seite ') && item.status === 'MASTERED');
+                      const masteredSongs = progressItems.filter(item => {
+                        const t = item.topic_name.toLowerCase().trim();
+                        return !t.includes(' - seite ') && t !== 'test' && t !== 'test - test' && t !== 'test-test' && item.status === 'MASTERED';
+                      });
                       if (masteredSongs.length === 0) {
                         return (
                           <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
@@ -10060,6 +10085,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             teacherId={studentUser ? studentUser.teacher_id : null}
             readOnly={true}
             isEmbed={true}
+            initialModalTab={homeworkBookTab}
           />
         )}
       </div>

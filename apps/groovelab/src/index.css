@@ -1292,3 +1292,55 @@ select option {
     grid-column: span 1;
   }
 }
+
+/* iOS Safe Area & Mobile Cockpit Enhancements */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .ios-safe-bottom,
+  .google-sidebar {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .ios-safe-top {
+    padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Responsive card tweaks for mobile touch targets */
+  .google-card {
+    padding: 16px !important;
+    border-radius: 20px !important;
+  }
+  
+  /* Mobile Bottom Navigation Scroll Indicator Affordance */
+  .bottom-nav-scrollable,
+  [style*="overflow-x: auto"],
+  [style*="overflowX: 'auto'"] {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    position: relative;
+  }
+  
+  /* Gentle Scroll-Peek pulse on initial view */
+  .scroll-peek-hint {
+    animation: scrollPeek 1.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
+  }
+}
+
+@keyframes scrollPeek {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-16px); }
+  50% { transform: translateX(0); }
+  75% { transform: translateX(-8px); }
+  100% { transform: translateX(0); }
+}
+
+/* Subtle Right Edge Fade to indicate scrollable content */
+.scroll-fade-right {
+  mask-image: linear-gradient(to right, #000 82%, transparent 98%);
+  -webkit-mask-image: linear-gradient(to right, #000 82%, transparent 98%);
+}
+
+

@@ -255,9 +255,14 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     showToast("Onboarding-Link in Zwischenablage kopiert!");
   };
 
-  const brandColor = activePlatform === 'groovelab' 
-    ? '#eab308' 
-    : (activePlatform === 'admin' || activePlatform === 'secretariat' ? '#ea4335' : '#34a853');
+  const isGroove = activePlatform === 'groovelab';
+  const isAdminOrSec = activePlatform === 'admin' || activePlatform === 'secretariat';
+
+  const brandColor = isGroove ? '#eab308' : (isAdminOrSec ? '#ea4335' : '#34a853');
+  const brandBgLight = isGroove ? '#fefce8' : (isAdminOrSec ? '#fff1f2' : '#f0fdf4');
+  const brandBorder = isGroove ? '#fef08a' : (isAdminOrSec ? '#fecaca' : '#bbf7d0');
+  const brandText = isGroove ? '#854d0e' : (isAdminOrSec ? '#991b1b' : '#166534');
+  const brandButtonTextColor = isGroove ? '#1e293b' : '#ffffff';
 
   const getSlotDetails = (dayId: number, startTime: string) => {
     const key = `${dayId}_${startTime}`;
@@ -304,21 +309,21 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       inset: 0,
       zIndex: 9999,
       background: 'rgba(15, 23, 42, 0.45)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px'
+      padding: '16px'
     }}>
       <div 
         className="glass-panel animate-scale-up"
         style={{
           width: '100%',
-          maxWidth: '840px',
+          maxWidth: '800px',
           maxHeight: '92vh',
           background: '#ffffff',
-          borderRadius: '24px',
+          borderRadius: '20px',
           border: '1px solid #e2e8f0',
           boxShadow: '0 25px 70px -15px rgba(15, 23, 42, 0.18), 0 0 1px rgba(15, 23, 42, 0.1)',
           display: 'flex',
@@ -328,50 +333,50 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       >
         {/* Modal Header */}
         <div style={{
-          padding: '22px 28px',
-          borderBottom: '1px solid #e2e8f0',
+          padding: '16px 22px',
+          borderBottom: '1px solid #f1f5f9',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           background: '#ffffff'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '14px',
-              background: isCompleted ? '#e6f4ea' : '#fefce8',
-              color: isCompleted ? '#34a853' : '#d97706',
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              background: isCompleted ? brandBgLight : '#fefce8',
+              color: isCompleted ? brandColor : '#d97706',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: `1px solid ${isCompleted ? '#bbf7d0' : '#fef08a'}`
+              border: `1px solid ${isCompleted ? brandBorder : '#fef08a'}`
             }}>
-              <Calendar size={22} />
+              <Calendar size={19} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
                   Stundenplan-Zeitfenster
                 </h3>
                 <span style={{
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                  fontSize: '0.74rem',
+                  padding: '3px 8px',
+                  borderRadius: '12px',
+                  fontSize: '0.7rem',
                   fontWeight: 700,
-                  background: isCompleted ? '#f0fdf4' : '#fefce8',
-                  color: isCompleted ? '#16a34a' : '#d97706',
-                  border: `1px solid ${isCompleted ? '#bbf7d0' : '#fef08a'}`,
-                  display: 'flex',
+                  background: isCompleted ? brandBgLight : '#fefce8',
+                  color: isCompleted ? brandText : '#b45309',
+                  border: `1px solid ${isCompleted ? brandBorder : '#fef08a'}`,
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px'
+                  gap: '4px'
                 }}>
-                  {isCompleted ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                  {isCompleted ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
                   {isCompleted ? 'Onboarding Abgeschlossen' : 'Warte auf Rückmeldung'}
                 </span>
               </div>
-              <p style={{ margin: '3px 0 0 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 500 }}>
-                Schüler: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{student?.first_name} {student?.last_name}</strong> ({student?.instrument || 'Gitarre'})
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+                Schüler: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{student?.first_name} {student?.last_name ? (student.last_name.length === 1 ? `${student.last_name}.` : student.last_name) : ''}</strong> ({student?.instrument || 'Gitarre'})
               </p>
             </div>
           </div>
@@ -379,21 +384,22 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
           <button
             onClick={onClose}
             style={{
-              background: '#f1f5f9',
-              border: 'none',
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               color: '#64748b',
-              transition: 'all 0.2s'
+              transition: 'all 0.15s'
             }}
             className="hover-scale-mini"
+            title="Schließen"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
@@ -402,274 +408,231 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
           <div style={{
             background: '#0f172a',
             color: 'white',
-            padding: '10px 18px',
-            fontSize: '0.85rem',
+            padding: '8px 16px',
+            fontSize: '0.8rem',
             fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             justifyContent: 'center'
           }}>
-            <Sparkles size={16} color={brandColor} />
+            <Sparkles size={15} color={brandColor} />
             <span>{toastMsg}</span>
           </div>
         )}
 
         {/* Modal Body */}
-        <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', background: '#ffffff' }}>
+        <div style={{ padding: '16px 22px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '14px', background: '#ffffff' }}>
           
-          {/* Status & Manual Edit Control Card */}
+          {/* Integrated Compact Control & Action Bar */}
           <div style={{
-            padding: '20px 24px',
-            borderRadius: '20px',
-            background: '#ffffff',
+            padding: '12px 16px',
+            borderRadius: '14px',
+            background: '#f8fafc',
             border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.03)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: isEditing ? '10px' : '0'
           }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '16px'
+              gap: '12px',
+              flexWrap: 'wrap'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '12px',
-                  background: isCompleted ? '#f0fdf4' : '#fefce8',
-                  border: `1px solid ${isCompleted ? '#bbf7d0' : '#fef08a'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
+              {/* Status Indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '220px', flex: 1 }}>
+                {isCompleted ? (
+                  <CheckCircle2 size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                ) : (
+                  <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                )}
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
                   {isCompleted ? (
-                    <CheckCircle2 size={22} color="#16a34a" />
+                    <span>
+                      Zeitfenster übermittelt
+                      {timetableAssignedAt && (
+                        <span style={{ color: '#64748b', fontWeight: 500, marginLeft: '4px' }}>
+                          ({new Date(timetableAssignedAt).toLocaleDateString('de-DE')})
+                        </span>
+                      )}
+                    </span>
                   ) : (
-                    <Clock size={22} color="#d97706" />
+                    <span style={{ color: '#b45309' }}>Noch keine Zeiten übermittelt</span>
                   )}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a', letterSpacing: '-0.01em' }}>
-                    {isCompleted 
-                      ? 'Zeitfenster wurden erfolgreich vom Schüler / Lehrer übermittelt.' 
-                      : 'Onboarding ausstehend: Schüler hat noch keine Zeiten übermittelt.'}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px', fontWeight: 500 }}>
-                    {timetableAssignedAt 
-                      ? `Abgeschlossen am: ${new Date(timetableAssignedAt).toLocaleDateString('de-DE')} um ${new Date(timetableAssignedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` 
-                      : 'Lehrer kann die Daten direkt manuell hier eintragen (z. B. nach E-Mail-Mitteilung).'}
-                  </div>
                 </div>
               </div>
 
-              {/* Apple-style Manual Edit Action Button */}
-              <button
-                onClick={() => setIsEditing(!isEditing)}
-                style={{
-                  background: isEditing ? brandColor : '#ffffff',
-                  color: isEditing ? (activePlatform === 'groovelab' ? '#1e293b' : '#ffffff') : '#0f172a',
-                  border: isEditing ? 'none' : '1.5px solid #cbd5e1',
-                  padding: '10px 18px',
-                  borderRadius: '14px',
-                  fontWeight: 700,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: isEditing 
-                    ? `0 4px 16px ${brandColor}40` 
-                    : '0 2px 8px rgba(0, 0, 0, 0.04)',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  flexShrink: 0
-                }}
-                className="hover-scale"
-              >
-                {isEditing ? <Check size={16} /> : <Edit3 size={16} color={brandColor} />}
-                <span>{isEditing ? 'Fertig mit Bearbeiten' : 'Manuell eintragen / bearbeiten'}</span>
-              </button>
+              {/* Action Buttons: Copy Link & Edit */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={handleCopyOnboardingLink}
+                  style={{
+                    background: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    padding: '6px 12px',
+                    borderRadius: '9px',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale-mini"
+                  title="Onboarding-Link in Zwischenablage kopieren"
+                >
+                  <Copy size={13} color="#64748b" /> Onboarding-Link kopieren
+                </button>
+
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  style={{
+                    background: isEditing ? brandColor : '#ffffff',
+                    color: isEditing ? brandButtonTextColor : '#0f172a',
+                    border: isEditing ? 'none' : '1px solid #cbd5e1',
+                    padding: '6px 12px',
+                    borderRadius: '9px',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: isEditing ? `0 2px 8px ${brandColor}35` : 'none',
+                    transition: 'all 0.15s'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  {isEditing ? <Check size={14} /> : <Edit3 size={13} color={brandColor} />}
+                  <span>{isEditing ? 'Fertig' : 'Manuell eintragen'}</span>
+                </button>
+              </div>
             </div>
 
-            {/* Teacher Brush Selection Toolbar when editing */}
+            {/* Brush Selection Toolbar when editing */}
             {isEditing && (
               <div style={{
-                background: '#f8fafc',
-                padding: '14px 18px',
-                borderRadius: '16px',
+                background: '#ffffff',
+                padding: '8px 12px',
+                borderRadius: '10px',
                 border: '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '12px',
-                animation: 'fadeIn 0.2s ease-out'
+                gap: '8px',
+                marginTop: '4px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.82rem', fontWeight: 700 }}>
-                  <Sliders size={15} style={{ color: '#64748b' }} />
-                  <span>Klick-Werkzeug für Lehrer:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.76rem', fontWeight: 700 }}>
+                  <Sliders size={13} />
+                  <span>Werkzeug:</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => setActiveBrush('wunsch')}
                     style={{
-                      padding: '7px 14px',
-                      borderRadius: '10px',
-                      border: activeBrush === 'wunsch' ? '2px solid #16a34a' : '1px solid #bbf7d0',
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      border: activeBrush === 'wunsch' ? '1.5px solid #16a34a' : '1px solid #bbf7d0',
                       background: activeBrush === 'wunsch' ? '#dcfce7' : '#ffffff',
                       color: '#15803d',
                       fontWeight: 700,
-                      fontSize: '0.78rem',
+                      fontSize: '0.74rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.15s'
+                      gap: '5px'
                     }}
                   >
-                    <Star size={13} fill="#22c55e" color="#16a34a" /> Wunschzeit (Grün)
+                    <Star size={11} fill="#22c55e" color="#16a34a" /> Wunschzeit
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveBrush('gesperrt')}
                     style={{
-                      padding: '7px 14px',
-                      borderRadius: '10px',
-                      border: activeBrush === 'gesperrt' ? '2px solid #dc2626' : '1px solid #fecaca',
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      border: activeBrush === 'gesperrt' ? '1.5px solid #dc2626' : '1px solid #fecaca',
                       background: activeBrush === 'gesperrt' ? '#fee2e2' : '#ffffff',
                       color: '#991b1b',
                       fontWeight: 700,
-                      fontSize: '0.78rem',
+                      fontSize: '0.74rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.15s'
+                      gap: '5px'
                     }}
                   >
-                    <Ban size={13} color="#ef4444" /> Geblockt (Rot)
+                    <Ban size={11} color="#ef4444" /> Geblockt
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveBrush('clear')}
                     style={{
-                      padding: '7px 14px',
-                      borderRadius: '10px',
-                      border: activeBrush === 'clear' ? '2px solid #475569' : '1px solid #cbd5e1',
+                      padding: '5px 10px',
+                      borderRadius: '8px',
+                      border: activeBrush === 'clear' ? '1.5px solid #475569' : '1px solid #cbd5e1',
                       background: activeBrush === 'clear' ? '#f1f5f9' : '#ffffff',
                       color: '#475569',
                       fontWeight: 700,
-                      fontSize: '0.78rem',
+                      fontSize: '0.74rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.15s'
+                      gap: '5px'
                     }}
                   >
-                    <Eraser size={13} color="#64748b" /> Zurücksetzen (Frei)
+                    <Eraser size={11} color="#64748b" /> Frei
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Dedicated Onboarding Link Card */}
-          <div style={{
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '18px',
-            padding: '16px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '14px',
-            boxShadow: '0 2px 10px -2px rgba(0,0,0,0.02)'
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                <LinkIcon size={14} style={{ color: '#64748b' }} />
-                <span>Onboarding-Link für Schüler:</span>
+          {/* Legend Header Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', letterSpacing: '-0.01em' }}>
+              Wochenraster
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#15803d' }} />
+                <span>Gebucht</span>
               </div>
-              <div style={{ 
-                fontSize: '0.84rem', 
-                fontWeight: 600, 
-                color: '#0f172a', 
-                overflow: 'hidden', 
-                textOverflow: 'ellipsis', 
-                whiteSpace: 'nowrap',
-                fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                padding: '6px 12px',
-                borderRadius: '8px'
-              }}>
-                {`${window.location.origin}/onboarding/${student?.qr_token || student?.id}?platform=${activePlatform}`}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                <span>Wunsch</span>
               </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCopyOnboardingLink}
-              style={{
-                background: brandColor,
-                color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
-                border: 'none',
-                padding: '10px 18px',
-                borderRadius: '12px',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '7px',
-                boxShadow: `0 2px 10px ${brandColor}35`,
-                flexShrink: 0
-              }}
-              className="hover-scale"
-            >
-              <Copy size={14} /> Link kopieren
-            </button>
-          </div>
-
-          {/* Legend */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.78rem', fontWeight: 600, color: '#64748b', padding: '0 4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#15803d' }} />
-              <span>Fest gebuchte Lektion</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
-              <span>Wunschzeit</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ffffff', border: '1.5px solid #cbd5e1' }} />
-              <span>Mögliche Zeit (Frei)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }} />
-              <span>Gesperrt / Geblockt</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', border: '1px solid #cbd5e1' }} />
+                <span>Frei</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                <span>Geblockt</span>
+              </div>
             </div>
           </div>
 
           {/* Schedule Grid Matrix */}
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600, fontSize: '0.85rem' }}>
               Zeitfenster werden geladen...
             </div>
           ) : (
             <div style={{
               border: '1px solid #e2e8f0',
-              borderRadius: '20px',
+              borderRadius: '14px',
               overflowX: 'auto',
-              maxHeight: '440px',
+              maxHeight: '480px',
               overflowY: 'auto',
               background: '#ffffff',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
             }}>
               {/* Header Row */}
               <div style={{
@@ -677,17 +640,17 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 top: 0,
                 zIndex: 5,
                 display: 'grid',
-                gridTemplateColumns: '110px repeat(6, 1fr)',
-                background: '#ffffff',
-                borderBottom: '2px solid #f1f5f9',
+                gridTemplateColumns: '95px repeat(6, 1fr)',
+                background: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0',
                 fontWeight: 800,
-                fontSize: '0.82rem',
+                fontSize: '0.78rem',
                 color: '#334155',
                 textAlign: 'center'
               }}>
-                <div style={{ padding: '14px 8px', borderRight: '1px solid #f1f5f9', background: '#ffffff' }}>Uhrzeit</div>
+                <div style={{ padding: '10px 4px', borderRight: '1px solid #e2e8f0', background: '#f8fafc' }}>Zeit</div>
                 {DAYS_OF_WEEK.map(day => (
-                  <div key={day.id} style={{ padding: '14px 8px', borderRight: day.id === 6 ? 'none' : '1px solid #f1f5f9', background: '#ffffff' }}>
+                  <div key={day.id} style={{ padding: '10px 4px', borderRight: day.id === 6 ? 'none' : '1px solid #e2e8f0', background: '#f8fafc' }}>
                     {day.name}
                   </div>
                 ))}
@@ -697,19 +660,20 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
               {TIME_SLOTS.map(slot => (
                 <div key={slot.start} style={{
                   display: 'grid',
-                  gridTemplateColumns: '110px repeat(6, 1fr)',
-                  borderBottom: '1px solid #f8fafc',
-                  fontSize: '0.8rem'
+                  gridTemplateColumns: '95px repeat(6, 1fr)',
+                  borderBottom: '1px solid #f1f5f9',
+                  fontSize: '0.76rem'
                 }}>
                   <div style={{
-                    padding: '8px',
+                    padding: '4px',
                     borderRight: '1px solid #f1f5f9',
                     background: '#fafafa',
                     fontWeight: 700,
                     color: '#64748b',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    fontSize: '0.72rem'
                   }}>
                     {slot.label}
                   </div>
@@ -727,25 +691,25 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       bg = '#15803d';
                       textColor = '#ffffff';
                       labelText = exactTime || 'Gebucht';
-                      icon = <Check size={12} color="white" />;
+                      icon = <Check size={11} color="white" />;
                     } else if (status === 'wunsch') {
                       bg = '#f0fdf4';
                       border = '1px solid #bbf7d0';
                       textColor = '#166534';
                       labelText = 'Wunsch';
-                      icon = <Star size={12} fill="#22c55e" color="#16a34a" />;
+                      icon = <Star size={11} fill="#22c55e" color="#16a34a" />;
                     } else if (status === 'moeglich') {
                       bg = '#ffffff';
                       border = '1px solid #f1f5f9';
                       textColor = '#64748b';
                       labelText = 'Möglich';
-                      icon = <Check size={11} color="#94a3b8" />;
+                      icon = <Check size={10} color="#94a3b8" />;
                     } else if (status === 'gesperrt') {
                       bg = '#fef2f2';
                       border = '1px solid #fecaca';
                       textColor = '#991b1b';
                       labelText = 'Geblockt';
-                      icon = <Ban size={12} color="#dc2626" />;
+                      icon = <Ban size={11} color="#dc2626" />;
                     }
 
                     return (
@@ -753,20 +717,20 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                         key={day.id}
                         onClick={() => handleCellClick(day.id, slot.start)}
                         style={{
-                          padding: '6px 2px',
+                          padding: '4px 2px',
                           borderRight: day.id === 6 ? 'none' : '1px solid #f8fafc',
                           background: bg,
                           color: textColor,
                           display: 'flex',
-                          flexDirection: 'column',
+                          flexDirection: 'row',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '2px',
+                          gap: '3px',
                           cursor: isEditing ? 'pointer' : 'default',
                           transition: 'all 0.15s',
-                          minHeight: '46px',
+                          minHeight: '36px',
                           fontWeight: 700,
-                          fontSize: '0.72rem',
+                          fontSize: '0.7rem',
                           boxSizing: 'border-box'
                         }}
                         className={isEditing ? 'hover-scale-mini' : ''}
@@ -774,12 +738,10 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                         {icon}
                         {labelText && (
                           <span style={{
-                            fontSize: status === 'fixed' ? '0.65rem' : '0.7rem',
+                            fontSize: status === 'fixed' ? '0.64rem' : '0.68rem',
                             lineHeight: '1.05',
                             textAlign: 'center',
-                            wordBreak: 'break-word',
-                            whiteSpace: 'normal',
-                            padding: '0 2px'
+                            whiteSpace: 'nowrap'
                           }}>
                             {labelText}
                           </span>
@@ -795,15 +757,15 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
 
         {/* Modal Footer Actions */}
         <div style={{
-          padding: '20px 28px',
-          borderTop: '1px solid #e2e8f0',
+          padding: '12px 22px',
+          borderTop: '1px solid #f1f5f9',
           background: '#ffffff',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '12px'
         }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div>
             {onOpenScheduleBoard && (
               <button
                 onClick={() => {
@@ -812,49 +774,50 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 }}
                 style={{
                   background: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
-                  padding: '10px 18px',
-                  borderRadius: '14px',
+                  border: '1px solid #cbd5e1',
+                  padding: '7px 14px',
+                  borderRadius: '10px',
                   fontWeight: 700,
-                  fontSize: '0.84rem',
+                  fontSize: '0.78rem',
                   color: '#0f172a',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '7px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                  gap: '6px',
+                  transition: 'all 0.15s'
                 }}
-                className="hover-scale"
+                className="hover-scale-mini"
               >
-                <ExternalLink size={15} />
+                <ExternalLink size={13} color="#475569" />
                 <span>Im Stundenplaner öffnen</span>
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
             {isEditing && (
               <button
                 onClick={handleSavePreferences}
                 disabled={saving}
                 style={{
                   background: brandColor,
-                  color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
+                  color: brandButtonTextColor,
                   border: 'none',
-                  padding: '11px 22px',
-                  borderRadius: '14px',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
                   fontWeight: 800,
-                  fontSize: '0.88rem',
+                  fontSize: '0.82rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: `0 4px 16px ${brandColor}40`
+                  gap: '6px',
+                  boxShadow: `0 2px 10px ${brandColor}35`,
+                  transition: 'all 0.15s'
                 }}
-                className="hover-scale"
+                className="hover-scale-mini"
               >
-                <Save size={16} />
-                <span>{saving ? 'Wird gespeichert...' : 'Änderungen Speichern'}</span>
+                <Save size={14} />
+                <span>{saving ? 'Speichert...' : 'Speichern'}</span>
               </button>
             )}
 
@@ -864,11 +827,12 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 background: '#f1f5f9',
                 color: '#475569',
                 border: 'none',
-                padding: '11px 20px',
-                borderRadius: '14px',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer'
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
               }}
               className="hover-scale-mini"
             >
