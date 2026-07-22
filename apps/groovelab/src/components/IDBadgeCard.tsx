@@ -3,6 +3,74 @@ import QRCode from 'react-qr-code';
 import { Check } from 'lucide-react';
 import { StudioAvatar } from './StudioAvatar';
 
+export const urlToDataUrl = async (url: string): Promise<string> => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+
+  try {
+    const response = await fetch(url, { cache: 'force-cache' });
+    if (response.ok) {
+      const blob = await response.blob();
+      const result = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string) || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+      });
+      if (result && result.startsWith('data:image/')) {
+        return result;
+      }
+    }
+  } catch (e) {
+    console.warn('Fetch failed for image URL, falling back to Image loader:', url, e);
+  }
+
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const dataUrl = await new Promise<string>((resolve) => {
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 250;
+          canvas.height = img.naturalHeight || 250;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve('');
+          }
+        } catch {
+          resolve('');
+        }
+      };
+      img.onerror = () => resolve('');
+      img.src = url;
+    });
+    if (dataUrl && dataUrl.startsWith('data:image/')) return dataUrl;
+  } catch (e) {
+    console.warn('Image loader fallback failed for:', url, e);
+  }
+
+  return url;
+};
+
+export const inlineAllImagesInElement = async (container: HTMLElement): Promise<void> => {
+  const images = Array.from(container.querySelectorAll('img'));
+  await Promise.all(
+    images.map(async (img) => {
+      const currentSrc = img.getAttribute('src') || img.src;
+      if (currentSrc && !currentSrc.startsWith('data:')) {
+        const dataUrl = await urlToDataUrl(currentSrc);
+        if (dataUrl && dataUrl.startsWith('data:image/')) {
+          img.src = dataUrl;
+        }
+      }
+    })
+  );
+};
+
 export interface IDBadgeCardProps {
   user: {
     id?: string;
@@ -31,7 +99,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   cardRef,
   onClick,
   style,
-  showSubtext = true,
+  showSubtext = false,
   selectedPrint,
   onToggleSelectPrint
 }) => {
@@ -128,9 +196,22 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
         </div>
       )}
 
-      {/* Lanyard Hole Mockup */}
-      <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-        <div style={{ width: '30px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
+      {/* Lanyard Hole Mockup (Centered for straight hanging) */}
+      <div style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b', position: 'relative' }}>
+        {/* Centered Lanyard Slot with Metallic Ring */}
+        <div style={{ 
+          width: '42px', 
+          height: '10px', 
+          borderRadius: '5px', 
+          background: '#0f172a',
+          border: '2px solid rgba(255,255,255,0.3)',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ width: '28px', height: '3px', borderRadius: '1.5px', background: '#020617' }}></div>
+        </div>
       </div>
 
       {/* Status Header Badge */}

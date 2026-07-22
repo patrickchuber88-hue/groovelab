@@ -7158,11 +7158,7 @@ function App() {
 
   const handleSwitchActiveRole = async (newRole: string) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', user.id);
-      if (error) throw error;
+      setUser((prevUser: any) => (prevUser ? { ...prevUser, role: newRole } : prevUser));
 
       if (newRole === 'teacher') {
         const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
@@ -7182,12 +7178,19 @@ function App() {
         localStorage.setItem('groovelab_active_workspace', 'secretary');
         localStorage.setItem('groovelab_active_platform', 'campus');
         localStorage.setItem('campus_active_tab', 'briefing');
-        // Let the workspace state inside SecretaryDashboard load from localStorage
+        setActivePlatform('campus');
+        setActiveStudentTab('briefing');
       }
 
-      setUser({ ...user, role: newRole });
+      const { error } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', user.id);
+      if (error) {
+        console.warn('Role update in Supabase notice:', error.message);
+      }
     } catch (err: any) {
-      alert('Fehler beim Rollenwechsel: ' + err.message);
+      console.warn('Fehler beim Rollenwechsel:', err);
     }
   };
 
@@ -9320,7 +9323,7 @@ function App() {
         {/* Profile Tab */}
         {activeStudentTab === 'profile' && !(user.role?.toLowerCase() === 'student' && activePlatform === 'campus') && (
           <ErrorBoundary>
-            {activePlatform === 'campus' && (user.role === 'teacher' || user.role === 'admin') ? (
+            {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? (
               /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
               <div className="animation-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%', paddingTop: '24px' }}>
                 {/* Hero Header Card — Briefing-style: image left panel, content right */}

@@ -232,14 +232,15 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       <img 
         src={displaySrc || '/avatar_ghost.jpg'} 
         onLoad={() => setIsLoaded(true)}
-        loading="lazy"
-        decoding="async"
+        loading="eager"
+        decoding="sync"
+        crossOrigin="anonymous"
         style={{ 
           width: '100%', 
           height: '100%', 
           objectFit: 'cover', 
           objectPosition: isPortraitAvatar ? 'center 15%' : 'center',
-          opacity: isLoaded ? 1 : 0,
+          opacity: 1,
           transition: 'opacity 0.3s ease-in-out',
           willChange: 'opacity',
           backfaceVisibility: 'hidden',

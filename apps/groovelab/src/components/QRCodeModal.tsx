@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { StudioAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
-import { IDBadgeCard } from './IDBadgeCard';
+import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 
 interface QRCodeModalProps {
   user: {
@@ -341,11 +341,12 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
   const downloadImage = async () => {
     if (cardRef.current === null) return;
     try {
+      await inlineAllImagesInElement(cardRef.current);
       const { toJpeg } = await import('html-to-image');
       const dataUrl = await toJpeg(cardRef.current, { 
-        quality: 0.95,
-        backgroundColor: activePlatform === 'campus' ? (isAdminOrSecretary ? '#7f1d1d' : '#34a853') : '#ffffff',
-        cacheBust: true,
+        quality: 0.98,
+        backgroundColor: '#ffffff',
+        cacheBust: false,
         pixelRatio: 2
       });
       const link = document.createElement('a');

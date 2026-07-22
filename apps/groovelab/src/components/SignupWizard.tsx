@@ -6,6 +6,7 @@ import {
   ArrowRight, ArrowLeft, RefreshCw, Key, ShieldCheck, Check, Sparkles, Download, Fingerprint
 } from 'lucide-react';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { inlineAllImagesInElement } from './IDBadgeCard';
 
 interface SignupWizardProps {
   onBackToLogin: () => void;
@@ -315,11 +316,12 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const downloadQrCode = async () => {
     if (!createdUser || !cardRef.current) return;
     try {
+      await inlineAllImagesInElement(cardRef.current);
       const { toJpeg } = await import('html-to-image');
       const dataUrl = await toJpeg(cardRef.current, { 
-        quality: 0.95,
-        backgroundColor: '#7f1d1d',
-        cacheBust: true,
+        quality: 0.98,
+        backgroundColor: '#ffffff',
+        cacheBust: false,
         pixelRatio: 2
       });
       const downloadLink = document.createElement('a');

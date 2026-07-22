@@ -16,7 +16,7 @@ import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { CampusEventsBoard } from './CampusEventsBoard';
 import { CampusSetupScreen } from './CampusSetupScreen';
 import { StudioAvatar } from './StudioAvatar';
-import { IDBadgeCard } from './IDBadgeCard';
+import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
 const cleanRoomName = (name: string | null | undefined): string => {
@@ -13228,15 +13228,14 @@ export function AdminDashboard({
     const saveAsImage = async () => {
       if (!qrCardRef.current) return;
       try {
+        await inlineAllImagesInElement(qrCardRef.current);
         const { toJpeg } = await import('html-to-image');
         const roleLower = (selectedQRUser.role || '').toLowerCase();
         const isQRAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
         const dataUrl = await toJpeg(qrCardRef.current, { 
-          quality: 0.95, 
-          backgroundColor: (activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) 
-            ? (isQRAdminOrSecretary ? '#7f1d1d' : '#34a853') 
-            : '#ffffff',
-          cacheBust: true,
+          quality: 0.98, 
+          backgroundColor: '#ffffff',
+          cacheBust: false,
           pixelRatio: 2,
         });
         const link = document.createElement('a');
@@ -13331,133 +13330,12 @@ export function AdminDashboard({
           </button>
 
           {/* ID Card Design */}
-          <div 
-            ref={qrCardRef}
-            style={(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? {
-              background: isQRAdminOrSecretary 
-                ? 'radial-gradient(circle at 80% 10%, rgba(239, 68, 68, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(239, 68, 68, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)' 
-                : 'radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.15), transparent 50%), radial-gradient(circle at 20% 90%, rgba(16, 185, 129, 0.08), transparent 50%), linear-gradient(135deg, #27272a 0%, #121214 100%)',
-              borderRadius: '32px', 
-              padding: '28px', 
-              color: 'white',
-              boxShadow: isQRAdminOrSecretary 
-                ? '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(239, 68, 68, 0.15)' 
-                : '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(16, 185, 129, 0.15)',
-              border: isQRAdminOrSecretary 
-                ? '1.5px solid rgba(239, 68, 68, 0.25)' 
-                : '1.5px solid rgba(16, 185, 129, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              position: 'relative',
-              overflow: 'hidden',
-              width: '100%',
-              height: '480px',
-              minHeight: '480px',
-              boxSizing: 'border-box',
-              gap: '20px'
-            } : { 
-              background: 'white', 
-              borderRadius: '32px', 
-              boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              width: '100%',
-              aspectRatio: '0.62',
-              boxSizing: 'border-box',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}
-          >
-            {(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? (
-              <>
-                {/* Sheen effect */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-50%', left: '-50%', right: '-50%', bottom: '-50%',
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%, rgba(255, 255, 255, 0.02) 100%)',
-                  pointerEvents: 'none'
-                }} />
-
-                 {/* CAMPUS PASS Header */}
-                 <span style={{ 
-                   fontSize: '0.68rem', 
-                   fontWeight: 900, 
-                   color: isQRAdminOrSecretary ? '#f87171' : '#34d399', 
-                   textTransform: 'uppercase', 
-                   letterSpacing: '0.2em',
-                   zIndex: 1,
-                   marginBottom: '-4px'
-                 }}>
-                   CAMPUS PASS
-                 </span>
-
-                 {/* Top Info Section: Details left, Avatar right */}
-                 <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', zIndex: 1, flexDirection: 'row-reverse', width: '100%' }}>
-                   {/* Right Side: Avatar Photo */}
-                   <img 
-                     src={qrAvatarDataUrl || '/avatar_ghost.jpg'} 
-                     onLoad={handleQRImageLoad}
-                     crossOrigin={qrAvatarDataUrl?.startsWith('data:') || qrAvatarDataUrl?.startsWith('/') ? undefined : 'anonymous'}
-                     alt="Avatar" 
-                     style={{ 
-                       width: '92px', 
-                       height: '92px', 
-                       borderRadius: '22px', 
-                       objectFit: 'cover',
-                       border: isQRAdminOrSecretary ? '1.5px solid rgba(239, 68, 68, 0.4)' : '1.5px solid rgba(16, 185, 129, 0.4)',
-                       boxShadow: '0 10px 20px rgba(0, 0, 0, 0.3)',
-                       flexShrink: 0,
-                       marginTop: '2px'
-                     }} 
-                   />
-                   
-                   {/* Left Side: Identity Details */}
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                     <div>
-                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Name</span>
-                       <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', marginTop: '1px', fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                         {selectedQRUser.first_name} {maskLastName(selectedQRUser.last_name, showRealNames)}
-                       </div>
-                     </div>
- 
-                     <div>
-                       <span style={{ fontSize: '0.52rem', color: 'rgba(255, 255, 255, 0.45)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Musikschule</span>
-                       <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#ffffff', opacity: 0.95, marginTop: '1px', lineHeight: '1.2' }}>
-                         {qrSchoolName}
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-
-                {/* Dashed divider line */}
-                <div style={{ background: isQRAdminOrSecretary ? 'linear-gradient(90deg, transparent 0%, rgba(239, 68, 68, 0.25) 50%, transparent 100%)' : 'linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.25) 50%, transparent 100%)', height: '1px', width: '100%', margin: '8px 0', zIndex: 1 }} />
-
-                {/* QR Code Scan area */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 1, gap: '16px' }}>
-                  <div style={{ 
-                    background: '#ffffff', 
-                    padding: '16px', 
-                    borderRadius: '24px', 
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.35)', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    border: isQRAdminOrSecretary ? '1.5px solid rgba(239, 68, 68, 0.2)' : '1.5px solid rgba(16, 185, 129, 0.2)'
-                  }}>
-                    <QRCode value={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} size={135} />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <IDBadgeCard 
-                user={selectedQRUser} 
-                activePlatform={activePlatform} 
-                qrValue={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} 
-              />
-            )}
-          </div>
+          <IDBadgeCard 
+            user={selectedQRUser} 
+            activePlatform={activePlatform} 
+            qrValue={`${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`} 
+            cardRef={qrCardRef}
+          />
 
           <button 
             onClick={saveAsImage} 
