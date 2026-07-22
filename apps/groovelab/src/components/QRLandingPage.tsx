@@ -3125,11 +3125,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return (
       <div style={{
         display: 'flex',
-        background: '#e3e3e8',
-        borderRadius: '12px',
-        padding: '2px',
+        background: 'rgba(118, 118, 128, 0.12)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: '14px',
+        padding: '3px',
         width: '100%',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        border: '1px solid rgba(0, 0, 0, 0.04)',
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
       }}>
         <button
           type="button"
@@ -3138,21 +3142,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             flex: 1,
             padding: '8px 12px',
             border: 'none',
-            borderRadius: '10px',
+            borderRadius: '11px',
             background: activeTab === 'action' ? '#ffffff' : 'transparent',
             color: activeTab === 'action' ? '#000000' : '#636366',
             fontSize: '0.85rem',
-            fontWeight: activeTab === 'action' ? 700 : 500,
+            fontWeight: activeTab === 'action' ? 700 : 550,
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: activeTab === 'action' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04)' : 'none',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeTab === 'action' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px'
           }}
         >
-          {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 6 }} /> Üben</>}
+          {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 4 }} /> Üben</>}
         </button>
         <button
           type="button"
@@ -3161,21 +3165,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             flex: 1,
             padding: '8px 12px',
             border: 'none',
-            borderRadius: '10px',
+            borderRadius: '11px',
             background: activeTab === 'homework' ? '#ffffff' : 'transparent',
             color: activeTab === 'homework' ? '#000000' : '#636366',
             fontSize: '0.85rem',
-            fontWeight: activeTab === 'homework' ? 700 : 500,
+            fontWeight: activeTab === 'homework' ? 700 : 550,
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: activeTab === 'homework' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04)' : 'none',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeTab === 'homework' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px'
           }}
         >
-          <><BookOpen size={14} style={{ marginRight: 6 }} /> Hausaufgaben</>
+          <><BookOpen size={14} style={{ marginRight: 4 }} /> Hausaufgaben</>
         </button>
         <button
           type="button"
@@ -3184,14 +3188,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             flex: 1,
             padding: '8px 12px',
             border: 'none',
-            borderRadius: '10px',
+            borderRadius: '11px',
             background: activeTab === 'lessons' ? '#ffffff' : 'transparent',
             color: activeTab === 'lessons' ? '#000000' : '#636366',
             fontSize: '0.85rem',
-            fontWeight: activeTab === 'lessons' ? 700 : 500,
+            fontWeight: activeTab === 'lessons' ? 700 : 550,
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: activeTab === 'lessons' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04)' : 'none',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeTab === 'lessons' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3825,7 +3829,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     {(() => {
                       let audioCount = 0;
                       return notesList.map((note, i) => {
-                        if (note.startsWith("STICKER:")) return null;
+                        if (note.startsWith("STICKER:") || note.startsWith("LATENCY:")) return null;
                         
                         const isAudio = note.startsWith("AUDIO:");
                         if (isAudio) {

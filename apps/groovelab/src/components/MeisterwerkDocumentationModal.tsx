@@ -1016,10 +1016,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
-  // Custom song creation form states
+  // Custom song & lehrwerk creation form states
   const [showCreateSongModal, setShowCreateSongModal] = useState(false);
   const [newSongTitle, setNewSongTitle] = useState('');
   const [newSongArtist, setNewSongArtist] = useState('');
+
+  const [showCreateLehrwerkModal, setShowCreateLehrwerkModal] = useState(false);
+  const [newLehrwerkTitle, setNewLehrwerkTitle] = useState('');
+  const [newLehrwerkPages, setNewLehrwerkPages] = useState('50');
+  const [newLehrwerkLoading, setNewLehrwerkLoading] = useState(false);
 
   const getCurrentTeacherId = async (): Promise<string> => {
     if (teacherId) return teacherId;
@@ -2133,6 +2138,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         studentId: student.id,
         lehrwerkId: lehrwerkId,
         assignedAt: new Date().toISOString(),
+        visibility: 'private',
         pageStates: {}
       };
 
@@ -2143,6 +2149,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setShowAssignDropdown(false);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const updateLehrwerkVisibility = (lehrwerkId: string, visibility: 'private' | 'read' | 'control') => {
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      const parsed = stored ? JSON.parse(stored) : [];
+      const updated = parsed.map((item: any) => {
+        if (item.studentId === student.id && item.lehrwerkId === lehrwerkId) {
+          return { ...item, visibility };
+        }
+        return item;
+      });
+      localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+      setAssignedLehrwerke(updated.filter((item: any) => item.studentId === student.id));
+    } catch (e) {
+      console.error('Error updating lehrwerk visibility:', e);
     }
   };
 
@@ -2180,10 +2203,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     overrideHomework?: boolean
   ) => {
     console.log('selectTextbookPage called:', { lehrwerkId, pageNum, overrideStatus, overrideHomework });
-    const book = globalLehrwerke.find(b => b.id === lehrwerkId);
+    let book = globalLehrwerke.find(b => b.id === lehrwerkId);
     if (!book) {
-      console.log('selectTextbookPage book not found:', lehrwerkId);
-      return;
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      const parsed = stored ? JSON.parse(stored) : [];
+      const assigned = parsed.find((a: any) => a.studentId === student.id && a.lehrwerkId === lehrwerkId);
+      if (assigned || lehrwerkId.startsWith('custom-')) {
+        book = {
+          id: lehrwerkId,
+          title: assigned?.title || 'Eigenes Lehrwerk',
+          totalPages: 50,
+          total_pages: 50,
+          emoji: '📚',
+          color: '#34a853',
+          is_custom: true
+        };
+      } else {
+        console.log('selectTextbookPage book not found:', lehrwerkId);
+        return;
+      }
     }
 
     setActiveLehrwerkId(lehrwerkId);
@@ -3086,6 +3124,77 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (err: any) {
       console.error('Error creating custom song:', err);
       alert(`Fehler beim Anlegen des Songs: ${err.message || err}`);
+    }
+  };
+
+  const handleCreateAndAssignLehrwerk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLehrwerkTitle.trim()) return;
+
+    setNewLehrwerkLoading(true);
+    try {
+      const schoolId = student?.school_id || student?.schoolId || studentSchoolId;
+      const totalPages = parseInt(newLehrwerkPages, 10) || 50;
+
+      let createdId = `custom-${Date.now()}`;
+      let createdBook: any = null;
+
+      try {
+        const { data: newLehrwerk, error } = await supabase
+          .from('lehrwerke')
+          .insert({
+            title: newLehrwerkTitle.trim(),
+            total_pages: totalPages,
+            emoji: '📚',
+            school_id: schoolId || null,
+            color: '#34a853'
+          })
+          .select('*')
+          .single();
+
+        if (!error && newLehrwerk) {
+          createdId = newLehrwerk.id;
+          createdBook = newLehrwerk;
+        }
+      } catch (err) {
+        console.warn('Supabase insert lehrwerke fallback to local:', err);
+      }
+
+      if (!createdBook) {
+        createdBook = {
+          id: createdId,
+          title: newLehrwerkTitle.trim(),
+          total_pages: totalPages,
+          totalPages: totalPages,
+          emoji: '📚',
+          color: '#34a853'
+        };
+      }
+
+      // Assign to student in localStorage & state
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (!parsed.some((item: any) => item.studentId === student.id && item.lehrwerkId === createdId)) {
+        const newAssignment = {
+          studentId: student.id,
+          lehrwerkId: createdId,
+          assignedAt: new Date().toISOString(),
+          pageStates: {}
+        };
+        const updated = [...parsed, newAssignment];
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+      }
+
+      await loadLehrwerke();
+      setGlobalLehrwerke(prev => [...prev.filter(b => b.id !== createdId), createdBook]);
+      setActiveLehrwerkId(createdId);
+      setShowCreateLehrwerkModal(false);
+      setNewLehrwerkTitle('');
+      setNewLehrwerkPages('50');
+    } catch (err: any) {
+      console.error('Error creating custom lehrwerk:', err);
+    } finally {
+      setNewLehrwerkLoading(false);
     }
   };
 
@@ -4739,12 +4848,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               </div>
             ) : activeSubView === 'lehrwerk' && activeLehrwerkId ? (
               (() => {
-                const book = globalLehrwerke.find(g => g.id === activeLehrwerkId);
-                if (!book) return null;
                 const assignedBook = assignedLehrwerke.find(a => a.lehrwerkId === activeLehrwerkId);
+                let book = globalLehrwerke.find(g => g.id === activeLehrwerkId);
+                if (!book) {
+                  book = {
+                    id: activeLehrwerkId,
+                    title: assignedBook?.title || 'Eigenes Lehrwerk',
+                    totalPages: 50,
+                    total_pages: 50,
+                    emoji: '📚',
+                    color: '#34a853',
+                    is_custom: true
+                  };
+                }
                 const bookColor = getLehrwerkColor(book.title);
                 const pct = assignedBook ? Math.min(100, Math.round((Object.values(assignedBook.pageStates || {}).filter((p: any) => p.status === 'mastered').length / (book.totalPages || 50)) * 100)) : 0;
                 const pages = Array.from({ length: book.totalPages || 50 }, (_, i) => i + 1);
+                const currentVisibility = assignedBook?.visibility || 'private';
 
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.25s ease', flex: 1, overflowY: 'auto', padding: '24px' }}>
@@ -4781,7 +4901,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       display: 'flex',
                       gap: '16px',
                       alignItems: 'center',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                      flexWrap: 'wrap'
                     }}>
                       <div style={{
                         width: '54px',
@@ -4793,7 +4914,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        flexShrink: 0
                       }}>
                         {bookColor && <BookOpen size={22} color={bookColor.text} />}
                         <div style={{
@@ -4806,10 +4928,115 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           borderRight: '1px solid rgba(255,255,255,0.1)'
                         }} />
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {book.title}
-                        </h4>
+                      <div style={{ flex: 1, minWidth: '220px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
+                            {book.title}
+                          </h4>
+                          {activeLehrwerkId.startsWith('custom-') || book.is_custom ? (
+                            <span style={{ color: '#d97706', fontSize: '0.72rem', fontWeight: 800, background: '#fffbeb', border: '1px solid #fef3c7', padding: '2px 8px', borderRadius: '10px' }}>
+                              ⭐ Eigenes Projekt
+                            </span>
+                          ) : (
+                            <span style={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                              🎓 Vom Lehrer
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Expressive Apple Access Control Bar */}
+                        <div style={{
+                          margin: '8px 0 10px 0',
+                          padding: '6px 12px',
+                          background: '#f8fafc',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '8px'
+                        }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>🛡️</span> Sichtbarkeit & Rechte:
+                          </span>
+
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: '#cbd5e1',
+                            borderRadius: '11px',
+                            padding: '2px',
+                            gap: '2px'
+                          }}>
+                            <button
+                              type="button"
+                              onClick={() => updateLehrwerkVisibility(book.id, 'private')}
+                              style={{
+                                border: 'none',
+                                background: currentVisibility === 'private' ? '#ffffff' : 'transparent',
+                                color: currentVisibility === 'private' ? '#0f172a' : '#475569',
+                                padding: '4px 10px',
+                                borderRadius: '9px',
+                                fontSize: '0.71rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                boxShadow: currentVisibility === 'private' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                                transition: 'all 0.15s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              🔒 Nur für mich (Privat)
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => updateLehrwerkVisibility(book.id, 'read')}
+                              style={{
+                                border: 'none',
+                                background: currentVisibility === 'read' ? '#ffffff' : 'transparent',
+                                color: currentVisibility === 'read' ? '#047857' : '#475569',
+                                padding: '4px 10px',
+                                borderRadius: '9px',
+                                fontSize: '0.71rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                boxShadow: currentVisibility === 'read' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                                transition: 'all 0.15s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              👁️ Lehrer liest mit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => updateLehrwerkVisibility(book.id, 'control')}
+                              style={{
+                                border: 'none',
+                                background: currentVisibility === 'control' ? '#ffffff' : 'transparent',
+                                color: currentVisibility === 'control' ? '#6d28d9' : '#475569',
+                                padding: '4px 10px',
+                                borderRadius: '9px',
+                                fontSize: '0.71rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                boxShadow: currentVisibility === 'control' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                                transition: 'all 0.15s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              🤝 Lehrer darf eintragen
+                            </button>
+                          </div>
+                        </div>
+
                         {book.author && (
                           <p style={{ margin: '0 0 2px 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
                             von {book.author}
@@ -5514,29 +5741,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     Lehrwerke & Übungen
                   </h3>
                   
-                  {!readOnly && (
-                    <div style={{ position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={() => setShowAssignDropdown(!showAssignDropdown)}
-                        style={{
-                          background: '#000',
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '20px',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Plus size={14} /> Zuweisen
-                      </button>
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                      style={{
+                        background: '#000',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={14} /> Lehrwerk hinzufügen
+                    </button>
                       
                       {showAssignDropdown && (
                         <div style={{
@@ -5613,15 +5839,124 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             ))
                           }
                           {globalLehrwerke.filter(g => !assignedLehrwerke.some(a => a.lehrwerkId === g.id)).length === 0 && (
-                            <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '8px', textAlign: 'center', fontStyle: 'italic' }}>
-                              Alle Lehrwerke zugewiesen
+                            <span style={{ fontSize: '0.72rem', color: '#7d7d82', padding: '6px 8px', textAlign: 'center', fontStyle: 'italic' }}>
+                              Alle Mediathek-Bücher zugewiesen
                             </span>
                           )}
+                          <div style={{ borderTop: '1px solid #e8e8ed', margin: '4px 0' }} />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCreateLehrwerkModal(!showCreateLehrwerkModal);
+                              setShowAssignDropdown(false);
+                            }}
+                            style={{
+                              border: 'none',
+                              background: '#34a853',
+                              color: 'white',
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <Plus size={14} /> Eigenes Lehrwerk neu anlegen
+                          </button>
                         </div>
                       )}
                     </div>
-                  )}
                 </div>
+
+                {showCreateLehrwerkModal && (
+                  <form onSubmit={handleCreateAndAssignLehrwerk} style={{
+                    background: '#f8fafc',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '14px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.04)'
+                  }} className="animation-slide-up">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        📚 Eigenes Lehrwerk erstellen
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateLehrwerkModal(false)}
+                        style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        placeholder="Buchtitel (z.B. Mein Gitarrenbuch 2026)..."
+                        value={newLehrwerkTitle}
+                        onChange={(e) => setNewLehrwerkTitle(e.target.value)}
+                        style={{
+                          flex: 2,
+                          minWidth: '180px',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                        autoFocus
+                      />
+                      <input
+                        type="number"
+                        placeholder="Seiten (z.B. 50)"
+                        value={newLehrwerkPages}
+                        onChange={(e) => setNewLehrwerkPages(e.target.value)}
+                        style={{
+                          width: '90px',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                        min="1"
+                        max="500"
+                      />
+                      <button
+                        type="submit"
+                        disabled={newLehrwerkLoading || !newLehrwerkTitle.trim()}
+                        style={{
+                          background: '#34a853',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: newLehrwerkTitle.trim() ? 'pointer' : 'not-allowed',
+                          opacity: newLehrwerkTitle.trim() ? 1 : 0.6,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        {newLehrwerkLoading ? 'Erstelle...' : 'Speichern & Aktivieren'}
+                      </button>
+                    </div>
+                  </form>
+                )}
 
                 {assignedLehrwerke.length === 0 ? (
                   <div style={{ padding: '40px 16px', textAlign: 'center', border: '2px dashed #e8e8ed', borderRadius: '24px', color: '#7d7d82', fontSize: '0.82rem', fontWeight: 600 }}>
@@ -5683,39 +6018,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           </div>
 
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                               <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {book.title}
                               </h4>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveLehrwerk(assigned.lehrwerkId, e);
-                                }}
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#ef4444',
-                                  cursor: 'pointer',
-                                  padding: '4px',
-                                  borderRadius: '50%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  transition: 'background 0.2s'
-                                }}
-                                onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
-                                onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
-                              >
-                                <X size={14} strokeWidth={2.5} />
-                              </button>
+                              {!readOnly && !(assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveLehrwerk(assigned.lehrwerkId, e);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background 0.2s'
+                                  }}
+                                  onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
+                                  onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
+                                >
+                                  <X size={14} strokeWidth={2.5} />
+                                </button>
+                              )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                              <p style={{ margin: 0, fontSize: '0.7rem', color: '#7d7d82', fontWeight: 700 }}>
-                                {total} Seiten • {worked} gemeistert
+                              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                {assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated ? (
+                                  <span style={{ color: '#d97706', fontWeight: 800 }}>⭐ Eigenes Projekt</span>
+                                ) : (
+                                  <span style={{ color: '#16a34a', fontWeight: 800 }}>🎓 Vom Lehrer</span>
+                                )}
+                                <span>•</span>
+                                <span>{total} Seiten</span>
+                                <span>•</span>
+                                <span>{worked} gemeistert</span>
                               </p>
-                              <span style={{ fontSize: '0.7rem', fontWeight: 900, color: pct > 0 ? '#34a853' : '#7d7d82' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: pct > 0 ? '#34a853' : '#64748b' }}>
                                 ({pct}%)
                               </span>
                             </div>
@@ -5829,35 +6174,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#000', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {songTitle}
                                   </h4>
-                                  <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#7d7d82', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {songArtist} • <span style={{ color: '#000', fontWeight: 800 }}>{progress}%</span>
+                                  <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    {skill.songs?.teacher_id || skill.created_by_teacher ? (
+                                      <span style={{ color: '#16a34a', fontWeight: 800 }}>🎓 Vom Lehrer</span>
+                                    ) : (
+                                      <span style={{ color: '#d97706', fontWeight: 800 }}>⭐ Wunschsong</span>
+                                    )}
+                                    <span>•</span>
+                                    <span>{songArtist}</span>
+                                    <span>•</span>
+                                    <span style={{ color: '#000', fontWeight: 800 }}>{progress}%</span>
                                   </p>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveSong(skill.id, e);
-                                    }}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#ef4444',
-                                      cursor: 'pointer',
-                                      padding: '4px',
-                                      borderRadius: '50%',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'background 0.2s',
-                                      zIndex: 10
-                                    }}
-                                    onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
-                                    onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
-                                  >
-                                    <X size={14} strokeWidth={2.5} />
-                                  </button>
+                                  {!readOnly && (skill.songs?.teacher_id || skill.created_by_teacher) && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveSong(skill.id, e);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#ef4444',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s',
+                                        zIndex: 10
+                                      }}
+                                      onMouseEnter={(el) => el.currentTarget.style.background = '#fef2f2'}
+                                      onMouseLeave={(el) => el.currentTarget.style.background = 'transparent'}
+                                    >
+                                      <X size={14} strokeWidth={2.5} />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 
@@ -6731,69 +7086,66 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           }}
                         />
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            💡 Schnell-Textbausteine (Antippen zum Hinzufügen / Entfernen):
+                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                             {[
-                              { label: '❓ Frage im Unterricht', text: '❓ Frage für den Unterricht: ' },
-                              { label: '🎯 Ziel-BPM erreicht', text: '🎯 Geschafft: Metronom-Tempo auf X BPM gesteigert!' },
-                              { label: '🛑 Takt X unklar', text: '🛑 Takt X ist mir noch nicht ganz klar.' },
-                              { label: '🐢 Langsam geübt', text: '🐢 Diese Woche besonders langsam & sauber mit Metronom geübt.' }
-                            ].map((chip, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => {
-                                  let text = chip.text;
-                                  if (text.includes('X BPM')) {
-                                    const bpm = prompt("Welche BPM hast du erreicht?", "120");
-                                    text = text.replace('X BPM', `${bpm || '120'} BPM`);
-                                  }
-                                  setStudentNotes(prev => prev ? `${prev}\n${text}` : text);
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  color: '#334155',
-                                  border: '1px solid #cbd5e1',
-                                  padding: '4px 10px',
-                                  borderRadius: '999px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                                }}
-                              >
-                                {chip.label}
-                              </button>
-                            ))}
+                              { id: 'frage', label: '❓ Frage im Unterricht', prefix: '❓ Frage für den Unterricht:' },
+                              { id: 'bpm', label: '🎯 Ziel-BPM erreicht', prefix: '🎯 Geschafft: Metronom-Tempo auf' },
+                              { id: 'takt', label: '🛑 Takt unklar', prefix: '🛑 Takt' },
+                              { id: 'langsam', label: '🐢 Langsam geübt', prefix: '🐢 Diese Woche besonders langsam' }
+                            ].map((chip) => {
+                              const isActive = studentNotes.includes(chip.prefix);
+                              return (
+                                <button
+                                  key={chip.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isActive) {
+                                      const lines = studentNotes.split('\n').filter(line => !line.includes(chip.prefix));
+                                      setStudentNotes(lines.join('\n').trim());
+                                    } else {
+                                      let snippet = '';
+                                      if (chip.id === 'frage') {
+                                        snippet = '❓ Frage für den Unterricht: ';
+                                      } else if (chip.id === 'bpm') {
+                                        const bpm = prompt("Welche BPM hast du erreicht?", "120");
+                                        snippet = `🎯 Geschafft: Metronom-Tempo auf ${bpm || '120'} BPM gesteigert!`;
+                                      } else if (chip.id === 'takt') {
+                                        const takt = prompt("Welcher Takt ist noch unklar?", "Takt 4");
+                                        snippet = `🛑 ${takt || 'Takt 4'} ist mir noch nicht ganz klar.`;
+                                      } else if (chip.id === 'langsam') {
+                                        snippet = '🐢 Diese Woche besonders langsam & sauber mit Metronom geübt.';
+                                      }
+                                      setStudentNotes(prev => prev ? `${prev.trim()}\n${snippet}` : snippet);
+                                    }
+                                  }}
+                                  style={{
+                                    background: isActive ? '#e6f4ea' : '#ffffff',
+                                    color: isActive ? '#137333' : '#334155',
+                                    border: isActive ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
+                                    padding: '8px 14px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: isActive ? '0 2px 6px rgba(52, 168, 83, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale"
+                                >
+                                  {isActive && <span style={{ color: '#34a853', fontWeight: 900 }}>✓</span>}
+                                  <span>{chip.label}</span>
+                                </button>
+                              );
+                            })}
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={handleSaveStudentNotes}
-                            style={{
-                              background: '#34a853',
-                              color: 'white',
-                              border: 'none',
-                              padding: '8px 16px',
-                              borderRadius: '10px',
-                              fontSize: '0.78rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)'
-                            }}
-                          >
-                            💾 Notiz speichern
-                          </button>
                         </div>
-
-                        {studentNotesSavedToast && (
-                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d', textAlign: 'right' }}>
-                            ✅ Notiz erfolgreich gespeichert!
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}

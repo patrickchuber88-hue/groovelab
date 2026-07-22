@@ -661,7 +661,7 @@ function MobileBriefingView({
               <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.03em' }} className="kpi-card-title">Streak</span>
               <Flame size={15} />
             </div>
-            <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{avatar?.streak_flame || 0} Tage</span>
+            <span style={{ fontSize: '1.25rem', fontWeight: 900, fontFamily: "'Urbanist', sans-serif" }} className="kpi-card-value">{avatar?.streak_flame || 0} {(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}</span>
           </div>
         )}
       </div>
@@ -10242,7 +10242,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <span style={{ fontSize: '1.6rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                         {avatar?.streak_flame || 0}
                       </span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Tage</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>{(avatar?.streak_flame || 0) === 1 ? 'Tag' : 'Tage'}</span>
                     </div>
                   </div>
                 )}
@@ -10766,7 +10766,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
                                 {currentWeekNotes && (() => {
                                   let audioCount = 0;
-                                  const filteredNotes = currentWeekNotes.filter((note: string) => !note.startsWith("STICKER:"));
+                                  const filteredNotes = currentWeekNotes.filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:"));
                                   return filteredNotes.map((note: string, idx: number) => {
                                     const isAudio = note.startsWith("AUDIO:");
                                     if (isAudio) {
@@ -10902,7 +10902,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 })}
                                 {prevWeekNotes && (() => {
                                   let audioCount = 0;
-                                  const filteredNotes = prevWeekNotes.filter((note: string) => !note.startsWith("STICKER:"));
+                                  const filteredNotes = prevWeekNotes.filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:"));
                                   return filteredNotes.map((note: string, idx: number) => {
                                     const isAudio = note.startsWith("AUDIO:");
                                     if (isAudio) {
