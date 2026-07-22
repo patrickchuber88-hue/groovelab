@@ -3636,27 +3636,42 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     const currentStreak = avatar?.streak_flame || 0;
     if (currentStreak <= 0) return; // Joker is only automatically applied if there is an active streak to save
 
-    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
-    let firstMissedDayGroup: any = null;
-    let foundJokerDate: Date | null = null;
+    // Check consecutive missed days from newest to oldest
+    let consecutiveMissed = 0;
+    let missedGroup: any = null;
+    let missedDateObj: Date | null = null;
 
-    for (let i = groupedList.length - 1; i >= 0; i--) {
+    for (let i = 0; i < groupedList.length; i++) {
       const group = groupedList[i];
-      if (group.isPlaceholder && !group.isToday) {
-        const parts = group.date.split('.');
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = 2000 + parseInt(parts[2], 10);
-        const d = new Date(year, month, day);
-        const weekOfD = getISOWeek(d);
-        
-        if (!lastJokerWeek || weekOfD > lastJokerWeek) {
-          firstMissedDayGroup = group;
-          foundJokerDate = new Date(year, month, day, 12, 0, 0);
-          break;
+      if (group.isToday) continue;
+
+      if (group.isPlaceholder) {
+        consecutiveMissed++;
+        if (consecutiveMissed === 1) {
+          missedGroup = group;
+          const parts = group.date.split('.');
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = 2000 + parseInt(parts[2], 10);
+          missedDateObj = new Date(year, month, day, 12, 0, 0);
         }
+      } else {
+        // Encountered a practice day
+        break;
       }
     }
+
+    // A Joker can ONLY be applied if exakt 1 day was missed while having an active streak!
+    // If consecutiveMissed >= 2, streak is broken (0), and NO joker can be used.
+    if (consecutiveMissed !== 1 || !missedGroup || !missedDateObj) return;
+
+    const lastJokerWeek = studentUser?.joker_used_at ? getISOWeek(new Date(studentUser.joker_used_at)) : null;
+    const weekOfMissed = getISOWeek(missedDateObj);
+
+    if (lastJokerWeek && weekOfMissed <= lastJokerWeek) return; // Joker already used this week
+
+    const firstMissedDayGroup = missedGroup;
+    const foundJokerDate = missedDateObj;
 
     if (firstMissedDayGroup && foundJokerDate) {
       console.log('Automatically applying joker to save streak for date:', firstMissedDayGroup.date);
@@ -4249,12 +4264,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         groups[dateStr].focusSeconds += seconds;
       }
 
-      if (groups[dateStr].focusSeconds >= 180 || groups[dateStr].extraSeconds >= 60) {
+      const totalSeconds = groups[dateStr].focusSeconds + groups[dateStr].extraSeconds;
+      if (totalSeconds >= 180) {
         groups[dateStr].isPlaceholder = false;
-      }
-
-      if (log.flame_level && log.flame_level !== 'Keine Flamme') {
-        groups[dateStr].flameLevel = log.flame_level;
+        if (!groups[dateStr].flameLevel || groups[dateStr].flameLevel === 'Keine Flamme') {
+          groups[dateStr].flameLevel = log.flame_level && log.flame_level !== 'Keine Flamme'
+            ? log.flame_level
+            : getFlameLevelName(avatar?.streak_flame || 0);
+        }
       }
     });
     
@@ -5731,44 +5748,30 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         const todayStr = toLocalYYYYMMDD(new Date());
         const diffDays = getDaysBetweenLocal(lastSecuredDateStr, todayStr);
         if (diffDays > 1) {
-          const tempDate = new Date(lastSecuredDateStr);
-          let currentDecayedStreak = activeStreak;
-          const initialJokerWeek = user?.joker_used_at ? getISOWeek(new Date(user.joker_used_at)) : null;
-          let lastJokerWeek = initialJokerWeek;
-          
-          let latestJokerDate: Date | null = null;
-          let streakChanged = false;
-          let jokerChanged = false;
-
-          for (let i = 1; i < diffDays; i++) {
-            const missedDate = new Date(tempDate.getTime());
-            missedDate.setDate(tempDate.getDate() + i);
+          if (diffDays === 2) {
+            // Missed EXACTLY 1 day
+            const missedDate = new Date(lastSecuredDateStr);
+            missedDate.setDate(missedDate.getDate() + 1);
             const weekOfMissed = getISOWeek(missedDate);
-            
-            if (currentDecayedStreak > 0 && (!lastJokerWeek || weekOfMissed > lastJokerWeek)) {
-              lastJokerWeek = weekOfMissed;
-              latestJokerDate = new Date(missedDate.getFullYear(), missedDate.getMonth(), missedDate.getDate(), 12, 0, 0);
-              jokerChanged = true;
-            } else {
-              const oldStreak = currentDecayedStreak;
-              currentDecayedStreak = Math.max(0, currentDecayedStreak - 1);
-              if (currentDecayedStreak !== oldStreak) {
-                streakChanged = true;
-              }
-            }
-          }
+            const initialJokerWeek = user?.joker_used_at ? getISOWeek(new Date(user.joker_used_at)) : null;
 
-          if (streakChanged || jokerChanged) {
-            if (streakChanged && avatarRecord) {
-              avatarRecord.streak_flame = currentDecayedStreak;
-              activeStreak = currentDecayedStreak;
-              await supabase.from('avatars').update({ streak_flame: currentDecayedStreak }).eq('user_id', studentId);
-              await supabase.from('student_stats').update({ streak_flame: currentDecayedStreak }).eq('student_id', studentId);
+            if (!initialJokerWeek || weekOfMissed > initialJokerWeek) {
+              // Apply Joker for the single missed day
+              await supabase.from('users').update({ joker_used_at: missedDate.toISOString() }).eq('id', studentId);
+              user.joker_used_at = missedDate.toISOString();
+            } else {
+              // Joker already used this week -> Streak breaks to 0
+              activeStreak = 0;
+              if (avatarRecord) avatarRecord.streak_flame = 0;
+              await supabase.from('avatars').update({ streak_flame: 0 }).eq('user_id', studentId);
+              await supabase.from('student_stats').update({ streak_flame: 0 }).eq('student_id', studentId);
             }
-            if (jokerChanged && latestJokerDate) {
-              await supabase.from('users').update({ joker_used_at: latestJokerDate.toISOString() }).eq('id', studentId);
-              user.joker_used_at = latestJokerDate.toISOString();
-            }
+          } else {
+            // Missed 2 OR MORE DAYS -> Streak breaks to 0 immediately! No Joker allowed!
+            activeStreak = 0;
+            if (avatarRecord) avatarRecord.streak_flame = 0;
+            await supabase.from('avatars').update({ streak_flame: 0 }).eq('user_id', studentId);
+            await supabase.from('student_stats').update({ streak_flame: 0 }).eq('student_id', studentId);
           }
         }
       }
@@ -8678,15 +8681,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                               })();
 
-                              const focusMins = Math.round(group.focusSeconds / 60);
-                              const extraMins = Math.floor(group.extraSeconds / 60);
-                              const extraSecs = group.extraSeconds % 60;
+                              const totalSecs = group.focusSeconds + group.extraSeconds;
+                              let fSeconds = group.focusSeconds;
+                              let eSeconds = group.extraSeconds;
+
+                              // Senior Developer Enhancement:
+                              // If totalSecs >= 180 (3 min target) but fSeconds was 0 (e.g. initial log flag), split totalSecs into 180s target focus + remainder extra!
+                              if (totalSecs >= 180 && fSeconds === 0) {
+                                fSeconds = 180;
+                                eSeconds = totalSecs - 180;
+                              }
+
+                              const focusMins = Math.floor(fSeconds / 60);
+                              const extraMins = Math.floor(eSeconds / 60);
+                              const extraSecs = eSeconds % 60;
                               
                               const textParts = [];
-                              if (group.focusSeconds > 0) {
+                              if (fSeconds > 0) {
                                 textParts.push(`Fokuszeit (+${focusMins}m)`);
                               }
-                              if (group.extraSeconds > 0) {
+                              if (eSeconds > 0) {
                                 textParts.push(`+${extraMins}:${String(extraSecs).padStart(2, '0')} (extra)`);
                               }
                               const statusText = textParts.join(' - ');
