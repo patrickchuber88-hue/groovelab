@@ -843,7 +843,8 @@ function MobileBriefingView({
                     const textNotes = info.pages
                       .map(p => p.notes)
                       .filter(Boolean)
-                      .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
+                      .map(n => n.split('\n').filter((l: string) => !l.trim().startsWith('STICKER:') && !l.trim().startsWith('AUDIO:') && l.trim() !== 'Inhalte in der Premium-Version freischalten').join('\n').trim())
+                      .filter(Boolean)
                       .join('; ');
 
                     return (
@@ -2338,6 +2339,31 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const getCurrentSchoolYear = (): string => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    if (month >= 9) {
+      return `${year}/${year + 1}`;
+    } else {
+      return `${year - 1}/${year}`;
+    }
+  };
+
+  const getAvailableSchoolYears = (): string[] => {
+    const current = getCurrentSchoolYear();
+    const startYear = parseInt(current.split('/')[0], 10);
+    return [
+      `${startYear}/${startYear + 1}`,
+      `${startYear - 1}/${startYear}`,
+      `${startYear - 2}/${startYear - 1}`
+    ];
+  };
+
+  const currentSchoolYear = getCurrentSchoolYear();
+  const availableSchoolYears = getAvailableSchoolYears();
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(currentSchoolYear);
 
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showOwnQr, setShowOwnQr] = useState<boolean>(false);

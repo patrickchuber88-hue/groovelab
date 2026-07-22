@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -47,6 +47,18 @@ interface Student {
   schoolId?: string;
   is_campus_active?: boolean;
 }
+
+export const cleanNotesText = (text: string | null | undefined): string => {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('STICKER:') && !trimmed.startsWith('AUDIO:');
+    })
+    .join('\n')
+    .trim();
+};
 
 interface MeisterwerkDocumentationModalProps {
   student: Student;
@@ -209,6 +221,15 @@ const SKILL_TAGS = [
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false }) => {
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
+    try {
+      const seen = localStorage.getItem('groovelab_protokoll_onboarding_seen');
+      return seen !== 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [onboardingStep, setOnboardingStep] = useState<number>(0);
 
   // Skill-Radar & Feedback-Tagging
   const [showSkillRadar, setShowSkillRadar] = useState(false);
@@ -834,13 +855,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       const targetTopic = topicNameContext || topicName || `Allgemein`;
       const dateStr = new Date().toISOString();
-      const stickerMetaStr = `STICKER:${stickerId}|${targetTopic}|${dateStr}`;
-      
-      setHomeworkNotesList(prev => [...prev, stickerMetaStr]);
-      
-      const updatedList = [...homeworkNotesList, stickerMetaStr];
-      await syncHomeworkNotes(updatedList);
-      
+
+      // Update simulatedStickers state so the Sticker Board renders the sticker immediately
+      setSimulatedStickers(prev => {
+        const existing = prev[stickerId] || { count: 0, details: [] };
+        return {
+          ...prev,
+          [stickerId]: {
+            count: existing.count + 1,
+            details: [...existing.details, { topic: targetTopic, date: dateStr }]
+          }
+        };
+      });
+
       await fetchProgress();
       notifyHomeworkChange();
       
@@ -1289,51 +1316,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     try {
       const targetTopic = topicNameContext || `System-Meilenstein`;
       const dateStr = new Date().toISOString();
-      const stickerMetaStr = `STICKER:${stickerId}|${targetTopic}|${dateStr}`;
       
-      const currentWeek = getISOWeek();
-      const dummyWeeklyItem = progressItems.find(item => 
-        item.topic_name.startsWith('Hausaufgabe KW ') && 
-        getItemWeek(item) === currentWeek
-      );
-
-      let currentNotes: string[] = [];
-      if (dummyWeeklyItem && dummyWeeklyItem.homework_notes) {
-        try {
-          currentNotes = dummyWeeklyItem.homework_notes.startsWith('[') && dummyWeeklyItem.homework_notes.endsWith(']')
-            ? JSON.parse(dummyWeeklyItem.homework_notes)
-            : [dummyWeeklyItem.homework_notes];
-        } catch (e) {
-          currentNotes = [dummyWeeklyItem.homework_notes];
-        }
-      }
-      
-      const updatedList = [...currentNotes, stickerMetaStr];
-      const allNotesJson = JSON.stringify(updatedList);
-
-      if (dummyWeeklyItem) {
-        const { error } = await supabase
-          .from('progress_matrix')
-          .update({ homework_notes: allNotesJson, updated_at: new Date().toISOString() })
-          .eq('id', dummyWeeklyItem.id);
-        if (error) throw error;
-      } else {
-        const activeTId = await getCurrentTeacherId();
-        const { error } = await supabase
-          .from('progress_matrix')
-          .insert({
-            student_id: student.id,
-            teacher_id: activeTId,
-            topic_name: `Hausaufgabe KW ${currentWeek.split('-W')[1]}`,
-            status: 'IN_PROGRESS',
-            is_current_homework: true,
-            teacher_notes: '',
-            homework_notes: allNotesJson,
-            updated_at: new Date().toISOString()
-          });
-        if (error) throw error;
-      }
-
+      setSimulatedStickers(prev => {
+        const existing = prev[stickerId] || { count: 0, details: [] };
+        return {
+          ...prev,
+          [stickerId]: {
+            count: existing.count + 1,
+            details: [...existing.details, { topic: targetTopic, date: dateStr }]
+          }
+        };
+      });
       await fetchProgress();
       notifyHomeworkChange();
     } catch (e) {
@@ -2116,14 +2109,18 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (dbItem?.homework_notes) {
       try {
         const parsed = JSON.parse(dbItem.homework_notes);
-        loadedNote = Array.isArray(parsed) ? parsed.join('\n') : String(parsed);
+        if (Array.isArray(parsed)) {
+          loadedNote = parsed.map((line: string) => cleanNotesText(line)).filter(Boolean).join('\n');
+        } else {
+          loadedNote = cleanNotesText(String(parsed));
+        }
       } catch {
-        loadedNote = dbItem.homework_notes;
+        loadedNote = cleanNotesText(dbItem.homework_notes);
       }
     } else {
-      loadedNote = pageState.homeworkNotes || pageState.homework_notes || '';
+      loadedNote = cleanNotesText(pageState.homeworkNotes || pageState.homework_notes || '');
     }
-    setHomeworkNotes(loadedNote);
+    setHomeworkNotes(cleanNotesText(loadedNote));
 
     // Map textbook page statuses to Supabase/form states
     if (overrideStatus !== undefined) {
@@ -3041,14 +3038,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }}
         className="hover-scale"
       >
-        <Sliders size={isMobile ? 12 : 13} />
+        <Activity size={isMobile ? 12 : 13} />
         <span>Skill-Radar</span>
       </button>
     );
   };
 
   const renderSchoolYearSelector = () => {
-    if (!isCampusActive) return null;
     const [cStartYear] = currentSchoolYear.split('/').map(Number);
     const options = [
       currentSchoolYear,
@@ -3057,34 +3053,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ];
 
     return (
-      <select
-        value={selectedSchoolYear}
-        onChange={(e) => setSelectedSchoolYear(e.target.value)}
-        style={{
-          background: selectedSchoolYear === currentSchoolYear ? 'rgba(255,255,255,0.15)' : '#eab308',
-          border: '1px solid rgba(255,255,255,0.25)',
-          color: selectedSchoolYear === currentSchoolYear ? '#ffffff' : '#0f172a',
-          borderRadius: '20px',
-          padding: '4px 10px',
-          fontSize: '0.72rem',
-          fontWeight: 800,
-          cursor: 'pointer',
-          outline: 'none',
-          boxShadow: selectedSchoolYear !== currentSchoolYear ? '0 2px 8px rgba(234, 179, 8, 0.4)' : 'none',
-          transition: 'all 0.15s ease',
-          marginRight: '4px',
-          flexShrink: 0
-        }}
-      >
-        <option value={currentSchoolYear} style={{ color: '#0f172a' }}>
-          🎓 Schuljahr {currentSchoolYear} (Aktuell)
-        </option>
-        {options.slice(1).map(sy => (
-          <option key={sy} value={sy} style={{ color: '#0f172a' }}>
-            📜 Schuljahr {sy} (Hall of Fame)
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <select
+          value={selectedSchoolYear}
+          onChange={(e) => setSelectedSchoolYear(e.target.value)}
+          style={{
+            background: selectedSchoolYear === currentSchoolYear 
+              ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+              : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+            border: '2px solid #fef3c7',
+            color: '#ffffff',
+            borderRadius: '999px',
+            padding: '8px 36px 8px 16px',
+            fontSize: '0.86rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            outline: 'none',
+            boxShadow: '0 4px 16px rgba(245, 158, 11, 0.4)',
+            transition: 'all 0.15s ease',
+            appearance: 'none',
+            WebkitAppearance: 'none'
+          }}
+        >
+          <option value={currentSchoolYear} style={{ color: '#0f172a', fontWeight: 800 }}>
+            🎓 Schuljahr {currentSchoolYear} (Aktuell)
           </option>
-        ))}
-      </select>
+          {options.slice(1).map(sy => (
+            <option key={sy} value={sy} style={{ color: '#0f172a', fontWeight: 800 }}>
+              🏆 Schuljahr {sy} (Hall of Fame Archiv)
+            </option>
+          ))}
+        </select>
+        <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#ffffff', fontSize: '0.7rem' }}>
+          ▼
+        </div>
+      </div>
     );
   };
 
@@ -3216,31 +3219,57 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-                <h2 
-                  onClick={() => onProfileClick && onProfileClick(student)}
-                  title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
-                  style={{
-                    margin: 0,
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    cursor: onProfileClick ? 'pointer' : 'default',
-                    transition: 'opacity 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (onProfileClick) e.currentTarget.style.opacity = '0.8';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (onProfileClick) e.currentTarget.style.opacity = '1';
-                  }}
-                >
-                  {displayedStudentName}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h2 
+                    onClick={() => onProfileClick && onProfileClick(student)}
+                    title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
+                    style={{
+                      margin: 0,
+                      fontSize: '1rem',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      cursor: onProfileClick ? 'pointer' : 'default',
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (onProfileClick) e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (onProfileClick) e.currentTarget.style.opacity = '1';
+                    }}
+                  >
+                    {displayedStudentName}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => { setOnboardingStep(0); setShowProtokollOnboarding(true); }}
+                    title="Anleitung & Onboarding anzeigen"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.18)',
+                      border: '1px solid rgba(255, 255, 255, 0.28)',
+                      color: '#ffffff',
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                    className="hover-scale"
+                  >
+                    <Info size={13} color="#ffffff" />
+                  </button>
+                </div>
                 <span style={{
                   fontSize: '0.68rem',
                   color: 'rgba(230, 244, 234, 0.85)',
@@ -3428,7 +3457,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
               <div className="header-desktop-archiv" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {renderSchoolYearSelector()}
                 {renderSkillRadarButton()}
                 {renderArchivButton()}
               </div>
@@ -6420,8 +6448,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
                         }}>
                           <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {activePageNumber}:</span>
-                          <span style={{ fontWeight: 650, color: homeworkNotes.trim() ? '#1e293b' : '#94a3b8', fontStyle: homeworkNotes.trim() ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                            {homeworkNotes.trim() || 'Keine Hausaufgabe eingetragen'}
+                          <span style={{ fontWeight: 650, color: cleanNotesText(homeworkNotes) ? '#1e293b' : '#94a3b8', fontStyle: cleanNotesText(homeworkNotes) ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
+                            {cleanNotesText(homeworkNotes) || 'Keine Hausaufgabe eingetragen'}
                           </span>
                         </div>
                       </div>
@@ -7772,119 +7800,88 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </button>
           </div>
 
-          {/* SIMULATOR TOGGLE BAR (Dev Mode) */}
-          <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '12px 20px',
-            border: '1.5px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            zIndex: 20,
-            flexShrink: 0
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sliders size={15} color="#64748b" />
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
-                Entwickler-Modus (Simulation)
-              </span>
+          {/* SIMULATOR TOGGLE BAR (Dev Mode - Teachers Only) */}
+          {!readOnly && (
+            <div style={{
+              background: 'white',
+              borderRadius: '20px',
+              padding: '12px 20px',
+              border: '1.5px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              zIndex: 20,
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sliders size={15} color="#64748b" />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                  Entwickler-Modus (Simulation)
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
+                  <input
+                    type="checkbox"
+                    checked={isDevSimulationActive}
+                    onChange={(e) => setIsDevSimulationActive(e.target.checked)}
+                    style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#34a853' }}
+                  />
+                  <span>Klick-Vergabe simulieren</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={simulateMultiYearProgress}
+                  style={{
+                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                    border: '1px solid #ca8a04',
+                    color: '#0f172a',
+                    fontSize: '0.74rem',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '5px 12px',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 6px rgba(234, 179, 8, 0.3)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <span>🎓 3 Schuljahre simulieren</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetStickerAlbum}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    transition: 'background 0.1s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <RotateCcw size={12} color="#ef4444" />
+                  Album leeren
+                </button>
+              </div>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
-                <input
-                  type="checkbox"
-                  checked={isDevSimulationActive}
-                  onChange={(e) => setIsDevSimulationActive(e.target.checked)}
-                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#34a853' }}
-                />
-                <span>Klick-Vergabe simulieren</span>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
-                <input
-                  type="checkbox"
-                  checked={isDemoMode}
-                  onChange={(e) => setIsDemoMode(e.target.checked)}
-                  style={{ cursor: 'pointer', width: '14px', height: '14px', accentColor: '#34a853' }}
-                />
-                <span>Demo-Limits</span>
-              </label>
-
-              <button
-                type="button"
-                onClick={simulateMultiYearProgress}
-                style={{
-                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                  border: '1px solid #ca8a04',
-                  color: '#0f172a',
-                  fontSize: '0.74rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '5px 12px',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 6px rgba(234, 179, 8, 0.3)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale"
-              >
-                <span>🎓 3 Schuljahre simulieren</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={triggerCelebrationTest}
-                style={{
-                  background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
-                  border: '1px solid #0369a1',
-                  color: '#ffffff',
-                  fontSize: '0.74rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '5px 12px',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale"
-              >
-                <span>✨ Animation testen</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={resetStickerAlbum}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ef4444',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  transition: 'background 0.1s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-              >
-                <RotateCcw size={12} color="#ef4444" />
-                Album leeren
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* ALBUM HEADER & PROGRESS TRACKER HERO BANNER */}
           {(() => {
@@ -7926,18 +7923,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                         <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.5px', color: '#facc15' }}>
                           Schuljahr-Ehrentafel {selectedSchoolYear}
                         </h2>
-                        <span style={{
-                          background: 'rgba(250, 204, 21, 0.2)',
-                          border: '1.5px solid #facc15',
-                          color: '#facc15',
-                          fontSize: '0.74rem',
-                          fontWeight: 900,
-                          padding: '4px 14px',
-                          borderRadius: '20px',
-                          letterSpacing: '0.06em'
-                        }}>
-                          🏆 HALL OF FAME ARCHIV
-                        </span>
+                        {renderSchoolYearSelector()}
                       </div>
                       <p style={{ margin: 0, fontSize: '0.86rem', color: '#c7d2fe', fontWeight: 600, maxWidth: '580px' }}>
                         Abgeheftete Meilensteine aus dem Schuljahr {selectedSchoolYear}. Alle gelernten Songs & Lehrwerke bleiben lebenslang im Repertoire!
@@ -8017,6 +8003,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       }}>
                         {rankTitle}
                       </span>
+                      {renderSchoolYearSelector()}
                     </div>
                     <p style={{ margin: 0, fontSize: '0.84rem', color: '#94a3b8', fontWeight: 600, maxWidth: '520px' }}>
                       Sammle XP, erstelle Streaks & meistere Songs, um alle haptischen Sammel-Sticker für dein virtuelles Musik-Album freizuschalten.
@@ -8217,7 +8204,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     key={st.id}
                     className="panini-sticker-card"
                     onClick={() => {
-                      if (isDevSimulationActive) {
+                      if (!readOnly && isDevSimulationActive) {
                         awardSticker(st.id, "Simulation");
                       } else {
                         setSelectedPreviewSticker(st);
@@ -8258,8 +8245,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       />
                     )}
 
-                    {/* Manual Award Button for Teachers / Dev simulation */}
-                    {st.id !== 'song-master' && !st.auto && (
+                    {/* Manual Award Button for Teachers ONLY */}
+                    {!readOnly && st.id !== 'song-master' && !st.auto && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -8288,7 +8275,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           fontWeight: 'bold',
                           fontSize: '1rem'
                         }}
-                        title="Sticker manuell vergeben"
+                        title="Sticker manuell vergeben (Nur für Lehrer)"
                         className="hover-scale"
                       >
                         +
@@ -9438,6 +9425,262 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
         );
       })()}
+
+        {/* Premium Schritt-für-Schritt Onboarding Modal Overlay */}
+        {showProtokollOnboarding && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            animation: 'fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}>
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              width: '100%',
+              maxWidth: '640px',
+              padding: '36px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+              border: '1.5px solid rgba(255, 255, 255, 0.8)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Top Progress Bar & Step Dots */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {[0, 1, 2, 3].map((stepIdx) => (
+                    <div
+                      key={stepIdx}
+                      style={{
+                        width: stepIdx === onboardingStep ? '28px' : '8px',
+                        height: '8px',
+                        borderRadius: '4px',
+                        background: stepIdx === onboardingStep ? '#34a853' : (stepIdx < onboardingStep ? '#a7f3d0' : '#e2e8f0'),
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                    />
+                  ))}
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', marginLeft: '6px' }}>
+                    Schritt {onboardingStep + 1} von 4
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    try { localStorage.setItem('groovelab_protokoll_onboarding_seen', 'true'); } catch(e){}
+                    setShowProtokollOnboarding(false);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Überspringen
+                </button>
+              </div>
+
+              {/* Step Content */}
+              {onboardingStep === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ background: '#e6f4ea', width: '52px', height: '52px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <BookOpen size={28} color="#34a853" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', margin: 0 }}>
+                        Dein zentrales Wochen-Protokoll
+                      </h3>
+                      <span style={{ fontSize: '0.74rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Wochenaufgaben & Lehrer-Notizen
+                      </span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                    Im <strong>Schüler-Protokoll</strong> findest du alle wöchentlichen Hausaufgaben, Lehrwerkseiten und Notizen deines Lehrers. Es bildet das Herzstück deines Musikunterrichts bei <strong>Campus-Groovelab</strong>.
+                  </p>
+                  <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Check size={16} color="#34a853" />
+                      <span>Transparenter Wochenfortschritt für Schüler & Eltern</span>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Check size={16} color="#34a853" />
+                      <span>Historie aller vergangenen Unterrichtsstunden nachschlagen</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {onboardingStep === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ background: '#fef3c7', width: '52px', height: '52px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Clock size={28} color="#d97706" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', margin: 0 }}>
+                        Fokus-Timer, XP & Streaks
+                      </h3>
+                      <span style={{ fontSize: '0.74rem', color: '#d97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Selbstständiges Üben belohnen
+                      </span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                    Starte beim Üben zu Hause den <strong>Fokus-Timer</strong>. Erreiche mindestens 3 Minuten Fokuszeit, um deinen Tages-Bonus freizuschalten, XP-Punkte zu sammeln und deine Übe-Streak-Flamme am Brennen zu halten!
+                  </p>
+                  <div style={{ background: '#fffbeb', borderRadius: '18px', padding: '16px', border: '1px dashed #fde68a', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Flame size={24} color="#f97316" />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#b45309' }}>1 Min. Übezeit = 1 XP | Tages-Ziel = +10 XP Bonus</span>
+                      <span style={{ fontSize: '0.74rem', color: '#d97706' }}>Disziplin zahlt sich aus: Halte deine Streak über 7, 14 & 30 Tage!</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {onboardingStep === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ background: '#e0e7ff', width: '52px', height: '52px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Mic size={28} color="#4f46e5" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', margin: 0 }}>
+                        Audio-Aufnahme & Loopstation Studio
+                      </h3>
+                      <span style={{ fontSize: '0.74rem', color: '#4f46e5', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Interaktives Recording & Band-Labor
+                      </span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                    Nimm deine Übe-Fortschritte direkt als Sprach-/Instrumenten-Memo im Protokoll auf oder nutze die <strong>Web-Audio Loopstation</strong> zum Einspielen eigener Mehrspur-Beats & Songs!
+                  </p>
+                  <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '16px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Headphones size={24} color="#4f46e5" />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Sample-Accurate Recording & Dynamic Waveforms</span>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Höre deine Aufnahmen jederzeit im Hausaufgabenheft an.</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {onboardingStep === 3 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ background: '#fef9c3', width: '52px', height: '52px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Award size={28} color="#ca8a04" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: '#0f172a', margin: 0 }}>
+                        Meisterwerke & Panini-Sticker
+                      </h3>
+                      <span style={{ fontSize: '0.74rem', color: '#ca8a04', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Glänzende Auszeichnungen sammeln
+                      </span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+                    Für gemeisterte Songs und Meilensteine erhältst du glänzende <strong>Panini-Sticker</strong> für dein virtuelles Sammelalbum. Sammle seltene, epische & legendäre Sticker und teile deine Urkunden!
+                  </p>
+                  <div style={{ background: '#fefce8', borderRadius: '18px', padding: '16px', border: '1px dashed #fef08a', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Star size={24} color="#eab308" />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e' }}>Dein persönliches Sticker-Sammelalbum</span>
+                      <span style={{ fontSize: '0.74rem', color: '#a16207' }}>Erfolge bleiben dein ganzes Schuljahr über sichtbar!</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Control Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  disabled={onboardingStep === 0}
+                  onClick={() => setOnboardingStep(prev => Math.max(0, prev - 1))}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #cbd5e1',
+                    color: onboardingStep === 0 ? '#cbd5e1' : '#475569',
+                    borderRadius: '12px',
+                    padding: '10px 18px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: onboardingStep === 0 ? 'default' : 'pointer'
+                  }}
+                >
+                  Zurück
+                </button>
+
+                {onboardingStep < 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingStep(prev => Math.min(3, prev + 1))}
+                    style={{
+                      background: '#34a853',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '10px 24px',
+                      fontSize: '0.84rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>Weiter</span>
+                    <ChevronRight size={16} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { localStorage.setItem('groovelab_protokoll_onboarding_seen', 'true'); } catch(e){}
+                      setShowProtokollOnboarding(false);
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #34a853 0%, #16a34a 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '10px 24px',
+                      fontSize: '0.86rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      boxShadow: '0 6px 18px rgba(52, 168, 83, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <span>Protokoll erkunden 🚀</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       </div>
     );
@@ -10114,7 +10357,23 @@ const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [showCalibrationHelp, setShowCalibrationHelp] = useState(false);
   const [autoLatencyResult, setAutoLatencyResult] = useState<number | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'studio' | 'saved'>('studio');
+  const [activeSubTab, setActiveSubTab] = useState<'studio' | 'saved' | 'guide'>(() => {
+    try {
+      const hasSeenGuide = localStorage.getItem('groovelab_loopstation_guide_seen');
+      return hasSeenGuide === 'true' ? 'studio' : 'guide';
+    } catch (e) {
+      return 'studio';
+    }
+  });
+
+  const handleFinishOnboarding = () => {
+    try {
+      localStorage.setItem('groovelab_loopstation_guide_seen', 'true');
+    } catch (e) {
+      console.warn('Could not save loopstation guide status:', e);
+    }
+    setActiveSubTab('studio');
+  };
   const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
   const [selectedSavedLoop, setSelectedSavedLoop] = useState<any>(null);
   const savedLoopAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -12857,16 +13116,15 @@ const targetVol = isActive ? vol : 0;
         }
       `}} />
 
-      {/* Segmented Switch Control */}
+      {/* Sub-Tab Navigation Header */}
       <div style={{
         display: 'flex',
         background: '#e5e5ea',
-        borderRadius: '10px',
-        padding: '2px',
+        borderRadius: '12px',
+        padding: '3px',
         width: '100%',
-        maxWidth: '340px',
-        alignSelf: 'center',
-        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.08)'
+        maxWidth: '560px',
+        marginBottom: '20px'
       }}>
         <button
           type="button"
@@ -12884,15 +13142,21 @@ const targetVol = isActive ? vol : 0;
             color: activeSubTab === 'studio' ? '#1d1d1f' : '#86868b',
             border: 'none',
             borderRadius: '8px',
-            padding: '8px 16px',
+            padding: '8px 14px',
             fontSize: '0.74rem',
-            fontWeight: activeSubTab === 'studio' ? 700 : 600,
+            fontWeight: activeSubTab === 'studio' ? 800 : 600,
             cursor: 'pointer',
             boxShadow: activeSubTab === 'studio' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
           }}
         >
-          Loopstation Studio
+          <Sliders size={14} />
+          <span>Studio</span>
         </button>
         <button
           type="button"
@@ -12904,17 +13168,254 @@ const targetVol = isActive ? vol : 0;
             color: activeSubTab === 'saved' ? '#1d1d1f' : '#86868b',
             border: 'none',
             borderRadius: '8px',
-            padding: '8px 16px',
+            padding: '8px 14px',
             fontSize: '0.74rem',
-            fontWeight: activeSubTab === 'saved' ? 700 : 600,
+            fontWeight: activeSubTab === 'saved' ? 800 : 600,
             cursor: 'pointer',
             boxShadow: activeSubTab === 'saved' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
           }}
         >
-          Gespeicherte Loops
+          <Music size={14} />
+          <span>Gespeicherte Loops</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('guide')}
+          className="tactile-btn"
+          style={{
+            flex: 1,
+            background: activeSubTab === 'guide' ? '#ffffff' : 'transparent',
+            color: activeSubTab === 'guide' ? '#1d1d1f' : '#86868b',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '8px 14px',
+            fontSize: '0.74rem',
+            fontWeight: activeSubTab === 'guide' ? 800 : 600,
+            cursor: 'pointer',
+            boxShadow: activeSubTab === 'guide' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            transition: 'all 0.15s ease',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}
+        >
+          <BookOpen size={14} />
+          <span>Anleitung & Pro-Tipps</span>
         </button>
       </div>
+
+      {activeSubTab === 'guide' ? (
+        <div style={{
+          width: '100%',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderRadius: '28px',
+          border: '1.5px solid rgba(0, 0, 0, 0.08)',
+          padding: '32px',
+          boxShadow: '0 12px 35px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '28px'
+        }}>
+          {/* Header Banner */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+            paddingBottom: '20px',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                color: '#d97706',
+                width: '54px',
+                height: '54px',
+                borderRadius: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 6px 16px rgba(217, 119, 6, 0.2)'
+              }}>
+                <Zap size={28} color="#d97706" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                  Loopstation Masterclass: Anleitung & Pro-Tipps
+                </h2>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 600 }}>
+                  Maximale Sound-Qualität & tanzbare Perfektion für deinen Musikunterricht & zu Hause
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleFinishOnboarding}
+              className="tactile-btn"
+              style={{
+                background: '#34a853',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '12px 22px',
+                fontSize: '0.86rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>Verstanden & Studio starten! 🚀</span>
+            </button>
+          </div>
+
+          {/* Large Visual Grid Cards (2x2 Grid) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '20px',
+            width: '100%'
+          }}>
+            {/* Card 1: Kopfhörer Modus */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1.5px solid rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Headphones size={22} color="#4f46e5" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>1. Kopfhörer-Modus verwenden</span>
+                  <span style={{ fontSize: '0.70rem', color: '#4f46e5', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Keine Übersprechungen</span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                Verwende vorzugsweise <strong>kabelgebundene Kopfhörer</strong>. Dadurch hörst du das Metronom und deine bereits aufgenommenen Spuren in voller Lautstärke, ohne dass der Lautsprecher-Sound erneut vom Mikrofon mit aufgenommen wird.
+              </p>
+              <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '12px', border: '1px dashed #cbd5e1', fontSize: '0.74rem', color: '#475569', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Headphones size={16} color="#4f46e5" />
+                <span>Ergebnis: Glasklares Mehrspur-Recording ohne störendes Hallen oder Dopplungen.</span>
+              </div>
+            </div>
+
+            {/* Card 2: 4-Takte-Pause */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1.5px solid rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: '#fef3c7', color: '#d97706', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Clock size={22} color="#d97706" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>2. Die 4-Takte-Zwischenpause</span>
+                  <span style={{ fontSize: '0.70rem', color: '#d97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>100% Sample-Accurate Sync</span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                Zwischen jeder Aufnahmespur schaltet die Loopstation automatisch eine <strong>4-Takte-Pause</strong> ein. Nutze diese Pause, um dich entspannt auf die nächste Instrumentenspur vorzubereiten und im Groove zu bleiben.
+              </p>
+              <div style={{ background: '#fffbeb', borderRadius: '14px', padding: '12px', border: '1px dashed #fde68a', fontSize: '0.74rem', color: '#b45309', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={16} color="#d97706" />
+                <span>Zero Swallowed Attack: Die erste Note deiner neuen Spur klingt exakt zum Taktstrich aus.</span>
+              </div>
+            </div>
+
+            {/* Card 3: Spur im laufenden Loop ersetzen */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1.5px solid rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: '#e6f4ea', color: '#34a853', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <RotateCcw size={22} color="#34a853" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>3. Spur im laufenden Loop ersetzen</span>
+                  <span style={{ fontSize: '0.70rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Punktgenauer Takt-Snap</span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                Gefällt dir eine Spur nicht? Klicke bei laufendem Loop einfach erneut auf das Mikrofon der Spur (<code>⏳ WARTET</code>). Die alte Aufnahme wird am Taktende gestoppt und die neue startet automatisch exakt zu Takt 1 des nächsten Zyklus!
+              </p>
+              <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '12px', border: '1px dashed #bbf7d0', fontSize: '0.74rem', color: '#15803d', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <RotateCcw size={16} color="#34a853" />
+                <span>Nahtloser Workflow: Ersetze einzelne Spuren beliebig oft, ohne den Gesamtmix anzuhalten.</span>
+              </div>
+            </div>
+
+            {/* Card 4: Unterbrechungsfreies Spur-Löschen */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px',
+              border: '1.5px solid rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: '#fce8e6', color: '#ea4335', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={22} color="#ea4335" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>4. Unterbrechungsfreies Spur-Löschen</span>
+                  <span style={{ fontSize: '0.70rem', color: '#ea4335', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Doppelte Bestätigung</span>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
+                Klicke auf das Mülleimer-Icon am Ende einer Spur. Nach doppelter Sicherheitsbestätigung wird die Spur gelöscht. Alle anderen Spuren spielen ohne Unterbrechung weiter, und du kannst die freie Spur sofort neu einspielen.
+              </p>
+              <div style={{ background: '#fef2f2', borderRadius: '14px', padding: '12px', border: '1px dashed #fecaca', fontSize: '0.74rem', color: '#b91c1c', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Trash2 size={16} color="#ea4335" />
+                <span>Maximale Sicherheit: Verhindert versehentliches Löschen und hält deine Band im Takt.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
 
       <div style={{ display: 'flex', gap: '24px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
       
@@ -14578,6 +15079,7 @@ const targetVol = isActive ? vol : 0;
         )}
       </div>
       </div>
+      )}
 
         {/* Auto-Calibration Glassmorphism Overlay */}
         {isCalibratingLatency && (

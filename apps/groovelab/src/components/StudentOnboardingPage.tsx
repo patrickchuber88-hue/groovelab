@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Download, Sliders, Smartphone, Copy, Check, ArrowRight, X } from 'lucide-react';
+import { Download, Sliders, Smartphone, Copy, Check, ArrowRight, X, Calendar, Clock, CheckCircle2, AlertCircle, Edit3 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl } from './StudioAvatar';
+import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 
 interface StudentOnboardingPageProps {
   token: string;
@@ -17,7 +18,89 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showNotification, setShowNotification] = useState(false);
   const passCardRef = useRef<HTMLDivElement>(null);
+  // State for Wallet guide (Apple / Google Wallet modal toggle)
   const [walletGuide, setWalletGuide] = useState<'apple' | 'google' | null>(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleCompleted, setScheduleCompleted] = useState(false);
+  const [usageMode, setUsageMode] = useState<'student_self' | 'parent_hybrid' | null>(null);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  const handleSelectUsageMode = async (mode: 'student_self' | 'parent_hybrid') => {
+    setUsageMode(mode);
+    if (student?.id) {
+      try {
+        await supabase
+          .from('users')
+          .update({ usage_mode: mode })
+          .eq('id', student.id);
+      } catch (e) {
+        console.error('Error saving usage mode:', e);
+      }
+    }
+  };
+
+  const handleDownloadAnonymousSticker = () => {
+    try {
+      const qrContainer = document.querySelector('.onboarding-qr-container svg');
+      if (!qrContainer) return;
+      const svgData = new XMLSerializer().serializeToString(qrContainer);
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 440;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 400, 440);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(8, 8, 384, 424);
+
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 60, 40, 280, 280);
+
+        // 100% Anonymous Footer (Zero PII for privacy & child safety)
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Campus-Groovelab Check-in Code', 200, 365);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 12px Inter, system-ui, sans-serif';
+        ctx.fillText('Anonymer QR-Sticker für Notenheft & Koffer', 200, 392);
+
+        const link = document.createElement('a');
+        link.download = `QR_Sticker_Notenheft_Anonym.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+    } catch (err) {
+      console.error('Error downloading anonymous QR sticker:', err);
+    }
+  };
+
+  const checkScheduleStatus = async (studentId: string) => {
+    try {
+      const { data: stRow } = await supabase
+        .from('students')
+        .select('timetable_assigned_at')
+        .eq('id', studentId)
+        .maybeSingle();
+
+      const { data: prefData } = await supabase
+        .from('student_schedule_preferences')
+        .select('id')
+        .eq('student_id', studentId)
+        .limit(1);
+
+      const isDone = Boolean(stRow?.timetable_assigned_at || (prefData && prefData.length > 0));
+      setScheduleCompleted(isDone);
+    } catch (e) {
+      console.error('Error checking schedule status:', e);
+    }
+  };
 
   useEffect(() => {
     const fetchOnboardingDetails = async () => {
@@ -52,6 +135,15 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         setStudent(userData);
         const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
         setSchool(schoolObj);
+
+        // Fetch schedule preference status
+        checkScheduleStatus(userData.id);
+
+        // Check if action parameter specifies schedule onboarding
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('action') === 'schedule') {
+          setShowScheduleModal(true);
+        }
 
         // Auto-save this profile to local profiles registry
         if (typeof window !== 'undefined') {
@@ -273,7 +365,31 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const platformParam = urlParams.get('platform') || (student.is_campus_active && !student.is_groovelab_active ? 'campus' : 'groovelab');
     const link = `${window.location.origin}/onboarding/${student.qr_token || student.id}?platform=${platformParam}`;
-    navigator.clipboard.writeText(link);
+
+    const isCampusLink = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
+
+    const formattedText = isCampusLink 
+      ? `Hallo ${student.first_name}! 🎶
+
+Hier ist dein persönlicher Campus-Groovelab Zugang:
+${link}
+
+Deine Vorteile auf einen Blick:
+📅 1. Stundenplan-Wunschzeiten in 2 Min. übermitteln
+💳 2. Digitalen Schülerausweis (Apple & Google Wallet) speichern
+🏷️ 3. Anonymen QR-Sticker für dein Notenheft herunterladen & am Kiosk einchecken
+📚 4. Hausaufgabenheft & Übe-Timer direkt nutzen`
+      : `Hallo ${student.first_name}! 🎶
+
+Hier ist dein persönlicher GrooveLab Zugang:
+${link}
+
+Deine Vorteile auf einen Blick:
+💳 1. Digitalen Pass (Apple & Google Wallet) speichern
+🏷️ 2. Anonymen QR-Sticker für dein Instrument/Notenheft herunterladen & am Kiosk einchecken
+🎸 3. Band-Repertoire, Songs & Skills in GrooveLab freischalten`;
+
+    navigator.clipboard.writeText(formattedText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -314,263 +430,356 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const cardSaveTitle = isCampus ? 'Campus Ausweis sichern' : 'Member Pass sichern';
 
   return (
-    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#1e293b', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', fontFamily: 'system-ui, sans-serif', boxSizing: 'border-box' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: '#f8fafc', 
+      color: '#1e293b', 
+      padding: '24px 16px', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      fontFamily: 'system-ui, -apple-system, sans-serif', 
+      boxSizing: 'border-box' 
+    }}>
       
       {/* Header */}
-      <div style={{ textAlign: 'center', marginTop: '16px' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '6px', color: '#1e293b' }}>{pageTitle}</h1>
-        <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Dein persönlicher Onboarding-Bereich</p>
+      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '4px', color: '#0f172a' }}>{pageTitle}</h1>
+        <p style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, margin: 0 }}>Dein persönlicher Onboarding-Assistent</p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '32px', maxWidth: '850px', width: '100%', alignItems: 'center', justifyContent: 'center' }} className="onboarding-container">
-        
-        {/* Pass Card Component Preview */}
-        <div ref={passCardRef} style={{
-          width: '280px',
-          height: '450px',
-          background: '#ffffff',
-          borderRadius: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-          overflow: 'hidden',
-          border: '1px solid rgba(0,0,0,0.05)',
-          boxSizing: 'border-box',
-          flexShrink: 0
+      {/* Standalone Ausweis Card (Exact Original Proportions 280px x 450px) */}
+      <div ref={passCardRef} style={{
+        width: '280px',
+        height: '450px',
+        background: '#ffffff',
+        borderRadius: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4), 0 10px 25px -5px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        border: '1px solid rgba(0,0,0,0.05)',
+        boxSizing: 'border-box',
+        flexShrink: 0,
+        marginBottom: '24px'
+      }}>
+        {/* Lanyard Hole Mockup */}
+        <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
+          <div style={{ width: '28px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
+        </div>
+
+        {/* Status Header */}
+        <div style={{ 
+          background: activeColor, 
+          padding: '6px', 
+          textAlign: 'center',
+          textTransform: 'uppercase'
         }}>
-          {/* Lanyard Hole Mockup */}
-          <div style={{ height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e293b' }}>
-            <div style={{ width: '28px', height: '6px', borderRadius: '3px', background: '#0f172a' }}></div>
+          <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
+            {cardHeaderText}
           </div>
+        </div>
 
-          {/* Status Header */}
+        {/* Content Area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
+          {/* Portrait Avatar */}
           <div style={{ 
-            background: activeColor, 
-            padding: '6px', 
-            textAlign: 'center',
-            textTransform: 'uppercase'
+            width: '110px', 
+            height: '110px', 
+            borderRadius: '50%', 
+            border: `3px solid ${activeColor}`,
+            padding: '4px',
+            background: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
           }}>
-            <div style={{ color: 'white', fontSize: '0.6rem', fontWeight: 1000, letterSpacing: '0.2em' }}>
-              {cardHeaderText}
+            <img 
+              src={displayAvatar} 
+              alt="Profile"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                borderRadius: '50%'
+              }} 
+            />
+          </div>
+
+          {/* Identity */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '1.4rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>
+              {student.first_name}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', fontWeight: 700 }}>
+              {student.last_name || 'Member'}
             </div>
           </div>
 
-          {/* Content Area */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 32px 20px', gap: '20px' }}>
-            {/* Portrait */}
-            <div style={{ 
-              width: '110px', 
-              height: '110px', 
-              borderRadius: '50%', 
-              border: `3px solid ${activeColor}`,
-              padding: '4px',
-              background: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden'
-            }}>
-              <img 
-                src={displayAvatar} 
-                alt="Profile"
-                style={{ 
-                  width: '100%', 
-                  height: '100%', 
-                  objectFit: 'cover',
-                  borderRadius: '50%'
-                }} 
-              />
-            </div>
+          {/* QR Code Container */}
+          <div className="onboarding-qr-container" style={{ 
+            background: '#f8fafc', 
+            padding: '10px', 
+            borderRadius: '16px',
+            border: '1px solid #f1f5f9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxSizing: 'border-box'
+          }}>
+            <QRCode value={`${window.location.origin}/qr/${student.qr_token || student.id}`} size={110} style={{ width: '110px', height: '110px' }} />
+          </div>
 
-            {/* Identity */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 1000, color: '#1e293b', lineHeight: 1.1 }}>
-                {student.first_name}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', fontWeight: 700 }}>
-                {student.last_name || 'Member'}
-              </div>
-            </div>
-
-            {/* QR Code Container */}
-            <div className="onboarding-qr-container" style={{ 
-              background: '#f8fafc', 
-              padding: '10px', 
-              borderRadius: '16px',
-              border: '1px solid #f1f5f9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxSizing: 'border-box'
-            }}>
-              <QRCode value={`${window.location.origin}/qr/${student.qr_token || student.id}`} size={110} style={{ width: '110px', height: '110px' }} />
-            </div>
-
-            <p style={{ 
-              fontSize: '0.7rem', 
-              color: '#94a3b8', 
-              textAlign: 'center', 
-              margin: '0', 
-              fontWeight: 600, 
-              lineHeight: 1.3,
-              maxWidth: '220px'
-            }}>
-              Halte diesen Code vor die Kamera des iPads,<br/>um dich am Platz anzumelden.
-            </p>
+          <p style={{ 
+            fontSize: '0.7rem', 
+            color: '#94a3b8', 
+            textAlign: 'center', 
+            margin: '0', 
+            fontWeight: 600, 
+            lineHeight: 1.3,
+            maxWidth: '220px'
+          }}>
+            Halte diesen Code vor die Kamera des iPads,<br/>um dich am Platz anzumelden.
+          </p>
         </div>
       </div>
 
-      {/* Action Panel */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '380px', width: '100%' }}>
-          
-          {/* Card Download & Save */}
-          <div style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '24px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0' }}>
-              <Download size={18} color={activeColor} /> {cardSaveTitle}
-            </h3>
-            
-            <button onClick={handleDownloadJPEG} style={{ width: '100%', background: activeColor, color: isCampus ? '#ffffff' : '#0f172a', border: 'none', borderRadius: '14px', padding: '12px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'transform 0.1s' }} className="hover-scale">
-              <Download size={16} /> Als JPEG auf Handy speichern
-            </button>
-            
-            <button onClick={handleCopyLink} style={{ width: '100%', background: '#f4f4f5', color: '#18181b', border: '1px solid #d4d4d8', borderRadius: '14px', padding: '12px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              {copied ? <Check size={16} color="#22c55e" /> : <Copy size={16} />}
-              {copied ? 'Link kopiert!' : 'Onboarding-Link kopieren'}
-            </button>
+      {/* Single Action Panel Below (Max 440px Centered) */}
+      <div style={{
+        maxWidth: '440px',
+        width: '100%',
+        background: '#ffffff',
+        borderRadius: '28px',
+        border: '1px solid rgba(0,0,0,0.06)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        boxSizing: 'border-box'
+      }}>
+        
+        {/* 1. Hero Action: Stundenplan Wunschzeiten (Nur für Campus-Modul) */}
+        {isCampus && (
+          <button 
+            onClick={() => setShowScheduleModal(true)} 
+            style={{ 
+              width: '100%', 
+              background: scheduleCompleted ? '#ffffff' : activeColor, 
+              color: scheduleCompleted ? '#0f172a' : '#ffffff', 
+              border: scheduleCompleted ? '1.5px solid #cbd5e1' : 'none', 
+              borderRadius: '16px', 
+              padding: '14px', 
+              fontSize: '0.88rem', 
+              fontWeight: 900, 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '10px', 
+              boxShadow: scheduleCompleted ? '0 2px 6px rgba(0,0,0,0.03)' : `0 6px 20px ${activeColor}45`,
+              transition: 'all 0.15s' 
+            }} 
+            className="hover-scale"
+          >
+            {scheduleCompleted ? <CheckCircle2 size={18} color="#22c55e" /> : <Calendar size={18} />}
+            {scheduleCompleted ? 'Stundenplan-Zeiten übermittelt (bearbeiten)' : 'Wunschzeiten für Stundenplan eintragen'}
+          </button>
+        )}
 
-            {/* Apple & Google Wallet Buttons */}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <button 
-                onClick={() => setWalletGuide(walletGuide === 'apple' ? null : 'apple')}
-                style={{ 
-                  flex: 1, 
-                  background: '#000000', 
-                  color: '#ffffff', 
-                  border: '1px solid #27272a', 
-                  borderRadius: '12px', 
-                  padding: '10px', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 900, 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '6px',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                }}
-              >
-                <span style={{ fontSize: '0.9rem' }}></span> Apple Wallet
-              </button>
+        {/* 2. Wer nutzt diesen Zugang? (Segmented Control) */}
+        <div style={{ 
+          background: '#f8fafc', 
+          borderRadius: '16px', 
+          padding: '4px', 
+          border: '1px solid #e2e8f0', 
+          display: 'flex', 
+          alignItems: 'center' 
+        }}>
+          <button
+            type="button"
+            onClick={() => handleSelectUsageMode('student_self')}
+            style={{
+              flex: 1,
+              padding: '8px',
+              borderRadius: '12px',
+              border: 'none',
+              background: usageMode === 'student_self' ? '#ffffff' : 'transparent',
+              color: usageMode === 'student_self' ? '#0f172a' : '#64748b',
+              fontWeight: usageMode === 'student_self' ? 800 : 600,
+              fontSize: '0.76rem',
+              cursor: 'pointer',
+              boxShadow: usageMode === 'student_self' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <span>🎓</span> Schüler
+          </button>
 
-              <button 
-                onClick={() => setWalletGuide(walletGuide === 'google' ? null : 'google')}
-                style={{ 
-                  flex: 1, 
-                  background: '#0f172a', 
-                  color: '#ffffff', 
-                  border: '1px solid #1e293b', 
-                  borderRadius: '12px', 
-                  padding: '10px', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 900, 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '6px',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                }}
-              >
-                Google Wallet
-              </button>
-            </div>
-
-            {walletGuide && (
-              <div style={{ 
-                background: '#f4f4f5', 
-                border: '1px solid #e4e4e7', 
-                borderRadius: '16px', 
-                padding: '16px', 
-                marginTop: '4px',
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                <button 
-                  onClick={() => setWalletGuide(null)} 
-                  style={{ 
-                    position: 'absolute', 
-                    top: '12px', 
-                    right: '12px', 
-                    background: 'none', 
-                    border: 'none', 
-                    color: '#71717a', 
-                    cursor: 'pointer',
-                    padding: 0
-                  }}
-                >
-                  <X size={14} />
-                </button>
-                <h4 style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a', margin: '0 16px 0 0' }}>
-                  {walletGuide === 'apple' ? ' Zu Apple Wallet hinzufügen' : 'Zu Google Wallet hinzufügen'}
-                </h4>
-                <ol style={{ fontSize: '0.7rem', color: '#52525b', paddingLeft: '16px', margin: '4px 0 0 0', lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <li>Tippe oben auf <strong>"Als JPEG auf Handy speichern"</strong>.</li>
-                  {walletGuide === 'apple' ? (
-                    <>
-                      <li>Öffne die <strong>Apple Wallet</strong> App auf deinem iPhone.</li>
-                      <li>Tippe oben rechts auf das <strong>(+)-Symbol</strong>.</li>
-                      <li>Wähle <strong>"Bordkarte oder Ticket"</strong> und scanne den QR-Code deines Ausweises, oder importiere dein JPEG als Kundenkarte.</li>
-                    </>
-                  ) : (
-                    <>
-                      <li>Öffne deine <strong>Google Wallet</strong> App.</li>
-                      <li>Tippe unten rechts auf <strong>"Zu Wallet hinzufügen"</strong>.</li>
-                      <li>Wähle <strong>"Kundenkarte"</strong>, scanne den QR-Code oder wähle dein gespeichertes Ausweis-JPEG aus.</li>
-                    </>
-                  )}
-                </ol>
-              </div>
-            )}
-
-            <div style={{ marginTop: '8px', borderTop: '1px solid #e4e4e7', paddingTop: '12px' }}>
-              <p style={{ fontSize: '0.72rem', color: '#52525b', margin: '0 0 6px 0', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Google / Apple Wallet Info:</p>
-              <p style={{ fontSize: '0.72rem', color: '#71717a', margin: '0', lineHeight: 1.4 }}>
-                Um den Pass in Apple Wallet oder Google Wallet zu nutzen, lade das JPEG herunter und füge es als Bildkarte hinzu, oder scanne den obigen QR-Code direkt in deiner Wallet-App.
-              </p>
-            </div>
-          </div>
-
-          {/* PWA / App Installation Guidance */}
-          <div id="pwa-install-section" style={{ background: '#fafafa', border: '1px solid #e4e4e7', borderRadius: '24px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0' }}>
-              <Smartphone size={18} color={activeColor} /> App auf Handy installieren (WAP)
-            </h3>
-            <p style={{ fontSize: '0.78rem', color: '#52525b', margin: '0', lineHeight: 1.4 }}>
-              Installiere {isCampus ? 'Campus' : 'GrooveLab'} als App auf deinem Startbildschirm für schnellen QR-Login:
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem', marginTop: '4px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: '#52525b' }}>
-                <span style={{ background: '#e4e4e7', color: activeColor, borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800 }}>1</span>
-                <div>
-                  <span style={{ fontWeight: 800, color: '#18181b' }}>iOS (Safari):</span> Tippe auf das Teilen-Symbol <span style={{ fontSize: '0.85rem' }}>📤</span> und wähle <span style={{ fontWeight: 800, color: '#18181b' }}>"Zum Home-Bildschirm"</span>.
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', color: '#52525b' }}>
-                <span style={{ background: '#e4e4e7', color: activeColor, borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800 }}>2</span>
-                <div>
-                  <span style={{ fontWeight: 800, color: '#18181b' }}>Android (Chrome):</span> Tippe auf die drei Punkte oben rechts und wähle <span style={{ fontWeight: 800, color: '#18181b' }}>"App installieren"</span>.
-                </div>
-              </div>
-            </div>
-
-            <button onClick={() => window.location.replace(`/login?platform=${isCampus ? 'campus' : 'groovelab'}`)} style={{ width: '100%', background: '#ffffff', color: '#18181b', border: '1px solid #d4d4d8', borderRadius: '14px', padding: '12px', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
-              Direkt zum Login <ArrowRight size={16} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleSelectUsageMode('parent_hybrid')}
+            style={{
+              flex: 1,
+              padding: '8px',
+              borderRadius: '12px',
+              border: 'none',
+              background: usageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
+              color: usageMode === 'parent_hybrid' ? '#0f172a' : '#64748b',
+              fontWeight: usageMode === 'parent_hybrid' ? 800 : 600,
+              fontSize: '0.76rem',
+              cursor: 'pointer',
+              boxShadow: usageMode === 'parent_hybrid' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <span>👨‍👩‍👧‍👦</span> Eltern (Hybrid)
+          </button>
         </div>
+
+        {/* 3. Export Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <button 
+            onClick={handleDownloadJPEG} 
+            style={{ 
+              background: '#ffffff', 
+              color: '#0f172a', 
+              border: '1px solid #cbd5e1', 
+              borderRadius: '14px', 
+              padding: '10px 8px', 
+              fontSize: '0.75rem', 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px' 
+            }}
+          >
+            <Download size={14} color={activeColor} /> Ausweis (JPEG)
+          </button>
+
+          <button 
+            onClick={handleDownloadAnonymousSticker} 
+            style={{ 
+              background: '#ffffff', 
+              color: '#0f172a', 
+              border: '1px solid #cbd5e1', 
+              borderRadius: '14px', 
+              padding: '10px 8px', 
+              fontSize: '0.75rem', 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px' 
+            }}
+          >
+            🏷️ Noten-Sticker
+          </button>
+        </div>
+
+        {/* 4. Wallet Buttons */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={() => setWalletGuide(walletGuide === 'apple' ? null : 'apple')}
+            style={{ 
+              flex: 1, 
+              background: '#000000', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '12px', 
+              padding: '8px', 
+              fontSize: '0.72rem', 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '4px'
+            }}
+          >
+            <span></span> Apple Wallet
+          </button>
+
+          <button 
+            onClick={() => setWalletGuide(walletGuide === 'google' ? null : 'google')}
+            style={{ 
+              flex: 1, 
+              background: '#0f172a', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '12px', 
+              padding: '8px', 
+              fontSize: '0.72rem', 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '4px'
+            }}
+          >
+            <span>Google Wallet</span>
+          </button>
+        </div>
+
+        {/* 5. WhatsApp/E-Mail Teilen */}
+        <button 
+          onClick={handleCopyLink} 
+          style={{ 
+            width: '100%', 
+            background: '#f8fafc', 
+            color: '#334155', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '14px', 
+            padding: '10px', 
+            fontSize: '0.76rem', 
+            fontWeight: 800, 
+            cursor: 'pointer', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '6px' 
+          }}
+        >
+          {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+          {copied ? 'WhatsApp/E-Mail Einladung kopiert!' : 'Zugangs-Link kopieren'}
+        </button>
+
+        {/* 6. Login Button */}
+        <button 
+          onClick={() => window.location.replace(`/login?platform=${isCampus ? 'campus' : 'groovelab'}`)}
+          style={{ 
+            width: '100%', 
+            background: '#0f172a', 
+            color: '#ffffff', 
+            border: 'none', 
+            borderRadius: '14px', 
+            padding: '12px', 
+            fontSize: '0.82rem', 
+            fontWeight: 900, 
+            cursor: 'pointer', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '6px' 
+          }}
+        >
+          Direkt zur App / Login <ArrowRight size={16} />
+        </button>
+
       </div>
 
       {/* Apple-style Push Notification for PWA Installation */}
@@ -665,6 +874,18 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         </div>
       )}
 
+      {showScheduleModal && student && (
+        <StudentMobileScheduleWizard
+          student={student}
+          onClose={() => setShowScheduleModal(false)}
+          activePlatform={platformParam || (isCampus ? 'campus' : 'groovelab')}
+          onPreferencesSaved={() => {
+            checkScheduleStatus(student.id);
+          }}
+        />
+      )}
+
     </div>
   );
 };
+

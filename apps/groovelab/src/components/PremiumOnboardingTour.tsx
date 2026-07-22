@@ -99,25 +99,28 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
         let top = 0;
         let left = 0;
 
+        const cardWidth = Math.min(viewportWidth - 32, 340);
+        const cardHeight = Math.min(viewportHeight - 48, 260);
+
         if (pos === 'right') {
           left = rect.right + 18;
           top = rect.top + rect.height / 2 - 100;
         } else if (pos === 'left') {
-          left = rect.left - 320 - 18;
+          left = rect.left - cardWidth - 18;
           top = rect.top + rect.height / 2 - 100;
         } else if (pos === 'bottom') {
-          left = rect.left + rect.width / 2 - 160;
+          left = rect.left + rect.width / 2 - cardWidth / 2;
           top = rect.bottom + 18;
         } else {
-          left = rect.left + rect.width / 2 - 160;
-          top = rect.top - 240 - 18;
+          left = rect.left + rect.width / 2 - cardWidth / 2;
+          top = rect.top - cardHeight - 18;
         }
 
         // Adjust bounds to stay inside viewport safely
         if (left < 16) left = 16;
-        if (left + 320 > viewportWidth - 16) left = viewportWidth - 320 - 16;
+        if (left + cardWidth > viewportWidth - 16) left = viewportWidth - cardWidth - 16;
         if (top < 16) top = 16;
-        if (top + 240 > viewportHeight - 16) top = viewportHeight - 240 - 16;
+        if (top + cardHeight > viewportHeight - 16) top = viewportHeight - cardHeight - 16;
 
         // Check if anything has changed
         const last = lastPositionRef.current;
@@ -405,14 +408,17 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
             <div
               style={{
                 position: 'relative',
-                width: '320px',
-                backgroundColor: 'rgba(255, 255, 255, 0.94)',
-                backdropFilter: 'blur(20px) saturate(190%)',
-                WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+                width: 'calc(100vw - 32px)',
+                maxWidth: '340px',
+                maxHeight: 'calc(100vh - 48px)',
+                overflowY: 'auto',
+                backgroundColor: 'rgba(255, 255, 255, 0.96)',
+                backdropFilter: 'blur(24px) saturate(190%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(190%)',
                 borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.8)',
                 padding: '24px',
-                boxShadow: '0 24px 64px -12px rgba(0, 0, 0, 0.22)',
+                boxShadow: '0 24px 64px -12px rgba(0, 0, 0, 0.25)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '16px',

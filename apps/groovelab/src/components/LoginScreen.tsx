@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera } from 'lucide-react';
+import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -5149,7 +5150,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
             <div style={{ textAlign: 'left' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>Stundenplan einrichten</span>
-              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Groovelab</span>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Campus-Groovelab</span>
             </div>
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 850, background: '#f1f5f9', color: '#475569', padding: '5px 12px', borderRadius: '100px', fontFamily: 'Urbanist' }}>
@@ -5171,7 +5172,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <form onSubmit={handleParentVerification} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ textAlign: 'left' }}>
               <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
-                Willkommen bei Groovelab!
+                Willkommen bei Campus-Groovelab!
               </h3>
               <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
                 Lass uns zuerst die Daten deines Kindes verifizieren, damit wir die Wunschzeiten richtig zuordnen können. Bitte gib die Daten exakt so ein, wie sie auf der Anmeldung stehen.
@@ -5725,356 +5726,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               </div>
             )}
 
-            {parentChildren[activeParentChildIndex] && (
-              <>
-                <div style={{ textAlign: 'left' }}>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Outfit' }}>
-                    Terminwünsche für {parentChildren[activeParentChildIndex].first_name} ({parentChildren[activeParentChildIndex].instrument})
-                  </h3>
-                  <p style={{ margin: 0, color: '#475569', fontSize: '0.82rem', lineHeight: '1.45' }}>
-                    Wähle die bevorzugten Unterrichtszeiten und sperre Zeiten, die absolut unmöglich sind.
-                  </p>
-                </div>
-
-                {/* Legend & Controls */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '12px', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 700, color: '#475569' }}>Klick-Modus wählen:</span>
-                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>({showSaturday ? 'Mit Samstag' : 'Nur Mo-Fr'})</span>
-                  </div>
-
-                  {/* Apple style segmented control */}
-                  <div style={{
-                    display: 'flex',
-                    background: '#e2e8f0',
-                    padding: '3px',
-                    borderRadius: '12px',
-                    position: 'relative'
-                  }}>
-                    <button
-                      type="button"
-                      onClick={() => setPreferenceMode('wunsch')}
-                      style={{
-                        flex: 1,
-                        padding: '8px 10px',
-                        borderRadius: '9px',
-                        border: 'none',
-                        background: preferenceMode === 'wunsch' ? '#34a853' : 'transparent',
-                        color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
-                        fontWeight: 800,
-                        fontSize: '12.5px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                      Wunschzeit 🟢
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreferenceMode('gesperrt')}
-                      style={{
-                        flex: 1,
-                        padding: '8px 10px',
-                        borderRadius: '9px',
-                        border: 'none',
-                        background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
-                        color: preferenceMode === 'gesperrt' ? '#ffffff' : '#475569',
-                        fontWeight: 800,
-                        fontSize: '12.5px',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff' }} />
-                      Sperrzeit 🔴
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                    <span style={{ color: '#475569', fontWeight: 600 }}>Samstag als Option anzeigen?</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowSaturday(!showSaturday)}
-                      style={{
-                        background: showSaturday ? '#34a853' : '#cbd5e1',
-                        border: 'none',
-                        padding: '4px 12px',
-                        borderRadius: '100px',
-                        color: '#ffffff',
-                        fontWeight: 800,
-                        fontSize: '11px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {showSaturday ? 'Ja' : 'Nein'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Visual Calendar Grid Weekspective */}
-                {(() => {
-                  const teacherDays = teacherAvailabilityState 
-                    ? Object.keys(teacherAvailabilityState).map(Number)
-                    : [];
-                  
-                  const activeDays = [1, 2, 3, 4, 5];
-                  if (teacherDays.includes(6)) activeDays.push(6);
-                  if (teacherDays.includes(7)) activeDays.push(7);
-                    
-                  const dayNames: { [key: number]: string } = { 1: 'Mo', 2: 'Di', 3: 'Mi', 4: 'Do', 5: 'Fr', 6: 'Sa', 7: 'So' };
-                  
-                  const isSlotAvailable = (dayNum: number, timeStr: string) => {
-                    if (!teacherAvailabilityState) return true;
-                    const dayConfig = teacherAvailabilityState[dayNum];
-                    if (!dayConfig) return false;
-                    
-                    const [sh, sm] = dayConfig.start.split(':').map(Number);
-                    const [eh, em] = dayConfig.end.split(':').map(Number);
-                    const [th, tm] = timeStr.split(':').map(Number);
-                    
-                    const startMins = sh * 60 + sm;
-                    const endMins = eh * 60 + em;
-                    const slotMins = th * 60 + tm;
-                    
-                    return slotMins >= startMins && slotMins < endMins;
-                  };
-
-                  let minMinutes = 10 * 60; // Default start 10:00
-                  let maxMinutes = 19 * 60; // Default end 19:00
-                  if (teacherAvailabilityState) {
-                    Object.values(teacherAvailabilityState).forEach((cfg: any) => {
-                      if (cfg.start) {
-                        const [h, m] = cfg.start.split(':').map(Number);
-                        minMinutes = Math.min(minMinutes, h * 60 + m);
-                      }
-                      if (cfg.end) {
-                        const [h, m] = cfg.end.split(':').map(Number);
-                        maxMinutes = Math.max(maxMinutes, h * 60 + m);
-                      }
-                    });
-                  }
-                  
-                  const timeSlots = Array.from({ length: Math.ceil((maxMinutes - minMinutes) / 30) }, (_, i) => {
-                    const mins = minMinutes + i * 30;
-                    const h = Math.floor(mins / 60);
-                    const m = mins % 60;
-                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                  });
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {/* Grid Legend */}
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        background: 'rgba(255, 255, 255, 0.8)',
-                        border: '1.5px dashed #cbd5e1',
-                        padding: '10px 14px',
-                        borderRadius: '16px',
-                        fontSize: '11px',
-                        color: '#475569',
-                        gap: '12px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-                          <div style={{ width: '12px', height: '12px', background: '#f4fbf7', border: '1px solid #a7f3d0', borderRadius: '4px', flexShrink: 0 }} />
-                          <span style={{ fontWeight: 700, color: '#34a853' }}>Regulärer Unterricht</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-                          <div style={{ width: '12px', height: '12px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', flexShrink: 0 }} />
-                          <span style={{ fontWeight: 700, color: '#64748b' }}>Ausweichzeit (flexible Verlegung)</span>
-                        </div>
-                      </div>
-
-                      {/* Scrollable Grid */}
-                      <div style={{
-                        background: '#f8fafc',
-                        borderRadius: '20px',
-                        border: '1px solid #e2e8f0',
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        maxHeight: window.innerHeight > 850 ? '480px' : '320px',
-                        overflowY: 'auto'
-                      }}>
-                        {/* Header Row */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: `45px repeat(${activeDays.length}, 1fr)`,
-                          gap: '3px',
-                          textAlign: 'center',
-                          fontWeight: 800,
-                          fontSize: '10px',
-                          color: '#64748b',
-                          paddingBottom: '6px',
-                          borderBottom: '1px solid #e2e8f0',
-                          position: 'sticky',
-                          top: 0,
-                          background: '#f8fafc',
-                          zIndex: 2
-                        }}>
-                          <div>Zeit</div>
-                          {activeDays.map(dayNum => {
-                            const isTeacherDay = teacherDays.includes(dayNum);
-                            return (
-                              <div 
-                                key={dayNum}
-                                style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '2px',
-                                  color: isTeacherDay ? '#34a853' : '#64748b'
-                                }}
-                              >
-                                <span>{dayNames[dayNum]}</span>
-                                {isTeacherDay && (
-                                  <span style={{ 
-                                    fontSize: '7px', 
-                                    background: '#e6f4ea', 
-                                    color: '#34a853', 
-                                    padding: '1px 3px', 
-                                    borderRadius: '4px',
-                                    fontWeight: 800,
-                                    border: '1px solid rgba(52, 168, 83, 0.2)'
-                                  }}>
-                                    Unterricht
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Rows */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          {timeSlots.map(time => (
-                            <div key={time} style={{
-                              display: 'grid',
-                              gridTemplateColumns: `45px repeat(${activeDays.length}, 1fr)`,
-                              gap: '3px',
-                              alignItems: 'center'
-                            }}>
-                              <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textAlign: 'right', paddingRight: '4px' }}>
-                                {time}
-                              </div>
-                              {activeDays.map(dayNum => {
-                                const cellKey = `${dayNum}-${time}`;
-                                const available = isSlotAvailable(dayNum, time);
-                                const selection = parentChildren[activeParentChildIndex].selectedSlots[cellKey];
-                                
-                                let bg = available ? '#f4fbf7' : '#f1f5f9';
-                                let border = available ? '1px solid #a7f3d0' : '1px solid #cbd5e1';
-                                let labelColor = 'transparent';
-                                let cursor = 'pointer';
-                                
-                                if (selection === 'wunsch') {
-                                  bg = '#34a853';
-                                  border = '1px solid #34a853';
-                                  labelColor = '#ffffff';
-                                } else if (selection === 'gesperrt') {
-                                  bg = '#ef4444';
-                                  border = '1px solid #dc2626';
-                                  labelColor = '#ffffff';
-                                }
-                                
-                                return (
-                                  <div
-                                    key={cellKey}
-                                    onClick={() => {
-                                      const updated = [...parentChildren];
-                                      const activeChild = updated[activeParentChildIndex];
-                                      const copy = { ...activeChild.selectedSlots };
-                                      if (copy[cellKey] === preferenceMode) {
-                                        delete copy[cellKey];
-                                      } else {
-                                        copy[cellKey] = preferenceMode;
-                                      }
-                                      updated[activeParentChildIndex] = {
-                                        ...activeChild,
-                                        selectedSlots: copy
-                                      };
-                                      setParentChildren(updated);
-                                    }}
-                                    style={{
-                                      background: bg,
-                                      border: border,
-                                      borderRadius: '6px',
-                                      height: '24px',
-                                      cursor: cursor,
-                                      transition: 'all 0.1s ease',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '9px',
-                                      color: labelColor,
-                                      fontWeight: 900
-                                    }}
-                                    className="hover-scale-mini"
-                                  >
-                                    {selection === 'wunsch' && '✓'}
-                                    {selection === 'gesperrt' && '✗'}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Live Progress Info */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '12px 14px', borderRadius: '16px', fontSize: '12.5px', color: '#34a853', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={16} />
-                    <span>
-                      Ausgewählte Wunschzeit: <strong>{((Object.values(parentChildren[activeParentChildIndex].selectedSlots).filter(v => v === 'wunsch').length * 30) / 60).toFixed(1)} Std.</strong>
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#34a853' }}>
-                    (mind. 2,0 Std. benötigt)
-                  </span>
-                </div>
-              </>
-            )}
-
-            {/* Action buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={handleSavePreferences}
-                disabled={parentOnboardingLoading}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#34a853',
-                  color: '#ffffff',
-                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
+            {verifiedStudentId && (
+              <StudentMobileScheduleWizard
+                student={{
+                  id: verifiedStudentId,
+                  first_name: parentFirstName,
+                  last_name: parentLastName,
+                  instrument: parentInstrument
                 }}
-              >
-                {parentOnboardingLoading ? 'Speichere Präferenzen...' : 'Wunschtermine speichern'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setParentOnboardingStep('email')}
-                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', cursor: 'pointer', alignSelf: 'center' }}
-              >
-                Zurück
-              </button>
-            </div>
+                onClose={() => setParentOnboardingStep('verify')}
+                onPreferencesSaved={() => {
+                  setParentOnboardingStep('success');
+                }}
+                activePlatform="campus"
+              />
+            )}
           </div>
         )}
 

@@ -15,7 +15,10 @@ import {
   Sparkles,
   Edit3,
   Check,
-  Share2
+  Share2,
+  Link as LinkIcon,
+  Eraser,
+  Sliders
 } from 'lucide-react';
 
 interface StudentScheduleSlotsModalProps {
@@ -69,7 +72,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
   
   // Teacher Manual Edit Mode
   const [isEditing, setIsEditing] = useState(false);
-  const [activeBrush, setActiveBrush] = useState<'wunsch' | 'moeglich' | 'gesperrt' | 'clear'>('wunsch');
+  const [activeBrush, setActiveBrush] = useState<'wunsch' | 'gesperrt' | 'clear'>('wunsch');
   const [editedMatrix, setEditedMatrix] = useState<Record<string, 'wunsch' | 'moeglich' | 'gesperrt' | 'none'>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -252,7 +255,9 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     showToast("Onboarding-Link in Zwischenablage kopiert!");
   };
 
-  const brandColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
+  const brandColor = activePlatform === 'groovelab' 
+    ? '#eab308' 
+    : (activePlatform === 'admin' || activePlatform === 'secretariat' ? '#ea4335' : '#34a853');
 
   const getSlotDetails = (dayId: number, startTime: string) => {
     const key = `${dayId}_${startTime}`;
@@ -298,24 +303,24 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       position: 'fixed',
       inset: 0,
       zIndex: 9999,
-      background: 'rgba(15, 23, 42, 0.65)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
+      background: 'rgba(15, 23, 42, 0.45)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '24px'
     }}>
       <div 
         className="glass-panel animate-scale-up"
         style={{
           width: '100%',
-          maxWidth: '820px',
-          maxHeight: '90vh',
-          background: 'white',
-          borderRadius: '28px',
-          border: '1px solid rgba(226, 232, 240, 0.9)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          maxWidth: '840px',
+          maxHeight: '92vh',
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 25px 70px -15px rgba(15, 23, 42, 0.18), 0 0 1px rgba(15, 23, 42, 0.1)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
@@ -323,40 +328,40 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       >
         {/* Modal Header */}
         <div style={{
-          padding: '24px 28px',
-          borderBottom: '1px solid #f1f5f9',
+          padding: '22px 28px',
+          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#f8fafc'
+          background: '#ffffff'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '16px',
+              width: '46px',
+              height: '46px',
+              borderRadius: '14px',
               background: isCompleted ? '#e6f4ea' : '#fefce8',
-              color: isCompleted ? '#34a853' : '#eab308',
+              color: isCompleted ? '#34a853' : '#d97706',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: `2px solid ${isCompleted ? '#a7f3d0' : '#fef08a'}`
+              border: `1px solid ${isCompleted ? '#bbf7d0' : '#fef08a'}`
             }}>
-              <Calendar size={24} />
+              <Calendar size={22} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
                   Stundenplan-Zeitfenster
                 </h3>
                 <span style={{
                   padding: '4px 10px',
                   borderRadius: '20px',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  background: isCompleted ? '#e6f4ea' : '#fefce8',
-                  color: isCompleted ? '#34a853' : '#d97706',
-                  border: `1px solid ${isCompleted ? '#a7f3d0' : '#fef08a'}`,
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  background: isCompleted ? '#f0fdf4' : '#fefce8',
+                  color: isCompleted ? '#16a34a' : '#d97706',
+                  border: `1px solid ${isCompleted ? '#bbf7d0' : '#fef08a'}`,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px'
@@ -365,8 +370,8 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                   {isCompleted ? 'Onboarding Abgeschlossen' : 'Warte auf Rückmeldung'}
                 </span>
               </div>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                Schüler: <strong style={{ color: '#1e293b' }}>{student?.first_name} {student?.last_name}</strong> ({student?.instrument || 'Gitarre'})
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 500 }}>
+                Schüler: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{student?.first_name} {student?.last_name}</strong> ({student?.instrument || 'Gitarre'})
               </p>
             </div>
           </div>
@@ -376,8 +381,8 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
             style={{
               background: '#f1f5f9',
               border: 'none',
-              width: '36px',
-              height: '36px',
+              width: '34px',
+              height: '34px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -388,7 +393,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
             }}
             className="hover-scale-mini"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -411,89 +416,200 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
         )}
 
         {/* Modal Body */}
-        <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', background: '#ffffff' }}>
           
-          {/* Status Alert Banner */}
+          {/* Status & Manual Edit Control Card */}
           <div style={{
-            padding: '16px 20px',
-            borderRadius: '18px',
-            background: isCompleted ? 'rgba(52, 168, 83, 0.08)' : 'rgba(234, 179, 8, 0.12)',
-            border: `1px solid ${isCompleted ? '#a7f3d0' : '#fde047'}`,
+            padding: '20px 24px',
+            borderRadius: '20px',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.03)',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
             gap: '16px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {isCompleted ? (
-                <CheckCircle2 size={22} color="#34a853" />
-              ) : (
-                <Clock size={22} color="#d97706" />
-              )}
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: isCompleted ? '#166534' : '#854d0e' }}>
-                  {isCompleted 
-                    ? 'Zeitfenster wurden erfolgreich vom Schüler / Lehrer übermittelt.' 
-                    : 'Onboarding ausstehend: Schüler hat noch keine Zeiten übermittelt.'}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: isCompleted ? '#f0fdf4' : '#fefce8',
+                  border: `1px solid ${isCompleted ? '#bbf7d0' : '#fef08a'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {isCompleted ? (
+                    <CheckCircle2 size={22} color="#16a34a" />
+                  ) : (
+                    <Clock size={22} color="#d97706" />
+                  )}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: isCompleted ? '#15803d' : '#a16207', marginTop: '2px' }}>
-                  {timetableAssignedAt 
-                    ? `Abgeschlossen am: ${new Date(timetableAssignedAt).toLocaleDateString('de-DE')} um ${new Date(timetableAssignedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` 
-                    : 'Lehrer kann die Daten direkt manuell hier eintragen (z. B. nach E-Mail-Mitteilung).'}
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    {isCompleted 
+                      ? 'Zeitfenster wurden erfolgreich vom Schüler / Lehrer übermittelt.' 
+                      : 'Onboarding ausstehend: Schüler hat noch keine Zeiten übermittelt.'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px', fontWeight: 500 }}>
+                    {timetableAssignedAt 
+                      ? `Abgeschlossen am: ${new Date(timetableAssignedAt).toLocaleDateString('de-DE')} um ${new Date(timetableAssignedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` 
+                      : 'Lehrer kann die Daten direkt manuell hier eintragen (z. B. nach E-Mail-Mitteilung).'}
+                  </div>
                 </div>
               </div>
+
+              {/* Apple-style Manual Edit Action Button */}
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                style={{
+                  background: isEditing ? brandColor : '#ffffff',
+                  color: isEditing ? (activePlatform === 'groovelab' ? '#1e293b' : '#ffffff') : '#0f172a',
+                  border: isEditing ? 'none' : '1.5px solid #cbd5e1',
+                  padding: '10px 18px',
+                  borderRadius: '14px',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: isEditing 
+                    ? `0 4px 16px ${brandColor}40` 
+                    : '0 2px 8px rgba(0, 0, 0, 0.04)',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  flexShrink: 0
+                }}
+                className="hover-scale"
+              >
+                {isEditing ? <Check size={16} /> : <Edit3 size={16} color={brandColor} />}
+                <span>{isEditing ? 'Fertig mit Bearbeiten' : 'Manuell eintragen / bearbeiten'}</span>
+              </button>
             </div>
 
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              style={{
-                background: isEditing ? brandColor : 'white',
-                color: isEditing ? (activePlatform === 'groovelab' ? '#1e293b' : 'white') : '#334155',
-                border: isEditing ? 'none' : '1px solid #cbd5e1',
-                padding: '8px 14px',
-                borderRadius: '12px',
-                fontWeight: 800,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
+            {/* Teacher Brush Selection Toolbar when editing */}
+            {isEditing && (
+              <div style={{
+                background: '#f8fafc',
+                padding: '14px 18px',
+                borderRadius: '16px',
+                border: '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                boxShadow: isEditing ? `0 4px 12px ${brandColor}30` : '0 2px 4px rgba(0,0,0,0.05)',
-                transition: 'all 0.2s'
-              }}
-              className="hover-scale"
-            >
-              <Edit3 size={15} />
-              <span>{isEditing ? 'Fertig mit Bearbeiten' : 'Manuell eintragen / bearbeiten'}</span>
-            </button>
+                justifyContent: 'space-between',
+                gap: '12px',
+                animation: 'fadeIn 0.2s ease-out'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.82rem', fontWeight: 700 }}>
+                  <Sliders size={15} style={{ color: '#64748b' }} />
+                  <span>Klick-Werkzeug für Lehrer:</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveBrush('wunsch')}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '10px',
+                      border: activeBrush === 'wunsch' ? '2px solid #16a34a' : '1px solid #bbf7d0',
+                      background: activeBrush === 'wunsch' ? '#dcfce7' : '#ffffff',
+                      color: '#15803d',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <Star size={13} fill="#22c55e" color="#16a34a" /> Wunschzeit (Grün)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveBrush('gesperrt')}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '10px',
+                      border: activeBrush === 'gesperrt' ? '2px solid #dc2626' : '1px solid #fecaca',
+                      background: activeBrush === 'gesperrt' ? '#fee2e2' : '#ffffff',
+                      color: '#991b1b',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <Ban size={13} color="#ef4444" /> Geblockt (Rot)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveBrush('clear')}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '10px',
+                      border: activeBrush === 'clear' ? '2px solid #475569' : '1px solid #cbd5e1',
+                      background: activeBrush === 'clear' ? '#f1f5f9' : '#ffffff',
+                      color: '#475569',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <Eraser size={13} color="#64748b" /> Zurücksetzen (Frei)
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Dedicated Onboarding Link Box for Fast Copy & Share */}
+          {/* Dedicated Onboarding Link Card */}
           <div style={{
-            background: '#f8fafc',
+            background: '#ffffff',
             border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '14px 18px',
+            borderRadius: '18px',
+            padding: '16px 20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '14px',
+            boxShadow: '0 2px 10px -2px rgba(0,0,0,0.02)'
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                🔗 Onboarding-Link für Schüler:
-              </span>
-              <span style={{ 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                <LinkIcon size={14} style={{ color: '#64748b' }} />
+                <span>Onboarding-Link für Schüler:</span>
+              </div>
+              <div style={{ 
                 fontSize: '0.84rem', 
-                fontWeight: 700, 
-                color: '#1e293b', 
+                fontWeight: 600, 
+                color: '#0f172a', 
                 overflow: 'hidden', 
                 textOverflow: 'ellipsis', 
                 whiteSpace: 'nowrap',
-                fontFamily: 'monospace'
+                fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                padding: '6px 12px',
+                borderRadius: '8px'
               }}>
                 {`${window.location.origin}/onboarding/${student?.qr_token || student?.id}?platform=${activePlatform}`}
-              </span>
+              </div>
             </div>
 
             <button
@@ -503,15 +619,16 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 background: brandColor,
                 color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
                 border: 'none',
-                padding: '8px 16px',
-                borderRadius: '10px',
-                fontWeight: 800,
+                padding: '10px 18px',
+                borderRadius: '12px',
+                fontWeight: 700,
                 fontSize: '0.82rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                boxShadow: `0 2px 8px ${brandColor}30`
+                gap: '7px',
+                boxShadow: `0 2px 10px ${brandColor}35`,
+                flexShrink: 0
               }}
               className="hover-scale"
             >
@@ -519,124 +636,29 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
             </button>
           </div>
 
-          {/* Teacher Brush Selection Toolbar when editing */}
-          {isEditing && (
-            <div style={{
-              background: '#f8fafc',
-              padding: '12px 18px',
-              borderRadius: '16px',
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              animation: 'fadeIn 0.2s ease-out'
-            }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#475569' }}>
-                Klick-Werkzeug für Lehrer:
-              </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush('wunsch')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '10px',
-                    border: activeBrush === 'wunsch' ? '2px solid #16a34a' : '1px solid #bbf7d0',
-                    background: activeBrush === 'wunsch' ? '#dcfce7' : 'white',
-                    color: '#15803d',
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <Star size={13} fill="#22c55e" /> Wunschzeit (Grün)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush('moeglich')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '10px',
-                    border: activeBrush === 'moeglich' ? '2px solid #64748b' : '1px solid #cbd5e1',
-                    background: activeBrush === 'moeglich' ? '#ffffff' : '#f8fafc',
-                    color: '#334155',
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: activeBrush === 'moeglich' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                  }}
-                >
-                  <ThumbsUp size={13} color="#64748b" /> Möglich (Frei)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush('gesperrt')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '10px',
-                    border: activeBrush === 'gesperrt' ? '2px solid #dc2626' : '1px solid #fecaca',
-                    background: activeBrush === 'gesperrt' ? '#fee2e2' : 'white',
-                    color: '#991b1b',
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <Ban size={13} color="#ef4444" /> Geblockt (Rot)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveBrush('clear')}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '10px',
-                    border: activeBrush === 'clear' ? '2px solid #475569' : '1px solid #cbd5e1',
-                    background: activeBrush === 'clear' ? '#f1f5f9' : 'white',
-                    color: '#475569',
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  🧹 Löschen
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Legend */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.78rem', fontWeight: 600, color: '#64748b', padding: '0 4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: '#15803d' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#15803d' }} />
               <span>Fest gebuchte Lektion</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: '#22c55e' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
               <span>Wunschzeit</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: '#ffffff', border: '1px solid #cbd5e1' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ffffff', border: '1.5px solid #cbd5e1' }} />
               <span>Mögliche Zeit (Frei)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: '#ef4444' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }} />
               <span>Gesperrt / Geblockt</span>
             </div>
           </div>
 
           {/* Schedule Grid Matrix */}
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 700 }}>
+            <div style={{ padding: '60px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
               Zeitfenster werden geladen...
             </div>
           ) : (
@@ -644,9 +666,10 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
               border: '1px solid #e2e8f0',
               borderRadius: '20px',
               overflowX: 'auto',
-              maxHeight: '450px',
+              maxHeight: '440px',
               overflowY: 'auto',
-              background: 'white'
+              background: '#ffffff',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)'
             }}>
               {/* Header Row */}
               <div style={{
@@ -655,16 +678,16 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 zIndex: 5,
                 display: 'grid',
                 gridTemplateColumns: '110px repeat(6, 1fr)',
-                background: '#f1f5f9',
-                borderBottom: '1px solid #e2e8f0',
+                background: '#ffffff',
+                borderBottom: '2px solid #f1f5f9',
                 fontWeight: 800,
                 fontSize: '0.82rem',
                 color: '#334155',
                 textAlign: 'center'
               }}>
-                <div style={{ padding: '12px 8px', borderRight: '1px solid #e2e8f0', background: '#f1f5f9' }}>Uhrzeit</div>
+                <div style={{ padding: '14px 8px', borderRight: '1px solid #f1f5f9', background: '#ffffff' }}>Uhrzeit</div>
                 {DAYS_OF_WEEK.map(day => (
-                  <div key={day.id} style={{ padding: '12px 8px', borderRight: day.id === 6 ? 'none' : '1px solid #e2e8f0', background: '#f1f5f9' }}>
+                  <div key={day.id} style={{ padding: '14px 8px', borderRight: day.id === 6 ? 'none' : '1px solid #f1f5f9', background: '#ffffff' }}>
                     {day.name}
                   </div>
                 ))}
@@ -675,12 +698,12 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 <div key={slot.start} style={{
                   display: 'grid',
                   gridTemplateColumns: '110px repeat(6, 1fr)',
-                  borderBottom: '1px solid #f1f5f9',
+                  borderBottom: '1px solid #f8fafc',
                   fontSize: '0.8rem'
                 }}>
                   <div style={{
                     padding: '8px',
-                    borderRight: '1px solid #e2e8f0',
+                    borderRight: '1px solid #f1f5f9',
                     background: '#fafafa',
                     fontWeight: 700,
                     color: '#64748b',
@@ -706,20 +729,20 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       labelText = exactTime || 'Gebucht';
                       icon = <Check size={12} color="white" />;
                     } else if (status === 'wunsch') {
-                      bg = '#dcfce7';
-                      border = '1px solid #86efac';
+                      bg = '#f0fdf4';
+                      border = '1px solid #bbf7d0';
                       textColor = '#166534';
                       labelText = 'Wunsch';
                       icon = <Star size={12} fill="#22c55e" color="#16a34a" />;
                     } else if (status === 'moeglich') {
                       bg = '#ffffff';
-                      border = '1px solid #e2e8f0';
+                      border = '1px solid #f1f5f9';
                       textColor = '#64748b';
                       labelText = 'Möglich';
                       icon = <Check size={11} color="#94a3b8" />;
                     } else if (status === 'gesperrt') {
-                      bg = '#fee2e2';
-                      border = '1px solid #fca5a5';
+                      bg = '#fef2f2';
+                      border = '1px solid #fecaca';
                       textColor = '#991b1b';
                       labelText = 'Geblockt';
                       icon = <Ban size={12} color="#dc2626" />;
@@ -731,7 +754,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                         onClick={() => handleCellClick(day.id, slot.start)}
                         style={{
                           padding: '6px 2px',
-                          borderRight: day.id === 6 ? 'none' : '1px solid #f1f5f9',
+                          borderRight: day.id === 6 ? 'none' : '1px solid #f8fafc',
                           background: bg,
                           color: textColor,
                           display: 'flex',
@@ -773,8 +796,8 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
         {/* Modal Footer Actions */}
         <div style={{
           padding: '20px 28px',
-          borderTop: '1px solid #f1f5f9',
-          background: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
+          background: '#ffffff',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -788,17 +811,18 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                   onOpenScheduleBoard();
                 }}
                 style={{
-                  background: 'white',
-                  border: '1px solid #cbd5e1',
-                  padding: '10px 16px',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  padding: '10px 18px',
                   borderRadius: '14px',
-                  fontWeight: 800,
+                  fontWeight: 700,
                   fontSize: '0.84rem',
-                  color: '#334155',
+                  color: '#0f172a',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '7px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
                 }}
                 className="hover-scale"
               >
@@ -817,15 +841,15 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                   background: brandColor,
                   color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
                   border: 'none',
-                  padding: '12px 24px',
+                  padding: '11px 22px',
                   borderRadius: '14px',
-                  fontWeight: 900,
+                  fontWeight: 800,
                   fontSize: '0.88rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: `0 4px 14px ${brandColor}35`
+                  boxShadow: `0 4px 16px ${brandColor}40`
                 }}
                 className="hover-scale"
               >
@@ -840,12 +864,13 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 background: '#f1f5f9',
                 color: '#475569',
                 border: 'none',
-                padding: '12px 20px',
+                padding: '11px 20px',
                 borderRadius: '14px',
-                fontWeight: 800,
+                fontWeight: 700,
                 fontSize: '0.85rem',
                 cursor: 'pointer'
               }}
+              className="hover-scale-mini"
             >
               Schließen
             </button>
@@ -855,3 +880,5 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     </div>
   );
 };
+
+

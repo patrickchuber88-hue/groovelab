@@ -2958,7 +2958,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               const textNotes = compressed ? '' : pages
                 .map(p => p.notes)
                 .filter(Boolean)
-                .filter(n => n !== 'Inhalte in der Premium-Version freischalten' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:'))
+                .map(n => n.split('\n').filter((l: string) => !l.trim().startsWith('STICKER:') && !l.trim().startsWith('AUDIO:') && l.trim() !== 'Inhalte in der Premium-Version freischalten').join('\n').trim())
+                .filter(Boolean)
                 .join('; ');
               return (
                 <div key={bookTitle} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
