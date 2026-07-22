@@ -9845,6 +9845,8 @@ function App() {
                                   {isActive && <span style={{ fontSize: '0.75rem', marginLeft: '2px' }}>✓</span>}
                                 </button>
                               );
+                            })}
+                          </div>
                         </div>
                       );
                     })()
