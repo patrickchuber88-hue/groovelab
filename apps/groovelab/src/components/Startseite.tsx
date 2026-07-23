@@ -509,9 +509,9 @@ export const Startseite: React.FC<StartseiteProps> = ({
           Als Schule registrieren
         </div>
         <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }}></div>
-        <div className="footer-link" onClick={() => onShowPrivacy()}>Datenschutz</div>
-        <div className="footer-link" onClick={() => onShowAgb()}>AGB</div>
-        <div className="footer-link" onClick={() => onShowImpressum()}>Impressum</div>
+        <div className="footer-link" onClick={() => onShowPrivacy?.()}>Datenschutz</div>
+        <div className="footer-link" onClick={() => onShowAgb?.()}>AGB</div>
+        <div className="footer-link" onClick={() => onShowImpressum?.()}>Impressum</div>
       </div>
     </div>
   );
