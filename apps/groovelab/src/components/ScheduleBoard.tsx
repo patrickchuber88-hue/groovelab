@@ -1325,7 +1325,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     let currentTime = board.startAnchor;
     const updatedStudents = board.students.map(s => {
       if (s.customStartTime) {
-        currentTime = s.customStartTime;
+        const [csh, csm] = parseTime(s.customStartTime);
+        const [curh, curm] = parseTime(currentTime);
+        if (csh * 60 + csm > curh * 60 + curm) {
+          currentTime = s.customStartTime;
+        }
       }
       const assignedTime = currentTime;
       currentTime = addMinutesToTime(currentTime, s.duration);
@@ -1887,7 +1891,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               nextStudents.sort((a, b) => {
                 const timeA = a.customStartTime || a.assignedTime || '00:00';
                 const timeB = b.customStartTime || b.assignedTime || '00:00';
-                return timeA.localeCompare(timeB);
+                if (timeA !== timeB) return timeA.localeCompare(timeB);
+                if (a.customStartTime && !b.customStartTime) return -1;
+                if (!a.customStartTime && b.customStartTime) return 1;
+                return 0;
               });
 
               const updatedBoard = recalculateBoardTimes({ ...b, students: nextStudents });
