@@ -1644,6 +1644,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         return totalMinutes;
       };
 
+      const calculateWunschDuration = (studentPrefs: any[]) => {
+        let totalMinutes = 0;
+        for (const p of studentPrefs) {
+          if (p.preference_type === 'wunsch') {
+            const [sh, sm] = parseTime(p.start_time);
+            const [eh, em] = parseTime(p.end_time || p.start_time);
+            let endMin = eh * 60 + em;
+            if (endMin <= sh * 60 + sm) endMin = sh * 60 + sm + 180;
+            totalMinutes += Math.max(0, endMin - (sh * 60 + sm));
+          }
+        }
+        return totalMinutes;
+      };
+
       const constrainedStudents = unassignedStudents.filter(s => (prefsByStudentId[s.id] || []).length > 0);
       const flexibleStudents = unassignedStudents.filter(s => (prefsByStudentId[s.id] || []).length === 0);
 
@@ -1657,9 +1671,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         
         const aBlockedMinutes = calculateBlockedDuration(aPrefs);
         const bBlockedMinutes = calculateBlockedDuration(bPrefs);
+        const aWunschMinutes = calculateWunschDuration(aPrefs);
+        const bWunschMinutes = calculateWunschDuration(bPrefs);
 
-        const aConstraintScore = (aBlockedMinutes / 60) * 10000 + aPrefs.filter(p => p.preference_type === 'wunsch').length * 5000;
-        const bConstraintScore = (bBlockedMinutes / 60) * 10000 + bPrefs.filter(p => p.preference_type === 'wunsch').length * 5000;
+        const aHasWunsch = aPrefs.some(p => p.preference_type === 'wunsch');
+        const bHasWunsch = bPrefs.some(p => p.preference_type === 'wunsch');
+
+        const aWunschScore = aHasWunsch ? (10000 - aWunschMinutes) * 10 : 0;
+        const bWunschScore = bHasWunsch ? (10000 - bWunschMinutes) * 10 : 0;
+
+        const aConstraintScore = (aBlockedMinutes / 60) * 10000 + aWunschScore;
+        const bConstraintScore = (bBlockedMinutes / 60) * 10000 + bWunschScore;
 
         const aTotalScore = aSiblingBonus + aConstraintScore + (a.duration * 100);
         const bTotalScore = bSiblingBonus + bConstraintScore + (b.duration * 100);
@@ -1671,6 +1693,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (aTime !== bTime) return aTime - bTime;
         return a.first_name.localeCompare(b.first_name);
       });
+      
+      flexibleStudents.sort((a, b) => b.duration - a.duration);
 
       let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
       const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
