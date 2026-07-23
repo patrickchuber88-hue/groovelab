@@ -844,10 +844,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             .maybeSingle();
 
           const dbHasPin = Boolean(
-            actDay ||
-            userData.is_pin_activated === true ||
-            (userData.personal_pin && String(userData.personal_pin).trim() !== '') ||
-            (userData.parent_pin && String(userData.parent_pin).trim() !== '')
+            userData.is_pin_activated === true &&
+            (actDay || (userData.personal_pin && String(userData.personal_pin).trim() !== '') || (userData.parent_pin && String(userData.parent_pin).trim() !== ''))
           );
 
           if (!dbHasPin) {

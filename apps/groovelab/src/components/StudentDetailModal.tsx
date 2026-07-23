@@ -240,9 +240,16 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
     try {
       await supabase.from('activation_days').delete().eq('student_id', student.id);
-      await supabase.from('users').update({ onboarding_pin: null, pin: null, is_pin_activated: false }).eq('id', student.id);
-      await supabase.from('students').update({ onboarding_pin: null, status: 'offen' }).eq('id', student.id);
-      await supabase.from('pending_students').update({ status: 'offen' }).eq('id', student.id);
+      await supabase.from('users').update({ 
+        onboarding_pin: null, 
+        pin: null, 
+        personal_pin: null,
+        parent_pin: null,
+        is_pin_activated: false,
+        status: 'offen'
+      }).eq('id', student.id);
+      await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
+      await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
 
       alert(`Die PIN von ${sName} wurde erfolgreich zurückgesetzt. Das Profil ist für die Neueingabe der PIN freigeschaltet.`);
       onClose();
