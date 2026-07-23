@@ -2431,6 +2431,7 @@ function App() {
       location.pathname.startsWith('/onboarding/') ||
       location.pathname.startsWith('/device-onboarding/');
       
+    const isAuth = !!loggedInUserId;
     if (isAuth) {
       // Redirect logged-in users at / or /login or /signup to /dashboard
       if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup') {
