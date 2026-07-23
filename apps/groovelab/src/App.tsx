@@ -7124,12 +7124,24 @@ function App() {
     );
   }
 
-  // 1.1 DETAILED LANDING PAGE
-  if (location.pathname === '/landingpage') {
+  // 1.1 DETAILED LANDING PAGES
+  if (location.pathname === '/landingpage' || location.pathname === '/startseite') {
     return (
       <Startseite 
         onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
         onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+      />
+    );
+  }
+
+  if (location.pathname === '/landingpage2' || location.pathname === '/startseite2' || location.pathname === '/starseite2') {
+    return (
+      <Startseite2 
+        onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
+        onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+        onShowPrivacy={() => setShowPrivacy(true)}
+        onShowAgb={() => setShowAgb(true)}
+        onShowImpressum={() => setShowImpressum(true)}
       />
     );
   }
