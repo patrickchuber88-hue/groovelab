@@ -3711,6 +3711,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
               </span>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MapPin size={16} color="#64748b" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
+              </span>
+            </div>
             {nextLesson.isPendingReview && (
               <div style={{ fontSize: '0.72rem', color: '#854d0e', fontWeight: 700, marginTop: '4px', background: '#fef9c3', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
                 Hinweis: Dieser Termin steht noch unter Vorbehalt der finalen Raumzuteilung durch das Sekretariat.
@@ -5576,9 +5582,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (hasCampusStudent && hasGrooveLabStudent) {
       studentSpectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
     } else if (hasGrooveLabStudent && !hasCampusStudent) {
-      studentSpectrumGradient = '#eab308';
-    } else {
+      studentSpectrumGradient = 'repeating-linear-gradient(90deg, #eab308 0px, #eab308 8px, transparent 8px, transparent 14px)';
+    } else if (hasCampusStudent && !hasGrooveLabStudent) {
       studentSpectrumGradient = '#34a853';
+    } else {
+      // Campus inactive & GrooveLab inactive: Gestrichelter (dashed) grüner Akzentbalken!
+      studentSpectrumGradient = 'repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 14px)';
     }
 
     return (
