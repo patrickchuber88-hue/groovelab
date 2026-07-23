@@ -8628,40 +8628,161 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                   <span>{showRealNames ? "Klarnamen anzeigen" : "Klarnamen verbergen"}</span>
                 </button>
 
-                {/* Bulk Delete Action Button */}
+                {/* Bulk Action Buttons */}
                 {selectedStudentIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBulkDeleteStep(1);
-                      setBulkDeletePin('');
-                      setShowBulkDeleteModal(true);
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      borderRadius: '10px',
-                      padding: '0 16px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      background: 'linear-gradient(135deg, #ff3b30 0%, #dc2626 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontFamily: 'Urbanist, -apple-system, sans-serif',
-                      height: '38px',
-                      boxSizing: 'border-box',
-                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
-                      whiteSpace: 'nowrap'
-                    }}
-                    className="hover-scale"
-                    title={`${selectedStudentIds.length} ausgewählte Schüler löschen`}
-                  >
-                    <Trash2 size={15} />
-                    <span>{selectedStudentIds.length} löschen</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* Bulk Campus Button */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const choice = window.prompt(
+                          `Campus-Modul für die ${selectedStudentIds.length} ausgewählten Schüler:\n\nTippe "1" zum AKTIVIEREN\nTippe "2" zum DEAKTIVIEREN\n(oder Abbrechen)`,
+                          '1'
+                        );
+                        if (!choice || (choice !== '1' && choice !== '2')) return;
+                        const activate = choice === '1';
+                        const actionText = activate ? 'aktivieren' : 'deaktivieren';
+
+                        if (!window.confirm(`Möchtest du das Campus-Modul für alle ${selectedStudentIds.length} ausgewählten Schüler wirklich ${actionText}?`)) {
+                          return;
+                        }
+
+                        try {
+                          await supabase
+                            .from('users')
+                            .update({ is_campus_active: activate })
+                            .in('id', selectedStudentIds);
+
+                          await supabase
+                            .from('pending_students')
+                            .update({ is_campus_active: activate })
+                            .in('id', selectedStudentIds);
+
+                          fetchDashboardData();
+                          alert(`Campus-Modul für ${selectedStudentIds.length} Schüler ${activate ? 'aktiviert' : 'deaktiviert'}.`);
+                        } catch (err: any) {
+                          alert("Fehler beim Verarbeiten: " + err.message);
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: '10px',
+                        padding: '0 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        background: '#e6f4ea',
+                        color: '#137333',
+                        border: '1.5px solid #34a853',
+                        cursor: 'pointer',
+                        fontFamily: 'Urbanist, -apple-system, sans-serif',
+                        height: '38px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.15)',
+                        whiteSpace: 'nowrap'
+                      }}
+                      className="hover-scale"
+                      title={`Campus-Modul für ${selectedStudentIds.length} ausgewählte Schüler aktivieren oder deaktivieren`}
+                    >
+                      <GraduationCap size={15} color="#34a853" />
+                      <span>Campus ({selectedStudentIds.length})</span>
+                    </button>
+
+                    {/* Bulk GrooveLab Button */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const choice = window.prompt(
+                          `GrooveLab-Modul für die ${selectedStudentIds.length} ausgewählten Schüler:\n\nTippe "1" zum AKTIVIEREN\nTippe "2" zum DEAKTIVIEREN\n(oder Abbrechen)`,
+                          '1'
+                        );
+                        if (!choice || (choice !== '1' && choice !== '2')) return;
+                        const activate = choice === '1';
+                        const actionText = activate ? 'aktivieren' : 'deaktivieren';
+
+                        if (!window.confirm(`Möchtest du das GrooveLab-Modul für alle ${selectedStudentIds.length} ausgewählten Schüler wirklich ${actionText}?`)) {
+                          return;
+                        }
+
+                        try {
+                          await supabase
+                            .from('users')
+                            .update({ is_groovelab_active: activate })
+                            .in('id', selectedStudentIds);
+
+                          await supabase
+                            .from('pending_students')
+                            .update({ is_groovelab_active: activate })
+                            .in('id', selectedStudentIds);
+
+                          fetchDashboardData();
+                          alert(`GrooveLab-Modul für ${selectedStudentIds.length} Schüler ${activate ? 'aktiviert' : 'deaktiviert'}.`);
+                        } catch (err: any) {
+                          alert("Fehler beim Verarbeiten: " + err.message);
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: '10px',
+                        padding: '0 14px',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        background: '#fef3c7',
+                        color: '#b45309',
+                        border: '1.5px solid #eab308',
+                        cursor: 'pointer',
+                        fontFamily: 'Urbanist, -apple-system, sans-serif',
+                        height: '38px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)',
+                        whiteSpace: 'nowrap'
+                      }}
+                      className="hover-scale"
+                      title={`GrooveLab-Modul für ${selectedStudentIds.length} ausgewählte Schüler aktivieren oder deaktivieren`}
+                    >
+                      <Music size={15} color="#d97706" />
+                      <span>GrooveLab ({selectedStudentIds.length})</span>
+                    </button>
+
+                    {/* Bulk Delete Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBulkDeleteStep(1);
+                        setBulkDeletePin('');
+                        setShowBulkDeleteModal(true);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        borderRadius: '10px',
+                        padding: '0 16px',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        background: 'linear-gradient(135deg, #ff3b30 0%, #dc2626 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'Urbanist, -apple-system, sans-serif',
+                        height: '38px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+                        whiteSpace: 'nowrap'
+                      }}
+                      className="hover-scale"
+                      title={`${selectedStudentIds.length} ausgewählte Schüler löschen`}
+                    >
+                      <Trash2 size={15} />
+                      <span>{selectedStudentIds.length} löschen</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
