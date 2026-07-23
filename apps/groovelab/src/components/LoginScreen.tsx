@@ -716,7 +716,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               .eq('student_id', result.student_id);
 
             const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
-            setSelectedSlots({});
+            prefSlots?.forEach(slot => {
+              const startTimeClean = slot.start_time.substring(0, 5);
+              const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+              loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+            });
+            setSelectedSlots(loadedSlots);
 
             const { data: mainStudentData } = await supabase
               .from('users')
@@ -2153,7 +2158,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           .eq('student_id', result.student_id);
 
         const loadedSlots: { [key: string]: 'wunsch' | 'gesperrt' } = {};
-        setSelectedSlots({});
+        prefSlots?.forEach(slot => {
+          const startTimeClean = slot.start_time.substring(0, 5);
+          const cellKey = `${slot.day_of_week}-${startTimeClean}`;
+          loadedSlots[cellKey] = slot.preference_type as 'wunsch' | 'gesperrt';
+        });
+        setSelectedSlots(loadedSlots);
 
         // Get school_id and sibling_group_id
         const { data: mainStudentData } = await supabase

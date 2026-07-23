@@ -1575,30 +1575,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleResetPreferences = async (studentId: string) => {
-    if (!await showConfirm("Möchtest du die Stundenplan-Präferenzen und das Onboarding für diesen Schüler wirklich zurücksetzen? Der Schüler muss das Onboarding dann erneut durchlaufen.")) {
+    if (!await showConfirm("Möchtest du das Onboarding für diesen Schüler zur Überarbeitung freigeben? Seine bisherigen Wünsche & Notizen bleiben erhalten, damit die Eltern sie bequem anpassen können.")) {
       return;
     }
     try {
       setLoading(true);
-      // 1. Delete user record if exists
-      await deleteUserStorageAssets([studentId]);
-      await supabase.from('bands').update({ coach_id: null }).eq('coach_id', studentId);
-      const { error: userErr } = await supabase.from('users').delete().eq('id', studentId);
-      if (userErr) console.error("Error deleting user during reset:", userErr);
-      
-      // 2. Clear student schedule preferences
-      const { error: prefErr } = await supabase.from('student_schedule_preferences').delete().eq('student_id', studentId);
-      if (prefErr) console.error("Error deleting preferences during reset:", prefErr);
-      
-      // 3. Reset student status to 'ausstehend' and clear parent notes
-      const { error: studentErr } = await supabase.from('students').update({ status: 'ausstehend', parent_notes: null }).eq('id', studentId);
-      if (studentErr) console.error("Error updating student during reset:", studentErr);
+      // Reset student status to 'ausstehend' to re-enable onboarding edit link, without deleting previous preferences
+      const { error: studentErr } = await supabase.from('students').update({ status: 'ausstehend' }).eq('id', studentId);
+      if (studentErr) console.error("Error updating student status during reset:", studentErr);
 
-      await showAlert("Onboarding erfolgreich zurückgesetzt.");
+      await showAlert("Onboarding zur Überarbeitung freigegeben.");
       loadInitialData();
     } catch (err) {
-      console.error("Error resetting student onboarding:", err);
-      await showAlert("Fehler beim Zurücksetzen.");
+      console.error("Error enabling student onboarding edit:", err);
+      await showAlert("Fehler beim Freigeben.");
     } finally {
       setLoading(false);
     }
@@ -5492,9 +5482,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   e.stopPropagation();
                                   handleResetPreferences(s.id);
                                 }}
-                                style={{ flex: 1, padding: '4px 8px', background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                                style={{ flex: 1, padding: '4px 8px', background: '#d97706', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                               >
-                                Onboarding zurücksetzen
+                                Zur Überarbeitung freigeben
                               </button>
                             )}
                           </div>
