@@ -133,13 +133,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
   }, [token]);
 
-  // Auto-switch to Hausaufgaben tab if Campus module is not booked
-  useEffect(() => {
-    if (profile && !profile.is_campus_active && activeTab === 'action') {
-      setActiveTab('homework');
-    }
-  }, [profile, activeTab]);
-
   // Inaktive Aktivierungs-States
   const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
   const [parentEmail, setParentEmail] = useState('');
@@ -239,6 +232,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   // Multi-Mode specific states
   const [progressItems, setProgressItems] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'action' | 'homework' | 'lessons'>('action');
+
+  // Auto-switch to Hausaufgaben tab if Campus module is not booked
+  useEffect(() => {
+    if (profile && !profile.is_campus_active && activeTab === 'action') {
+      setActiveTab('homework');
+    }
+  }, [profile, activeTab]);
   const [lessonsUnlocked, setLessonsUnlocked] = useState(false);
   const [lessonsPinAttempts, setLessonsPinAttempts] = useState(0);
   const [pendingCancelOccId, setPendingCancelOccId] = useState<string | null>(null);
@@ -3599,7 +3599,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <User size={16} color="#64748b" />
               <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                Bei {lesson.teacher ? lesson.teacher.first_name + ' ' + lesson.teacher.last_name : 'Lehrkraft'}
+                Mit deiner Lehrkraft
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -4352,7 +4352,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column'}}>
                   <h2 style={{margin: 0, fontSize: '1.25rem', fontWeight: 900, textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}>
-                    {profile.first_name} {profile.last_name ? profile.last_name.charAt(0) + '.' : ''}
+                    Mein Campus Pass
                   </h2>
                   <span style={{fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600}}>
                     {profile.instrument || 'Schüler'} · {profile.school_name}
