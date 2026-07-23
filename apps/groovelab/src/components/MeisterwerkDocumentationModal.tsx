@@ -3203,11 +3203,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // Assign to student in localStorage & state
       const stored = localStorage.getItem('student_lehrwerke_progress');
       const parsed = stored ? JSON.parse(stored) : [];
+      const isStudentCreator = currentUserRole === 'student' || (!teacherMode && !readOnly);
       if (!parsed.some((item: any) => item.studentId === student.id && item.lehrwerkId === createdId)) {
         const newAssignment = {
           studentId: student.id,
           lehrwerkId: createdId,
           assignedAt: new Date().toISOString(),
+          createdByRole: isStudentCreator ? 'student' : 'teacher',
+          isStudentCreated: isStudentCreator,
           pageStates: {}
         };
         const updated = [...parsed, newAssignment];
@@ -4950,13 +4953,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                           <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a' }}>
                             {book.title}
                           </h4>
-                          {activeLehrwerkId.startsWith('custom-') || book.is_custom ? (
+                          {assignedBook?.isStudentCreated || assignedBook?.createdByRole === 'student' || book.created_by_role === 'student' ? (
                             <span style={{ color: '#d97706', fontSize: '0.72rem', fontWeight: 800, background: '#fffbeb', border: '1px solid #fef3c7', padding: '2px 8px', borderRadius: '10px' }}>
-                              ⭐ Eigenes Projekt
+                              🙋 Vom Schüler angelegt
+                            </span>
+                          ) : activeLehrwerkId.startsWith('custom-') || book.is_custom || assignedBook?.createdByRole === 'teacher' || book.created_by_teacher ? (
+                            <span style={{ color: '#0284c7', fontSize: '0.72rem', fontWeight: 800, background: '#f0f9ff', border: '1px solid #e0f2fe', padding: '2px 8px', borderRadius: '10px' }}>
+                              👨‍🏫 Vom Lehrer angelegt
                             </span>
                           ) : (
                             <span style={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
-                              🎓 Vom Lehrer
+                              🎓 Vom Lehrer zugewiesen
                             </span>
                           )}
                         </div>
@@ -6068,10 +6075,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                               <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                {assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.isStudentCreated ? (
-                                  <span style={{ color: '#d97706', fontWeight: 800 }}>⭐ Eigenes Projekt</span>
+                                {assigned.isStudentCreated || assigned.createdByRole === 'student' || book.created_by_role === 'student' ? (
+                                  <span style={{ color: '#d97706', fontWeight: 800 }}>🙋 Vom Schüler angelegt</span>
+                                ) : (assigned.lehrwerkId?.startsWith('custom-') || book.is_custom || assigned.createdByRole === 'teacher' || book.created_by_teacher) ? (
+                                  <span style={{ color: '#0284c7', fontWeight: 800 }}>👨‍🏫 Vom Lehrer angelegt</span>
                                 ) : (
-                                  <span style={{ color: '#16a34a', fontWeight: 800 }}>🎓 Vom Lehrer</span>
+                                  <span style={{ color: '#16a34a', fontWeight: 800 }}>🎓 Vom Lehrer zugewiesen</span>
                                 )}
                                 <span>•</span>
                                 <span>{total} Seiten</span>
