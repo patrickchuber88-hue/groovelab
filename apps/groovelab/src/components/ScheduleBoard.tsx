@@ -1846,6 +1846,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 }
                 if (overlapsExisting) continue;
 
+                // Verify that inserting this student does not push any existing student on the board into a Sperrzeit
+                const tempStudentsTest = [...board.students, { ...student, assignedDay: board.dayOfWeek, customStartTime: candidateStartStr }];
+                tempStudentsTest.sort((a, b) => {
+                  const timeA = a.customStartTime || a.assignedTime || '00:00';
+                  const timeB = b.customStartTime || b.assignedTime || '00:00';
+                  if (timeA !== timeB) return timeA.localeCompare(timeB);
+                  if (a.customStartTime && !b.customStartTime) return -1;
+                  if (!a.customStartTime && b.customStartTime) return 1;
+                  return 0;
+                });
+                const tempBoardTest = recalculateBoardTimes({ ...board, students: tempStudentsTest });
+                let boardSperrzeitConflict = false;
+                for (const bs of tempBoardTest.students) {
+                  if (bs.isBreak || !bs.assignedTime) continue;
+                  const [bsh, bsm] = parseTime(bs.assignedTime);
+                  const bsStart = bsh * 60 + bsm;
+                  const bsEnd = bsStart + bs.duration;
+                  if (isSlotBlockedForStudent(bs.id, board.dayOfWeek, bsStart, bsEnd)) {
+                    boardSperrzeitConflict = true;
+                    break;
+                  }
+                }
+                if (boardSperrzeitConflict) continue;
+
                 const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin);
                 const sibBonus = siblingMatchBonus(student, board, candidateMin, candidateEndMin);
                 let totalScore = 1000000 + fitnessScore + sibBonus; // 1.000.000 for wunschzeit window hit
@@ -1898,7 +1922,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   continue; 
                 }
 
-                if (!isPhase3 && isSlotBlockedForStudent(student.id, board.dayOfWeek, startMin, endMin)) continue;
+                if (isSlotBlockedForStudent(student.id, board.dayOfWeek, startMin, endMin)) continue;
+
+                // Verify that inserting this student does not push any existing student on the board into a Sperrzeit
+                let boardSperrzeitConflict = false;
+                for (const bs of tempBoard.students) {
+                  if (bs.isBreak || !bs.assignedTime) continue;
+                  const [bsh, bsm] = parseTime(bs.assignedTime);
+                  const bsStart = bsh * 60 + bsm;
+                  const bsEnd = bsStart + bs.duration;
+                  if (isSlotBlockedForStudent(bs.id, board.dayOfWeek, bsStart, bsEnd)) {
+                    boardSperrzeitConflict = true;
+                    break;
+                  }
+                }
+                if (boardSperrzeitConflict) continue;
 
                 const wunschBonus = calculateWunschBonus(student.id, board.dayOfWeek, startMin, endMin);
                 const fitnessScore = calculateSlotFitness(board, startMin, endMin);
