@@ -248,7 +248,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   
   const [parentUnlocked, setParentUnlocked] = useState(false);
-  const [pinPurpose, setPinPurpose] = useState<'unlock_preview' | 'unlock_app'>('unlock_app');
+  const [pinPurpose, setPinPurpose] = useState<'unlock_preview' | 'unlock_app' | 'setup_initial_pin'>('unlock_app');
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [parentPinInput, setParentPinInput] = useState('');
   const [parentPinError, setParentPinError] = useState(false);
@@ -763,10 +763,30 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_proposals: userData.parent_allow_proposals ?? true
         });
 
+        // Check if activation_days record or PIN exists for this student
+        let hasPinCreated = false;
+        if (userData.role === 'student') {
+          const { data: actDay } = await supabase
+            .from('activation_days')
+            .select('day_of_birth')
+            .eq('student_id', userData.id)
+            .maybeSingle();
+          hasPinCreated = Boolean(actDay || userData.onboarding_pin || userData.personal_pin || userData.pin);
+        } else {
+          hasPinCreated = true;
+        }
+
         // Check if parents unlocked preview previously on this device
         const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
         if (wasUnlocked) {
           setParentUnlocked(true);
+        }
+
+        // 1.5 Allererstes Öffnen der QR Landingpage 2: Wenn noch keine PIN erstellt wurde (Status "Offen"), zur Ersterstellung auffordern!
+        if (userData.role === 'student' && !hasPinCreated) {
+          setPinPurpose('setup_initial_pin');
+          setPageState('pin_required');
+          return;
         }
 
         // 2. Wenn PIN-Schutz erzwungen wird und das Gerät nicht entsperrt ist -> direkt zur PIN-Eingabe springen
@@ -776,7 +796,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        // 3. Ansonsten immer auf die öffentliche Landingpage führen (für aktive & inaktive)
+        // 3. Ansonsten auf die Landingpage führen (für bereits aktivierte Nutzer)
         sessionStorage.setItem('groovelab_qr_token', token);
         setPageState('profile');
       } catch (err: any) {
@@ -1843,6 +1863,54 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   const handlePinSubmit = async () => {
     if (!pinInput || pinInput.length !== 4 || pinLoading || !profile) return;
+
+    if (pinPurpose === 'setup_initial_pin') {
+      setPinLoading(true);
+      setPinError(null);
+      try {
+        const { error: updateErr } = await supabase
+          .from('users')
+          .update({
+            onboarding_pin: pinInput,
+            personal_pin: pinInput,
+            is_pin_activated: true,
+            status: 'aktiv'
+          })
+          .eq('id', profile.id);
+
+        if (updateErr) throw updateErr;
+
+        await supabase.from('students').update({ status: 'aktiv', is_pin_activated: true }).eq('id', profile.id);
+        await supabase.from('pending_students').update({ status: 'aktiv', is_pin_activated: true }).eq('id', profile.id);
+
+        // Ensure activation_days record exists so Secretary Dashboard shows "Aktiv"
+        const { data: existingAct } = await supabase
+          .from('activation_days')
+          .select('student_id')
+          .eq('student_id', profile.id)
+          .maybeSingle();
+
+        if (!existingAct) {
+          await supabase.from('activation_days').insert({
+            student_id: profile.id,
+            day_of_birth: (profile as any).day_of_birth || 1
+          });
+        }
+
+        localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+        setParentUnlocked(true);
+        setPinInput('');
+        sessionStorage.setItem('groovelab_qr_token', token);
+        setPageState('profile');
+      } catch (err: any) {
+        console.error('[QRLanding] setup_initial_pin error:', err);
+        setPinError('Fehler beim Speichern der PIN: ' + err.message);
+      } finally {
+        setPinLoading(false);
+      }
+      return;
+    }
+
     if (pinAttempts >= MAX_ATTEMPTS) {
       setPinError(`Zu viele Fehlversuche. Bitte wende dich an deine Schule.`);
       return;
@@ -3993,10 +4061,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </h2>
             )}
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Sicherheits-PIN eingeben
+              {pinPurpose === 'setup_initial_pin' ? 'Wähle deine 4-stellige PIN' : 'Sicherheits-PIN eingeben'}
             </h1>
             <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
-              Gib deine 4-stellige Eltern- bzw. Sicherheits-PIN ein, um fortzufahren.
+              {pinPurpose === 'setup_initial_pin'
+                ? 'Erstelle deine persönliche PIN für deine erste Anmeldung. Danach wird dein Profil im Sekretariat als "Aktiv" markiert.'
+                : 'Gib deine 4-stellige Eltern- bzw. Sicherheits-PIN ein, um fortzufahren.'}
             </p>
           </div>
 
@@ -4096,11 +4166,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             >
               {pinLoading ? (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={styles.spinnerInline} /> Prüfe...
+                  <span style={styles.spinnerInline} /> Speichere...
                 </span>
               ) : (
                 <>
-                  <CheckCircle size={20} /> Bestätigen
+                  <CheckCircle size={20} /> {pinPurpose === 'setup_initial_pin' ? 'PIN speichern & Ausweis aktivieren' : 'Bestätigen'}
                 </>
               )}
             </button>
