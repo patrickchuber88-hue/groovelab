@@ -83,9 +83,9 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
 }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt' | 'ankunft'>('ankunft');
+  const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt'>('wunsch');
   const [showSaturday, setShowSaturday] = useState(false);
-  const [editedMatrix, setEditedMatrix] = useState<Record<string, 'wunsch' | 'gesperrt' | 'ankunft' | 'none'>>({});
+  const [editedMatrix, setEditedMatrix] = useState<Record<string, 'wunsch' | 'gesperrt' | 'none'>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [hoveredDayId, setHoveredDayId] = useState<number | null>(null);
 
@@ -168,13 +168,16 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
         .select('*')
         .eq('student_id', student.id);
 
-      const matrix: Record<string, 'wunsch' | 'gesperrt' | 'ankunft' | 'none'> = {};
+      const matrix: Record<string, 'wunsch' | 'gesperrt' | 'none'> = {};
       let hasSaturdaySlot = false;
 
       (prefData || []).forEach((p: any) => {
+        // Ignore legacy ankunft entries
+        if (p.preference_type === 'ankunft') return;
+
         const startStr = (p.start_time || '').slice(0, 5);
         const endStr = (p.end_time || '').slice(0, 5);
-        const prefType = p.preference_type === 'gesperrt' ? 'gesperrt' : 'wunsch';
+        const prefType: 'wunsch' | 'gesperrt' = p.preference_type === 'gesperrt' ? 'gesperrt' : 'wunsch';
 
         if (p.day_of_week === 6) {
           hasSaturdaySlot = true;
@@ -192,7 +195,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             matrix[`${p.day_of_week}_${timeKey}`] = prefType;
           }
         } else if (startStr) {
-          matrix[`${p.day_of_week}_${startStr}`] = p.preference_type === 'gesperrt' ? 'gesperrt' : (p.preference_type === 'ankunft' ? 'ankunft' : 'wunsch');
+          matrix[`${p.day_of_week}_${startStr}`] = prefType;
         }
       });
 
@@ -216,43 +219,6 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
     }
 
     const key = `${dayId}_${startTime}`;
-
-    if (preferenceMode === 'ankunft') {
-      const [targetH, targetM] = startTime.split(':').map(Number);
-      const targetMins = targetH * 60 + (targetM || 0);
-
-      const targetKey = `${dayId}_${startTime}`;
-      const isAlreadyAnkunft = editedMatrix[targetKey] === 'ankunft';
-
-      setEditedMatrix(prev => {
-        const nextMatrix = { ...prev };
-        TIME_SLOTS.forEach(slot => {
-          const [sH, sM] = slot.start.split(':').map(Number);
-          const slotMins = sH * 60 + (sM || 0);
-          const slotKey = `${dayId}_${slot.start}`;
-
-          if (isAlreadyAnkunft) {
-            // If tapping existing arrival slot, toggle off arrival marker and prior locks
-            if (slotMins <= targetMins && (nextMatrix[slotKey] === 'gesperrt' || nextMatrix[slotKey] === 'ankunft')) {
-              nextMatrix[slotKey] = 'none';
-            }
-          } else {
-            if (slotMins < targetMins) {
-              nextMatrix[slotKey] = 'gesperrt';
-            } else if (slotMins === targetMins) {
-              nextMatrix[slotKey] = 'ankunft';
-            } else if (nextMatrix[slotKey] === 'gesperrt' || nextMatrix[slotKey] === 'ankunft') {
-              nextMatrix[slotKey] = 'none';
-            }
-          }
-        });
-        return nextMatrix;
-      });
-
-      showToast(isAlreadyAnkunft ? `Ankunft am ${startTime} Uhr aufgehoben` : `Ankunft um ${startTime} Uhr gesetzt (Zeiten davor gesperrt)`);
-      return;
-    }
-
     const current = editedMatrix[key] || 'none';
 
     let next: 'wunsch' | 'gesperrt' | 'none' = 'none';
@@ -262,10 +228,15 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
       next = preferenceMode;
     }
 
-    setEditedMatrix(prev => ({
-      ...prev,
-      [key]: next
-    }));
+    setEditedMatrix(prev => ({ ...prev, [key]: next }));
+
+    if (next === 'wunsch') {
+      showToast(`Wunschzeit um ${startTime} Uhr markiert (grün)`);
+    } else if (next === 'gesperrt') {
+      showToast(`Zeit um ${startTime} Uhr gesperrt (rot)`);
+    } else {
+      showToast(`Markierung für ${startTime} Uhr aufgehoben`);
+    }
   };
 
   const handleToggleWholeDay = (dayId: number, dayName: string) => {
@@ -420,21 +391,17 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                 <Sparkles size={13} color="#64748b" />
-                <span>Terminauswahl in 3 Schritten</span>
+                <span>Terminauswahl in 2 Schritten</span>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.72rem', color: '#475569', fontWeight: 500, lineHeight: 1.35 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #bfdbfe', flexShrink: 0 }}>1. Ankunft</span>
-                  <span>Uhrzeit antippen – dieser Slot und alle früheren Zeiten werden gesperrt.</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ background: '#f0fdf4', color: '#166534', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #bbf7d0', flexShrink: 0 }}>2. Wunsch</span>
+                  <span style={{ background: '#f0fdf4', color: '#166534', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #bbf7d0', flexShrink: 0 }}>1. Wunschzeit</span>
                   <span>Bevorzugte Unterrichtszeiten im Raster grün markieren.</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ background: '#fef2f2', color: '#991b1b', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #fecaca', flexShrink: 0 }}>3. Sperr</span>
-                  <span>Zeiten sperren, die absolut unmöglich sind.</span>
+                  <span style={{ background: '#fef2f2', color: '#991b1b', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #fecaca', flexShrink: 0 }}>2. Sperrzeit</span>
+                  <span>Zeiten sperren, die absolut unmöglich sind (rot).</span>
                 </div>
               </div>
             </div>
@@ -498,7 +465,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>({showSaturday ? 'Mit Samstag' : 'Nur Mo-Fr'})</span>
             </div>
 
-            {/* Apple style segmented control with 3 modes */}
+            {/* Apple style segmented control with 2 modes */}
             <div style={{
               display: 'flex',
               background: '#e2e8f0',
@@ -506,29 +473,6 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               borderRadius: '12px',
               gap: '4px'
             }}>
-              <button
-                type="button"
-                onClick={() => setPreferenceMode('ankunft')}
-                style={{
-                  flex: 1,
-                  padding: '7px 4px',
-                  borderRadius: '9px',
-                  border: 'none',
-                  background: preferenceMode === 'ankunft' ? '#2563eb' : 'transparent',
-                  color: preferenceMode === 'ankunft' ? '#ffffff' : '#475569',
-                  fontWeight: 800,
-                  fontSize: '0.74rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Clock size={12} color={preferenceMode === 'ankunft' ? '#ffffff' : '#2563eb'} />
-                <span>Ankunft 🚀</span>
-              </button>
               <button
                 type="button"
                 onClick={() => setPreferenceMode('wunsch')}
@@ -550,7 +494,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                 }}
               >
                 <Star size={12} fill={preferenceMode === 'wunsch' ? '#ffffff' : '#22c55e'} color={preferenceMode === 'wunsch' ? '#ffffff' : '#16a34a'} />
-                <span>Wunsch 🟢</span>
+                <span>Wunschzeit 🟢</span>
               </button>
               <button
                 type="button"
@@ -573,7 +517,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                 }}
               >
                 <Ban size={12} color={preferenceMode === 'gesperrt' ? '#ffffff' : '#dc2626'} />
-                <span>Sperr 🔴</span>
+                <span>Sperrzeit 🔴</span>
               </button>
             </div>
 
@@ -612,16 +556,16 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             gap: '8px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '9px', height: '9px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '3px', flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, color: '#2563eb' }}>Ankunft</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <div style={{ width: '9px', height: '9px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '3px', flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, color: '#166534' }}>Unterricht</span>
+              <span style={{ fontWeight: 700, color: '#166534' }}>Wunschzeit</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '9px', height: '9px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '3px', flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, color: '#64748b' }}>Ausweichzeit</span>
+              <div style={{ width: '9px', height: '9px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '3px', flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, color: '#dc2626' }}>Sperrzeit</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '9px', height: '9px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '3px', flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, color: '#047857' }}>Unterrichtszeit</span>
             </div>
           </div>
 
@@ -786,11 +730,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                     let border = '1px solid #e2e8f0';
                     let icon = null;
 
-                    if (status === 'ankunft') {
-                      bg = '#eff6ff';
-                      border = '1.5px solid #60a5fa';
-                      icon = <Clock size={10} color="#2563eb" />;
-                    } else if (status === 'wunsch') {
+                    if (status === 'wunsch') {
                       bg = '#f0fdf4';
                       border = '1.5px solid #86efac';
                       icon = <Star size={9} fill="#22c55e" color="#16a34a" />;
