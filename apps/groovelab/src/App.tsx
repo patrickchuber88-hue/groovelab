@@ -3899,7 +3899,7 @@ function App() {
               supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name'),
               supabase.from('users').select('*').eq('school_id', sid).order('first_name'),
               supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid),
-              supabase.from('schedule_occurrences').select('*, student:users!student_id(*)').eq('school_id', sid)
+              supabase.from('schedule_occurrences').select('*, student:users!student_id(*)')
             ]);
             (uResExact.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
             (uResSchool.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));

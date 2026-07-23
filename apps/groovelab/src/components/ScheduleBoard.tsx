@@ -20,7 +20,9 @@ import {
   Search,
   Upload,
   Eye,
-  EyeOff
+  EyeOff,
+  Ban,
+  Star
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
@@ -69,6 +71,12 @@ const parseTime = (timeStr: string | null | undefined, fallback = '14:00'): [num
   const parts = str.split(':').map(Number);
   if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return [14, 0];
   return [parts[0], parts[1]];
+};
+
+const formatMinutes = (totalMins: number): string => {
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
 const DAYS_OF_WEEK = [
@@ -273,6 +281,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [selectedStudentNote, setSelectedStudentNote] = useState<string | null>(null);
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+  const [failedStudentIds, setFailedStudentIds] = useState<string[]>([]);
   const [otherTeachersSchedules, setOtherTeachersSchedules] = useState<any[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
   const [siblingInfo, setSiblingInfo] = useState<any | null>(null);
@@ -1599,18 +1608,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     // 1. Find all unassigned students for this teacher
     const unassignedStudents = students.filter(s => !s.assignedDay && !s.isBreak);
     if (unassignedStudents.length === 0) {
-      setToast({
-        message: "Alle Schüler sind bereits eingeteilt!",
-        type: 'success'
-      });
+      setToast({ message: "Alle Schüler sind bereits eingeteilt!", type: 'success' });
       return;
     }
 
     if (boards.length === 0) {
-      setToast({
-        message: "Bitte lege zuerst mindestens einen Unterrichtstag (Board) an.",
-        type: 'warning'
-      });
+      setToast({ message: "Bitte lege zuerst mindestens einen Unterrichtstag (Board) an.", type: 'warning' });
       return;
     }
 
@@ -1618,7 +1621,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setLoading(true);
       const studentIds = unassignedStudents.map(s => s.id);
       
-      // 2. Fetch preferences for all unassigned students
       const { data: prefs, error } = await supabase
         .from('student_schedule_preferences')
         .select('*')
@@ -1627,131 +1629,292 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       if (error) throw error;
 
       const prefsByStudentId: Record<string, any[]> = {};
-      studentIds.forEach(id => {
-        prefsByStudentId[id] = [];
-      });
+      studentIds.forEach(id => { prefsByStudentId[id] = []; });
       prefs?.forEach(p => {
-        if (p.student_id) {
-          prefsByStudentId[p.student_id].push(p);
-        }
+        if (p.student_id) prefsByStudentId[p.student_id].push(p);
       });
 
-      // 3. Sort students by constraints: number of 'gesperrt' preferences descending
-      // If equal, sort by number of 'wunsch' preferences descending.
-      const sortedUnassigned = [...unassignedStudents].sort((a, b) => {
+      // Calculate blocked duration in minutes
+      const calculateBlockedDuration = (studentPrefs: any[]) => {
+        let totalMinutes = 0;
+        for (const p of studentPrefs) {
+          if (p.preference_type === 'gesperrt') {
+            const [sh, sm] = parseTime(p.start_time);
+            const [eh, em] = parseTime(p.end_time);
+            totalMinutes += Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+          }
+        }
+        return totalMinutes;
+      };
+
+      const constrainedStudents = unassignedStudents.filter(s => (prefsByStudentId[s.id] || []).length > 0);
+      const flexibleStudents = unassignedStudents.filter(s => (prefsByStudentId[s.id] || []).length === 0);
+
+      // Phase 1: Vorverarbeitung & Scoring (Das Ranking)
+      constrainedStudents.sort((a, b) => {
+        const aSiblingBonus = a.sibling_group_id ? 50000 : 0;
+        const bSiblingBonus = b.sibling_group_id ? 50000 : 0;
+        
         const aPrefs = prefsByStudentId[a.id] || [];
         const bPrefs = prefsByStudentId[b.id] || [];
-        const aBlocked = aPrefs.filter(p => p.preference_type === 'gesperrt').length;
-        const bBlocked = bPrefs.filter(p => p.preference_type === 'gesperrt').length;
-        if (aBlocked !== bBlocked) {
-          return bBlocked - aBlocked; // More blocked slots = higher priority
-        }
-        const aWunsch = aPrefs.filter(p => p.preference_type === 'wunsch').length;
-        const bWunsch = bPrefs.filter(p => p.preference_type === 'wunsch').length;
-        return bWunsch - aWunsch;
+        
+        const aBlockedMinutes = calculateBlockedDuration(aPrefs);
+        const bBlockedMinutes = calculateBlockedDuration(bPrefs);
+
+        const aConstraintScore = (aBlockedMinutes / 60) * 10000 + aPrefs.filter(p => p.preference_type === 'wunsch').length * 5000;
+        const bConstraintScore = (bBlockedMinutes / 60) * 10000 + bPrefs.filter(p => p.preference_type === 'wunsch').length * 5000;
+
+        const aTotalScore = aSiblingBonus + aConstraintScore + (a.duration * 100);
+        const bTotalScore = bSiblingBonus + bConstraintScore + (b.duration * 100);
+
+        if (aTotalScore !== bTotalScore) return bTotalScore - aTotalScore;
+
+        const aTime = aPrefs[0]?.created_at ? new Date(aPrefs[0].created_at).getTime() : Infinity;
+        const bTime = bPrefs[0]?.created_at ? new Date(bPrefs[0].created_at).getTime() : Infinity;
+        return aTime - bTime;
       });
 
-      // 4. Local copy of boards during allocation
-      let currentBoards = [...boards];
+      let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
       const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
 
-      for (const student of sortedUnassigned) {
-        let bestBoardId: string | null = null;
-        let highestScore = -Infinity;
+      const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
+        const studentPrefs = prefsByStudentId[studentId] || [];
+        const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && Number(p.day_of_week) === Number(dayOfWeek));
+        for (const pref of blockedPrefs) {
+          const [psh, psm] = parseTime(pref.start_time);
+          const [peh, pem] = parseTime(pref.end_time);
+          const prefStart = psh * 60 + psm;
+          const prefEnd = peh * 60 + pem;
 
-        // Try placing on each active board
-        for (const board of currentBoards) {
-          // Determine the start time for the student on this board
-          // The student would be appended to the end of the board's students list
-          const startAnchorTime = board.startAnchor;
-          let currentMinutes = 0;
-          if (board.students.length > 0) {
-            // Find the last student's end time
-            const lastStudent = board.students[board.students.length - 1];
-            if (lastStudent.assignedTime) {
-              const [h, m] = parseTime(lastStudent.assignedTime);
-              currentMinutes = h * 60 + m + lastStudent.duration;
-            } else {
-              const [h, m] = parseTime(startAnchorTime);
-              currentMinutes = h * 60 + m;
-            }
-          } else {
-            const [h, m] = parseTime(startAnchorTime);
-            currentMinutes = h * 60 + m;
+          if (startMin < prefEnd && endMin > prefStart) {
+            return true; // Overlaps with Sperrzeit
           }
+        }
+        return false;
+      };
 
-          const startMin = currentMinutes;
-          const endMin = startMin + student.duration;
+      const calculateWunschBonus = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
+        const studentPrefs = prefsByStudentId[studentId] || [];
+        const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(dayOfWeek));
+        for (const pref of wunschPrefs) {
+          const [psh, psm] = parseTime(pref.start_time);
+          const [peh, pem] = parseTime(pref.end_time);
+          const prefStart = psh * 60 + psm;
+          const prefEnd = peh * 60 + pem;
 
-          // Check if this slot overlaps with any 'gesperrt' preferences of the student
-          const studentPrefs = prefsByStudentId[student.id] || [];
-          const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && Number(p.day_of_week) === Number(board.dayOfWeek));
+          if (startMin < prefEnd && endMin > prefStart) {
+            return 1000000; // Wunschzeit-Treffer
+          }
+        }
+        return 0;
+      };
+
+      // Helper to calculate slot fitness (Lückenlos-Bonus, Isolations-Strafe, etc.)
+      const calculateSlotFitness = (board: any, startMin: number, endMin: number) => {
+        let score = 0;
+        
+        // 1. Check if within Teacher Availability (hard constraint)
+        const [bh, bm] = parseTime(board.startAnchor);
+        const boardStartMin = bh * 60 + bm;
+        const [beh, bem] = parseTime(board.endAnchor || '23:59');
+        const boardEndMin = beh * 60 + bem;
+        
+        if (startMin < boardStartMin || endMin > boardEndMin) {
+          return -9999999; // Strictly avoid outside teacher hours
+        }
+
+        let lueckenlos = false;
+        let gapBefore = 0;
+        let gapAfter = 0;
+
+        if (board.students.length === 0) {
+          // Empty board, connecting to start of day is lückenlos
+          gapBefore = startMin - boardStartMin;
+          if (gapBefore === 0) lueckenlos = true;
+        } else {
+          score += 500; // Tages-Auslastungs-Bonus for already populated boards
           
-          let isBlocked = false;
-          for (const pref of blockedPrefs) {
-            const [psh, psm] = parseTime(pref.start_time);
-            const [peh, pem] = parseTime(pref.end_time);
-            const prefStart = psh * 60 + psm;
-            const prefEnd = peh * 60 + pem;
+          // Find closest student before and after
+          let closestEndBefore = boardStartMin;
+          let closestStartAfter = boardEndMin;
 
-            if (startMin < prefEnd && endMin > prefStart) {
-              isBlocked = true;
-              break;
+          for (const s of board.students) {
+            if (!s.assignedTime) continue;
+            const [sh, sm] = parseTime(s.assignedTime);
+            const sStart = sh * 60 + sm;
+            const sEnd = sStart + s.duration;
+            
+            if (sEnd <= startMin && sEnd > closestEndBefore) {
+              closestEndBefore = sEnd;
+            }
+            if (sStart >= endMin && sStart < closestStartAfter) {
+              closestStartAfter = sStart;
             }
           }
 
-          if (isBlocked) continue; // Skip this board/day since it's blocked
+          gapBefore = startMin - closestEndBefore;
+          gapAfter = closestStartAfter - endMin;
 
-          // Calculate score
-          let score = 1000;
+          if (gapBefore === 0 || gapAfter === 0) lueckenlos = true;
+        }
 
-          // Add points for preferred time ('wunsch') overlap
-          const preferredPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
-          let hasWunschOverlap = false;
-          for (const pref of preferredPrefs) {
-            const [psh, psm] = parseTime(pref.start_time);
-            const [peh, pem] = parseTime(pref.end_time);
-            const prefStart = psh * 60 + psm;
-            const prefEnd = peh * 60 + pem;
+        if (lueckenlos) {
+          score += 10000;
+        } else {
+          // Isolation penalty
+          if (gapBefore > 0) score -= Math.floor(gapBefore / 15) * 5000;
+          // Only penalize after gap if it's not simply the end of the day
+          if (gapAfter > 0 && gapAfter < 1440) score -= Math.floor(gapAfter / 15) * 5000;
+        }
 
-            if (startMin < prefEnd && endMin > prefStart) {
-              hasWunschOverlap = true;
-              break;
+        return score;
+      };
+
+      // PHASE 2 & 3 Combined Logic (Greedy Insertion)
+      const assignStudents = (studentsList: any[], isPhase3: boolean) => {
+        for (const student of studentsList) {
+          const studentPrefs = prefsByStudentId[student.id] || [];
+          const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch');
+
+          let bestCandidate: { boardId: string; insertIndex: number; customStartTime?: string; score: number } | null = null;
+          let highestScore = -Infinity;
+
+          // If Phase 2, try exact Wunschzeit customStartTime matches first
+          if (!isPhase3) {
+            for (const pref of wunschPrefs) {
+              const prefDay = Number(pref.day_of_week);
+              const board = currentBoards.find(b => Number(b.dayOfWeek) === prefDay);
+              if (!board) continue;
+
+              const [psh, psm] = parseTime(pref.start_time);
+              const startMin = psh * 60 + psm;
+              const endMin = startMin + student.duration;
+
+              if (isSlotBlockedForStudent(student.id, board.dayOfWeek, startMin, endMin)) continue;
+
+              // Teacher availability check
+              const [bh, bm] = parseTime(board.startAnchor);
+              const boardStartMin = bh * 60 + bm;
+              const [beh, bem] = parseTime(board.endAnchor || '23:59');
+              const boardEndMin = beh * 60 + bem;
+              if (startMin < boardStartMin || endMin > boardEndMin) continue;
+
+              // Check overlap
+              let overlapsExisting = false;
+              for (const s of board.students) {
+                if (!s.assignedTime) continue;
+                const [ssh, ssm] = parseTime(s.assignedTime);
+                const sStart = ssh * 60 + ssm;
+                const sEnd = sStart + s.duration;
+                if (startMin < sEnd && endMin > sStart) {
+                  overlapsExisting = true;
+                  break;
+                }
+              }
+              if (overlapsExisting) continue;
+
+              const fitnessScore = calculateSlotFitness(board, startMin, endMin);
+              const totalScore = 1000000 + fitnessScore; // 1.000.000 for exact wunsch
+
+              if (totalScore > highestScore) {
+                let insertPos = board.students.length;
+                for (let i = 0; i < board.students.length; i++) {
+                  if (board.students[i].assignedTime) {
+                    const [sh, sm] = parseTime(board.students[i].assignedTime!);
+                    if (startMin < sh * 60 + sm) {
+                      insertPos = i;
+                      break;
+                    }
+                  }
+                }
+                highestScore = totalScore;
+                bestCandidate = { boardId: board.id, insertIndex: insertPos, customStartTime: pref.start_time, score: totalScore };
+              }
             }
           }
 
-          if (hasWunschOverlap) {
-            score += 10000;
+          // Fallback or Phase 3: Evaluate standard insertion points (before/after every existing student and at start of day)
+          if (!bestCandidate) {
+            for (const board of currentBoards) {
+              const studentCount = board.students.length;
+              for (let pos = 0; pos <= studentCount; pos++) {
+                const tempStudents = [...board.students];
+                const tempStudentToAssign = { ...student, assignedDay: board.dayOfWeek, customStartTime: undefined };
+                tempStudents.splice(pos, 0, tempStudentToAssign);
+
+                const tempBoard = recalculateBoardTimes({ ...board, students: tempStudents });
+                const assignedStud = tempBoard.students.find(s => s.id === student.id);
+                if (!assignedStud || !assignedStud.assignedTime) continue;
+
+                const [ash, asm] = parseTime(assignedStud.assignedTime);
+                const startMin = ash * 60 + asm;
+                const endMin = startMin + student.duration;
+
+                // Teacher availability check
+                const [bh, bm] = parseTime(board.startAnchor);
+                const boardStartMin = bh * 60 + bm;
+                const [beh, bem] = parseTime(board.endAnchor || '23:59');
+                const boardEndMin = beh * 60 + bem;
+
+                if (startMin < boardStartMin || endMin > boardEndMin) {
+                  continue; 
+                }
+
+                if (!isPhase3 && isSlotBlockedForStudent(student.id, board.dayOfWeek, startMin, endMin)) continue;
+
+                const wunschBonus = calculateWunschBonus(student.id, board.dayOfWeek, startMin, endMin);
+                const fitnessScore = calculateSlotFitness(board, startMin, endMin);
+                const score = wunschBonus + fitnessScore;
+
+                if (score > highestScore) {
+                  highestScore = score;
+                  bestCandidate = { boardId: board.id, insertIndex: pos, score };
+                }
+              }
+            }
           }
 
-          // Load balancing: subtract total duration of students on board to prefer less busy boards
-          const boardLoad = board.students.reduce((acc, s) => acc + s.duration, 0);
-          score -= boardLoad;
+          if (bestCandidate) {
+            currentBoards = currentBoards.map(b => {
+              if (b.id !== bestCandidate!.boardId) return b;
+              const studentToAssign = { 
+                ...student, 
+                assignedDay: b.dayOfWeek, 
+                customStartTime: bestCandidate!.customStartTime 
+              };
+              const nextStudents = [...b.students];
+              nextStudents.splice(bestCandidate!.insertIndex, 0, studentToAssign);
+              
+              nextStudents.sort((a, b) => {
+                const timeA = a.customStartTime || a.assignedTime || '00:00';
+                const timeB = b.customStartTime || b.assignedTime || '00:00';
+                return timeA.localeCompare(timeB);
+              });
 
-          if (score > highestScore) {
-            highestScore = score;
-            bestBoardId = board.id;
+              const updatedBoard = recalculateBoardTimes({ ...b, students: nextStudents });
+              
+              const assignedItem = updatedBoard.students.find(s => s.id === student.id);
+              if (assignedItem && assignedItem.assignedTime) {
+                newlyAssignedStudentIds[student.id] = { day: b.dayOfWeek, time: assignedItem.assignedTime };
+              }
+              return updatedBoard;
+            });
           }
         }
+      };
 
-        if (bestBoardId) {
-          // Perform the assignment
-          currentBoards = currentBoards.map(b => {
-            if (b.id !== bestBoardId) return b;
-            const studentToAssign = { ...student, assignedDay: b.dayOfWeek };
-            const nextStudents = [...b.students, studentToAssign];
-            const updatedBoard = recalculateBoardTimes({ ...b, students: nextStudents });
-            
-            // Extract the recalculated start time for this student
-            const assignedTime = updatedBoard.students[updatedBoard.students.length - 1].assignedTime || '';
-            newlyAssignedStudentIds[student.id] = { day: b.dayOfWeek, time: assignedTime };
-            
-            return updatedBoard;
-          });
-        }
-      }
+      // Run Phase 2 (Constrained)
+      assignStudents(constrainedStudents, false);
+      // Run Phase 3 (Flexible)
+      assignStudents(flexibleStudents, true);
 
-      // Update boards and student states
+      // Track unassignable student IDs
+      const failedIds = unassignedStudents
+        .filter(s => !newlyAssignedStudentIds[s.id])
+        .map(s => s.id);
+      setFailedStudentIds(failedIds);
+
+      // Update state
       setBoards(currentBoards);
       setStudents(currentStudents => currentStudents.map(s => {
         if (newlyAssignedStudentIds[s.id]) {
@@ -1768,13 +1931,25 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const unassignedCount = unassignedStudents.length - assignedCount;
 
       if (assignedCount > 0) {
-        setToast({
-          message: `${assignedCount} Schüler wurden automatisch zugeteilt! ${unassignedCount > 0 ? `(${unassignedCount} nicht zuteilbar aufgrund von Konflikten)` : ''}`,
-          type: unassignedCount > 0 ? 'warning' : 'success'
-        });
+        if (unassignedCount > 0) {
+          const failedNames = unassignedStudents
+            .filter(s => failedIds.includes(s.id))
+            .map(s => `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`)
+            .slice(0, 3)
+            .join(', ');
+          setToast({
+            message: `${assignedCount} Schüler zugeteilt. ${unassignedCount} Schüler (${failedNames}) konnte wegen Kapazitäts- oder Sperrzeit-Kollision nicht eingeteilt werden.`,
+            type: 'warning'
+          });
+        } else {
+          setToast({
+            message: `${assignedCount} Schüler wurden erfolgreich zugeteilt!`,
+            type: 'success'
+          });
+        }
       } else {
         setToast({
-          message: "Keine Schüler konnten automatisch zugeteilt werden (Präferenz-Konflikte auf allen Tagen).",
+          message: "Keine Schüler konnten automatisch zugeteilt werden (Sperrzeit-Konflikte oder mangelnde Unterrichtszeit-Kapazitäten).",
           type: 'warning'
         });
       }
@@ -2257,19 +2432,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 setShakingStudentId(sourceId);
                 setTimeout(() => setShakingStudentId(null), 500);
 
-                // Show warnings toast
-                setToast({
-                  message: `Zeitkonflikt: Der Schüler ${student.first_name} ${maskLastName(student.last_name, showRealNames)} ist in diesem Zeitraum gesperrt!`,
-                  type: 'warning'
-                });
+                const allowOverride = await showConfirm(
+                  `Achtung: Sperrzeit-Kollision!\n\n${student.first_name} ${maskLastName(student.last_name, showRealNames)} hat den Zeitraum (${formatMinutes(startMin)} - ${formatMinutes(endMin)} Uhr) als Sperrzeit angegeben.\n\nMöchtest du den Schüler trotzdem eintragen?`,
+                  'Trotzdem eintragen',
+                  'Abbrechen'
+                );
 
-                // Reset drag tracking and stop execution
-                setDraggedStudentId(null);
-                setDragSource(null);
-                setDragSourceBoardId(null);
-                setDragOverBoardId(null);
-                setDragOverIndex(null);
-                return;
+                if (!allowOverride) {
+                  // Reset drag tracking and stop execution
+                  setDraggedStudentId(null);
+                  setDragSource(null);
+                  setDragSourceBoardId(null);
+                  setDragOverBoardId(null);
+                  setDragOverIndex(null);
+                  return;
+                }
               }
             }
           } catch (err) {
@@ -3938,11 +4115,35 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 const PX_PER_MIN = 2.5;
                 const [anchorH, anchorM] = parseTime(board.startAnchor);
                 const startMinutes = anchorH * 60 + anchorM;
-                const totalMinutes = board.students.reduce((acc, s) => acc + s.duration, 0);
-                const endMinutes = startMinutes + Math.max(totalMinutes, 60);
+                const dayConfig = (teacherAvailability as any)?.[board.dayOfWeek];
+                let availEndMins = startMinutes + 300; // default 5 hours if not specified
+                if (dayConfig?.end) {
+                  const [eh, em] = parseTime(dayConfig.end);
+                  availEndMins = eh * 60 + em;
+                }
+
+                let maxStudentEndMins = startMinutes;
+                let curMins = startMinutes;
+                board.students.forEach(s => {
+                  curMins += s.duration;
+                  if (curMins > maxStudentEndMins) maxStudentEndMins = curMins;
+                });
+
+                let maxPrefEndMins = startMinutes;
+                if ((selectedStudentId || draggedStudentId) && selectedStudentPrefs.length > 0) {
+                  selectedStudentPrefs.forEach(pref => {
+                    if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
+                      const [peh, pem] = parseTime(pref.end_time);
+                      const prefEndMins = peh * 60 + pem;
+                      if (prefEndMins > maxPrefEndMins) maxPrefEndMins = prefEndMins;
+                    }
+                  });
+                }
+
+                const endMinutes = Math.max(availEndMins, maxStudentEndMins, maxPrefEndMins, startMinutes + 60);
                 const columnHeightPx = (endMinutes - startMinutes) * PX_PER_MIN + 48;
                 const startHour = Math.floor(startMinutes / 60);
-                const endHour = Math.ceil(endMinutes / 60) + 1;
+                const endHour = Math.ceil(endMinutes / 60);
                 const hourMarkers: { hour: number; top: number }[] = [];
                 for (let h = startHour; h <= endHour; h++) {
                   const top = (h * 60 - startMinutes) * PX_PER_MIN;
@@ -4157,12 +4358,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             if (currentType && startIndex !== -1) {
                               const top = startIndex * 15 * PX_PER_MIN;
                               const height = (i - startIndex) * 15 * PX_PER_MIN;
-                              const className = currentType === 'gesperrt' ? 'roentgen-blocked' : 'roentgen-preferred';
+                              const isBlocked = currentType === 'gesperrt';
+                              const blockStartTimeStr = formatMinutes(startMinutes + startIndex * 15);
+                              const blockEndTimeStr = formatMinutes(startMinutes + i * 15);
                               
                               mergedBlocks.push(
                                 <div
                                   key={`pref-block-${board.id}-${startIndex}-${i}`}
-                                  className={className}
+                                  className={isBlocked ? 'roentgen-blocked' : 'roentgen-preferred'}
                                   style={{
                                     position: 'absolute',
                                     left: 0,
@@ -4171,9 +4374,33 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     height: `${height}px`,
                                     zIndex: 3,
                                     boxSizing: 'border-box',
-                                    pointerEvents: 'none'
+                                    pointerEvents: 'none',
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    justifyContent: 'flex-start',
+                                    padding: '4px 6px',
+                                    overflow: 'hidden'
                                   }}
-                                />
+                                >
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.64rem',
+                                    fontWeight: 800,
+                                    color: isBlocked ? '#991b1b' : '#166534',
+                                    background: isBlocked ? '#fef2f2' : '#f0fdf4',
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${isBlocked ? '#fecaca' : '#bbf7d0'}`,
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                    backdropFilter: 'blur(4px)',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {isBlocked ? <Ban size={11} color="#dc2626" /> : <Star size={11} fill="#16a34a" color="#166534" />}
+                                    <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
+                                  </div>
+                                </div>
                               );
                             }
                             currentType = type;
@@ -4184,12 +4411,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         if (currentType && startIndex !== -1) {
                           const top = startIndex * 15 * PX_PER_MIN;
                           const height = (blockCount - startIndex) * 15 * PX_PER_MIN;
-                          const className = currentType === 'gesperrt' ? 'roentgen-blocked' : 'roentgen-preferred';
+                          const isBlocked = currentType === 'gesperrt';
+                          const blockStartTimeStr = formatMinutes(startMinutes + startIndex * 15);
+                          const blockEndTimeStr = formatMinutes(startMinutes + blockCount * 15);
                           
                           mergedBlocks.push(
                             <div
                               key={`pref-block-${board.id}-${startIndex}-${blockCount}`}
-                              className={className}
+                              className={isBlocked ? 'roentgen-blocked' : 'roentgen-preferred'}
                               style={{
                                 position: 'absolute',
                                 left: 0,
@@ -4198,9 +4427,33 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 height: `${height}px`,
                                 zIndex: 3,
                                 boxSizing: 'border-box',
-                                pointerEvents: 'none'
+                                pointerEvents: 'none',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                justifyContent: 'flex-start',
+                                padding: '4px 6px',
+                                overflow: 'hidden'
                               }}
-                            />
+                            >
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.64rem',
+                                fontWeight: 800,
+                                color: isBlocked ? '#991b1b' : '#166534',
+                                background: isBlocked ? '#fef2f2' : '#f0fdf4',
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                border: `1px solid ${isBlocked ? '#fecaca' : '#bbf7d0'}`,
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                backdropFilter: 'blur(4px)',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {isBlocked ? <Ban size={11} color="#dc2626" /> : <Star size={11} fill="#16a34a" color="#166534" />}
+                                <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
+                              </div>
+                            </div>
                           );
                         }
 
@@ -4328,7 +4581,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       })()}
 
                       {/* Empty drop hint */}
-                      {board.students.length === 0 && (
+                      {board.students.length === 0 && !((selectedStudentId || draggedStudentId) && selectedStudentPrefs.some(p => Number(p.day_of_week) === Number(board.dayOfWeek) && p.preference_type === 'gesperrt')) && (
                         <div style={{ position: 'absolute', inset: '8px 0', border: '1.5px dashed rgba(0,0,0,0.08)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#86868b', pointerEvents: 'none', zIndex: 1 }}>
                           <Users size={18} style={{ color: '#c7c7cc', marginBottom: '4px' }} />
                           <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>Schüler hierhin</span>
@@ -4528,7 +4781,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const isAdminViewTheme = currentUserRole === 'admin' || currentUserRole === 'secretary';
 
                         const studentInPool = students.find((s: Student) => s.id === bs.id);
-                        const isPendingOnboarding = bs.status === 'ausstehend' || (studentInPool ? (studentInPool.status === 'ausstehend' || studentInPool.isOnboarded === false) : false);
+                        const isPendingOnboarding = (bs.status === 'ausstehend' || (studentInPool ? (studentInPool.status === 'ausstehend' || studentInPool.isOnboarded === false) : false)) && !studentInPool?.hasPreferences;
 
                         let cardPrimaryColor = isPendingOnboarding ? '#64748b' : '#34a853'; // Grey vs Campus Green
                         let cardLightBg = isPendingOnboarding ? 'rgba(100, 116, 139, 0.08)' : 'rgba(52, 168, 83, 0.06)';
@@ -4981,6 +5234,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </button>
               </div>
 
+
+
               {/* Sidebar Student cards list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '350px', overflowY: 'auto', paddingRight: '2px' }}>
                 {filteredStudents.map(s => {
@@ -5026,16 +5281,26 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>
                           {s.first_name} {maskLastName(s.last_name, showRealNames)}
                         </span>
-                        {s.status === 'ausstehend' ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ausstehend</span>
+                        {failedStudentIds.includes(s.id) ? (
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
+                            <Ban size={9} color="#dc2626" />
+                            <span>Sperrzeit-Konflikt</span>
+                          </span>
+                        ) : s.hasPreferences ? (
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
+                            <Star size={9} fill="#16a34a" color="#166534" />
+                            <span>Zeiten da</span>
+                          </span>
+                        ) : s.status === 'ausstehend' ? (
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }} title="Noch keine Wunsch- & Sperrzeiten eingereicht (Stundenplan-Onboarding ausstehend)">Ausstehend</span>
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title={s.hasPreferences ? 'Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)' : 'Noch keine Wunsch- & Sperrzeiten eingereicht (Stundenplan-Onboarding ausstehend)'}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title="Stundenplan-Onboarding abgeschlossen">
                             <span style={{
                               height: '7px',
                               width: '7px',
                               borderRadius: '50%',
-                              background: s.hasPreferences ? '#34a853' : '#94a3b8',
-                              boxShadow: s.hasPreferences ? '0 0 6px rgba(52, 168, 83, 0.35)' : 'none',
+                              background: '#34a853',
+                              boxShadow: '0 0 6px rgba(52, 168, 83, 0.35)',
                               flexShrink: 0
                             }}></span>
                           </div>

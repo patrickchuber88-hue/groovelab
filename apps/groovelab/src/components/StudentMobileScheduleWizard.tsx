@@ -239,14 +239,29 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
     }
   };
 
+  const activeDays = showSaturday ? DAYS_OF_WEEK : DAYS_OF_WEEK.filter(d => d.id <= 5);
+
+  // Filter TIME_SLOTS to only show slots where at least one day is available for the teacher
+  // or has an existing user preference (or fallback to 12:00 onwards if no teacher data is available)
+  const visibleTimeSlots = TIME_SLOTS.filter(slot => {
+    const isTeacherAvailAnyDay = activeDays.some(day => isTeacherAvailableSlot(day.id, slot.start));
+    const hasPreferenceAnyDay = activeDays.some(day => editedMatrix[`${day.id}_${slot.start}`] && editedMatrix[`${day.id}_${slot.start}`] !== 'none');
+    return isTeacherAvailAnyDay || hasPreferenceAnyDay;
+  });
+
+  const displayTimeSlots = visibleTimeSlots.length > 0 ? visibleTimeSlots : TIME_SLOTS.filter(slot => {
+    const [sh, sm] = slot.start.split(':').map(Number);
+    return (sh * 60 + sm) >= 12 * 60;
+  });
+
   const handleToggleWholeDay = (dayId: number, dayName: string) => {
-    const allLocked = TIME_SLOTS.every(slot => 
+    const allLocked = displayTimeSlots.every(slot => 
       editedMatrix[`${dayId}_${slot.start}`] === 'gesperrt'
     );
 
     setEditedMatrix(prev => {
       const nextMatrix = { ...prev };
-      TIME_SLOTS.forEach(slot => {
+      displayTimeSlots.forEach(slot => {
         const slotKey = `${dayId}_${slot.start}`;
         if (allLocked) {
           nextMatrix[slotKey] = 'none';
@@ -336,7 +351,6 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
   };
 
   const activeColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
-  const activeDays = showSaturday ? DAYS_OF_WEEK : DAYS_OF_WEEK.filter(d => d.id <= 5);
 
   return (
     <div style={{
@@ -612,7 +626,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                   const isTeacherDay = Boolean(hasConfig && (hasConfig.start || (Array.isArray(hasConfig) && hasConfig.length > 0)));
                   const windowStr = getTeacherDayTimeWindow(day.id);
                   const isHovered = hoveredDayId === day.id;
-                  const isWholeDayLocked = TIME_SLOTS.every(slot => editedMatrix[`${day.id}_${slot.start}`] === 'gesperrt');
+                  const isWholeDayLocked = displayTimeSlots.every(slot => editedMatrix[`${day.id}_${slot.start}`] === 'gesperrt');
 
                   return (
                     <div 
@@ -700,7 +714,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               </div>
 
               {/* Slots Rows */}
-              {TIME_SLOTS.map(slot => (
+              {displayTimeSlots.map(slot => (
                 <div 
                   key={slot.start} 
                   ref={slot.start === '13:00' ? slot13Ref : undefined}

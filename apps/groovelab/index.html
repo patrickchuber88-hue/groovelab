@@ -25,6 +25,8 @@
         var appleTouchIcon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/apple-touch-icon.png';
         var favicon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/pwa-icon.png';
         
+        var origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+
         // Dynamische Manifest-Generierung, um Kiosk-Kopplungsparameter im iOS WebClip/PWA zu erhalten
         var manifestObj;
         if (isGrooveLab) {
@@ -32,7 +34,7 @@
           var stationId = params.get('station_id') || safeGetItem('groovelab_station_id') || '';
           var roomId = params.get('kiosk_room_id') || safeGetItem('groovelab_kiosk_room_id') || '';
           
-          var startUrl = '/?platform=groovelab';
+          var startUrl = origin + '/?platform=groovelab';
           if (token && stationId) {
             startUrl += '&kiosk_token=' + encodeURIComponent(token) + '&station_id=' + encodeURIComponent(stationId);
             if (roomId) {
@@ -45,18 +47,18 @@
             "name": "GrooveLab",
             "icons": [
               {
-                "src": "/pwa-icon-groovelab.png",
+                "src": origin + "/pwa-icon-groovelab.png",
                 "type": "image/png",
                 "sizes": "192x192"
               },
               {
-                "src": "/pwa-icon-groovelab.png",
+                "src": origin + "/pwa-icon-groovelab.png",
                 "type": "image/png",
                 "sizes": "512x512"
               }
             ],
             "start_url": startUrl,
-            "scope": "/",
+            "scope": origin + "/",
             "background_color": "#0c0f12",
             "theme_color": "#eab308",
             "display": displayMode,
@@ -68,18 +70,18 @@
             "name": "Campus-Groovelab",
             "icons": [
               {
-                "src": "/pwa-icon.png",
+                "src": origin + "/pwa-icon.png",
                 "type": "image/png",
                 "sizes": "192x192"
               },
               {
-                "src": "/pwa-icon.png",
+                "src": origin + "/pwa-icon.png",
                 "type": "image/png",
                 "sizes": "512x512"
               }
             ],
-            "start_url": "/?platform=campus",
-            "scope": "/",
+            "start_url": origin + "/?platform=campus",
+            "scope": origin + "/",
             "background_color": "#062413",
             "theme_color": "#34a853",
             "display": displayMode,

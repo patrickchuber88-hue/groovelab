@@ -3621,177 +3621,171 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
 
             {/* Desktop Tabs */}
-            {isCampusActive && (
-              <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
-                {isTeacherTools ? (
-                  <>
-                    {/* Teacher tools order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
-                    {activePlat === 'campus' && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveViewMode('loopstation')}
-                        style={{
-                          background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                          border: 'none',
-                          color: '#ffffff',
-                          padding: '6px 14px',
-                          borderRadius: '20px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Sliders size={14} />
-                        <span>Loopstation</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('practice')}
-                      style={{
-                        background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Music size={14} />
-                      <span>Übe-Begleiter</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('recordings')}
-                      style={{
-                        background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Mic size={14} />
-                      <span>Aufnahmen</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* Student order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('document')}
-                      style={{
-                        background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <BookOpen size={14} />
-                      <span>Protokoll</span>
-                    </button>
-                    {activePlat === 'campus' && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveViewMode('loopstation')}
-                        style={{
-                          background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                          border: 'none',
-                          color: '#ffffff',
-                          padding: '6px 14px',
-                          borderRadius: '20px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Sliders size={14} />
-                        <span>Loopstation</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('practice')}
-                      style={{
-                        background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Music size={14} />
-                      <span>Übe-Begleiter</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('recordings')}
-                      style={{
-                        background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Mic size={14} />
-                      <span>Aufnahmen</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
+              {isTeacherTools ? (
+                <>
+                  {/* Teacher tools order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('loopstation')}
+                    style={{
+                      background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Sliders size={14} />
+                    <span>Loopstation</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('practice')}
+                    style={{
+                      background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Music size={14} />
+                    <span>Übe-Begleiter</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('recordings')}
+                    style={{
+                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Mic size={14} />
+                    <span>Aufnahmen</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Student order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('document')}
+                    style={{
+                      background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <BookOpen size={14} />
+                    <span>Protokoll</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('loopstation')}
+                    style={{
+                      background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Sliders size={14} />
+                    <span>Loopstation</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('practice')}
+                    style={{
+                      background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Music size={14} />
+                    <span>Übe-Begleiter</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewMode('recordings')}
+                    style={{
+                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                      border: 'none',
+                      color: '#ffffff',
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Mic size={14} />
+                    <span>Aufnahmen</span>
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
@@ -3806,173 +3800,167 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
 
           {/* Bottom Row (mobile/tablet only) - Wrapped cleanly in 2 rows, no horizontal scrolling cutoffs */}
-          {isCampusActive && (
-            <div className="header-mobile-menu-row" style={{
-              display: 'none',
-              flexWrap: 'wrap',
-              gap: '8px',
-              width: '100%',
-              marginTop: '12px',
-              justifyContent: 'center',
-              alignItems: 'center'
-            }}>
-              {isTeacherTools ? (
-                <>
-                  {/* Teacher mobile order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
-                  {activePlat === 'campus' && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('loopstation')}
-                      style={{
-                        background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Sliders size={12} />
-                      <span>Loopstation</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setActiveViewMode('practice')}
-                    style={{
-                      background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Music size={12} />
-                    <span>Übe-Begleiter</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveViewMode('recordings')}
-                    style={{
-                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Mic size={12} />
-                    <span>Aufnahmen</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Student mobile order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveViewMode('document')}
-                    style={{
-                      background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <BookOpen size={12} />
-                    <span>Protokoll</span>
-                  </button>
-                  {activePlat === 'campus' && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveViewMode('loopstation')}
-                      style={{
-                        background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Sliders size={12} />
-                      <span>Loopstation</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setActiveViewMode('practice')}
-                    style={{
-                      background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Music size={12} />
-                    <span>Übe-Begleiter</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveViewMode('recordings')}
-                    style={{
-                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                      border: 'none',
-                      color: '#ffffff',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Mic size={12} />
-                    <span>Aufnahmen</span>
-                  </button>
-                </>
-              )}
-              {renderSkillRadarButton(true)}
-              {renderArchivButton(true)}
-            </div>
-          )}
+          <div className="header-mobile-menu-row" style={{
+            display: 'none',
+            flexWrap: 'wrap',
+            gap: '8px',
+            width: '100%',
+            marginTop: '12px',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            {isTeacherTools ? (
+              <>
+                {/* Teacher mobile order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('loopstation')}
+                  style={{
+                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Sliders size={12} />
+                  <span>Loopstation</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('practice')}
+                  style={{
+                    background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Music size={12} />
+                  <span>Übe-Begleiter</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('recordings')}
+                  style={{
+                    background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Mic size={12} />
+                  <span>Aufnahmen</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Student mobile order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('document')}
+                  style={{
+                    background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <BookOpen size={12} />
+                  <span>Protokoll</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('loopstation')}
+                  style={{
+                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Sliders size={12} />
+                  <span>Loopstation</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('practice')}
+                  style={{
+                    background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Music size={12} />
+                  <span>Übe-Begleiter</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('recordings')}
+                  style={{
+                    background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Mic size={12} />
+                  <span>Aufnahmen</span>
+                </button>
+              </>
+            )}
+            {renderSkillRadarButton(true)}
+            {renderArchivButton(true)}
+          </div>
         </div>
 
         {/* Modal Content - Side-by-side Columns or Logbook */}
