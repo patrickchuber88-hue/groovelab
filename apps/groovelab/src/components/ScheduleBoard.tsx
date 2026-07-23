@@ -1013,7 +1013,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               dayOfWeek: p.dayOfWeek,
               startAnchor: p.startAnchor,
               roomId: daySched ? daySched.room_id : p.roomId,
-              students: p.students || []
+              students: (p.students || []).map((s: any) => {
+                const dbStudent = loadedStudents.find(ls => ls.id === s.id);
+                if (dbStudent && !s.isBreak) {
+                  return {
+                    ...s,
+                    duration: dbStudent.duration,
+                    first_name: dbStudent.first_name,
+                    last_name: dbStudent.last_name,
+                    instrument: dbStudent.instrument
+                  };
+                }
+                return s;
+              })
             };
           });
           
@@ -1658,39 +1670,46 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         return totalMinutes;
       };
 
-      const constrainedStudents = unassignedStudents.filter(s => (prefsByStudentId[s.id] || []).length > 0);
-      const flexibleStudents = unassignedStudents.filter(s => (prefsByStudentId[s.id] || []).length === 0);
+      const flexibleStudents = unassignedStudents.filter(s => {
+        const hasPrefs = prefsByStudentId[s.id] && prefsByStudentId[s.id].length > 0;
+        const hasSib = !!s.sibling_group_id;
+        return !hasPrefs && !hasSib;
+      });
 
-      // Phase 1: Vorverarbeitung & Scoring (Das Ranking)
-      constrainedStudents.sort((a, b) => {
-        const aSiblingBonus = a.sibling_group_id ? 50000 : 0;
-        const bSiblingBonus = b.sibling_group_id ? 50000 : 0;
-        
-        const aPrefs = prefsByStudentId[a.id] || [];
-        const bPrefs = prefsByStudentId[b.id] || [];
-        
-        const aBlockedMinutes = calculateBlockedDuration(aPrefs);
-        const bBlockedMinutes = calculateBlockedDuration(bPrefs);
-        const aWunschMinutes = calculateWunschDuration(aPrefs);
-        const bWunschMinutes = calculateWunschDuration(bPrefs);
+      const wunschStudents = unassignedStudents.filter(s => {
+        const prefs = prefsByStudentId[s.id] || [];
+        return prefs.some(p => p.preference_type === 'wunsch');
+      });
 
-        const aHasWunsch = aPrefs.some(p => p.preference_type === 'wunsch');
-        const bHasWunsch = bPrefs.some(p => p.preference_type === 'wunsch');
+      const sperrzeitStudents = unassignedStudents.filter(s => {
+        const prefs = prefsByStudentId[s.id] || [];
+        const hasWunsch = prefs.some(p => p.preference_type === 'wunsch');
+        const hasPrefs = prefs.length > 0;
+        const hasSib = !!s.sibling_group_id;
+        return !hasWunsch && (hasPrefs || hasSib);
+      });
 
-        const aWunschScore = aHasWunsch ? (10000 - aWunschMinutes) * 10 : 0;
-        const bWunschScore = bHasWunsch ? (10000 - bWunschMinutes) * 10 : 0;
+      // Sort Wunsch students (fewer wunsch minutes = harder to place = placed first)
+      wunschStudents.sort((a, b) => {
+        const aWunsch = calculateWunschDuration(prefsByStudentId[a.id] || []);
+        const bWunsch = calculateWunschDuration(prefsByStudentId[b.id] || []);
+        if (aWunsch !== bWunsch) return aWunsch - bWunsch;
+        return a.duration - b.duration;
+      });
 
-        const aConstraintScore = (aBlockedMinutes / 60) * 10000 + aWunschScore;
-        const bConstraintScore = (bBlockedMinutes / 60) * 10000 + bWunschScore;
+      // Sort Sperrzeit students (more blocked minutes = harder to place = placed first)
+      const getSperrzeitScore = (s: any) => {
+        const sSiblingBonus = s.sibling_group_id ? 50000 : 0;
+        const sPrefs = prefsByStudentId[s.id] || [];
+        const sBlockedMinutes = calculateBlockedDuration(sPrefs);
+        const sConstraintScore = (sBlockedMinutes / 60) * 10000;
+        return sSiblingBonus + sConstraintScore + (s.duration * 100);
+      };
 
-        const aTotalScore = aSiblingBonus + aConstraintScore + (a.duration * 100);
-        const bTotalScore = bSiblingBonus + bConstraintScore + (b.duration * 100);
-
-        if (aTotalScore !== bTotalScore) return bTotalScore - aTotalScore;
-
-        const aTime = aPrefs[0]?.created_at ? new Date(aPrefs[0].created_at).getTime() : 0;
-        const bTime = bPrefs[0]?.created_at ? new Date(bPrefs[0].created_at).getTime() : 0;
-        if (aTime !== bTime) return aTime - bTime;
+      sperrzeitStudents.sort((a, b) => {
+        const aScore = getSperrzeitScore(a);
+        const bScore = getSperrzeitScore(b);
+        if (aScore !== bScore) return bScore - aScore;
         return a.first_name.localeCompare(b.first_name);
       });
       
@@ -1705,13 +1724,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
         const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
 
-        const fuzzedConstrainedStudents = [...constrainedStudents];
+        const fuzzedWunschStudents = [...wunschStudents];
         if (iteration > 0) {
-          for (let i = 0; i < fuzzedConstrainedStudents.length - 1; i++) {
+          for (let i = 0; i < fuzzedWunschStudents.length - 1; i++) {
             if (Math.random() < 0.2) {
-              const temp = fuzzedConstrainedStudents[i];
-              fuzzedConstrainedStudents[i] = fuzzedConstrainedStudents[i+1];
-              fuzzedConstrainedStudents[i+1] = temp;
+              const temp = fuzzedWunschStudents[i];
+              fuzzedWunschStudents[i] = fuzzedWunschStudents[i+1];
+              fuzzedWunschStudents[i+1] = temp;
+            }
+          }
+        }
+
+        const fuzzedSperrzeitStudents = [...sperrzeitStudents];
+        if (iteration > 0) {
+          for (let i = 0; i < fuzzedSperrzeitStudents.length - 1; i++) {
+            if (Math.random() < 0.2) {
+              const temp = fuzzedSperrzeitStudents[i];
+              fuzzedSperrzeitStudents[i] = fuzzedSperrzeitStudents[i+1];
+              fuzzedSperrzeitStudents[i+1] = temp;
             }
           }
         }
@@ -2055,8 +2085,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
       };
 
-      // Run Phase 2 (Constrained)
-      assignStudents(fuzzedConstrainedStudents, false);
+      // Run Phase 1 (V.I.P. Wunschzeiten)
+      assignStudents(fuzzedWunschStudents, false);
+      // Run Phase 2 (Sperrzeiten & Siblings)
+      assignStudents(fuzzedSperrzeitStudents, false);
       // Run Phase 3 (Flexible)
       assignStudents(fuzzedFlexibleStudents, true);
 
