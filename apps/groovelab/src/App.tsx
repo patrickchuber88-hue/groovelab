@@ -7080,17 +7080,22 @@ function App() {
   const urlParams = new URLSearchParams(location.search);
   const queryQrToken = urlParams.get('token') || urlParams.get('qr_token');
 
-  if (!qrPathMatch && !queryQrToken && location.pathname === '/' && typeof window !== 'undefined') {
-    sessionStorage.removeItem('groovelab_qr_token');
-    localStorage.removeItem('groovelab_last_qr_token');
-  }
-
   const sessionQrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
+  const localLastQrToken = typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_qr_token') : null;
+
   const effectiveQrToken = qrPathMatch 
     ? qrPathMatch[1] 
-    : (queryQrToken ? queryQrToken : (location.pathname.startsWith('/qr/') && sessionQrToken ? sessionQrToken : null));
+    : (queryQrToken || sessionQrToken || (location.pathname.startsWith('/qr/') ? localLastQrToken : null));
 
   if (effectiveQrToken) {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('groovelab_qr_token', effectiveQrToken);
+      localStorage.setItem('groovelab_last_qr_token', effectiveQrToken);
+      if (!location.pathname.startsWith('/qr/')) {
+        window.history.replaceState(null, '', `/qr/${effectiveQrToken}`);
+      }
+    }
+
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
     const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
 
