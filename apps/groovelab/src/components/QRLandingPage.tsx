@@ -364,17 +364,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{
-            width: '46px',
-            height: '46px',
+            width: '48px',
+            height: '48px',
             borderRadius: '12px',
-            background: 'linear-gradient(135deg, #34a853 0%, #166534 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            overflow: 'hidden',
             flexShrink: 0,
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.4)'
+            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
           }}>
-            <Smartphone size={24} color="#ffffff" />
+            <img src="/campus_pwa_icon_3d.png" alt="Campus App" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
