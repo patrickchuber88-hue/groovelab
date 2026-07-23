@@ -330,11 +330,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       <div style={{
         ...styles.card,
         padding: '18px 20px',
-        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        background: 'linear-gradient(135deg, #052e16 0%, #0f172a 100%)',
+        border: '1px solid rgba(52, 168, 83, 0.35)',
         color: '#ffffff',
         position: 'relative',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+        boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)',
         marginTop: '12px'
       }}>
         {/* Dismiss Button */}
@@ -367,12 +367,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             width: '46px',
             height: '46px',
             borderRadius: '12px',
-            background: 'linear-gradient(135deg, #ea4335 0%, #eab308 50%, #34a853 100%)',
+            background: 'linear-gradient(135deg, #34a853 0%, #166534 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.4)'
           }}>
             <Smartphone size={24} color="#ffffff" />
           </div>
