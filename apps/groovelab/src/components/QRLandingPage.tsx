@@ -5597,15 +5597,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         alignItems: 'center',
         justifyContent: 'center',
         boxSizing: 'border-box',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
+        fontFamily: "'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
         transition: 'background 0.5s ease'
       }}>
-        {/* Dynamic Full Smartphone Responsive CSS */}
+        {/* Dynamic Full Smartphone Responsive CSS & Typography */}
         <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Urbanist:wght@500;600;700;800;900&display=swap');
+
+          * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+          }
+
           .qr-pass-card {
             width: 100%;
             height: 100%;
-            max-width: 430px;
+            max-width: 440px;
             max-height: 880px;
             border-radius: 32px;
             background: #ffffff;
@@ -5616,14 +5624,30 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             position: relative;
             overflow: hidden;
             border: 1px solid rgba(0, 0, 0, 0.06);
+            font-family: 'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, sans-serif;
           }
+
+          h1, h2, h3, h4 {
+            font-family: 'Urbanist', 'Outfit', sans-serif !important;
+            letter-spacing: -0.02em;
+          }
+
           @media (max-width: 640px) {
             .qr-pass-card {
-              max-width: calc(100vw - 20px) !important;
-              max-height: calc(100dvh - 20px) !important;
-              height: calc(100dvh - 20px) !important;
-              border-radius: 28px !important;
-              margin: 10px auto !important;
+              max-width: 100vw !important;
+              max-height: 100dvh !important;
+              height: 100dvh !important;
+              border-radius: 0px !important;
+              margin: 0 !important;
+              border: none !important;
+            }
+            button, [role="button"] {
+              -webkit-tap-highlight-color: transparent;
+              touch-action: manipulation;
+            }
+            button:active {
+              transform: scale(0.97);
+              transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
             }
           }
         `}</style>
@@ -7388,7 +7412,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    fontFamily: "'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', sans-serif",
     padding: '20px',
     overflowY: 'auto' as const,
   },
