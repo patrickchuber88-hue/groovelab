@@ -3426,7 +3426,123 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '16px' }}>
+        {/* Schnellwahl-Vorlagen & Quick-Actions Bar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>⚡ 1-Klick Schnell-Auswahl:</span>
+            {Object.values(onboardingAvailability).some(c => c.checked) && (
+              <button
+                type="button"
+                onClick={() => setOnboardingAvailability({ 1:{checked:false,start:'',end:''}, 2:{checked:false,start:'',end:''}, 3:{checked:false,start:'',end:''}, 4:{checked:false,start:'',end:''}, 5:{checked:false,start:'',end:''}, 6:{checked:false,start:'',end:''}, 7:{checked:false,start:'',end:''} })}
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                🧹 Alle abwählen
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setOnboardingAvailability({
+                  1: { checked: true, start: '13:00', end: '19:00' },
+                  2: { checked: true, start: '13:00', end: '19:00' },
+                  3: { checked: true, start: '13:00', end: '19:00' },
+                  4: { checked: true, start: '13:00', end: '19:00' },
+                  5: { checked: true, start: '13:00', end: '19:00' },
+                  6: { checked: false, start: '', end: '' },
+                  7: { checked: false, start: '', end: '' }
+                });
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: '1px solid #bbf7d0',
+                background: '#f0fdf4',
+                color: '#15803d',
+                fontWeight: 800,
+                fontSize: '0.76rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.15s'
+              }}
+            >
+              📅 Mo – Fr (13:00 – 19:00)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOnboardingAvailability({
+                  1: { checked: true, start: '14:00', end: '18:00' },
+                  2: { checked: true, start: '14:00', end: '18:00' },
+                  3: { checked: true, start: '14:00', end: '18:00' },
+                  4: { checked: true, start: '14:00', end: '18:00' },
+                  5: { checked: true, start: '14:00', end: '18:00' },
+                  6: { checked: false, start: '', end: '' },
+                  7: { checked: false, start: '', end: '' }
+                });
+              }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: '1px solid #e0f2fe',
+                background: '#f0f9ff',
+                color: '#0369a1',
+                fontWeight: 800,
+                fontSize: '0.76rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.15s'
+              }}
+            >
+              ☀️ Nachmittag (14:00 – 18:00)
+            </button>
+
+            {Object.values(onboardingAvailability).filter(c => c.checked).length >= 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const firstActive = Object.values(onboardingAvailability).find(c => c.checked && c.start && c.end);
+                  if (firstActive) {
+                    setOnboardingAvailability(prev => {
+                      const next = { ...prev };
+                      Object.keys(next).forEach((key: any) => {
+                        if (next[key].checked) {
+                          next[key].start = firstActive.start;
+                          next[key].end = firstActive.end;
+                        }
+                      });
+                      return next;
+                    });
+                  }
+                }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #fed7aa',
+                  background: '#fff7ed',
+                  color: '#c2410c',
+                  fontWeight: 800,
+                  fontSize: '0.76rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="Überträgt die eingestellte Zeit des ersten Tages auf alle angehakten Tage"
+              >
+                📋 Zeiten auf alle übertragen
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
           {DAYS_OF_WEEK.map(day => {
             const cfg = onboardingAvailability[day.value];
             return (
@@ -3446,15 +3562,26 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     type="checkbox"
                     checked={cfg.checked}
                     onChange={(e) => {
-                      setOnboardingAvailability(prev => ({
-                        ...prev,
-                        [day.value]: { ...prev[day.value], checked: e.target.checked }
-                      }));
+                      const isChecked = e.target.checked;
+                      setOnboardingAvailability(prev => {
+                        // Find standard default time from first active day or default to 13:00-19:00
+                        const firstActive = Object.values(prev).find(c => c.checked && c.start && c.end);
+                        const defaultStart = firstActive?.start || '13:00';
+                        const defaultEnd = firstActive?.end || '19:00';
+                        return {
+                          ...prev,
+                          [day.value]: {
+                            checked: isChecked,
+                            start: isChecked ? (prev[day.value].start && prev[day.value].start !== prev[day.value].end ? prev[day.value].start : defaultStart) : prev[day.value].start,
+                            end: isChecked ? (prev[day.value].end && prev[day.value].start !== prev[day.value].end ? prev[day.value].end : defaultEnd) : prev[day.value].end
+                          }
+                        };
+                      });
                     }}
                     style={{
                       accentColor: '#34a853',
-                      width: '15px',
-                      height: '15px',
+                      width: '16px',
+                      height: '16px',
                       cursor: 'pointer'
                     }}
                   />
@@ -3465,9 +3592,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
-                      <input
-                        type="time"
-                        value={cfg.start || ''}
+                      <select
+                        value={cfg.start || '13:00'}
                         onChange={(e) => {
                           setOnboardingAvailability(prev => ({
                             ...prev,
@@ -3475,7 +3601,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '2px 6px',
+                          padding: '3px 8px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
                           fontSize: '0.78rem',
@@ -3485,14 +3611,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           cursor: 'pointer',
                           outline: 'none'
                         }}
-                      />
+                      >
+                        {timeOptions.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
-                      <input
-                        type="time"
-                        value={cfg.end || ''}
+                      <select
+                        value={cfg.end || '19:00'}
                         onChange={(e) => {
                           setOnboardingAvailability(prev => ({
                             ...prev,
@@ -3500,7 +3629,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '2px 6px',
+                          padding: '3px 8px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
                           fontSize: '0.78rem',
@@ -3510,7 +3639,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           cursor: 'pointer',
                           outline: 'none'
                         }}
-                      />
+                      >
+                        {timeOptions.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 )}
