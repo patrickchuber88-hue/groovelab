@@ -3500,36 +3500,40 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       // Merge pending students into student list (avoid duplicates)
       if (pendingStudents) {
         pendingStudents.forEach(ps => {
+          const userMatch = allUsers?.find(u => u.id === ps.id || (u.first_name && ps.first_name && u.first_name.toLowerCase().trim() === ps.first_name.toLowerCase().trim()));
           const exists = studentsList.some(s => s.id === ps.id || (s.first_name && s.first_name === ps.first_name));
           if (!exists) {
-          const fName = ps.first_name || 'Ausstehendes';
-          const lName = ps.last_name || 'Onboarding';
-          const fullName = `${fName} ${lName}`;
-          
-          map[ps.id] = fullName;
-          userInstrumentMap[ps.id] = ps.instrument || '';
+            const fName = ps.first_name || 'Ausstehendes';
+            const lName = ps.last_name || 'Onboarding';
+            const fullName = `${fName} ${lName}`;
+            
+            map[ps.id] = fullName;
+            userInstrumentMap[ps.id] = ps.instrument || '';
 
-          studentsList.push({
-            id: ps.id,
-            school_id: ps.school_id,
-            teacher_id: ps.teacher_id,
-            role: 'student',
-            first_name: fName,
-            last_name: lName,
-            email: '',
-            instrument: ps.instrument || 'Nicht festgelegt',
-            is_active: false,
-            is_campus_active: false,
-            is_groovelab_active: false,
-            status: 'inactive',
-            isPendingOnboarding: true,
-            day_of_birth: ps.day_of_birth || null,
-            ausweis_nummer: 'Ausstehend (Onboarding)',
-            created_at: ps.created_at || new Date().toISOString()
-          });
-        }
-      });
-    }
+            const isCampusAct = userMatch ? !!userMatch.is_campus_active : ((ps as any).is_campus_active ?? true);
+            const isGrooveAct = userMatch ? !!userMatch.is_groovelab_active : ((ps as any).is_groovelab_active ?? false);
+
+            studentsList.push({
+              id: ps.id,
+              school_id: ps.school_id,
+              teacher_id: ps.teacher_id,
+              role: 'student',
+              first_name: fName,
+              last_name: lName,
+              email: '',
+              instrument: ps.instrument || 'Nicht festgelegt',
+              is_active: false,
+              is_campus_active: isCampusAct,
+              is_groovelab_active: isGrooveAct,
+              status: 'inactive',
+              isPendingOnboarding: true,
+              day_of_birth: ps.day_of_birth || null,
+              ausweis_nummer: 'Ausstehend (Onboarding)',
+              created_at: ps.created_at || new Date().toISOString()
+            });
+          }
+        });
+      }
 
       setUserMap(map);
       setCoaches(coachesList);
@@ -8654,6 +8658,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             .in('id', selectedStudentIds);
 
                           await supabase
+                            .from('students')
+                            .update({ is_campus_active: activate })
+                            .in('id', selectedStudentIds);
+
+                          await supabase
                             .from('pending_students')
                             .update({ is_campus_active: activate })
                             .in('id', selectedStudentIds);
@@ -8709,6 +8718,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         try {
                           await supabase
                             .from('users')
+                            .update({ is_groovelab_active: activate })
+                            .in('id', selectedStudentIds);
+
+                          await supabase
+                            .from('students')
                             .update({ is_groovelab_active: activate })
                             .in('id', selectedStudentIds);
 
@@ -8991,18 +9005,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             }
                             try {
                               const newVal = !student.is_campus_active;
-                              const { error } = await supabase
-                                .from('users')
-                                .update({ is_campus_active: newVal })
-                                .eq('id', student.id);
-                              if (error) throw error;
-
-                              if (student.isPendingOnboarding) {
-                                await supabase
-                                  .from('pending_students')
-                                  .update({ is_campus_active: newVal })
-                                  .eq('id', student.id);
-                              }
+                              await supabase.from('users').update({ is_campus_active: newVal }).eq('id', student.id);
+                              await supabase.from('students').update({ is_campus_active: newVal }).eq('id', student.id);
+                              await supabase.from('pending_students').update({ is_campus_active: newVal }).eq('id', student.id);
                               fetchDashboardData();
                             } catch (err: any) {
                               console.error("Fehler beim Umschalten des Campus-Moduls:", err);
@@ -9044,18 +9049,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             }
                             try {
                               const newVal = !student.is_groovelab_active;
-                              const { error } = await supabase
-                                .from('users')
-                                .update({ is_groovelab_active: newVal })
-                                .eq('id', student.id);
-                              if (error) throw error;
-
-                              if (student.isPendingOnboarding) {
-                                await supabase
-                                  .from('pending_students')
-                                  .update({ is_groovelab_active: newVal })
-                                  .eq('id', student.id);
-                              }
+                              await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
+                              await supabase.from('students').update({ is_groovelab_active: newVal }).eq('id', student.id);
+                              await supabase.from('pending_students').update({ is_groovelab_active: newVal }).eq('id', student.id);
                               fetchDashboardData();
                             } catch (err: any) {
                               console.error("Fehler beim Umschalten des GrooveLab-Moduls:", err);
