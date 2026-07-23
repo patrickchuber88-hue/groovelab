@@ -3169,8 +3169,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           .eq('school_id', schoolId),
         supabase
           .from('pending_students_decrypted')
-          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-          .eq('school_id', schoolId),
+          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth'),
         supabase
           .from('activation_days')
           .select('student_id, day_of_birth'),
@@ -3414,8 +3413,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         }
 
         if (u.role === 'student') {
-          const pendingMatch = pendingStudents?.find(p => p.id === u.id || (p.first_name && p.first_name === u.first_name));
-          const resolvedDay = activationDaysMap[u.id] || (u as any).day_of_birth || pendingMatch?.day_of_birth || null;
+          const pendingMatch = pendingStudents?.find(p => p.id === u.id || (p.first_name && u.first_name && p.first_name.toLowerCase().trim() === u.first_name.toLowerCase().trim()));
+          const resolvedDay = activationDaysMap[u.id] || (u as any).day_of_birth || pendingMatch?.day_of_birth || (pendingMatch ? activationDaysMap[pendingMatch.id] : null) || 1;
           const resolvedStatus = statusMap[u.id] || (u as any).status || pendingMatch?.status || (u.is_campus_active || u.is_groovelab_active ? 'aktiv' : 'offen');
           const isPending = pendingMatch ? (resolvedStatus === 'ausstehend' || resolvedStatus === 'offen' || (!u.is_campus_active && !u.is_groovelab_active)) : (resolvedStatus === 'ausstehend' || resolvedStatus === 'offen');
 
@@ -9115,11 +9114,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           className="hover-scale-mini"
                         >
                           <select
-                            value={student.day_of_birth || ''}
+                            value={student.day_of_birth || 1}
                             onChange={async (e) => {
-                              const val = e.target.value;
-                              if (!val) return;
-                              const newDay = parseInt(val, 10);
+                              const newDay = parseInt(e.target.value, 10);
                               try {
                                 const { data: existing } = await supabase
                                   .from('activation_days')
@@ -9156,7 +9153,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             style={{
                               fontSize: '0.74rem',
                               fontWeight: 800,
-                              color: student.day_of_birth ? '#1d1d1f' : '#b45309',
+                              color: '#1d1d1f',
                               background: 'transparent',
                               border: 'none',
                               outline: 'none',
@@ -9167,7 +9164,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               MozAppearance: 'none'
                             }}
                           >
-                            {!student.day_of_birth && <option value="">Tag wählen</option>}
                             {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                               <option key={d} value={d}>
                                 Tag {d}
