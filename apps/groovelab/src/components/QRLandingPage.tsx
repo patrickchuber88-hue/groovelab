@@ -726,15 +726,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        const isInactive = !userData.is_campus_active && !userData.is_groovelab_active;
-        const isLocked = isInactive && userData.is_pin_activated;
 
-        if (isLocked) {
-          sessionStorage.removeItem('groovelab_qr_token');
-          setErrorMsg('Dieses Profil wurde nach 3 PIN-Fehlversuchen aus Sicherheitsgründen gesperrt. Bitte wende dich an deine Musikschule.');
-          setPageState('error');
-          return;
-        }
 
         setProfile({
           id: userData.id,
