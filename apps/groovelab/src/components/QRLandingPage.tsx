@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
 
@@ -273,6 +273,175 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     setTimeout(() => {
       setToast(null);
     }, 4000);
+  };
+
+  // PWA Installation states
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isInstallDismissed, setIsInstallDismissed] = useState<boolean>(() => {
+    return localStorage.getItem('groovelab_pwa_prompt_dismissed') === 'true';
+  });
+  const [isStandaloneApp, setIsStandaloneApp] = useState<boolean>(() => {
+    return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+  });
+  const [showIOSInstallGuide, setShowIOSInstallGuide] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
+    const matchStandalone = window.matchMedia('(display-mode: standalone)');
+    const handleStandaloneChange = (e: MediaQueryListEvent) => {
+      setIsStandaloneApp(e.matches);
+    };
+    matchStandalone.addEventListener?.('change', handleStandaloneChange);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      matchStandalone.removeEventListener?.('change', handleStandaloneChange);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        setDeferredInstallPrompt(null);
+      }
+    } else {
+      setShowIOSInstallGuide(prev => !prev);
+    }
+  };
+
+  const handleDismissInstall = () => {
+    setIsInstallDismissed(true);
+    localStorage.setItem('groovelab_pwa_prompt_dismissed', 'true');
+  };
+
+  const renderPWAInstallCard = () => {
+    if (isStandaloneApp || isInstallDismissed) return null;
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    return (
+      <div style={{
+        ...styles.card,
+        padding: '18px 20px',
+        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        color: '#ffffff',
+        position: 'relative',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+        marginTop: '12px'
+      }}>
+        {/* Dismiss Button */}
+        <button
+          type="button"
+          onClick={handleDismissInstall}
+          aria-label="Schließen"
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            border: 'none',
+            color: '#94a3b8',
+            borderRadius: '50%',
+            width: '26px',
+            height: '26px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '0.85rem'
+          }}
+        >
+          <X size={14} color="#94a3b8" />
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            width: '46px',
+            height: '46px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #ea4335 0%, #eab308 50%, #34a853 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}>
+            <Smartphone size={24} color="#ffffff" />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
+            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
+              Campus-Groovelab App installieren
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500, lineHeight: '1.3' }}>
+              Schneller Zugriff auf Hausaufgaben &amp; Musikpass direkt vom Startbildschirm.
+            </p>
+          </div>
+        </div>
+
+        {/* Install Action Button */}
+        <button
+          type="button"
+          onClick={handleInstallClick}
+          style={{
+            marginTop: '14px',
+            width: '100%',
+            padding: '10px 16px',
+            borderRadius: '12px',
+            background: '#34a853',
+            color: '#ffffff',
+            border: 'none',
+            fontWeight: 800,
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)'
+          }}
+        >
+          <Download size={16} />
+          {deferredInstallPrompt ? 'Jetzt als App installieren' : (isIOS ? 'Anleitung: Zum Home-Bildschirm' : 'App auf Startbildschirm hinzufügen')}
+        </button>
+
+        {/* iOS Step-by-Step Guide */}
+        {showIOSInstallGuide && (
+          <div style={{
+            marginTop: '12px',
+            background: 'rgba(255, 255, 255, 0.07)',
+            borderRadius: '10px',
+            padding: '12px',
+            fontSize: '0.78rem',
+            color: '#cbd5e1',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <div style={{ fontWeight: 800, color: '#ffffff', marginBottom: '2px' }}>
+              So installierst du die App auf iOS/Safari:
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: '#334155', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>1</span>
+              <span>Tippe in Safari unten auf das <strong>Teilen-Symbol ↗️</strong></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: '#334155', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>2</span>
+              <span>Wähle <strong>'Zum Home-Bildschirm' ➕</strong></span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleSaveInitialPin = async () => {
@@ -4759,6 +4928,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </button>
             )}
 
+            {/* PWA Install Prompt Card */}
+            {renderPWAInstallCard()}
+
             {/* Activation callout or Notice */}
             {activationError && (
               <div style={{ padding: '12px 16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '16px', color: '#991b1b', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -6643,6 +6815,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </div>
                 )}
                 {!timerRunning && renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
+                {!timerRunning && renderPWAInstallCard()}
                 {profile.is_campus_active ? <>
                   {!timerRunning && renderSegmentedControl()}
                   {activeTab === 'action' ? (
