@@ -3847,7 +3847,42 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </div>
       );
     }
-    return null;
+    return (
+      <div style={{
+        ...styles.card,
+        padding: '16px',
+        gap: '12px',
+        border: '1px dashed #cbd5e1',
+        background: '#f8fafc'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+            Nächster Unterrichtstermin
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Calendar size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>
+              Terminierung ausstehend
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.88rem', fontWeight: 650, color: '#64748b' }}>
+              Uhrzeit wird vom Sekretariat zugeteilt
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <MapPin size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.88rem', fontWeight: 650, color: '#64748b' }}>
+              Raumzuweisung ausstehend
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderSegmentedControl = () => {
