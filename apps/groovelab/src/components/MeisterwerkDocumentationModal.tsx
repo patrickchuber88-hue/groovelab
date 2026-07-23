@@ -1030,7 +1030,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const getCurrentTeacherId = async (): Promise<string> => {
     if (teacherId) return teacherId;
-    if (student.teacher_id) return student.teacher_id;
+    if ((student as any).teacher_id) return (student as any).teacher_id;
     try {
       if (student.id && student.id !== 'teacher-self') {
         const { data: stUser } = await supabase.from('users').select('teacher_id').eq('id', student.id).maybeSingle();
