@@ -8854,7 +8854,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       </div>
 
                       {/* Micro status toggles */}
-                      <div style={{ flex: '1.2', display: 'flex', gap: '4px', minWidth: '140px' }}>
+                      <div style={{ flex: '1.4', display: 'flex', gap: '6px', minWidth: '190px', flexShrink: 0 }}>
                         {/* Campus Toggle */}
                         <button
                           onClick={async () => {
@@ -8863,54 +8863,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht. Bitte aktiviere das Campus-Modul zuerst in den Admin-Einstellungen unter Abrechnung.");
                               return;
                             }
-                            if (student.isPendingOnboarding) {
-                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Überweisung (Jahresbetrag) als Zahlungsart hinterlegt.`)) {
-                                return;
-                              }
-                              try {
-                                // 1. Onboarding abschließen (in users Tabelle verschieben)
-                                let completeError: any = null;
-                                const rpcRes1 = await supabase.rpc('complete_onboarding', {
-                                  input_student_id: student.id,
-                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`,
-                                  input_pin: ''
-                                });
-                                completeError = rpcRes1.error;
-                                if (completeError) {
-                                  const rpcRes2 = await supabase.rpc('complete_onboarding', {
-                                    input_student_id: student.id,
-                                    input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
-                                  });
-                                  completeError = rpcRes2.error;
-                                }
-                                if (completeError) throw completeError;
-
-                                // 2. Aktivieren und Zahlungsart festlegen
-                                const { error: updateError } = await supabase
-                                  .from('users')
-                                  .update({ 
-                                    is_campus_active: true, 
-                                    is_groovelab_active: false,
-                                    student_billing_payment_method: 'cash' 
-                                  })
-                                  .eq('id', student.id);
-                                if (updateError) throw updateError;
-
-                                fetchDashboardData();
-                              } catch (err: any) {
-                                console.error("Error manually onboarding student:", err);
-                                alert("Fehler bei der manuellen Aktivierung: " + err.message);
-                              }
+                            const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
+                            const actionWord = student.is_campus_active ? 'deaktivieren' : 'aktivieren';
+                            if (!window.confirm(`Möchtest du das Campus-Modul für ${sName} wirklich ${actionWord}?`)) {
                               return;
                             }
+                            try {
+                              const newVal = !student.is_campus_active;
+                              const { error } = await supabase
+                                .from('users')
+                                .update({ is_campus_active: newVal })
+                                .eq('id', student.id);
+                              if (error) throw error;
 
-                            const newVal = !student.is_campus_active;
-                            const { error } = await supabase
-                              .from('users')
-                              .update({ is_campus_active: newVal })
-                              .eq('id', student.id);
-                            if (error) alert(error.message);
-                            else fetchDashboardData();
+                              if (student.isPendingOnboarding) {
+                                await supabase
+                                  .from('pending_students')
+                                  .update({ is_campus_active: newVal })
+                                  .eq('id', student.id);
+                              }
+                              fetchDashboardData();
+                            } catch (err: any) {
+                              console.error("Fehler beim Umschalten des Campus-Moduls:", err);
+                              alert("Fehler beim Umschalten: " + err.message);
+                            }
                           }}
                           style={{
                             flex: 1,
@@ -8932,7 +8908,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           Campus
                         </button>
 
-                        {/* Groove Toggle */}
+                        {/* GrooveLab Toggle */}
                         <button
                           onClick={async () => {
                             const isGrooveAvailable = !isBillingBooked || hasGroovelabSub;
@@ -8940,54 +8916,30 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht. Bitte aktiviere das GrooveLab-Modul zuerst in den Admin-Einstellungen unter Abrechnung.");
                               return;
                             }
-                            if (student.isPendingOnboarding) {
-                              if (!window.confirm(`Möchtest du diesen ausstehenden Schüler manuell aktivieren? Dadurch wird das Eltern-Onboarding übersprungen und standardmäßig Überweisung (Jahresbetrag) hinterlegt.`)) {
-                                return;
-                              }
-                              try {
-                                // 1. Onboarding abschließen (in users Tabelle verschieben)
-                                let completeError: any = null;
-                                const rpcRes1 = await supabase.rpc('complete_onboarding', {
-                                  input_student_id: student.id,
-                                  input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`,
-                                  input_pin: ''
-                                });
-                                completeError = rpcRes1.error;
-                                if (completeError) {
-                                  const rpcRes2 = await supabase.rpc('complete_onboarding', {
-                                    input_student_id: student.id,
-                                    input_email: `manuell_${student.id.slice(0, 8)}@campus-groovelab.de`
-                                  });
-                                  completeError = rpcRes2.error;
-                                }
-                                if (completeError) throw completeError;
-
-                                // 2. Aktivieren und Zahlungsart festlegen
-                                const { error: updateError } = await supabase
-                                  .from('users')
-                                  .update({ 
-                                    is_groovelab_active: true, 
-                                    is_campus_active: false,
-                                    student_billing_payment_method: 'cash' 
-                                  })
-                                  .eq('id', student.id);
-                                if (updateError) throw updateError;
-
-                                fetchDashboardData();
-                              } catch (err: any) {
-                                console.error("Error manually onboarding student:", err);
-                                alert("Fehler bei der manuellen Aktivierung: " + err.message);
-                              }
+                            const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
+                            const actionWord = student.is_groovelab_active ? 'deaktivieren' : 'aktivieren';
+                            if (!window.confirm(`Möchtest du das GrooveLab-Modul für ${sName} wirklich ${actionWord}?`)) {
                               return;
                             }
+                            try {
+                              const newVal = !student.is_groovelab_active;
+                              const { error } = await supabase
+                                .from('users')
+                                .update({ is_groovelab_active: newVal })
+                                .eq('id', student.id);
+                              if (error) throw error;
 
-                            const newVal = !student.is_groovelab_active;
-                            const { error } = await supabase
-                              .from('users')
-                              .update({ is_groovelab_active: newVal })
-                              .eq('id', student.id);
-                            if (error) alert(error.message);
-                            else fetchDashboardData();
+                              if (student.isPendingOnboarding) {
+                                await supabase
+                                  .from('pending_students')
+                                  .update({ is_groovelab_active: newVal })
+                                  .eq('id', student.id);
+                              }
+                              fetchDashboardData();
+                            } catch (err: any) {
+                              console.error("Fehler beim Umschalten des GrooveLab-Moduls:", err);
+                              alert("Fehler beim Umschalten: " + err.message);
+                            }
                           }}
                           style={{
                             flex: 1,
@@ -9006,7 +8958,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           title={(!isBillingBooked || hasGroovelabSub) ? (student.is_groovelab_active ? 'GrooveLab Aktiviert (0,49 € Sammelzahler)' : 'GrooveLab Inaktiv (0 €)') : 'GrooveLab-Modul in den Einstellungen buchen'}
                           className="hover-scale-mini"
                         >
-                          Groovelab
+                          GrooveLab
                         </button>
                       </div>
 
