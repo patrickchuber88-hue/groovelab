@@ -4392,6 +4392,40 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <p style={{margin: 0, fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic', fontWeight: 550}}>Keine aktuellen Hausaufgaben erfasst</p>
                 )}
               </div>
+
+              {/* PIN-Geschützter Termine Tab Button */}
+              <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <button
+                  type="button"
+                  onClick={() => setPageState('pin_required')}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '14px',
+                    border: '1.5px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#1e293b',
+                    fontSize: '0.88rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.borderColor = '#34a853'}
+                  onMouseOut={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={16} color="#34a853" />
+                    <span>Alle Termine & Kalender</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#64748b', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                    <Lock size={12} color="#64748b" />
+                    <span>PIN-geschützt</span>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* Minimalistic Upgrade Callout Button */}
