@@ -1696,8 +1696,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       
       flexibleStudents.sort((a, b) => b.duration - a.duration);
 
-      let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
-      const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
+      const RUN_ITERATIONS = 100;
+      let bestGlobalScore = -Infinity;
+      let bestBoardsState: any[] = [];
+      let bestNewlyAssigned: Record<string, { day: number; time: string }> = {};
+
+      for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
+        let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
+        const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
+
+        const fuzzedConstrainedStudents = [...constrainedStudents];
+        if (iteration > 0) {
+          for (let i = 0; i < fuzzedConstrainedStudents.length - 1; i++) {
+            if (Math.random() < 0.2) {
+              const temp = fuzzedConstrainedStudents[i];
+              fuzzedConstrainedStudents[i] = fuzzedConstrainedStudents[i+1];
+              fuzzedConstrainedStudents[i+1] = temp;
+            }
+          }
+        }
+
+        const fuzzedFlexibleStudents = [...flexibleStudents];
+        if (iteration > 0) {
+          for (let i = 0; i < fuzzedFlexibleStudents.length - 1; i++) {
+            if (Math.random() < 0.2) {
+              const temp = fuzzedFlexibleStudents[i];
+              fuzzedFlexibleStudents[i] = fuzzedFlexibleStudents[i+1];
+              fuzzedFlexibleStudents[i+1] = temp;
+            }
+          }
+        }
 
       const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const studentPrefs = prefsByStudentId[studentId] || [];
@@ -2028,14 +2056,41 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       };
 
       // Run Phase 2 (Constrained)
-      assignStudents(constrainedStudents, false);
+      assignStudents(fuzzedConstrainedStudents, false);
       // Run Phase 3 (Flexible)
-      assignStudents(flexibleStudents, true);
+      assignStudents(fuzzedFlexibleStudents, true);
 
-      // Track unassignable student IDs
-      const failedIds = unassignedStudents
-        .filter(s => !newlyAssignedStudentIds[s.id])
-        .map(s => s.id);
+      // Evaluate Global Score
+      let globalScore = 0;
+      const assignedIdsCount = Object.keys(newlyAssignedStudentIds).length;
+      globalScore += assignedIdsCount * 10000000; // Maximizing total assignments is priority #1
+
+      for (const board of currentBoards) {
+        for (const s of board.students) {
+          if (newlyAssignedStudentIds[s.id]) {
+            const sPrefs = prefsByStudentId[s.id] || [];
+            const isWunsch = sPrefs.some(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
+            if (isWunsch) {
+              globalScore += 500000; // Priority #2: Maximize Wunschzeit hits
+            }
+          }
+        }
+      }
+
+      if (globalScore > bestGlobalScore) {
+        bestGlobalScore = globalScore;
+        bestBoardsState = currentBoards;
+        bestNewlyAssigned = newlyAssignedStudentIds;
+      }
+    } // End GRASP Loop
+
+    let currentBoards = bestBoardsState;
+    const newlyAssignedStudentIds = bestNewlyAssigned;
+
+    // Track unassignable student IDs
+    const failedIds = unassignedStudents
+      .filter(s => !newlyAssignedStudentIds[s.id])
+      .map(s => s.id);
       setFailedStudentIds(failedIds);
 
       // Update state
