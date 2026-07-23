@@ -1056,18 +1056,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        const isSessionUnlocked = sessionStorage.getItem(`groovelab_lessons_unlocked_${userData.id}`) === 'true';
-        if (isSessionUnlocked) {
-          setLessonsUnlocked(true);
+        if (wasUnlocked) {
           setParentUnlocked(true);
+          setLessonsUnlocked(true);
+          sessionStorage.setItem('groovelab_qr_token', token);
+          setPageState('profile');
         } else {
-          setLessonsUnlocked(false);
+          // 2. Wenn der Cache-Speicher geleert wurde / Gerät noch nicht gekoppelt ist -> IMMER sofort PIN vor Öffnen der Landingpage abfragen!
           setParentUnlocked(false);
+          setLessonsUnlocked(false);
+          setPinPurpose('unlock_preview');
+          setPageState('pin_required');
+          return;
         }
-
-        // Always navigate to profile preview landing page (open area for Üben & Hausaufgaben)
-        sessionStorage.setItem('groovelab_qr_token', token);
-        setPageState('profile');
       } catch (err: any) {
         sessionStorage.removeItem('groovelab_qr_token');
         sessionStorage.removeItem('groovelab_user_id');
@@ -4159,13 +4160,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <button
           type="button"
           onClick={() => {
-            const isSessionUnlocked = sessionStorage.getItem(`groovelab_lessons_unlocked_${profile?.id}`) === 'true';
-            if (!isSessionUnlocked) {
-              setPinPurpose('unlock_preview');
-              setPageState('pin_required');
-            } else {
-              setActiveTab('lessons');
-            }
+            setPinPurpose('unlock_preview');
+            setPageState('pin_required');
           }}
           style={{
             flex: 1,
