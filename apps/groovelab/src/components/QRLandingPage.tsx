@@ -832,7 +832,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         });
 
         // Check if device was previously unlocked in localStorage
-        const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
+        const wasUnlocked = Boolean(
+          localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true' ||
+          localStorage.getItem(`groovelab_parent_unlocked_${userData.id}`) === 'true' ||
+          localStorage.getItem(`groovelab_user_pin_${userData.id}`) ||
+          localStorage.getItem(`groovelab_pin_${token}`)
+        );
 
         // Check if activation_days record or PIN strictly exists in DB for this student
         let hasPinCreated = false;
@@ -852,6 +857,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             hasPinCreated = false;
             // Purge any stale local unlock caches if PIN was reset in DB
             localStorage.removeItem(`groovelab_parent_unlocked_${token}`);
+            localStorage.removeItem(`groovelab_parent_unlocked_${userData.id}`);
             localStorage.removeItem(`groovelab_user_pin_${userData.id}`);
             localStorage.removeItem(`groovelab_pin_${token}`);
             sessionStorage.removeItem(`groovelab_lessons_unlocked_${userData.id}`);
@@ -873,6 +879,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         if (wasUnlocked) {
           setParentUnlocked(true);
+          setLessonsUnlocked(true);
+          sessionStorage.setItem(`groovelab_lessons_unlocked_${userData.id}`, 'true');
         } else {
           // 2. Wenn eine PIN in der DB existiert, aber dieses Gerät noch nicht gekoppelt ist -> PIN-Abfrage zum Entsperren!
           setPinPurpose('unlock_preview');
@@ -2046,7 +2054,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (isCorrect === true) {
         setPinAttempts(0);
         localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
+        localStorage.setItem(`groovelab_parent_unlocked_${profile.id}`, 'true');
+        localStorage.setItem(`groovelab_user_pin_${profile.id}`, pinInput);
+        localStorage.setItem(`groovelab_pin_${token}`, pinInput);
+        sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
         setParentUnlocked(true);
+        setLessonsUnlocked(true);
         setPinInput('');
         
         if (pinPurpose === 'unlock_preview') {
