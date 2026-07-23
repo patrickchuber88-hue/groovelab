@@ -1406,7 +1406,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const { data: focusData, error: focusError } = await supabase
             .from('fokus_logs')
             .select('duration_seconds')
-            .eq('student_id', student.id);
+            .eq('user_id', student.id);
 
           if (!focusError && focusData) {
             const totalSeconds = focusData.reduce((sum, item) => sum + (item.duration_seconds || 0), 0);
