@@ -74,6 +74,18 @@ const parseTime = (timeStr: string | null | undefined, fallback = '14:00'): [num
   return [parts[0], parts[1]];
 };
 
+const getPrefStartEndMinutes = (pref: any): { startMin: number; endMin: number } => {
+  if (!pref) return { startMin: 0, endMin: 0 };
+  const [sh, sm] = parseTime(pref.start_time);
+  let [eh, em] = parseTime(pref.end_time || pref.start_time);
+  let startMin = sh * 60 + sm;
+  let endMin = eh * 60 + em;
+  if (endMin <= startMin) {
+    endMin = startMin + 120;
+  }
+  return { startMin, endMin };
+};
+
 const formatMinutes = (totalMins: number): string => {
   const h = Math.floor(totalMins / 60);
   const m = totalMins % 60;
@@ -418,7 +430,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const key = `${os.day_of_week}_${os.room_id}`;
         const [osh, osm] = parseTime(os.time_slot);
         const start = osh * 60 + osm;
-        const end = start + (os.duration || 45);
+        const end = start + (os.duration || 30);
         if (!map[key]) {
           map[key] = [];
         }
@@ -630,7 +642,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           first_name: members.map(m => m.first_name).join(' & '),
           last_name: '',
           instrument: members.map(m => m.instrument || 'Musiker').filter((val, idx, arr) => arr.indexOf(val) === idx).join('/'),
-          duration: Math.max(...members.map(m => m.duration || 45)),
+          duration: Math.max(...members.map(m => m.duration || 30)),
           assignedDay,
           assignedTime,
           status: members.some(m => m.status === 'ausstehend') ? 'ausstehend' : 'verplant',
@@ -841,7 +853,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           first_name: s.first_name || (s as any).name || (s as any).full_name || 'Schüler',
           last_name: s.last_name || '',
           instrument: s.instrument || 'Musiker',
-          duration: s.lesson_duration || 45,
+          duration: s.lesson_duration || 30,
           status: (statusMap[s.id] || 'verplant') as any,
           sibling_group_id: s.sibling_group_id,
           group_id: s.group_id,
@@ -1015,13 +1027,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               roomId: daySched ? daySched.room_id : p.roomId,
               students: (p.students || []).map((s: any) => {
                 const dbStudent = loadedStudents.find(ls => ls.id === s.id);
-                if (dbStudent && !s.isBreak) {
+                const targetDuration = dbStudent?.duration || (s.lesson_duration ? s.lesson_duration : 30);
+                if (!s.isBreak) {
                   return {
                     ...s,
-                    duration: dbStudent.duration,
-                    first_name: dbStudent.first_name,
-                    last_name: dbStudent.last_name,
-                    instrument: dbStudent.instrument
+                    duration: targetDuration,
+                    first_name: dbStudent?.first_name || s.first_name,
+                    last_name: dbStudent?.last_name || s.last_name,
+                    instrument: dbStudent?.instrument || s.instrument
                   };
                 }
                 return s;
@@ -1052,7 +1065,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   first_name: isBreak ? 'Pause' : slot.student.first_name,
                   last_name: isBreak ? '' : slot.student.last_name,
                   instrument: isBreak ? '' : (slot.student.instrument || 'Musiker'),
-                  duration: slot.duration || (isBreak ? 15 : (slot.student.lesson_duration || 45)),
+                  duration: slot.duration || (isBreak ? 15 : (slot.student.lesson_duration || 30)),
                   assignedDay: slot.day_of_week,
                   assignedTime: slot.time_slot,
                   isBreak: isBreak,
@@ -1071,7 +1084,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     first_name: isBreak ? 'Pause' : slot.student.first_name,
                     last_name: isBreak ? '' : slot.student.last_name,
                     instrument: isBreak ? '' : (slot.student.instrument || 'Musiker'),
-                    duration: slot.duration || (isBreak ? 15 : (slot.student.lesson_duration || 45)),
+                    duration: slot.duration || (isBreak ? 15 : (slot.student.lesson_duration || 30)),
                     assignedDay: slot.day_of_week,
                     assignedTime: slot.time_slot,
                     isBreak: isBreak,
@@ -1572,7 +1585,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               first_name: sibData.first_name || '',
               last_name: sibData.last_name || '',
               instrument: sibData.instrument || '',
-              duration: sibData.lesson_duration || 45,
+              duration: sibData.lesson_duration || 30,
               assignedDay: sibSch?.day_of_week,
               assignedTime: sibSch?.start_time,
               teacher_name: sibSch?.teacher ? `${Array.isArray(sibSch.teacher) ? sibSch.teacher[0]?.first_name : (sibSch.teacher as any).first_name} ${Array.isArray(sibSch.teacher) ? sibSch.teacher[0]?.last_name : (sibSch.teacher as any).last_name}` : undefined,
@@ -1648,9 +1661,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         let totalMinutes = 0;
         for (const p of studentPrefs) {
           if (p.preference_type === 'gesperrt') {
-            const [sh, sm] = parseTime(p.start_time);
-            const [eh, em] = parseTime(p.end_time);
-            totalMinutes += Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+            const { startMin, endMin } = getPrefStartEndMinutes(p);
+            totalMinutes += Math.max(0, endMin - startMin);
           }
         }
         return totalMinutes;
@@ -1660,11 +1672,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         let totalMinutes = 0;
         for (const p of studentPrefs) {
           if (p.preference_type === 'wunsch') {
-            const [sh, sm] = parseTime(p.start_time);
-            const [eh, em] = parseTime(p.end_time || p.start_time);
-            let endMin = eh * 60 + em;
-            if (endMin <= sh * 60 + sm) endMin = sh * 60 + sm + 180;
-            totalMinutes += Math.max(0, endMin - (sh * 60 + sm));
+            const { startMin, endMin } = getPrefStartEndMinutes(p);
+            totalMinutes += Math.max(0, endMin - startMin);
           }
         }
         return totalMinutes;
@@ -1761,10 +1770,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const studentPrefs = prefsByStudentId[studentId] || [];
         const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && Number(p.day_of_week) === Number(dayOfWeek));
         for (const pref of blockedPrefs) {
-          const [psh, psm] = parseTime(pref.start_time);
-          const [peh, pem] = parseTime(pref.end_time);
-          const prefStart = psh * 60 + psm;
-          const prefEnd = peh * 60 + pem;
+          const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
           if (startMin < prefEnd && endMin > prefStart) {
             return true; // Overlaps with Sperrzeit
@@ -1777,13 +1783,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const studentPrefs = prefsByStudentId[studentId] || [];
         const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(dayOfWeek));
         for (const pref of wunschPrefs) {
-          const [psh, psm] = parseTime(pref.start_time);
-          const [peh, pem] = parseTime(pref.end_time);
-          const prefStart = psh * 60 + psm;
-          const prefEnd = peh * 60 + pem;
+          const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
           if (startMin < prefEnd && endMin > prefStart) {
-            return 1000000; // Wunschzeit-Treffer
+            return 10000000; // High Wunschzeit-Treffer Bonus
           }
         }
         return 0;
@@ -4812,8 +4815,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           if (siblingInfo.scheduled_slot && siblingInfo.scheduled_slot.day_of_week === board.dayOfWeek) {
                             const [sh, sm] = parseTime(siblingInfo.scheduled_slot.start_time);
                             const sibStartMin = sh * 60 + sm;
-                            const sibDuration = siblingInfo.duration || 45;
-                            const currentStudDuration = students.find(s => s.id === selectedStudentId)?.duration || 45;
+                            const sibDuration = siblingInfo.duration || 30;
+                            const currentStudDuration = students.find(s => s.id === selectedStudentId)?.duration || 30;
 
                             const recommendations = [
                               {
