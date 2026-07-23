@@ -1687,7 +1687,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const wunschStudents = unassignedStudents.filter(s => {
         const prefs = prefsByStudentId[s.id] || [];
-        return prefs.some(p => p.preference_type === 'wunsch');
+        const hasDirectWunsch = prefs.some(p => p.preference_type === 'wunsch');
+        const hasSiblingWunsch = s.sibling_group_id && unassignedStudents.some(other => 
+          other.sibling_group_id === s.sibling_group_id && (prefsByStudentId[other.id] || []).some(p => p.preference_type === 'wunsch')
+        );
+        return hasDirectWunsch || hasSiblingWunsch;
       });
 
       const sperrzeitStudents = unassignedStudents.filter(s => {
@@ -1804,6 +1808,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         
         if (startMin < boardStartMin || endMin > boardEndMin) {
           return -9999999; // Strictly avoid outside teacher hours
+        }
+
+        // 2. Check Room Conflict with other teachers or room blockings
+        if (board.roomId) {
+          const hasBlockedConflict = blockedSlots.some((s: any) => {
+            if (s.room_id !== board.roomId || Number(s.day_of_week) !== Number(board.dayOfWeek)) return false;
+            const { startMin: bStart, endMin: bEnd } = getPrefStartEndMinutes(s);
+            return (startMin < bEnd && endMin > bStart);
+          });
+          if (hasBlockedConflict) return -9999999;
+
+          const hasOtherTeacherConflict = otherTeachersSchedules.some((os: any) => {
+            if (Number(os.day_of_week) !== Number(board.dayOfWeek) || os.room_id !== board.roomId) return false;
+            const [osh, osm] = parseTime(os.time_slot);
+            const oStart = osh * 60 + osm;
+            const oEnd = oStart + (os.duration || 30);
+            return (startMin < oEnd && endMin > oStart);
+          });
+          if (hasOtherTeacherConflict) return -9999999;
+        }
+
+        // 3. Check continuous instruction time without breaks (> 180 min penalty)
+        let currentContinuousMins = 0;
+        for (const s of board.students) {
+          if (s.isBreak) {
+            currentContinuousMins = 0;
+          } else {
+            currentContinuousMins += s.duration;
+          }
+        }
+        if (currentContinuousMins + (endMin - startMin) > 180) {
+          score -= 15000;
         }
 
         let lueckenlos = false;
