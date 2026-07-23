@@ -781,8 +781,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        // 2. Wenn PIN-Schutz erzwungen wird und das Gerät nicht entsperrt ist -> direkt zur PIN-Eingabe springen
-        if (userData.pin_enforced_for_preview && !wasUnlocked) {
+        // 2. Wenn das Gerät noch nicht gekoppelt/entsperrt ist -> 1x PIN eingeben, um dieses Gerät zu freizuschalten!
+        if (!wasUnlocked) {
           setPinPurpose('unlock_preview');
           setPageState('pin_required');
           return;
@@ -4070,7 +4070,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
               {pinPurpose === 'setup_initial_pin'
                 ? 'Willkommen in deiner Musikschule! 🎵 Wähle deine persönliche 4-stellige PIN, um dein digitales Hausaufgabenheft und deinen Musikpass freizuschalten.'
-                : 'Gib deine 4-stellige Eltern- bzw. Sicherheits-PIN ein, um fortzufahren.'}
+                : 'Gib deine 4-stellige PIN ein, um diesen Musikpass einmalig auf diesem Gerät freizuschalten.'}
             </p>
           </div>
 
