@@ -4780,36 +4780,40 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                 localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                               }
 
-                              // Check if kiosk record already exists for this station
-                              const { data: existingKiosk, error: fetchErr } = await supabase
-                                .from('kiosks')
-                                .select('*')
-                                .eq('station_id', newSelection)
-                                .limit(1)
-                                .maybeSingle();
+                               const isUuid = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+                               const generatedSecretToken = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-0000-4000-8000-' + Math.floor(Math.random()*1e12).toString(16).padStart(12, '0'));
 
-                              if (fetchErr) throw fetchErr;
+                               // Check if kiosk record already exists for this station
+                               const { data: existingKiosk, error: fetchErr } = isUuid(newSelection) ? await supabase
+                                 .from('kiosks')
+                                 .select('*')
+                                 .eq('station_id', newSelection)
+                                 .limit(1)
+                                 .maybeSingle() : { data: null, error: null };
 
-                              let kioskRecord = existingKiosk;
+                               if (fetchErr) throw fetchErr;
 
-                              if (!kioskRecord) {
-                                // Create new kiosk record if none exists
-                                const { data: insertedRows, error: insertErr } = await supabase
-                                  .from('kiosks')
-                                  .insert({
-                                    school_id: schoolData.id,
-                                    name: station.name || 'iPad Kiosk',
-                                    room_id: station.room_id,
-                                    station_id: station.id
-                                  })
-                                  .select();
+                               let kioskRecord = existingKiosk;
 
-                                if (insertErr) throw insertErr;
-                                if (!insertedRows || insertedRows.length === 0) {
-                                  throw new Error('Kopplungs-Eintrag konnte nicht erstellt werden.');
-                                }
-                                kioskRecord = insertedRows[0];
-                              }
+                               if (!kioskRecord) {
+                                 // Create new kiosk record if none exists
+                                 const { data: insertedRows, error: insertErr } = await supabase
+                                   .from('kiosks')
+                                   .insert({
+                                     school_id: schoolData.id,
+                                     name: station.name || 'iPad Kiosk',
+                                     secret_token: generatedSecretToken,
+                                     room_id: isUuid(station.room_id) ? station.room_id : null,
+                                     station_id: isUuid(station.id) ? station.id : null
+                                   })
+                                   .select();
+
+                                 if (insertErr) throw insertErr;
+                                 if (!insertedRows || insertedRows.length === 0) {
+                                   throw new Error('Kopplungs-Eintrag konnte nicht erstellt werden.');
+                                 }
+                                 kioskRecord = insertedRows[0];
+                               }
 
                               if (kioskRecord && kioskRecord.secret_token) {
                                 // Overwrite the temporary school token with the kiosk's specific secret token
