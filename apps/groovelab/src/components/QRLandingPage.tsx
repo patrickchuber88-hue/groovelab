@@ -4356,28 +4356,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             {/* Main Info Box */}
             <div style={{...styles.card, padding: '24px', gap: '20px'}}>
-              {/* Regular Appointment Section */}
+              {/* Nächster Unterrichtstermin Section */}
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                <h3 style={{margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px'}}>
-                  <Clock size={16} color="#34a853" /> Unterrichtstermin
-                </h3>
-                {schedules.length > 0 ? (
-                  schedules.map((sch, i) => (
-                    <div key={i} style={{fontSize: '0.95rem', color: '#1e293b', fontWeight: 700, lineHeight: 1.4}}>
-                      Jeden {dayNames[sch.day_of_week - 1]} um {sch.time_slot.substring(0, 5)} Uhr ({sch.duration} Min.)
-                      <div style={{fontSize: '0.85rem', color: '#64748b', fontWeight: 550, marginTop: '2px'}}>
-                        {sch.room?.name && `Raum: ${sch.room.name}`}
-                        {sch.teacher?.first_name && ` · Lehrkraft: ${sch.teacher.first_name} ${sch.teacher.last_name}`}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p style={{margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic'}}>Kein regelmäßiger Termin eingetragen.</p>
-                )}
-              </div>
-
-              {/* Next Lesson Section */}
-              <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <h3 style={{margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px'}}>
                   <Calendar size={16} color="#34a853" /> Nächster Unterrichtstermin
                 </h3>
@@ -4385,11 +4365,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <div style={{fontSize: '0.95rem', color: '#1e293b', fontWeight: 700}}>
                     {nextLessonInfo.dateStr}
                     <div style={{fontSize: '0.85rem', color: '#34a853', fontWeight: 700, marginTop: '2px'}}>
-                      Start um {nextLessonInfo.time.substring(0, 5)} Uhr
+                      Start um {nextLessonInfo.time ? nextLessonInfo.time.substring(0, 5) : ''} Uhr
                     </div>
                   </div>
+                ) : schedules.length > 0 ? (
+                  <div style={{fontSize: '0.95rem', color: '#1e293b', fontWeight: 700}}>
+                    Jeden {dayNames[schedules[0].day_of_week - 1]} um {schedules[0].time_slot.substring(0, 5)} Uhr ({schedules[0].duration} Min.)
+                  </div>
                 ) : (
-                  <p style={{margin: 0, fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic'}}>Kein anstehender Termin geplant.</p>
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <Clock size={16} color="#34a853" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 700 }}>
+                      Wird vom Musikschul-Stundenplaner eingeteilt
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -4431,28 +4428,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   }}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
+                    padding: '14px 16px',
                     borderRadius: '14px',
-                    border: '1.5px solid #e2e8f0',
-                    background: '#f8fafc',
-                    color: '#1e293b',
-                    fontSize: '0.88rem',
+                    border: '1.5px solid #34a853',
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    fontSize: '0.9rem',
                     fontWeight: 800,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)'
                   }}
-                  onMouseOver={e => e.currentTarget.style.borderColor = '#34a853'}
-                  onMouseOut={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                  onMouseOver={e => e.currentTarget.style.background = '#dcfce7'}
+                  onMouseOut={e => e.currentTarget.style.background = '#f0fdf4'}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Calendar size={16} color="#34a853" />
-                    <span>Alle Termine & Kalender</span>
+                    <Calendar size={18} color="#34a853" />
+                    <span>Alle Termine, Absagen & Chat</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#64748b', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', fontWeight: 800 }}>
-                    <Lock size={12} color="#64748b" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#166534', background: '#dcfce7', padding: '4px 8px', borderRadius: '6px', fontWeight: 900 }}>
+                    <Lock size={12} color="#166534" />
                     <span>PIN-geschützt</span>
                   </div>
                 </button>
