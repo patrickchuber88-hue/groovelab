@@ -51,6 +51,7 @@ interface DayBoard {
   dayOfWeek: number; // 1 = Monday, 2 = Tuesday, etc.
   startAnchor: string; // e.g. "14:00"
   endAnchor?: string;
+  availabilityEnd?: string; // hard limit for teacher's day
   roomId?: string; // room associated with this board
   students: Student[]; // Ordered list of assigned students
 }
@@ -221,6 +222,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Create Board form state
   const [newBoardDay, setNewBoardDay] = useState(1);
   const [newBoardStart, setNewBoardStart] = useState('14:00');
+  const [newBoardEnd, setNewBoardEnd] = useState('20:00');
   const [newBoardRoom, setNewBoardRoom] = useState('');
   const [showAddBoardForm, setShowAddBoardForm] = useState(false);
 
@@ -1353,6 +1355,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       id: `board-${crypto.randomUUID()}`,
       dayOfWeek: newBoardDay,
       startAnchor: newBoardStart,
+      availabilityEnd: newBoardEnd,
       roomId: undefined,
       students: []
     };
@@ -1706,7 +1709,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         // 1. Check if within Teacher Availability (hard constraint)
         const [bh, bm] = parseTime(board.startAnchor);
         const boardStartMin = bh * 60 + bm;
-        const [beh, bem] = parseTime(board.endAnchor || '23:59');
+        const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
         const boardEndMin = beh * 60 + bem;
         
         if (startMin < boardStartMin || endMin > boardEndMin) {
@@ -1717,13 +1720,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         let gapBefore = 0;
         let gapAfter = 0;
 
+        // Calculate total assigned minutes on this board for load balancing
+        let totalAssignedMinutes = 0;
+        for (const s of board.students) {
+          totalAssignedMinutes += s.duration;
+        }
+        // Load balancing penalty: boards with more assigned minutes become less attractive
+        score -= totalAssignedMinutes * 10;
+
         if (board.students.length === 0) {
           // Empty board, connecting to start of day is lückenlos
           gapBefore = startMin - boardStartMin;
           if (gapBefore === 0) lueckenlos = true;
         } else {
-          score += 500; // Tages-Auslastungs-Bonus for already populated boards
-          
           // Find closest student before and after
           let closestEndBefore = boardStartMin;
           let closestStartAfter = boardEndMin;
@@ -1785,7 +1794,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               // Teacher availability check
               const [bh, bm] = parseTime(board.startAnchor);
               const boardStartMin = bh * 60 + bm;
-              const [beh, bem] = parseTime(board.endAnchor || '23:59');
+              const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
               const boardEndMin = beh * 60 + bem;
               if (startMin < boardStartMin || endMin > boardEndMin) continue;
 
@@ -1843,7 +1852,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 // Teacher availability check
                 const [bh, bm] = parseTime(board.startAnchor);
                 const boardStartMin = bh * 60 + bm;
-                const [beh, bem] = parseTime(board.endAnchor || '23:59');
+                const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
                 const boardEndMin = beh * 60 + bem;
 
                 if (startMin < boardStartMin || endMin > boardEndMin) {
@@ -3582,7 +3591,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
-                      <select
+                      <input
+                        type="time"
                         value={cfg.start || '13:00'}
                         onChange={(e) => {
                           setOnboardingAvailability(prev => ({
@@ -3591,7 +3601,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '3px 8px',
+                          padding: '3px 6px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
                           fontSize: '0.78rem',
@@ -3601,16 +3611,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           cursor: 'pointer',
                           outline: 'none'
                         }}
-                      >
-                        {timeOptions.map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
-                      <select
+                      <input
+                        type="time"
                         value={cfg.end || '19:00'}
                         onChange={(e) => {
                           setOnboardingAvailability(prev => ({
@@ -3619,7 +3626,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '3px 8px',
+                          padding: '3px 6px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
                           fontSize: '0.78rem',
@@ -3629,11 +3636,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           cursor: 'pointer',
                           outline: 'none'
                         }}
-                      >
-                        {timeOptions.map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
                 )}
@@ -4194,6 +4197,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   required
                   value={newBoardStart}
                   onChange={e => setNewBoardStart(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(255, 255, 255, 0.5)', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '10px', padding: '8px 10px', fontSize: '0.8rem', fontWeight: 600, outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#86868b' }}>Endzeit (Uhrzeit)</label>
+                <input
+                  type="time"
+                  required
+                  value={newBoardEnd}
+                  onChange={e => setNewBoardEnd(e.target.value)}
                   style={{ width: '100%', background: 'rgba(255, 255, 255, 0.5)', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '10px', padding: '8px 10px', fontSize: '0.8rem', fontWeight: 600, outline: 'none' }}
                 />
               </div>
