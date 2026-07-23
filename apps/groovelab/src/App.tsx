@@ -7201,6 +7201,7 @@ function App() {
     if (location.pathname === '/login') {
       return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
     }
+    return <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />;
   }
 
   if (showDeletionPrompt && deletionPromptUserId) {
