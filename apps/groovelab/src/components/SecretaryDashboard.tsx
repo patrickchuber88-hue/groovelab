@@ -3415,8 +3415,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         if (u.role === 'student') {
           const pendingMatch = pendingStudents?.find(p => p.id === u.id || (p.first_name && u.first_name && p.first_name.toLowerCase().trim() === u.first_name.toLowerCase().trim()));
           const resolvedDay = activationDaysMap[u.id] || (u as any).day_of_birth || pendingMatch?.day_of_birth || (pendingMatch ? activationDaysMap[pendingMatch.id] : null) || 1;
-          const resolvedStatus = statusMap[u.id] || (u as any).status || pendingMatch?.status || (u.is_campus_active || u.is_groovelab_active ? 'aktiv' : 'offen');
-          const isPending = pendingMatch ? (resolvedStatus === 'ausstehend' || resolvedStatus === 'offen' || (!u.is_campus_active && !u.is_groovelab_active)) : (resolvedStatus === 'ausstehend' || resolvedStatus === 'offen');
+          const hasCreatedPin = Boolean(activationDaysMap[u.id] || (pendingMatch && activationDaysMap[pendingMatch.id]) || (u as any).onboarding_pin || (u as any).pin);
+          const resolvedStatus = hasCreatedPin ? 'aktiv' : 'offen';
+          const isPending = !hasCreatedPin;
 
           studentsList.push({
             ...u,
