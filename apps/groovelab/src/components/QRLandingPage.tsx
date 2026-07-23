@@ -3704,7 +3704,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('lessons')}
+          onClick={() => {
+            if (profile && !profile.has_parent_pin) {
+              setIsInitialPinSetup(true);
+              setParentPinErrorMsg(null);
+              setParentPinSuccessMsg(null);
+              setShowPinPrompt(true);
+            } else if (profile?.pin_enforced_for_preview !== false && !isPairedForToken(token) && !lessonsUnlocked) {
+              setShowPinPrompt(true);
+            } else {
+              setActiveTab('lessons');
+            }
+          }}
           style={{
             flex: 1,
             padding: '8px 12px',
@@ -4397,7 +4408,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 <button
                   type="button"
-                  onClick={() => setPageState('pin_required')}
+                  onClick={() => {
+                    if (profile && !profile.has_parent_pin) {
+                      setIsInitialPinSetup(true);
+                      setParentPinErrorMsg(null);
+                      setParentPinSuccessMsg(null);
+                      setShowPinPrompt(true);
+                    } else if (!lessonsUnlocked) {
+                      setShowPinPrompt(true);
+                    } else {
+                      setActiveTab('lessons');
+                      setPageState('profile');
+                    }
+                  }}
                   style={{
                     width: '100%',
                     padding: '12px 16px',
@@ -5549,7 +5572,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <Music size={14} />
                   </div>
                   <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Urbanist', 'Outfit', sans-serif" }}>
-                    Campus-Groovelab
+                    {(hasCampusStudent && hasGrooveLabStudent) ? 'Campus-Groovelab' : (hasGrooveLabStudent && !hasCampusStudent ? 'Groovelab' : 'Campus')}
                   </span>
                 </div>
 
