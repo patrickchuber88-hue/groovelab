@@ -4071,7 +4071,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </h1>
             <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
               {pinPurpose === 'setup_initial_pin'
-                ? 'Erstelle deine persönliche PIN für deine erste Anmeldung. Danach wird dein Profil im Sekretariat als "Aktiv" markiert.'
+                ? 'Willkommen in deiner Musikschule! 🎵 Wähle deine persönliche 4-stellige PIN, um dein digitales Hausaufgabenheft und deinen Musikpass freizuschalten.'
                 : 'Gib deine 4-stellige Eltern- bzw. Sicherheits-PIN ein, um fortzufahren.'}
             </p>
           </div>
