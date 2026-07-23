@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Calendar, 
@@ -11,8 +11,10 @@ import {
   Save, 
   Sparkles, 
   Check,
-  RotateCcw
+  RotateCcw,
+  UserCheck
 } from 'lucide-react';
+import { useTeacherAvailability } from '../hooks/useTeacherAvailability';
 
 interface StudentMobileScheduleWizardProps {
   student: any;
@@ -32,25 +34,45 @@ const DAYS_OF_WEEK = [
 
 const TIME_SLOTS = [
   { start: '10:00', label: '10:00' },
+  { start: '10:15', label: '10:15' },
   { start: '10:30', label: '10:30' },
+  { start: '10:45', label: '10:45' },
   { start: '11:00', label: '11:00' },
+  { start: '11:15', label: '11:15' },
   { start: '11:30', label: '11:30' },
+  { start: '11:45', label: '11:45' },
   { start: '12:00', label: '12:00' },
+  { start: '12:15', label: '12:15' },
   { start: '12:30', label: '12:30' },
+  { start: '12:45', label: '12:45' },
   { start: '13:00', label: '13:00' },
+  { start: '13:15', label: '13:15' },
   { start: '13:30', label: '13:30' },
+  { start: '13:45', label: '13:45' },
   { start: '14:00', label: '14:00' },
+  { start: '14:15', label: '14:15' },
   { start: '14:30', label: '14:30' },
+  { start: '14:45', label: '14:45' },
   { start: '15:00', label: '15:00' },
+  { start: '15:15', label: '15:15' },
   { start: '15:30', label: '15:30' },
+  { start: '15:45', label: '15:45' },
   { start: '16:00', label: '16:00' },
+  { start: '16:15', label: '16:15' },
   { start: '16:30', label: '16:30' },
+  { start: '16:45', label: '16:45' },
   { start: '17:00', label: '17:00' },
+  { start: '17:15', label: '17:15' },
   { start: '17:30', label: '17:30' },
+  { start: '17:45', label: '17:45' },
   { start: '18:00', label: '18:00' },
+  { start: '18:15', label: '18:15' },
   { start: '18:30', label: '18:30' },
+  { start: '18:45', label: '18:45' },
   { start: '19:00', label: '19:00' },
-  { start: '19:30', label: '19:30' }
+  { start: '19:15', label: '19:15' },
+  { start: '19:30', label: '19:30' },
+  { start: '19:45', label: '19:45' }
 ];
 
 export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardProps> = ({
@@ -61,70 +83,78 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
 }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt'>('wunsch');
+  const [preferenceMode, setPreferenceMode] = useState<'wunsch' | 'gesperrt' | 'ankunft'>('ankunft');
   const [showSaturday, setShowSaturday] = useState(false);
-  const [editedMatrix, setEditedMatrix] = useState<Record<string, 'wunsch' | 'gesperrt' | 'none'>>({});
+  const [editedMatrix, setEditedMatrix] = useState<Record<string, 'wunsch' | 'gesperrt' | 'ankunft' | 'none'>>({});
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [hoveredDayId, setHoveredDayId] = useState<number | null>(null);
 
-  const [teacherAvailability, setTeacherAvailability] = useState<any>(null);
-  const [teacherName, setTeacherName] = useState<string>('');
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const slot13Ref = useRef<HTMLDivElement>(null);
+
+  const { availability: teacherAvailability, teacherName } = useTeacherAvailability(student);
 
   useEffect(() => {
     if (student?.id) {
       fetchStudentPreferences();
-      fetchTeacherAvailability();
     }
   }, [student?.id]);
 
-  const fetchTeacherAvailability = async () => {
-    try {
-      let teacherId = student?.teacher_id;
-      if (!teacherId) {
-        const { data: stRow } = await supabase
-          .from('students')
-          .select('teacher_id')
-          .eq('id', student.id)
-          .maybeSingle();
-        if (stRow?.teacher_id) {
-          teacherId = stRow.teacher_id;
-        }
-      }
+  const getTeacherDayTimeWindow = (dayId: number): string | null => {
+    const activeAvail = (teacherAvailability && Object.keys(teacherAvailability).length > 0) ? teacherAvailability : {
+      "1": { start: "12:00", end: "20:00" },
+      "2": { start: "12:00", end: "20:00" },
+      "3": { start: "12:00", end: "20:00" },
+      "4": { start: "12:00", end: "20:00" },
+      "5": { start: "12:00", end: "20:00" }
+    };
+    
+    let dayConfig = activeAvail[dayId] || activeAvail[String(dayId)];
+    if (!dayConfig) return null;
 
-      if (teacherId) {
-        const { data: teacherUser } = await supabase
-          .from('users')
-          .select('first_name, last_name, teacher_availability')
-          .eq('id', teacherId)
-          .maybeSingle();
+    let start = dayConfig.start || dayConfig.start_time;
+    let end = dayConfig.end || dayConfig.end_time;
 
-        if (teacherUser) {
-          if (teacherUser.first_name || teacherUser.last_name) {
-            setTeacherName(`${teacherUser.first_name || ''} ${teacherUser.last_name || ''}`.trim());
-          }
-          let avail = teacherUser.teacher_availability;
-          if (typeof avail === 'string') {
-            try { avail = JSON.parse(avail); } catch (e) {}
-          }
-          setTeacherAvailability(avail || null);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching teacher availability:', err);
+    if (!start && Array.isArray(dayConfig) && dayConfig.length > 0) {
+      start = dayConfig[0].start || dayConfig[0].start_time;
+      end = dayConfig[dayConfig.length - 1].end || dayConfig[dayConfig.length - 1].end_time;
     }
+
+    if (start && end) {
+      return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+    }
+    return null;
   };
 
   const isTeacherAvailableSlot = (dayId: number, slotStart: string) => {
-    if (!teacherAvailability || Object.keys(teacherAvailability).length === 0) return true;
-    const dayConfig = teacherAvailability[dayId] || teacherAvailability[String(dayId)];
-    if (!dayConfig || !dayConfig.start || !dayConfig.end) return false;
+    const activeAvail = (teacherAvailability && Object.keys(teacherAvailability).length > 0) ? teacherAvailability : {
+      "1": { start: "12:00", end: "20:00" },
+      "2": { start: "12:00", end: "20:00" },
+      "3": { start: "12:00", end: "20:00" },
+      "4": { start: "12:00", end: "20:00" },
+      "5": { start: "12:00", end: "20:00" }
+    };
 
-    const [sh, sm] = dayConfig.start.split(':').map(Number);
-    const [eh, em] = dayConfig.end.split(':').map(Number);
+    const dayConfig = activeAvail[dayId] || activeAvail[String(dayId)];
+    if (!dayConfig) return false;
+
+    let start = dayConfig.start || dayConfig.start_time;
+    let end = dayConfig.end || dayConfig.end_time;
+
+    if (!start && Array.isArray(dayConfig) && dayConfig.length > 0) {
+      start = dayConfig[0].start || dayConfig[0].start_time;
+      end = dayConfig[dayConfig.length - 1].end || dayConfig[dayConfig.length - 1].end_time;
+    }
+
+    if (!start || !end) return false;
+
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
     const [th, tm] = slotStart.split(':').map(Number);
 
-    const startMins = sh * 60 + sm;
-    const endMins = eh * 60 + em;
-    const slotMins = th * 60 + tm;
+    const startMins = sh * 60 + (sm || 0);
+    const endMins = eh * 60 + (em || 0);
+    const slotMins = th * 60 + (tm || 0);
 
     return slotMins >= startMins && slotMins < endMins;
   };
@@ -138,15 +168,31 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
         .select('*')
         .eq('student_id', student.id);
 
-      const matrix: Record<string, 'wunsch' | 'gesperrt' | 'none'> = {};
+      const matrix: Record<string, 'wunsch' | 'gesperrt' | 'ankunft' | 'none'> = {};
       let hasSaturdaySlot = false;
 
       (prefData || []).forEach((p: any) => {
-        const cleanTime = (p.start_time || '').slice(0, 5);
-        const key = `${p.day_of_week}_${cleanTime}`;
-        matrix[key] = p.preference_type === 'gesperrt' ? 'gesperrt' : 'wunsch';
+        const startStr = (p.start_time || '').slice(0, 5);
+        const endStr = (p.end_time || '').slice(0, 5);
+        const prefType = p.preference_type === 'gesperrt' ? 'gesperrt' : 'wunsch';
+
         if (p.day_of_week === 6) {
           hasSaturdaySlot = true;
+        }
+
+        if (startStr && endStr) {
+          const [sH, sM] = startStr.split(':').map(Number);
+          const [eH, eM] = endStr.split(':').map(Number);
+          const startMins = sH * 60 + (sM || 0);
+          const endMins = eH * 60 + (eM || 0);
+          for (let m = startMins; m < endMins; m += 15) {
+            const curH = Math.floor(m / 60);
+            const curM = m % 60;
+            const timeKey = `${curH.toString().padStart(2, '0')}:${curM.toString().padStart(2, '0')}`;
+            matrix[`${p.day_of_week}_${timeKey}`] = prefType;
+          }
+        } else if (startStr) {
+          matrix[`${p.day_of_week}_${startStr}`] = p.preference_type === 'gesperrt' ? 'gesperrt' : (p.preference_type === 'ankunft' ? 'ankunft' : 'wunsch');
         }
       });
 
@@ -163,7 +209,50 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
   };
 
   const handleCellClick = (dayId: number, startTime: string) => {
+    const isTeacherTime = isTeacherAvailableSlot(dayId, startTime);
+    if (!isTeacherTime) {
+      showToast(`Kein Unterricht: ${teacherName || 'Der Lehrer'} ist um ${startTime} Uhr nicht im Haus.`);
+      return;
+    }
+
     const key = `${dayId}_${startTime}`;
+
+    if (preferenceMode === 'ankunft') {
+      const [targetH, targetM] = startTime.split(':').map(Number);
+      const targetMins = targetH * 60 + (targetM || 0);
+
+      const targetKey = `${dayId}_${startTime}`;
+      const isAlreadyAnkunft = editedMatrix[targetKey] === 'ankunft';
+
+      setEditedMatrix(prev => {
+        const nextMatrix = { ...prev };
+        TIME_SLOTS.forEach(slot => {
+          const [sH, sM] = slot.start.split(':').map(Number);
+          const slotMins = sH * 60 + (sM || 0);
+          const slotKey = `${dayId}_${slot.start}`;
+
+          if (isAlreadyAnkunft) {
+            // If tapping existing arrival slot, toggle off arrival marker and prior locks
+            if (slotMins <= targetMins && (nextMatrix[slotKey] === 'gesperrt' || nextMatrix[slotKey] === 'ankunft')) {
+              nextMatrix[slotKey] = 'none';
+            }
+          } else {
+            if (slotMins < targetMins) {
+              nextMatrix[slotKey] = 'gesperrt';
+            } else if (slotMins === targetMins) {
+              nextMatrix[slotKey] = 'ankunft';
+            } else if (nextMatrix[slotKey] === 'gesperrt' || nextMatrix[slotKey] === 'ankunft') {
+              nextMatrix[slotKey] = 'none';
+            }
+          }
+        });
+        return nextMatrix;
+      });
+
+      showToast(isAlreadyAnkunft ? `Ankunft am ${startTime} Uhr aufgehoben` : `Ankunft um ${startTime} Uhr gesetzt (Zeiten davor gesperrt)`);
+      return;
+    }
+
     const current = editedMatrix[key] || 'none';
 
     let next: 'wunsch' | 'gesperrt' | 'none' = 'none';
@@ -179,9 +268,30 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
     }));
   };
 
-  // Calculate selected wunsch hours (each 30-min slot is 0.5 hours)
+  const handleToggleWholeDay = (dayId: number, dayName: string) => {
+    const allLocked = TIME_SLOTS.every(slot => 
+      editedMatrix[`${dayId}_${slot.start}`] === 'gesperrt'
+    );
+
+    setEditedMatrix(prev => {
+      const nextMatrix = { ...prev };
+      TIME_SLOTS.forEach(slot => {
+        const slotKey = `${dayId}_${slot.start}`;
+        if (allLocked) {
+          nextMatrix[slotKey] = 'none';
+        } else {
+          nextMatrix[slotKey] = 'gesperrt';
+        }
+      });
+      return nextMatrix;
+    });
+
+    showToast(allLocked ? `${dayName} wieder freigegeben ⚪` : `${dayName} komplett gesperrt 🔴`);
+  };
+
+  // Calculate selected wunsch hours (each 15-min slot is 0.25 hours)
   const totalWunschSlots = Object.values(editedMatrix).filter(val => val === 'wunsch').length;
-  const selectedHours = totalWunschSlots * 0.5;
+  const selectedHours = totalWunschSlots * 0.25;
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -199,7 +309,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
           const day = parseInt(dayStr);
           const [h, m] = startTime.split(':').map(Number);
           let endH = h;
-          let endM = (m || 0) + 30;
+          let endM = (m || 0) + 15;
           if (endM >= 60) {
             endH += 1;
             endM -= 60;
@@ -299,9 +409,35 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
               Terminwünsche für {student?.first_name || 'Schüler'}{student?.instrument ? ` (${student.instrument})` : ''}
             </h3>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35 }}>
-              Wähle bevorzugte Unterrichtszeiten und sperre Zeiten, die absolut unmöglich sind.
-            </p>
+            <div style={{ 
+              margin: '8px 0 0 0', 
+              background: 'rgba(248, 250, 252, 0.85)', 
+              backdropFilter: 'blur(8px)',
+              padding: '10px 14px', 
+              borderRadius: '14px', 
+              border: '1px solid #e2e8f0',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                <Sparkles size={13} color="#64748b" />
+                <span>Terminauswahl in 3 Schritten</span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '0.72rem', color: '#475569', fontWeight: 500, lineHeight: 1.35 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ background: '#eff6ff', color: '#2563eb', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #bfdbfe', flexShrink: 0 }}>1. Ankunft</span>
+                  <span>Uhrzeit antippen – dieser Slot und alle früheren Zeiten werden gesperrt.</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ background: '#f0fdf4', color: '#166534', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #bbf7d0', flexShrink: 0 }}>2. Wunsch</span>
+                  <span>Bevorzugte Unterrichtszeiten im Raster grün markieren.</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ background: '#fef2f2', color: '#991b1b', fontWeight: 700, padding: '1px 6px', borderRadius: '6px', fontSize: '0.66rem', border: '1px solid #fecaca', flexShrink: 0 }}>3. Sperr</span>
+                  <span>Zeiten sperren, die absolut unmöglich sind.</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <button
@@ -362,7 +498,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>({showSaturday ? 'Mit Samstag' : 'Nur Mo-Fr'})</span>
             </div>
 
-            {/* Apple style segmented control */}
+            {/* Apple style segmented control with 3 modes */}
             <div style={{
               display: 'flex',
               background: '#e2e8f0',
@@ -372,49 +508,72 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             }}>
               <button
                 type="button"
-                onClick={() => setPreferenceMode('wunsch')}
+                onClick={() => setPreferenceMode('ankunft')}
                 style={{
                   flex: 1,
-                  padding: '8px 10px',
+                  padding: '7px 4px',
                   borderRadius: '9px',
                   border: 'none',
-                  background: preferenceMode === 'wunsch' ? '#34a853' : 'transparent',
-                  color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
+                  background: preferenceMode === 'ankunft' ? '#2563eb' : 'transparent',
+                  color: preferenceMode === 'ankunft' ? '#ffffff' : '#475569',
                   fontWeight: 800,
-                  fontSize: '0.78rem',
+                  fontSize: '0.74rem',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px'
+                  gap: '4px'
                 }}
               >
-                <Star size={13} fill={preferenceMode === 'wunsch' ? '#ffffff' : '#22c55e'} color={preferenceMode === 'wunsch' ? '#ffffff' : '#16a34a'} />
-                <span>Wunschzeit 🟢</span>
+                <Clock size={12} color={preferenceMode === 'ankunft' ? '#ffffff' : '#2563eb'} />
+                <span>Ankunft 🚀</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreferenceMode('wunsch')}
+                style={{
+                  flex: 1,
+                  padding: '7px 4px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: preferenceMode === 'wunsch' ? '#34a853' : 'transparent',
+                  color: preferenceMode === 'wunsch' ? '#ffffff' : '#475569',
+                  fontWeight: 800,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Star size={12} fill={preferenceMode === 'wunsch' ? '#ffffff' : '#22c55e'} color={preferenceMode === 'wunsch' ? '#ffffff' : '#16a34a'} />
+                <span>Wunsch 🟢</span>
               </button>
               <button
                 type="button"
                 onClick={() => setPreferenceMode('gesperrt')}
                 style={{
                   flex: 1,
-                  padding: '8px 10px',
+                  padding: '7px 4px',
                   borderRadius: '9px',
                   border: 'none',
                   background: preferenceMode === 'gesperrt' ? '#ef4444' : 'transparent',
                   color: preferenceMode === 'gesperrt' ? '#ffffff' : '#475569',
                   fontWeight: 800,
-                  fontSize: '0.78rem',
+                  fontSize: '0.74rem',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px'
+                  gap: '4px'
                 }}
               >
-                <Ban size={13} color={preferenceMode === 'gesperrt' ? '#ffffff' : '#dc2626'} />
-                <span>Sperrzeit 🔴</span>
+                <Ban size={12} color={preferenceMode === 'gesperrt' ? '#ffffff' : '#dc2626'} />
+                <span>Sperr 🔴</span>
               </button>
             </div>
 
@@ -452,13 +611,17 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
             color: '#475569',
             gap: '8px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-              <div style={{ width: '10px', height: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, color: '#166534' }}>Regulärer Unterricht</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '9px', height: '9px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '3px', flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, color: '#2563eb' }}>Ankunft</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
-              <div style={{ width: '10px', height: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, color: '#64748b' }}>Ausweichzeit (Verlegung)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '9px', height: '9px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '3px', flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, color: '#166534' }}>Unterricht</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '9px', height: '9px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '3px', flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, color: '#64748b' }}>Ausweichzeit</span>
             </div>
           </div>
 
@@ -468,17 +631,21 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
               Wunschzeiten werden geladen...
             </div>
           ) : (
-            <div style={{
-              background: '#f8fafc',
-              borderRadius: '20px',
-              border: '1px solid #e2e8f0',
-              padding: '10px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              maxHeight: '340px',
-              overflowY: 'auto'
-            }}>
+            <div 
+              ref={gridContainerRef}
+              style={{
+                background: '#f8fafc',
+                borderRadius: '20px',
+                border: '1px solid #e2e8f0',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+                maxHeight: '380px',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
               {/* Header Row */}
               <div style={{
                 display: 'grid',
@@ -498,31 +665,90 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                 <div>Zeit</div>
                 {activeDays.map(day => {
                   const hasConfig = teacherAvailability && (teacherAvailability[day.id] || teacherAvailability[String(day.id)]);
-                  const isTeacherDay = Boolean(hasConfig && hasConfig.start && hasConfig.end);
+                  const isTeacherDay = Boolean(hasConfig && (hasConfig.start || (Array.isArray(hasConfig) && hasConfig.length > 0)));
+                  const windowStr = getTeacherDayTimeWindow(day.id);
+                  const isHovered = hoveredDayId === day.id;
+                  const isWholeDayLocked = TIME_SLOTS.every(slot => editedMatrix[`${day.id}_${slot.start}`] === 'gesperrt');
+
                   return (
                     <div 
                       key={day.id}
+                      onMouseEnter={() => setHoveredDayId(day.id)}
+                      onMouseLeave={() => setHoveredDayId(null)}
+                      onClick={() => handleToggleWholeDay(day.id, day.name)}
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '2px',
-                        color: isTeacherDay ? '#34a853' : '#64748b'
+                        color: isWholeDayLocked ? '#ef4444' : (isTeacherDay ? '#34a853' : '#64748b'),
+                        cursor: 'pointer',
+                        padding: '2px 1px',
+                        borderRadius: '6px',
+                        background: isHovered ? (isWholeDayLocked ? '#fee2e2' : '#e2e8f0') : 'transparent',
+                        transition: 'all 0.15s ease'
                       }}
+                      className="hover-scale-mini"
+                      title={`${day.name} komplett sperren / freigeben`}
                     >
-                      <span>{day.name}</span>
-                      {isTeacherDay && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <span>{day.name}</span>
+                        {(isHovered || isWholeDayLocked) && (
+                          <Ban size={9} color={isWholeDayLocked ? '#dc2626' : '#64748b'} />
+                        )}
+                      </div>
+
+                      {isHovered ? (
                         <span style={{ 
-                          fontSize: '7px', 
-                          background: '#e6f4ea', 
-                          color: '#34a853', 
+                          fontSize: '6.5px', 
+                          background: isWholeDayLocked ? '#22c55e' : '#ef4444', 
+                          color: '#ffffff', 
                           padding: '1px 3px', 
                           borderRadius: '4px',
                           fontWeight: 800,
-                          border: '1px solid rgba(52, 168, 83, 0.2)'
+                          whiteSpace: 'nowrap'
                         }}>
-                          Unterricht
+                          {isWholeDayLocked ? 'Freigeben' : 'Sperren 🔴'}
                         </span>
+                      ) : (
+                        windowStr ? (
+                          <span style={{ 
+                            fontSize: '6.5px', 
+                            background: '#e6f4ea', 
+                            color: '#166534', 
+                            padding: '1px 3px', 
+                            borderRadius: '4px',
+                            fontWeight: 700,
+                            border: '1px solid rgba(52, 168, 83, 0.3)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {windowStr}
+                          </span>
+                        ) : isTeacherDay ? (
+                          <span style={{ 
+                            fontSize: '7px', 
+                            background: '#e6f4ea', 
+                            color: '#34a853', 
+                            padding: '1px 3px', 
+                            borderRadius: '4px',
+                            fontWeight: 800,
+                            border: '1px solid rgba(52, 168, 83, 0.2)'
+                          }}>
+                            Unterricht
+                          </span>
+                        ) : (
+                          <span style={{ 
+                            fontSize: '6.5px', 
+                            background: '#f1f5f9', 
+                            color: '#94a3b8', 
+                            padding: '1px 3px', 
+                            borderRadius: '4px',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            Frei
+                          </span>
+                        )
                       )}
                     </div>
                   );
@@ -531,13 +757,22 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
 
               {/* Slots Rows */}
               {TIME_SLOTS.map(slot => (
-                <div key={slot.start} style={{
-                  display: 'grid',
-                  gridTemplateColumns: `45px repeat(${activeDays.length}, 1fr)`,
-                  gap: '3px',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textAlign: 'center' }}>
+                <div 
+                  key={slot.start} 
+                  ref={slot.start === '13:00' ? slot13Ref : undefined}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `45px repeat(${activeDays.length}, 1fr)`,
+                    gap: '3px',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div style={{ 
+                    fontSize: (slot.start.endsWith(':15') || slot.start.endsWith(':45')) ? '0.60rem' : '0.68rem', 
+                    fontWeight: (slot.start.endsWith(':15') || slot.start.endsWith(':45')) ? 600 : 800, 
+                    color: (slot.start.endsWith(':15') || slot.start.endsWith(':45')) ? '#94a3b8' : '#334155', 
+                    textAlign: 'center' 
+                  }}>
                     {slot.start}
                   </div>
 
@@ -551,18 +786,26 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                     let border = '1px solid #e2e8f0';
                     let icon = null;
 
-                    if (status === 'wunsch') {
+                    if (status === 'ankunft') {
+                      bg = '#eff6ff';
+                      border = '1.5px solid #60a5fa';
+                      icon = <Clock size={10} color="#2563eb" />;
+                    } else if (status === 'wunsch') {
                       bg = '#f0fdf4';
                       border = '1.5px solid #86efac';
-                      icon = <Star size={10} fill="#22c55e" color="#16a34a" />;
+                      icon = <Star size={9} fill="#22c55e" color="#16a34a" />;
                     } else if (status === 'gesperrt') {
                       bg = '#fef2f2';
                       border = '1.5px solid #fca5a5';
-                      icon = <Ban size={10} color="#dc2626" />;
-                    } else if (isTeacherTime && teacherAvailability) {
-                      bg = '#f4fbf7';
+                      icon = <Ban size={9} color="#dc2626" />;
+                    } else if (isTeacherTime) {
+                      bg = '#ecfdf5';
                       border = '1px solid #a7f3d0';
-                      icon = null; // Clean slot without any icon in the center!
+                      icon = null;
+                    } else {
+                      bg = 'repeating-linear-gradient(135deg, #f8fafc, #f8fafc 4px, #f1f5f9 4px, #f1f5f9 8px)';
+                      border = '1px solid #e2e8f0';
+                      icon = null;
                     }
 
                     return (
@@ -570,16 +813,18 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                         key={day.id}
                         onClick={() => handleCellClick(day.id, slot.start)}
                         style={{
-                          height: '28px',
+                          height: '24px',
                           background: bg,
                           border: border,
-                          borderRadius: '6px',
+                          borderRadius: '5px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          cursor: 'pointer',
+                          cursor: isTeacherTime ? 'pointer' : 'not-allowed',
+                          opacity: isTeacherTime || status !== 'none' ? 1 : 0.6,
                           transition: 'all 0.1s ease',
-                          boxSizing: 'border-box'
+                          boxSizing: 'border-box',
+                          touchAction: 'manipulation'
                         }}
                         className="hover-scale-mini"
                       >

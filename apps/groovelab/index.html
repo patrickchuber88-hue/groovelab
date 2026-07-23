@@ -13,10 +13,9 @@
         }
 
         var params = new URLSearchParams(window.location.search);
-        var isGrooveLab = params.get('platform') === 'groovelab' || 
-                          window.location.pathname.indexOf('/onboarding') !== -1 || 
-                          window.location.pathname.indexOf('/device-onboarding') !== -1 || 
-                          safeGetItem('groovelab_active_platform') === 'groovelab';
+        var platformParam = params.get('platform');
+        var isGrooveLab = platformParam === 'groovelab' || 
+                          (platformParam !== 'campus' && safeGetItem('groovelab_active_platform') === 'groovelab' && window.location.pathname.indexOf('/onboarding') === -1);
         
         var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         var displayMode = 'standalone';
@@ -120,7 +119,7 @@
         alert('Unhandled Promise Rejection: ' + (e.reason ? e.reason.message || e.reason : e));
       });
     </script>
-    <title>Groovelab - Gamified Music Learning</title>
+    <title>Campus-Groovelab</title>
   </head>
   <body>
     <div id="root"></div>

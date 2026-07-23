@@ -1,0 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://supabase.campus-groovelab.de';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgwNDE3ODE1LCJleHAiOjQ5MzQwMTc4MTV9.zOsuxweIlQBi7doeBoUqg9aTR6-qzOr0sjsa0Oee5cc';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function run() {
+  const { data, error } = await supabase.from('students').select('*').limit(1);
+  console.log("Students data:", data);
+  if (error) console.error("Error:", error);
+}
+run();

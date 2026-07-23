@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -205,6 +205,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     return val ? parseInt(val) : 45;
   });
   const [showDurationRequestDropdown, setShowDurationRequestDropdown] = useState<boolean>(false);
+  const [confirmDurationModal, setConfirmDurationModal] = useState<{ open: boolean; targetDuration: number } | null>(null);
 
   // Lehrwerke assigned to student states
   const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>([]);
@@ -685,17 +686,21 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleUpdateDuration = async (duration: number) => {
     try {
-      const { error } = await supabase
+      await supabase
         .from('users')
         .update({ lesson_duration: duration })
         .eq('id', student.id);
-      if (error) throw error;
+      await supabase
+        .from('students')
+        .update({ lesson_duration: duration })
+        .eq('id', student.id);
       setLessonDuration(duration);
       student.lesson_duration = duration;
       localStorage.removeItem(`req_duration_${student.id}`);
       setDurationRequestSent(false);
+      setConfirmDurationModal(null);
     } catch (err: any) {
-      alert('Fehler beim Aktualisieren der Unterrichtsform: ' + err.message);
+      alert('Fehler beim Aktualisieren der Unterrichtsdauer: ' + err.message);
     }
   };
 
@@ -741,7 +746,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .update({ group_id: newGroupId })
         .eq('id', student.id);
       await supabase
-        .from('pending_students')
+        .from('students')
         .update({ group_id: newGroupId })
         .eq('id', student.id);
 
@@ -750,13 +755,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .update({ group_id: newGroupId })
         .eq('id', selectedStudentToLink);
       await supabase
-        .from('pending_students')
+        .from('students')
         .update({ group_id: newGroupId })
         .eq('id', selectedStudentToLink);
 
       alert('Gruppenunterricht erfolgreich eingerichtet!');
       setSelectedStudentToLink('');
       setStudentSearchQuery('');
+      setShowGroupSelector(false);
+      setGroupId(newGroupId);
       setRefreshTrigger(prev => prev + 1);
     } catch (err: any) {
       alert('Fehler beim Einrichten: ' + err.message);
@@ -765,13 +772,30 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleUnlinkGroup = async () => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ group_id: null })
-        .eq('id', student.id);
-      if (error) throw error;
+      const targetGroupId = groupId || student.group_id;
+      if (targetGroupId) {
+        await supabase
+          .from('users')
+          .update({ group_id: null })
+          .eq('group_id', targetGroupId);
+        await supabase
+          .from('students')
+          .update({ group_id: null })
+          .eq('group_id', targetGroupId);
+      } else {
+        await supabase
+          .from('users')
+          .update({ group_id: null })
+          .eq('id', student.id);
+        await supabase
+          .from('students')
+          .update({ group_id: null })
+          .eq('id', student.id);
+      }
 
       alert('Schüler erfolgreich aus der Gruppe entfernt!');
+      setGroupId(null);
+      setGroupStudents([]);
       setRefreshTrigger(prev => prev + 1);
     } catch (err: any) {
       alert('Fehler beim Trennen: ' + err.message);
@@ -859,10 +883,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .from('users')
         .select('first_name, last_name, is_campus_active, is_groovelab_active, lesson_duration, app_usage_mode, exempt_from_direct_billing, group_id, school_id, parent_pin')
         .eq('id', student.id)
-        .single();
+        .maybeSingle();
 
-      let groupStudentIds = [student.id];
-      if (latestUser) {
+      const { data: latestPending } = await supabase
+        .from('pending_students_decrypted')
+        .select('first_name, last_name, lesson_duration, group_id, school_id')
+        .eq('id', student.id)
+        .maybeSingle();
+
+      if (latestPending && !latestUser) {
+        if (latestPending.first_name) setFirstName(latestPending.first_name);
+        if (latestPending.last_name !== undefined) setLastName(latestPending.last_name || '');
+        if (latestPending.lesson_duration) setLessonDuration(latestPending.lesson_duration);
+      } else if (latestUser) {
         setFirstName(latestUser.first_name || '');
         setLastName(latestUser.last_name || '');
         setIsCampusActive(latestUser.is_campus_active ?? false);
@@ -871,21 +904,41 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         setLessonDuration(latestUser.lesson_duration || 30);
         setAppUsageMode(latestUser.app_usage_mode || 'student_only');
         setParentPin(latestUser.parent_pin || '');
-        
-        if (latestUser.group_id) {
-          setGroupId(latestUser.group_id);
-          const { data: grpUsers } = await supabase
-            .from('users')
-            .select('id, first_name, last_name')
-            .eq('group_id', latestUser.group_id);
-          if (grpUsers) {
-            setGroupStudents(grpUsers.filter((u: any) => u.id !== student.id));
-            groupStudentIds = grpUsers.map((u: any) => u.id);
+      }
+
+      const effectiveGroupId = latestUser?.group_id || latestPending?.group_id || student.group_id || null;
+
+      let groupStudentIds = [student.id];
+      if (effectiveGroupId) {
+        setGroupId(effectiveGroupId);
+        const [uGrpRes, pGrpRes] = await Promise.all([
+          supabase.from('users').select('id, first_name, last_name').eq('group_id', effectiveGroupId),
+          supabase.from('pending_students_decrypted').select('id, first_name, last_name').eq('group_id', effectiveGroupId)
+        ]);
+
+        const combinedGrp: any[] = [];
+        const seenIds = new Set<string>();
+
+        (uGrpRes.data || []).forEach(u => {
+          if (!seenIds.has(u.id)) {
+            combinedGrp.push(u);
+            seenIds.add(u.id);
           }
-        } else {
-          setGroupId(null);
-          setGroupStudents([]);
-        }
+        });
+
+        (pGrpRes.data || []).forEach(p => {
+          if (!seenIds.has(p.id)) {
+            combinedGrp.push(p);
+            seenIds.add(p.id);
+          }
+        });
+
+        setGroupStudents(combinedGrp.filter(u => u.id !== student.id));
+        groupStudentIds = Array.from(seenIds);
+      } else {
+        setGroupId(null);
+        setGroupStudents([]);
+      }
 
         // Fetch parent consent logs
         const { data: cLogs } = await supabase
@@ -894,51 +947,92 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           .eq('student_id', student.id)
           .order('created_at', { ascending: false });
         if (cLogs) setConsentLogs(cLogs);
-      }
 
       // Fetch other school students (for group setup dropdown list)
       const schoolIdFallback = sessionStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_school_id');
       const targetSchoolId = latestUser?.school_id || student.school_id || student.schoolId || schoolIdFallback;
 
-      if (targetSchoolId) {
-        const [usersRes, pendingRes] = await Promise.all([
-          supabase
-            .from('users')
-            .select('id, first_name, last_name, role')
-            .eq('school_id', targetSchoolId)
-            .neq('id', student.id),
-          supabase
-            .from('pending_students')
-            .select('id, first_name, last_name')
-            .eq('school_id', targetSchoolId)
-            .neq('id', student.id)
-        ]);
+      const teacherIdToFilter = (currentUserRole === 'teacher' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_user_role') === 'teacher'))
+        ? (currentTeacherId || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null))
+        : null;
 
-        const combinedStudents: any[] = [];
-        const addedIds = new Set<string>();
+      const [usersRes, pendingRes, byTeacherUsers, byTeacherPending, schedsRes] = await Promise.all([
+        targetSchoolId
+          ? supabase.from('users').select('id, first_name, last_name, role, teacher_id').eq('school_id', targetSchoolId).neq('id', student.id)
+          : Promise.resolve({ data: [], error: null }),
+        targetSchoolId
+          ? supabase.from('pending_students_decrypted').select('id, first_name, last_name, teacher_id').eq('school_id', targetSchoolId).neq('id', student.id)
+          : Promise.resolve({ data: [], error: null }),
+        teacherIdToFilter
+          ? supabase.from('users').select('id, first_name, last_name, role, teacher_id').eq('teacher_id', teacherIdToFilter).neq('id', student.id)
+          : Promise.resolve({ data: [], error: null }),
+        teacherIdToFilter
+          ? supabase.from('pending_students_decrypted').select('id, first_name, last_name, teacher_id').eq('teacher_id', teacherIdToFilter).neq('id', student.id)
+          : Promise.resolve({ data: [], error: null }),
+        teacherIdToFilter
+          ? supabase.from('schedules').select('*, student:users!student_id(*)').eq('teacher_id', teacherIdToFilter)
+          : Promise.resolve({ data: [], error: null })
+      ]);
 
-        if (usersRes.data) {
-          usersRes.data.forEach((u: any) => {
-            if (!u.role || u.role === 'student') {
+      const combinedStudents: any[] = [];
+      const addedIds = new Set<string>();
+
+      const isAssignedToTeacher = (u: any) => {
+        if (!teacherIdToFilter) return true; // Admins/Secretaries see all school students
+        if (u.teacher_id === teacherIdToFilter) return true;
+        if (student.teacher_id && student.teacher_id === teacherIdToFilter) return true;
+        return false;
+      };
+
+      if (byTeacherUsers.data) {
+        byTeacherUsers.data.forEach((u: any) => {
+          if (u && u.id && u.id !== student.id && (!u.role || u.role === 'student')) {
+            combinedStudents.push(u);
+            addedIds.add(u.id);
+          }
+        });
+      }
+
+      if (byTeacherPending.data) {
+        byTeacherPending.data.forEach((p: any) => {
+          if (p && p.id && p.id !== student.id && !addedIds.has(p.id)) {
+            combinedStudents.push(p);
+            addedIds.add(p.id);
+          }
+        });
+      }
+
+      if (schedsRes.data) {
+        schedsRes.data.forEach((sc: any) => {
+          const u = sc.student || sc.users;
+          if (u && u.id && u.id !== student.id && !addedIds.has(u.id)) {
+            combinedStudents.push(u);
+            addedIds.add(u.id);
+          }
+        });
+      }
+
+      if (usersRes.data) {
+        usersRes.data.forEach((u: any) => {
+          if (!u.role || u.role === 'student') {
+            if (isAssignedToTeacher(u) && !addedIds.has(u.id)) {
               combinedStudents.push(u);
               addedIds.add(u.id);
             }
-          });
-        }
-
-        if (pendingRes.data) {
-          pendingRes.data.forEach((p: any) => {
-            if (!addedIds.has(p.id)) {
-              combinedStudents.push(p);
-              addedIds.add(p.id);
-            }
-          });
-        }
-
-        setSchoolStudents(combinedStudents);
-      } else {
-        setSchoolStudents([]);
+          }
+        });
       }
+
+      if (pendingRes.data) {
+        pendingRes.data.forEach((p: any) => {
+          if (isAssignedToTeacher(p) && !addedIds.has(p.id)) {
+            combinedStudents.push(p);
+            addedIds.add(p.id);
+          }
+        });
+      }
+
+      setSchoolStudents(combinedStudents);
 
       // Fetch skills (shared for group if linked)
       const { data: skillsData } = await supabase
@@ -1771,8 +1865,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </button>
             </div>
           ) : (
-            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span>{firstName} {maskLastName(lastName, showRealNames)}</span>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span>
+                {firstName} {maskLastName(lastName, showRealNames)}
+                {groupStudents.length > 0 && (
+                  <span style={{ color: '#3b82f6', fontWeight: 800 }}>
+                    {groupStudents.map(g => ` & ${g.first_name} ${maskLastName(g.last_name, showRealNames)}`).join('')}
+                  </span>
+                )}
+              </span>
+              {groupStudents.length > 0 && (
+                <span style={{ 
+                  background: '#e0f2fe', 
+                  color: '#0284c7', 
+                  border: '1px solid #bae6fd', 
+                  fontSize: '0.7rem', 
+                  fontWeight: 800, 
+                  padding: '3px 9px', 
+                  borderRadius: '12px' 
+                }}>
+                  👥 Partner-Gruppe
+                </span>
+              )}
               <button 
                 onClick={() => toggleRealNames()}
                 style={{
@@ -2868,7 +2982,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                           return (
                             <button
                               key={dur}
-                              onClick={() => handleUpdateDuration(dur)}
+                              onClick={() => {
+                                if (dur !== lessonDuration) {
+                                  setConfirmDurationModal({ open: true, targetDuration: dur });
+                                }
+                              }}
                               style={{
                                 background: isSelected ? '#ffffff' : 'transparent',
                                 color: isSelected ? '#1e293b' : '#64748b',
@@ -2947,7 +3065,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                         Dieser Schüler hat aktuell Einzelunterricht.
                       </div>
 
-                      {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
+                      {(currentUserRole === 'admin' || currentUserRole === 'secretary' || currentUserRole === 'teacher' || (typeof window !== 'undefined' && ['teacher', 'admin', 'secretary'].includes((sessionStorage.getItem('groovelab_user_role') || '').toLowerCase()))) && (
                         <>
                           {!showGroupSelector ? (
                             <button
@@ -3025,9 +3143,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                                       .map(s => (
                                         <div
                                           key={s.id}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            setSelectedStudentToLink(s.id);
+                                            setStudentSearchQuery(`${s.first_name || ''} ${s.last_name || ''}`.trim());
+                                            setSearchDropdownOpen(false);
+                                          }}
                                           onClick={() => {
                                             setSelectedStudentToLink(s.id);
-                                            setStudentSearchQuery(`${s.first_name || ''} ${s.last_name || ''}`);
+                                            setStudentSearchQuery(`${s.first_name || ''} ${s.last_name || ''}`.trim());
                                             setSearchDropdownOpen(false);
                                           }}
                                           style={{
@@ -4168,6 +4292,88 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           initialViewMode="document"
           isTeacherTools={false}
         />
+      )}
+      {confirmDurationModal?.open && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '28px',
+            maxWidth: '420px',
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+            border: '1px solid #f1f5f9',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#fef3c7',
+              color: '#d97706',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto'
+            }}>
+              <AlertTriangle size={28} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: '0 0 10px 0' }}>
+              Unterrichtsdauer ändern?
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: '0 0 24px 0', lineHeight: 1.5 }}>
+              Möchtest du die Unterrichtsdauer für <strong style={{ color: '#0f172a' }}>{firstName} {lastName}</strong> wirklich von <span style={{ textDecoration: 'line-through' }}>{lessonDuration} Min</span> auf <strong style={{ color: '#2563eb' }}>{confirmDurationModal.targetDuration} Min</strong> ändern?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setConfirmDurationModal(null)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => handleUpdateDuration(confirmDurationModal.targetDuration)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#34a853',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)'
+                }}
+              >
+                Ja, Ändern
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

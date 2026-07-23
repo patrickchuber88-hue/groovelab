@@ -5330,7 +5330,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         birth_date: finalBirthDate,
         instrument: newStudentInstrument || 'Nicht festgelegt',
         school_id: schoolId,
-        teacher_id: teacherId
+        teacher_id: teacherId,
+        lesson_duration: newStudentDuration || 30
       });
 
       if (insertError) throw insertError;
@@ -5371,7 +5372,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         birth_date: finalBirthDate,
         instrument: newStudentInstrument || 'Nicht festgelegt',
         school_id: schoolId,
-        teacher_id: teacherId
+        teacher_id: teacherId,
+        lesson_duration: newStudentDuration || 30
       });
 
       if (insertError) throw insertError;
@@ -5532,16 +5534,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
             birth_date: finalBirthDate,
             instrument: instrument,
             school_id: schoolId,
-            teacher_id: teacherId || null
+            teacher_id: teacherId || null,
+            lesson_duration: bulkImportDuration || 30
           });
 
           if (rpcError) throw rpcError;
-          if (data && bulkImportDuration) {
-            const sid = typeof data === 'string' ? data : (data as any)?.id;
-            if (sid) {
-              await supabase.from('users').update({ lesson_duration: bulkImportDuration }).eq('id', sid);
-            }
-          }
           successCount++;
         } catch (err: any) {
           console.error('Import error for line:', line, err);

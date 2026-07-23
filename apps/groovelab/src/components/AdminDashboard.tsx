@@ -2089,8 +2089,8 @@ export function AdminDashboard({
             school_id: ps.school_id,
             teacher_id: ps.teacher_id,
             role: 'student',
-            first_name: ps.first_name || 'Ausstehendes',
-            last_name: ps.last_name || 'Onboarding',
+            first_name: ps.first_name || 'Ausstehender Schüler',
+            last_name: ps.last_name || '',
             email: '',
             instrument: ps.instrument || 'Gitarre',
             is_active: false,
@@ -2250,8 +2250,8 @@ export function AdminDashboard({
                   school_id: ps.school_id,
                   teacher_id: ps.teacher_id,
                   role: 'student',
-                  first_name: ps.first_name || 'Ausstehendes',
-                  last_name: ps.last_name || 'Onboarding',
+                  first_name: ps.first_name || 'Ausstehender Schüler',
+                  last_name: ps.last_name || '',
                   email: '',
                   instrument: ps.instrument || 'Gitarre',
                   is_active: false,
@@ -5462,89 +5462,132 @@ export function AdminDashboard({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%' }}>
-            {students.filter(s => {
-              const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
-              if (listType === 'active' && isArchived) return false;
-              if (listType === 'archive' && !isArchived) return false;
+            {(() => {
+              const filtered = students.filter(s => {
+                const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
+                if (listType === 'active' && isArchived) return false;
+                if (listType === 'archive' && !isArchived) return false;
 
-              const inst = s.instrument?.toLowerCase() || 'gitarre';
-              let normInst = s.instrument || 'Gitarre';
-              if (inst.includes('guitar') || inst.includes('gitarre')) normInst = 'Gitarre';
-              else if (inst.includes('bass')) normInst = 'Bass';
-              else if (inst.includes('drum') || inst.includes('schlagzeug')) normInst = 'Drums';
-              else if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier')) normInst = 'Piano';
-              else if (inst.includes('vocal') || inst.includes('gesang')) normInst = 'Vocals';
+                const inst = s.instrument?.toLowerCase() || 'gitarre';
+                let normInst = s.instrument || 'Gitarre';
+                if (inst.includes('guitar') || inst.includes('gitarre')) normInst = 'Gitarre';
+                else if (inst.includes('bass')) normInst = 'Bass';
+                else if (inst.includes('drum') || inst.includes('schlagzeug')) normInst = 'Drums';
+                else if (inst.includes('piano') || inst.includes('keys') || inst.includes('klavier')) normInst = 'Piano';
+                else if (inst.includes('vocal') || inst.includes('gesang')) normInst = 'Vocals';
 
-              if (instrumentFilter !== 'all' && normInst !== instrumentFilter) return false;
+                if (instrumentFilter !== 'all' && normInst !== instrumentFilter) return false;
 
-              const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
-              return fullName.includes(studentSearch.toLowerCase());
-            }).map(s => {
-              const avatarSrc = getInstrumentAvatarUrl(s.instrument);
+                const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+                return fullName.includes(studentSearch.toLowerCase());
+              });
 
-              return (
-                <div 
-                  key={s.id} 
-                  className="glass-panel" 
-                  style={{ 
-                    padding: '18px 22px', 
-                    background: 'white', 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    borderRadius: '24px', 
-                    border: '1px solid #e2e8f0', 
-                    borderLeft: `6px solid ${brandColor}`, 
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                    transition: 'transform 0.2s, box-shadow 0.2s', 
-                    cursor: 'default' 
-                  }} 
-                >
+              // Group merging logic for teacher board
+              const groupMap: Record<string, any[]> = {};
+              filtered.forEach(s => {
+                if (s.group_id) {
+                  if (!groupMap[s.group_id]) groupMap[s.group_id] = [];
+                  groupMap[s.group_id].push(s);
+                }
+              });
+
+              const displayStudents: any[] = [];
+              const processedGroupIds = new Set<string>();
+
+              filtered.forEach(s => {
+                if (s.group_id && groupMap[s.group_id]?.length >= 2) {
+                  if (!processedGroupIds.has(s.group_id)) {
+                    processedGroupIds.add(s.group_id);
+                    const members = groupMap[s.group_id];
+                    const mergedStudent = {
+                      ...members[0],
+                      id: members[0].id,
+                      first_name: members.map(m => `${m.first_name || ''} ${maskLastName(m.last_name, showRealNames)}`.trim()).join(' & '),
+                      last_name: '',
+                      isGroup: true,
+                      group_id: s.group_id,
+                      groupStudents: members
+                    };
+                    displayStudents.push(mergedStudent);
+                  }
+                } else {
+                  displayStudents.push(s);
+                }
+              });
+
+              return displayStudents.map(s => {
+                const avatarSrc = getInstrumentAvatarUrl(s.instrument);
+
+                return (
                   <div 
-                    onClick={() => fetchStudentProfile(s)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+                    key={s.id} 
+                    className="glass-panel" 
+                    style={{ 
+                      padding: '18px 22px', 
+                      background: 'white', 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      borderRadius: '24px', 
+                      border: '1px solid #e2e8f0', 
+                      borderLeft: `6px solid ${brandColor}`, 
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                      transition: 'transform 0.2s, box-shadow 0.2s', 
+                      cursor: 'default' 
+                    }} 
                   >
-                    <div style={{ position: 'relative' }}>
-                      <div style={{ 
-                        width: '56px', 
-                        height: '56px', 
-                        borderRadius: '16px', 
-                        background: `${brandColor}15`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        border: '2px solid white',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                        position: 'relative'
-                      }}>
-                        <span style={{ fontSize: '1.2rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
-                        <img 
-                          src={resolveUserAvatar(s, activePlatform)} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                    <div 
+                      onClick={() => fetchStudentProfile(s)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1 }}
+                    >
+                      <div style={{ position: 'relative' }}>
+                        <div style={{ 
+                          width: '56px', 
+                          height: '56px', 
+                          borderRadius: '16px', 
+                          background: `${brandColor}15`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          border: '2px solid white',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                          position: 'relative'
+                        }}>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: brandColor, position: 'absolute', zIndex: 0 }}>{s.first_name?.[0]}</span>
+                          <img 
+                            src={resolveUserAvatar(s, activePlatform)} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontWeight: 900, color: '#000000', fontSize: '1.1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>
+                          {s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {s.isGroup && (
+                            <div style={{ padding: '2px 6px', background: '#e0f2fe', color: '#0284c7', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
+                              👥 Gruppe
+                            </div>
+                          )}
+                          {s.is_trial ? (
+                            <div style={{ padding: '2px 6px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
+                              ⏳ PROBE
+                            </div>
+                          ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
+                            <div style={{ padding: '2px 6px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#eab308', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
+                              Aktiv
+                            </div>
+                          ) : (
+                            <div style={{ padding: '2px 6px', background: '#f1f3f4', color: '#5f6368', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
+                              Inaktiv
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ fontWeight: 900, color: '#000000', fontSize: '1.1rem', letterSpacing: '-0.01em', lineHeight: '1.2' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {s.is_trial ? (
-                          <div style={{ padding: '2px 6px', background: '#fef7e0', color: '#b06000', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
-                            ⏳ PROBE
-                          </div>
-                        ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
-                          <div style={{ padding: '2px 6px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#eab308', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
-                            Aktiv
-                          </div>
-                        ) : (
-                          <div style={{ padding: '2px 6px', background: '#f1f3f4', color: '#5f6368', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
-                            Inaktiv
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                   <div style={{ display: 'flex', gap: '8px', marginLeft: '8px' }}>
                     {canManageStudents && (
                       <>
@@ -5644,7 +5687,8 @@ export function AdminDashboard({
                   </div>
                 </div>
               );
-            })}
+            });
+          })()}
           </div>
         </div>
       </div>

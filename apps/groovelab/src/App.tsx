@@ -5212,6 +5212,37 @@ function App() {
         content
       });
       if (error) throw error;
+
+      // Group lesson message replication: Check if recipient has a group_id
+      try {
+        let recipientGroupId: string | null = null;
+        const { data: recUser } = await supabase.from('users').select('group_id').eq('id', recipientId).maybeSingle();
+        if (recUser?.group_id) recipientGroupId = recUser.group_id;
+        else {
+          const { data: recPending } = await supabase.from('pending_students_decrypted').select('group_id').eq('id', recipientId).maybeSingle();
+          if (recPending?.group_id) recipientGroupId = recPending.group_id;
+        }
+
+        if (recipientGroupId) {
+          const { data: groupUsers } = await supabase.from('users').select('id').eq('group_id', recipientGroupId).neq('id', recipientId);
+          const { data: groupPending } = await supabase.from('pending_students_decrypted').select('id').eq('group_id', recipientGroupId).neq('id', recipientId);
+          
+          const partnerIds = new Set<string>();
+          (groupUsers || []).forEach((u: any) => { if (u?.id && u.id !== uid) partnerIds.add(u.id); });
+          (groupPending || []).forEach((p: any) => { if (p?.id && p.id !== uid) partnerIds.add(p.id); });
+
+          for (const partnerId of Array.from(partnerIds)) {
+            await supabase.from('campus_direct_messages').insert({
+              sender_id: uid,
+              recipient_id: partnerId,
+              content
+            });
+          }
+        }
+      } catch (grpErr) {
+        console.error('Error replicating group lesson message:', grpErr);
+      }
+
       fetchCampusMessages();
     } catch (err) {
       console.error('Error sending campus message:', err);

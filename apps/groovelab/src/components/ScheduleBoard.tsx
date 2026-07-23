@@ -40,6 +40,8 @@ interface Student {
   groupStudents?: Student[];
   sibling_group_id?: string;
   group_id?: string | null;
+  isOnboarded?: boolean;
+  hasPreferences?: boolean;
 }
 
 interface DayBoard {
@@ -742,31 +744,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             .in('role', ['teacher', 'admin', 'secretary'])
             .order('first_name');
           
-          const filteredTeachers = (tData || []).filter(u => {
-            const rawPlanned = u.planned_boards;
-            let loadedDrafts: any[] = [];
-            let loadedSubmittedDraftId = '';
-            if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
-              loadedDrafts = (rawPlanned as any).drafts;
-              loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
-            } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
-              loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: rawPlanned }];
-            }
-            
-            const hasDrafts = loadedDrafts && loadedDrafts.length > 0 && loadedDrafts.some(d => d.boards && d.boards.length > 0);
-            const isSubmitted = loadedSubmittedDraftId !== '';
-            
-            if (hasDrafts && !isSubmitted) {
-              return false; // exclude unsubmitted
-            }
-            return true;
-          });
-
-          teachersList = filteredTeachers;
+          teachersList = tData || [];
           setTeachers(teachersList);
           
-          // Default to the first teacher if selectedTeacherId is still the admin's ID
-          if (selectedTeacherId === userId && teachersList.length > 0) {
+          // Default to the first teacher ONLY if the logged-in user is NOT a teacher in the list
+          const isUserATeacher = teachersList.some(t => t.id === userId);
+          if (!isUserATeacher && selectedTeacherId === userId && teachersList.length > 0) {
             const firstTeacher = teachersList.find(t => t.id !== userId) || teachersList[0];
             if (firstTeacher) {
               setSelectedTeacherId(firstTeacher.id);
@@ -789,54 +772,82 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         setNewBoardRoom(loadedRooms[0].id);
       }
       
-      // 2. Fetch all students for the selected teacher who are in the school
-      const { data: sData } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id')
-        .eq('school_id', schoolId)
-        .eq('role', 'student')
-        .eq('teacher_id', selectedTeacherId)
-        ;
-
-      // Fetch pending students from pending_students_decrypted view
-      const { data: pendingData } = await supabase
-        .from('pending_students_decrypted')
-        .select('id, first_name, last_name, instrument, sibling_group_id')
-        .eq('school_id', schoolId)
-        .eq('teacher_id', selectedTeacherId);
-
-      // Fetch statuses and parent notes for all teacher's students
+      // 2. Fetch statuses and student IDs assigned to this teacher from students table
       const { data: allStudentsDb } = await supabase
         .from('students')
-        .select('id, status')
+        .select('id, status, teacher_id')
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
       const statusMap: Record<string, string> = {};
+      const stDbStudentIds: string[] = [];
       allStudentsDb?.forEach(st => {
         statusMap[st.id] = st.status;
+        if (st.id) stDbStudentIds.push(st.id);
       });
-      
+
+      // Fetch students from users table assigned to this teacher (or linked via students table)
+      let userQuery = supabase
+        .from('users')
+        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
+        .eq('school_id', schoolId)
+        .eq('role', 'student');
+
+      if (stDbStudentIds.length > 0) {
+        userQuery = userQuery.or(`teacher_id.eq.${selectedTeacherId},id.in.(${stDbStudentIds.join(',')})`);
+      } else {
+        userQuery = userQuery.eq('teacher_id', selectedTeacherId);
+      }
+
+      const { data: sData } = await userQuery;
+
+      // Fetch pending students from pending_students_decrypted view
+      const { data: pendingData } = await supabase
+        .from('pending_students_decrypted')
+        .select('id, first_name, last_name, instrument, lesson_duration')
+        .eq('school_id', schoolId)
+        .eq('teacher_id', selectedTeacherId);
+
+      // Collect all student IDs to check student_schedule_preferences
+      const rawAllStudentIds = [
+        ...(sData || []).map(s => s.id),
+        ...(pendingData || []).map((s: any) => s.id)
+      ];
+
+      const prefSubmittedSet = new Set<string>();
+      if (rawAllStudentIds.length > 0) {
+        const { data: prefRows } = await supabase
+          .from('student_schedule_preferences')
+          .select('student_id')
+          .in('student_id', rawAllStudentIds);
+
+        prefRows?.forEach(p => prefSubmittedSet.add(p.student_id));
+      }
+
       const loadedStudents: Student[] = [
         ...(sData || []).map(s => ({
           id: s.id,
           first_name: s.first_name,
           last_name: s.last_name,
           instrument: s.instrument || 'Musiker',
-          duration: s.lesson_duration || 45, // Load lesson_duration from DB
+          duration: s.lesson_duration || 45,
           status: (statusMap[s.id] || 'verplant') as any,
           sibling_group_id: s.sibling_group_id,
-          group_id: s.group_id
+          group_id: s.group_id,
+          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
+          hasPreferences: prefSubmittedSet.has(s.id)
         })),
-        ...(pendingData || []).map(s => ({
+        ...(pendingData || []).map((s: any) => ({
           id: s.id,
           first_name: s.first_name,
           last_name: s.last_name,
           instrument: s.instrument || 'Musiker',
-          duration: 45, // default duration
+          duration: s.lesson_duration || 30,
           status: 'ausstehend' as const,
           sibling_group_id: s.sibling_group_id,
-          group_id: null
+          group_id: s.group_id || null,
+          isOnboarded: false,
+          hasPreferences: prefSubmittedSet.has(s.id)
         }))
       ];
 
@@ -1264,6 +1275,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .eq('id', selectedTeacherId);
         
       if (error) throw error;
+      
+      try {
+        localStorage.setItem('groovelab_teacher_availability', JSON.stringify(availabilityJson));
+        if (selectedTeacherId) {
+          localStorage.setItem(`groovelab_teacher_availability_${selectedTeacherId}`, JSON.stringify(availabilityJson));
+        }
+      } catch (e) {}
       
       // Auto-initialize standard draft boards for the selected days
       await loadInitialData();
@@ -2797,6 +2815,56 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
+  const handleHardResetSystem = async () => {
+    if (!await showConfirm("🚨 Möchtest du WIRKLICH alle bisher eingereichten Stundenpläne komplett löschen und von vorne beginnen? Dies kann nicht rückgängig gemacht werden!")) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // 1. Delete all schedule slots for this teacher
+      await supabase
+        .from('schedules')
+        .delete()
+        .eq('teacher_id', selectedTeacherId);
+        
+      // 2. Delete all future schedule_occurrences
+      const todayStr = new Date().toISOString().split('T')[0];
+      await supabase
+        .from('schedule_occurrences')
+        .delete()
+        .eq('teacher_id', selectedTeacherId)
+        .gte('date', todayStr);
+        
+      // 3. Clear draft state in users table
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
+      await supabase
+        .from('users')
+        .update({ [columnName]: null })
+        .eq('id', selectedTeacherId);
+        
+      // 4. Force refresh of the data
+      setHasSubmittedSchedule(false);
+      setScheduleStatus('none');
+      setDrafts([{ id: `draft-${crypto.randomUUID()}`, name: 'Entwurf 1', boards: [] }]);
+      setBoards([]);
+      
+      await loadInitialData();
+      
+      setToast({
+        message: "Stundenplan-Altlasten wurden erfolgreich gelöscht.",
+        type: 'success'
+      });
+    } catch (err: any) {
+      console.error('Error in hard reset:', err);
+      await showAlert('Fehler beim Zurücksetzen: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Lock in schedule and send to Secretariat
   const handleLockAndSend = async () => {
     const unassignedCount = students.filter(s => !s.assignedDay).length;
@@ -3154,34 +3222,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     onboardingOverlayContent = (
       <div style={{
         background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
-        borderRadius: '20px',
-        padding: '24px 32px',
-        maxWidth: '750px',
-        margin: '24px auto',
+        borderRadius: '16px',
+        padding: '16px 24px',
+        maxWidth: '500px',
+        margin: '12px auto',
         border: '1px solid #e2e8f0',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.05)',
+        boxShadow: '0 12px 36px rgba(0,0,0,0.06)',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ height: '48px', width: '48px', background: '#e6f4ea', color: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
-            <Calendar size={24} />
+        <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+          <div style={{ height: '36px', width: '36px', background: '#e6f4ea', color: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px auto' }}>
+            <Calendar size={18} />
           </div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: '0 0 4px 0', fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
             Persönliches Onboarding
           </h2>
-          <p style={{ color: '#475569', fontSize: '0.82rem', lineHeight: '1.4', maxWidth: '620px', margin: '0 auto' }}>
-            Bevor du den Stundenplan-Designer nutzen kannst, richte bitte deine Wunschtage und Unterrichtszeiten ein. Deine Schüler sehen beim Onboarding nur die hier ausgewählten Wochentage und können Wunschzeiten nur innerhalb der von dir festgelegten Zeitfenster angeben.
+          <p style={{ color: '#475569', fontSize: '0.78rem', lineHeight: '1.35', maxWidth: '440px', margin: '0 auto' }}>
+            Bevor du den Stundenplan-Designer nutzen kannst, richte bitte deine Wunschtage und Unterrichtszeiten ein. Deine Schüler sehen beim Onboarding nur die hier ausgewählten Wochentage und Zeitfenster.
           </p>
         </div>
 
         {onboardingError && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '10px 14px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 600, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <AlertCircle size={14} />
             <span>{onboardingError}</span>
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '16px' }}>
           {DAYS_OF_WEEK.map(day => {
             const cfg = onboardingAvailability[day.value];
             return (
@@ -3189,14 +3257,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '10px 16px',
-                borderRadius: '12px',
+                padding: '6px 12px',
+                borderRadius: '8px',
                 background: cfg.checked ? '#ffffff' : '#f8fafc',
-                border: cfg.checked ? '1.5px solid #34a853' : '1.5px solid #e2e8f0',
+                border: cfg.checked ? '1.5px solid #34a853' : '1px solid #e2e8f0',
                 transition: 'all 0.2s',
-                boxShadow: cfg.checked ? '0 4px 12px rgba(52, 168, 83, 0.04)' : 'none'
+                boxShadow: cfg.checked ? '0 2px 6px rgba(52, 168, 83, 0.05)' : 'none'
               }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 700, color: '#1e293b', fontSize: '0.9rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>
                   <input
                     type="checkbox"
                     checked={cfg.checked}
@@ -3208,8 +3276,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     }}
                     style={{
                       accentColor: '#34a853',
-                      width: '16px',
-                      height: '16px',
+                      width: '15px',
+                      height: '15px',
                       cursor: 'pointer'
                     }}
                   />
@@ -3217,9 +3285,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </label>
 
                 {cfg.checked && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Von:</span>
                       <input
                         type="time"
                         value={cfg.start || ''}
@@ -3230,10 +3298,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '4px 8px',
+                          padding: '2px 6px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.8rem',
+                          fontSize: '0.78rem',
                           fontWeight: 700,
                           color: '#1e293b',
                           background: '#ffffff',
@@ -3243,8 +3311,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       />
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Bis:</span>
                       <input
                         type="time"
                         value={cfg.end || ''}
@@ -3255,10 +3323,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }));
                         }}
                         style={{
-                          padding: '4px 8px',
+                          padding: '2px 6px',
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1',
-                          fontSize: '0.8rem',
+                          fontSize: '0.78rem',
                           fontWeight: 700,
                           color: '#1e293b',
                           background: '#ffffff',
@@ -3280,22 +3348,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           disabled={onboardingSubmitting}
           style={{
             width: '100%',
-            padding: '14px',
-            borderRadius: '16px',
+            padding: '10px 16px',
+            borderRadius: '10px',
             border: 'none',
             background: '#34a853',
             color: '#ffffff',
             fontWeight: 800,
-            fontSize: '1rem',
+            fontSize: '0.88rem',
             cursor: onboardingSubmitting ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s',
-            boxShadow: '0 8px 24px rgba(52, 168, 83, 0.2)',
+            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px'
+            gap: '6px'
           }}
-          onMouseOver={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#34a853'; }}
+          onMouseOver={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#2d9247'; }}
           onMouseOut={(e) => { if (!onboardingSubmitting) e.currentTarget.style.backgroundColor = '#34a853'; }}
         >
           {onboardingSubmitting ? 'Wird gespeichert...' : 'Verfügbarkeit speichern & Stundenplan freischalten'}
@@ -3550,6 +3618,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
               {/* Right: Status + Senden */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleHardResetSystem}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                    fontWeight: 600,
+                    padding: '8px 14px',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                  title="Stundenplan und Pool komplett auf Null zurücksetzen (Altlasten löschen)"
+                >
+                  <Trash2 size={14} />
+                  <span>System-Reset</span>
+                </button>
                 {hasSubmittedSchedule && scheduleStatus === 'approved' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.65)', border: '1px solid rgba(52, 168, 83, 0.25)', color: '#34a853', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
                     <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span>
@@ -4435,31 +4527,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const isGroovelabTheme = localStorage.getItem('groovelab_active_platform') === 'groovelab';
                         const isAdminViewTheme = currentUserRole === 'admin' || currentUserRole === 'secretary';
 
-                        let cardPrimaryColor = '#34a853'; // Campus Green
-                        let cardLightBg = 'rgba(52, 168, 83, 0.06)';
-                        let cardBorderColor = 'rgba(52, 168, 83, 0.2)';
-                        let cardTextColor = '#34a853';
-                        let cardLightText = '#1e3524';
+                        const studentInPool = students.find((s: Student) => s.id === bs.id);
+                        const isPendingOnboarding = bs.status === 'ausstehend' || (studentInPool ? (studentInPool.status === 'ausstehend' || studentInPool.isOnboarded === false) : false);
 
-                        if (isAdminViewTheme) {
-                          cardPrimaryColor = '#ea4335'; // Admin Red
-                          cardLightBg = 'rgba(234, 67, 53, 0.06)';
-                          cardBorderColor = 'rgba(234, 67, 53, 0.2)';
-                          cardTextColor = '#dc2626';
-                          cardLightText = '#450a0a';
-                        } else if (isGroovelabTheme) {
-                          cardPrimaryColor = '#ca8a04'; // GrooveLab Dark Yellow
-                          cardLightBg = 'rgba(254, 252, 232, 0.9)'; // Sleek yellow glassmorphism
-                          cardBorderColor = 'rgba(234, 179, 8, 0.25)';
-                          cardTextColor = '#854d0e';
-                          cardLightText = '#422006';
-                        } else if (!isCampusTheme) {
-                          // Blue fallback
-                          cardPrimaryColor = '#3b82f6';
-                          cardLightBg = 'rgba(59, 130, 246, 0.06)';
-                          cardBorderColor = 'rgba(59, 130, 246, 0.2)';
-                          cardTextColor = '#1d4ed8';
-                          cardLightText = '#1e3a8a';
+                        let cardPrimaryColor = isPendingOnboarding ? '#64748b' : '#34a853'; // Grey vs Campus Green
+                        let cardLightBg = isPendingOnboarding ? 'rgba(100, 116, 139, 0.08)' : 'rgba(52, 168, 83, 0.06)';
+                        let cardBorderColor = isPendingOnboarding ? 'rgba(100, 116, 139, 0.3)' : 'rgba(52, 168, 83, 0.2)';
+                        let cardTextColor = isPendingOnboarding ? '#475569' : '#34a853';
+                        let cardLightText = isPendingOnboarding ? '#334155' : '#1e3524';
+
+                        if (!isPendingOnboarding) {
+                          if (isAdminViewTheme) {
+                            cardPrimaryColor = '#ea4335'; // Admin Red
+                            cardLightBg = 'rgba(234, 67, 53, 0.06)';
+                            cardBorderColor = 'rgba(234, 67, 53, 0.2)';
+                            cardTextColor = '#dc2626';
+                            cardLightText = '#450a0a';
+                          } else if (isGroovelabTheme) {
+                            cardPrimaryColor = '#ca8a04'; // GrooveLab Dark Yellow
+                            cardLightBg = 'rgba(254, 252, 232, 0.9)'; // Sleek yellow glassmorphism
+                            cardBorderColor = 'rgba(234, 179, 8, 0.25)';
+                            cardTextColor = '#854d0e';
+                            cardLightText = '#422006';
+                          } else if (!isCampusTheme) {
+                            // Blue fallback
+                            cardPrimaryColor = '#3b82f6';
+                            cardLightBg = 'rgba(59, 130, 246, 0.06)';
+                            cardBorderColor = 'rgba(59, 130, 246, 0.2)';
+                            cardTextColor = '#1d4ed8';
+                            cardLightText = '#1e3a8a';
+                          }
                         }
 
                         const cardBg = hasConflict
@@ -4932,7 +5029,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         {s.status === 'ausstehend' ? (
                           <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Ausstehend</span>
                         ) : (
-                          <span style={{ height: '5px', width: '5px', borderRadius: '50%', background: isAssigned ? '#34a853' : '#d1d1d6', flexShrink: 0 }}></span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title={s.hasPreferences ? 'Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)' : 'Noch keine Wunsch- & Sperrzeiten eingereicht (Stundenplan-Onboarding ausstehend)'}>
+                            <span style={{
+                              height: '7px',
+                              width: '7px',
+                              borderRadius: '50%',
+                              background: s.hasPreferences ? '#34a853' : '#94a3b8',
+                              boxShadow: s.hasPreferences ? '0 0 6px rgba(52, 168, 83, 0.35)' : 'none',
+                              flexShrink: 0
+                            }}></span>
+                          </div>
                         )}
                       </div>
 

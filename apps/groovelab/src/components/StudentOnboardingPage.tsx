@@ -104,6 +104,16 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   };
 
   useEffect(() => {
+    document.title = 'Campus-Groovelab';
+    try {
+      const favLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+      if (favLink) {
+        favLink.href = '/pwa-icon.png';
+      }
+    } catch (e) {
+      // ignore
+    }
+
     const fetchOnboardingDetails = async () => {
       try {
         setLoading(true);
@@ -129,12 +139,48 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         }
 
         if (userErr) throw userErr;
+
+        // Fallback for pending students (stored in pending_students_decrypted view)
+        if (!userData && token) {
+          try {
+            const { data: pendingData } = await supabase
+              .from('pending_students_decrypted')
+              .select('*')
+              .eq('id', token)
+              .maybeSingle();
+
+            if (pendingData) {
+              userData = {
+                ...pendingData,
+                role: 'student',
+                isPendingOnboarding: true,
+                qr_token: pendingData.id
+              };
+              userErr = null;
+            }
+          } catch (pe) {
+            console.warn('[Onboarding] Fallback pending_students_decrypted query warning:', pe);
+          }
+        }
+
         if (!userData) {
           throw new Error('Ungültiger Onboarding-Link oder Code nicht gefunden.');
         }
 
+        let schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
+        if (!schoolObj && userData.school_id) {
+          const { data: sData } = await supabase
+            .from('schools')
+            .select('*')
+            .eq('id', userData.school_id)
+            .maybeSingle();
+          if (sData) {
+            schoolObj = sData;
+            userData.schools = sData;
+          }
+        }
+
         setStudent(userData);
-        const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
         setSchool(schoolObj);
 
         // Fetch schedule preference status

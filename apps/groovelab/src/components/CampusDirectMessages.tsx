@@ -428,211 +428,125 @@ export default function CampusDirectMessages({
     const fetchAssignedStudents = async () => {
       try {
         const teacherId = user?.id || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
+        if (!teacherId) return;
+
+        const userRole = (user?.role || '').toLowerCase();
+        const isAdminOrSecretary = userRole === 'admin' || userRole === 'secretary';
         const studentMap = new Map<string, any>();
 
-        // 1. Unconditional direct queries for all non-staff users and pending_students
-        try {
-          const { data: allUsersInDb } = await supabase.from('users').select('*');
-          (allUsersInDb || []).forEach((u: any) => {
-            if (u && u.id && u.id !== teacherId) {
-              const r = (u.role || '').toLowerCase();
-              if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-                studentMap.set(u.id, u);
-              }
-            }
-          });
-        } catch (e) {}
+        if (isAdminOrSecretary) {
+          // Admins & Secretariats see all students in their school
+          let targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
+          if (!targetSchoolId && typeof window !== 'undefined') {
+            targetSchoolId = sessionStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_school_id');
+          }
 
-        try {
-          const { data: allPendingInDb } = await supabase.from('pending_students_decrypted').select('*');
-          (allPendingInDb || []).forEach((p: any) => {
-            if (p && p.id && p.id !== teacherId) {
+          let query = supabase.from('users').select('*').eq('role', 'student').order('first_name');
+          if (targetSchoolId) {
+            query = query.eq('school_id', targetSchoolId);
+          }
+          const { data: schoolStudents } = await query;
+          (schoolStudents || []).forEach(u => {
+            if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+          });
+
+          // Also add pending students for the school
+          let pQuery = supabase.from('pending_students_decrypted').select('*');
+          if (targetSchoolId) {
+            pQuery = pQuery.eq('school_id', targetSchoolId);
+          }
+          const { data: pStudents } = await pQuery;
+          (pStudents || []).forEach(p => {
+            if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
               studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
             }
           });
-        } catch (e) {}
+        } else {
+          // Teachers ONLY see their strictly assigned students!
+          const assignedStudentIds = new Set<string>();
 
-        // 1b. Fetch current user's profile to resolve exact school_id from all possible sources
-        let targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
-        if (!targetSchoolId && typeof window !== 'undefined') {
-          targetSchoolId = sessionStorage.getItem('groovelab_school_id') || 
-                           localStorage.getItem('groovelab_school_id') || 
-                           sessionStorage.getItem('school_id') || 
-                           localStorage.getItem('school_id');
-        }
-        if (!targetSchoolId && teacherId) {
+          // 1. Fetch student_ids from schedules where teacher_id = teacherId
           try {
-            const { data: me } = await supabase.from('users').select('school_id').eq('id', teacherId).maybeSingle();
-            if (me?.school_id) targetSchoolId = me.school_id;
-          } catch (e) {}
-        }
-        if (!targetSchoolId) {
+            const { data: scheds, error: sErr } = await supabase
+              .from('schedules')
+              .select('student_id, teacher_id')
+              .eq('teacher_id', teacherId);
+            if (sErr) console.error('[CampusDirectMessages] error fetching schedules:', sErr);
+            (scheds || []).forEach(sc => {
+              if (sc.student_id) assignedStudentIds.add(sc.student_id);
+            });
+          } catch (e) {
+            console.error('[CampusDirectMessages] catch error fetching schedules:', e);
+          }
+
+          // 2. Direct teacher_id assignment in users table
           try {
-            const { data: anyUser } = await supabase.from('users').select('school_id').not('school_id', 'is', null).limit(1).maybeSingle();
-            if (anyUser?.school_id) targetSchoolId = anyUser.school_id;
-          } catch (e) {}
-        }
-
-        const schoolIds = new Set<string>();
-        if (targetSchoolId) schoolIds.add(targetSchoolId);
-        if (user?.school_id) schoolIds.add(user.school_id);
-        if (Array.isArray(user?.schools)) user.schools.forEach((s: any) => { if (s?.id) schoolIds.add(s.id); });
-
-        try {
-          const { data: allSchools } = await supabase.from('schools').select('id');
-          (allSchools || []).forEach(s => { if (s?.id) schoolIds.add(s.id); });
-        } catch (e) {}
-
-        // 1b. Direct teacher_id queries (Fetch all students assigned to this teacher regardless of onboarding or activation)
-        if (teacherId) {
-          try {
-            const { data: byTeacher } = await supabase.from('users').select('*').eq('teacher_id', teacherId);
+            const { data: byTeacher } = await supabase
+              .from('users')
+              .select('*')
+              .eq('teacher_id', teacherId);
             (byTeacher || []).forEach(u => {
-              if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
+              if (u && u.id && u.id !== teacherId) {
+                assignedStudentIds.add(u.id);
+                studentMap.set(u.id, u);
+              }
             });
           } catch (e) {}
 
+          // 3. Fetch users for assignedStudentIds from schedules if not already in studentMap
+          if (assignedStudentIds.size > 0) {
+            try {
+              const idsArr = Array.from(assignedStudentIds);
+              const { data: schedUsers } = await supabase
+                .from('users')
+                .select('*')
+                .in('id', idsArr);
+              (schedUsers || []).forEach(u => {
+                if (u && u.id && u.id !== teacherId) {
+                  studentMap.set(u.id, u);
+                }
+              });
+            } catch (e) {}
+          }
+
+          // 4. Pending students assigned to this teacher or created by this teacher
           try {
-            const { data: pByTeacher } = await supabase.from('pending_students_decrypted').select('*').eq('teacher_id', teacherId);
+            const { data: pByTeacher } = await supabase
+              .from('pending_students_decrypted')
+              .select('*')
+              .or(`teacher_id.eq.${teacherId},created_by.eq.${teacherId}`);
             (pByTeacher || []).forEach(p => {
-              if (p && p.id && p.id !== teacherId) studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
-            });
-          } catch (e) {}
-
-          try {
-            const { data: schedByTeacher } = await supabase.from('schedules').select('*, student:users!student_id(*)').eq('teacher_id', teacherId);
-            (schedByTeacher || []).forEach((sc: any) => {
-              const u = sc.student || sc.users;
-              if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
-            });
-          } catch (e) {}
-        }
-
-        // 2. Query each school using exact TeacherDashboard query pattern: eq('school_id', sid).eq('role', 'student')
-        for (const sid of Array.from(schoolIds)) {
-          try {
-            const { data: sExact } = await supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name');
-            (sExact || []).forEach(u => {
-              if (u && u.id && u.id !== teacherId) {
-                studentMap.set(u.id, u);
-              }
-            });
-          } catch (e) {}
-
-          try {
-            const { data: sData } = await supabase.from('users').select('*').eq('school_id', sid).order('first_name');
-            (sData || []).forEach(u => {
-              if (u && u.id && u.id !== teacherId) {
-                const r = (u.role || '').toLowerCase();
-                if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-                  studentMap.set(u.id, u);
-                }
-              }
-            });
-          } catch (e) {}
-
-          try {
-            const { data: scheds } = await supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid);
-            (scheds || []).forEach((sc: any) => {
-              const u = sc.student || sc.users;
-              if (u && u.id && u.id !== teacherId) {
-                const r = (u.role || '').toLowerCase();
-                if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-                  studentMap.set(u.id, u);
-                }
-              }
-            });
-          } catch (e) {}
-
-          try {
-            const { data: occs } = await supabase.from('schedule_occurrences').select('*, student:users!student_id(*)').eq('school_id', sid);
-            (occs || []).forEach((sc: any) => {
-              const u = sc.student || sc.users;
-              if (u && u.id && u.id !== teacherId) {
-                const r = (u.role || '').toLowerCase();
-                if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-                  studentMap.set(u.id, u);
-                }
-              }
-            });
-          } catch (e) {}
-        }
-
-        // 3. Global fallbacks across role = 'student' and all non-staff users
-        try {
-          const { data: sRoles } = await supabase.from('users').select('*').eq('role', 'student').order('first_name');
-          (sRoles || []).forEach(u => {
-            if (u && u.id && u.id !== teacherId) studentMap.set(u.id, u);
-          });
-        } catch (e) {}
-
-        try {
-          const { data: sAll } = await supabase.from('users').select('*').order('first_name');
-          (sAll || []).forEach(u => {
-            if (u && u.id && u.id !== teacherId) {
-              const r = (u.role || '').toLowerCase();
-              if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-                studentMap.set(u.id, u);
-              }
-            }
-          });
-        } catch (e) {}
-
-        // 4. Also fetch pending_students for each school and globally
-        for (const sid of Array.from(schoolIds)) {
-          try {
-            const { data: pStudents } = await supabase.from('pending_students_decrypted').select('*').eq('school_id', sid);
-            (pStudents || []).forEach(p => {
               if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
                 studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
               }
             });
           } catch (e) {}
-        }
 
-        try {
-          const { data: pAll } = await supabase.from('pending_students_decrypted').select('*');
-          (pAll || []).forEach(p => {
-            if (p && p.id && p.id !== teacherId && !studentMap.has(p.id)) {
-              studentMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
-            }
-          });
-        } catch (e) {}
-
-        // 5. Incorporate window.__groovelabAllStudents if set by TeacherDashboard
-        if (typeof window !== 'undefined' && Array.isArray((window as any).__groovelabAllStudents)) {
-          (window as any).__groovelabAllStudents.forEach((u: any) => {
-            if (u && u.id && u.id !== teacherId && !studentMap.has(u.id)) {
-              studentMap.set(u.id, u);
-            }
-          });
-        }
-
-        // Incorporate all users passed from parent schoolUsers
-        (schoolUsers || []).forEach((u: any) => {
-          if (u && u.id && u.id !== teacherId) {
-            const r = (u.role || '').toLowerCase();
-            if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-              studentMap.set(u.id, u);
-            }
-          }
-        });
-
-        // Incorporate message partners from campusMessages
-        if (campusMessages && campusMessages.length > 0) {
-          campusMessages.forEach((m: any) => {
-            const partnerId = m.sender_id === user?.id ? m.recipient_id : m.sender_id;
-            if (partnerId && partnerId !== teacherId && !studentMap.has(partnerId)) {
-              const existingInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
-              if (existingInSchool) {
-                studentMap.set(partnerId, existingInSchool);
+          // 5. Also check schoolUsers prop passed from parent
+          (schoolUsers || []).forEach((su: any) => {
+            if (su && su.id && su.id !== teacherId) {
+              if (su.teacher_id === teacherId || assignedStudentIds.has(su.id)) {
+                studentMap.set(su.id, su);
               }
             }
           });
+
+          // 6. Students who have existing messages with this teacher
+          if (campusMessages && campusMessages.length > 0) {
+            campusMessages.forEach((m: any) => {
+              const partnerId = m.sender_id === teacherId ? m.recipient_id : m.sender_id;
+              if (partnerId && partnerId !== teacherId && !studentMap.has(partnerId)) {
+                const existingInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
+                if (existingInSchool) {
+                  studentMap.set(partnerId, existingInSchool);
+                }
+              }
+            });
+          }
         }
 
         const result = Array.from(studentMap.values());
-        console.log('[CampusDirectMessages] Total fetched students:', result.length, result.map(s => s.first_name));
+        console.log('[CampusDirectMessages] Strictly assigned students for teacher:', teacherId, 'Count:', result.length);
         setAssignedStudents(result);
       } catch (err) {
         console.error('[CampusDirectMessages] Unexpected error in fetchAssignedStudents:', err);
@@ -662,17 +576,23 @@ export default function CampusDirectMessages({
     return false;
   };
 
-  // Combine schoolUsers, window.__groovelabAllStudents, and assignedStudents
-  const windowStudents = (typeof window !== 'undefined' && Array.isArray((window as any).__groovelabAllStudents)) ? (window as any).__groovelabAllStudents : [];
+  // Determine source list based on user role: Teachers only see their assigned students!
+  const userRole = (user?.role || '').toLowerCase();
+  const isAdminOrSecretary = userRole === 'admin' || userRole === 'secretary';
+
+  const sourceUsers = isAdminOrSecretary 
+    ? [...schoolUsers, ...assignedStudents] 
+    : assignedStudents;
+
   const allAvailableUsersMap = new Map<string, any>();
-  [...schoolUsers, ...windowStudents, ...assignedStudents].forEach(u => {
+  sourceUsers.forEach(u => {
     if (u && u.id) {
       allAvailableUsersMap.set(u.id, u);
     }
   });
   const allAvailableUsers = Array.from(allAvailableUsersMap.values());
 
-  // Get potential chat partners (Includes ALL non-staff students in the school)
+  // Get potential chat partners
   const chatPartners = allAvailableUsers.filter(u => {
     if (u.id === user.id) return false;
     if (selectedRecipient && u.id === selectedRecipient.id) return true;
@@ -687,6 +607,9 @@ export default function CampusDirectMessages({
                         roles.includes('teacher') || roles.includes('admin') || roles.includes('secretary');
 
     if (isStaffUser) return false;
+
+    // Remove ghost users / corrupted entries
+    if (!u.first_name || u.first_name.trim() === '') return false;
 
     return true;
   });
