@@ -379,10 +379,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
             <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
-              Campus-Groovelab App installieren
+              Campus App installieren
             </h4>
             <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500, lineHeight: '1.3' }}>
-              Schneller Zugriff auf Hausaufgaben &amp; Musikpass direkt vom Startbildschirm.
+              Schneller Zugriff auf dein Hausaufgabenheft, Übe-Timer &amp; Termine direkt vom Startbildschirm.
             </p>
           </div>
         </div>
@@ -410,7 +410,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           }}
         >
           <Download size={16} />
-          {deferredInstallPrompt ? 'Jetzt als App installieren' : (isIOS ? 'Anleitung: Zum Home-Bildschirm' : 'App auf Startbildschirm hinzufügen')}
+          {deferredInstallPrompt ? 'Jetzt Campus App installieren' : (isIOS ? 'Anleitung: Zum Home-Bildschirm' : 'Campus App auf Startbildschirm hinzufügen')}
         </button>
 
         {/* iOS Step-by-Step Guide */}
