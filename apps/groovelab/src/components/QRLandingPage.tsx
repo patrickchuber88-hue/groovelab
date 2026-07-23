@@ -734,13 +734,24 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         let studentInstrument = userData.instrument || null;
         if (!studentInstrument && userData.id) {
           try {
-            const { data: stData } = await supabase
-              .from('students')
+            const { data: psData } = await supabase
+              .from('pending_students')
               .select('instrument')
-              .or(`id.eq.${userData.id},user_id.eq.${userData.id}`)
+              .eq('id', userData.id)
               .maybeSingle();
-            if (stData?.instrument) studentInstrument = stData.instrument;
+            if (psData?.instrument) studentInstrument = psData.instrument;
           } catch (e) {}
+
+          if (!studentInstrument) {
+            try {
+              const { data: stData } = await supabase
+                .from('students')
+                .select('instrument')
+                .or(`id.eq.${userData.id},user_id.eq.${userData.id}`)
+                .maybeSingle();
+              if (stData?.instrument) studentInstrument = stData.instrument;
+            } catch (e) {}
+          }
 
           if (!studentInstrument) {
             try {
@@ -6291,7 +6302,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       Hallo {profile.first_name}! 🎵
                     </h2>
                     <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
-                      {profile.instrument || 'Musiker'}
+                      {profile.instrument || 'Schüler'}
                     </span>
                   </div>
                 )}
@@ -6494,7 +6505,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       Hallo {profile.first_name}! 🎵
                     </h2>
                     <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
-                      {profile.instrument || 'Musiker'}
+                      {profile.instrument || 'Schüler'}
                     </span>
                   </div>
                 )}
