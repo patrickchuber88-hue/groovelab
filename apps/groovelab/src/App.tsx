@@ -7072,11 +7072,19 @@ function App() {
     return <DeviceOnboardingPage token={deviceOnboardingPathMatch[1]} />;
   }
 
-  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder gespeicherter QR Token (Sofort abfangen vor allen States!)
+  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder fixer QR-Token-Link (Sofort abfangen vor allen States!)
   const urlParams = new URLSearchParams(location.search);
   const queryQrToken = urlParams.get('token') || urlParams.get('qr_token');
-  const storedQrToken = queryQrToken || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_qr_token') || localStorage.getItem('groovelab_last_qr_token')) : null);
-  const effectiveQrToken = qrPathMatch ? qrPathMatch[1] : (storedQrToken && location.pathname !== '/login' && location.pathname !== '/signup' ? storedQrToken : null);
+
+  if (!qrPathMatch && !queryQrToken && location.pathname === '/' && typeof window !== 'undefined') {
+    sessionStorage.removeItem('groovelab_qr_token');
+    localStorage.removeItem('groovelab_last_qr_token');
+  }
+
+  const sessionQrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
+  const effectiveQrToken = qrPathMatch 
+    ? qrPathMatch[1] 
+    : (queryQrToken ? queryQrToken : (location.pathname.startsWith('/qr/') && sessionQrToken ? sessionQrToken : null));
 
   if (effectiveQrToken) {
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
