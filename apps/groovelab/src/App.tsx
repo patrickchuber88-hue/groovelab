@@ -3262,11 +3262,17 @@ function App() {
       const fetchPublicPass = async () => {
         try {
           setLoadingPublicPass(true);
-          const { data, error } = await supabase
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(urlCampusPassToken);
+          const upperToken = urlCampusPassToken.toUpperCase();
+          let passQuery = supabase
             .from('users')
-            .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer')
-            .eq('qr_token', urlCampusPassToken)
-            .single();
+            .select('id, first_name, last_name, role, email, instrument, qr_token, photo_url, school_id, ausweis_id, ausweis_nummer');
+          if (isUuid) {
+            passQuery = passQuery.or(`id.eq.${urlCampusPassToken},qr_token.eq.${urlCampusPassToken},teacher_qr_token.eq.${urlCampusPassToken}`);
+          } else {
+            passQuery = passQuery.or(`teacher_qr_token.eq.${urlCampusPassToken},ausweis_nummer.eq.${urlCampusPassToken},ausweis_nummer.eq.${upperToken}`);
+          }
+          const { data, error } = await passQuery.maybeSingle();
             
           if (error) {
             console.error('[PublicPassView] Supabase error fetching user for pass:', error);
