@@ -3464,181 +3464,187 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     if (activeModalTab === 'access') {
       return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '32px', alignItems: 'start' }} className="student-detail-grid">
-          {/* Left Column: Onboarding Links (Dual Cards for Campus PWA & GrooveLab PWA) */}
+          {/* Left Column: Onboarding Link & Unified Single Pass Card */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* CARD 1: CAMPUS PWA APP & AUSWEIS */}
-            <section style={{
-              background: 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)',
-              borderRadius: '24px',
-              padding: '20px',
-              border: '1.5px solid rgba(52, 168, 83, 0.25)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <GraduationCap size={18} /> Campus App &amp; Ausweis
-                </h4>
-                <span style={{ background: '#34a853', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>
-                  Grün
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#ffffff', padding: '10px 14px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                <img src={getCampusAvatarSrc()} style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover', border: '2px solid #34a853' }} />
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Campus Pass</div>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Instrument-Avatar • Campus PWA Link</div>
-                </div>
-              </div>
+            {(() => {
+              const isCampusAct = !!isCampusActive;
+              const isGrooveAct = !!isGroovelabActive;
+              const isKombi = isCampusAct && isGrooveAct;
 
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`;
-                    navigator.clipboard.writeText(link);
-                    setCopiedCampusLink(true);
-                    setTimeout(() => setCopiedCampusLink(false), 2000);
-                  }}
-                  style={{
-                    flex: 1,
-                    background: copiedCampusLink ? '#e6f4ea' : '#34a853',
-                    color: copiedCampusLink ? '#34a853' : '#ffffff',
-                    border: copiedCampusLink ? '1.5px solid #34a853' : 'none',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  {copiedCampusLink ? <Check size={12} /> : <Copy size={12} />}
-                  <span>{copiedCampusLink ? 'Link kopiert! ✓' : 'Campus PWA Link'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQrOverlayTab('campus');
-                    setShowQrOverlay(true);
-                  }}
-                  style={{
-                    background: '#ffffff',
-                    color: '#34a853',
-                    border: '1.5px solid #34a853',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  <Award size={12} />
-                  <span>Campus Pass</span>
-                </button>
-              </div>
-            </section>
+              const cardBg = isKombi
+                ? 'linear-gradient(135deg, #e6f4ea 0%, #fefce8 100%)'
+                : isCampusAct
+                ? 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)'
+                : isGrooveAct
+                ? 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)'
+                : 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)';
 
-            {/* CARD 2: GROOVELAB PWA APP & MEMBER PASS */}
-            <section style={{
-              background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
-              borderRadius: '24px',
-              padding: '20px',
-              border: '1.5px solid rgba(234, 179, 8, 0.3)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Music size={18} /> GrooveLab App &amp; Member Pass
-                </h4>
-                <span style={{ background: '#eab308', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800 }}>
-                  Gelb
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#ffffff', padding: '10px 14px', borderRadius: '16px', border: '1px solid #fef08a' }}>
-                <img src={getGroovelabAvatarSrc()} style={{ width: '44px', height: '44px', borderRadius: '12px', objectFit: 'cover', border: '2px solid #eab308' }} />
-                <div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e' }}>Member Pass</div>
-                  <div style={{ fontSize: '0.7rem', color: '#a16207' }}>Musiker-Avatar • GrooveLab PWA Link</div>
-                </div>
-              </div>
+              const borderColor = isKombi
+                ? '#34a853'
+                : isCampusAct
+                ? 'rgba(52, 168, 83, 0.3)'
+                : isGrooveAct
+                ? 'rgba(234, 179, 8, 0.3)'
+                : '#e2e8f0';
 
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=groovelab`;
-                    navigator.clipboard.writeText(link);
-                    setCopiedGrooveLink(true);
-                    setTimeout(() => setCopiedGrooveLink(false), 2000);
-                  }}
-                  style={{
-                    flex: 1,
-                    background: copiedGrooveLink ? '#fefce8' : '#eab308',
-                    color: copiedGrooveLink ? '#854d0e' : '#ffffff',
-                    border: copiedGrooveLink ? '1.5px solid #eab308' : 'none',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  {copiedGrooveLink ? <Check size={12} /> : <Copy size={12} />}
-                  <span>{copiedGrooveLink ? 'Link kopiert! ✓' : 'GrooveLab PWA Link'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQrOverlayTab('groovelab');
-                    setShowQrOverlay(true);
-                  }}
-                  style={{
-                    background: '#ffffff',
-                    color: '#854d0e',
-                    border: '1.5px solid #eab308',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    transition: 'all 0.15s'
-                  }}
-                  className="hover-scale"
-                >
-                  <Award size={12} />
-                  <span>Member Pass</span>
-                </button>
-              </div>
-            </section>
+              const titleColor = isKombi
+                ? '#1e293b'
+                : isCampusAct
+                ? '#34a853'
+                : isGrooveAct
+                ? '#ca8a04'
+                : '#64748b';
+
+              const badgeText = isKombi
+                ? 'Kombi'
+                : isCampusAct
+                ? 'Campus'
+                : isGrooveAct
+                ? 'GrooveLab'
+                : 'Ausweis';
+
+              const badgeBg = isKombi
+                ? 'linear-gradient(90deg, #34a853 0%, #eab308 100%)'
+                : isCampusAct
+                ? '#34a853'
+                : isGrooveAct
+                ? '#eab308'
+                : '#94a3b8';
+
+              const passTitle = isKombi
+                ? 'Campus-Groovelab Pass'
+                : isCampusAct
+                ? 'Campus Pass'
+                : isGrooveAct
+                ? 'Member Pass'
+                : 'Campus-Groovelab Pass';
+
+              const passSubtitle = isKombi
+                ? 'Kombi-Mitgliedsausweis • QR-Code'
+                : isCampusAct
+                ? 'Instrument-Avatar • Campus PWA Link'
+                : isGrooveAct
+                ? 'Musiker-Avatar • GrooveLab PWA Link'
+                : 'Gestrichelter Ausweis • Noch kein Modul gebucht';
+
+              const avatarSrc = isGrooveAct && !isCampusAct ? getGroovelabAvatarSrc() : getCampusAvatarSrc();
+              const avatarBorder = isKombi ? '2px solid #34a853' : isCampusAct ? '2px solid #34a853' : isGrooveAct ? '2px solid #eab308' : '2px dashed #34a853';
+
+              const linkBtnLabel = isKombi
+                ? (copiedCampusLink ? 'Link kopiert! ✓' : 'App-Link kopieren')
+                : isCampusAct
+                ? (copiedCampusLink ? 'Link kopiert! ✓' : 'Campus PWA Link')
+                : isGrooveAct
+                ? (copiedGrooveLink ? 'Link kopiert! ✓' : 'GrooveLab PWA Link')
+                : (copiedCampusLink ? 'Link kopiert! ✓' : 'Onboarding-Link kopieren');
+
+              const mainBtnBg = isKombi
+                ? (copiedCampusLink ? '#e6f4ea' : 'linear-gradient(90deg, #34a853 0%, #eab308 100%)')
+                : isCampusAct
+                ? (copiedCampusLink ? '#e6f4ea' : '#34a853')
+                : isGrooveAct
+                ? (copiedGrooveLink ? '#fefce8' : '#eab308')
+                : (copiedCampusLink ? '#e6f4ea' : '#64748b');
+
+              const mainBtnColor = (copiedCampusLink || copiedGrooveLink) ? '#1e293b' : '#ffffff';
+
+              return (
+                <section style={{
+                  background: cardBg,
+                  borderRadius: '24px',
+                  padding: '20px',
+                  border: `1.5px solid ${borderColor}`,
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: titleColor, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Award size={20} /> Ausweis &amp; App-Zugang
+                    </h4>
+                    <span style={{ background: badgeBg, color: 'white', padding: '3px 10px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 800 }}>
+                      {badgeText}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: '#ffffff', padding: '12px 16px', borderRadius: '18px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <img src={avatarSrc} style={{ width: '48px', height: '48px', borderRadius: '14px', objectFit: 'cover', border: avatarBorder }} />
+                    <div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#1e293b' }}>{passTitle}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>{passSubtitle}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetPlatform = isGrooveAct && !isCampusAct ? 'groovelab' : 'campus';
+                        const link = `${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=${targetPlatform}`;
+                        navigator.clipboard.writeText(link);
+                        if (isGrooveAct && !isCampusAct) {
+                          setCopiedGrooveLink(true);
+                          setTimeout(() => setCopiedGrooveLink(false), 2000);
+                        } else {
+                          setCopiedCampusLink(true);
+                          setTimeout(() => setCopiedCampusLink(false), 2000);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        background: mainBtnBg,
+                        color: mainBtnColor,
+                        border: 'none',
+                        borderRadius: '14px',
+                        padding: '10px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                      }}
+                      className="hover-scale"
+                    >
+                      {(copiedCampusLink || copiedGrooveLink) ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{linkBtnLabel}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQrOverlayTab(isGrooveAct && !isCampusAct ? 'groovelab' : 'campus');
+                        setShowQrOverlay(true);
+                      }}
+                      style={{
+                        flex: 1,
+                        background: '#ffffff',
+                        color: isKombi ? '#34a853' : isGrooveAct ? '#ca8a04' : '#34a853',
+                        border: `1.5px solid ${isKombi ? '#34a853' : isGrooveAct ? '#eab308' : '#34a853'}`,
+                        borderRadius: '14px',
+                        padding: '10px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Award size={14} />
+                      <span>Ausweis anzeigen</span>
+                    </button>
+                  </div>
+                </section>
+              );
+            })()}
           </div>
 
           {/* Right Column: Attendance & DSGVO */}
@@ -3889,14 +3895,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 alignItems: 'center',
                 gap: '6px',
                 transition: 'all 0.2s',
-                background: localTab === 'campus' ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)' : '#1e293b',
+                background: (isCampusActive && isGroovelabActive)
+                  ? 'linear-gradient(90deg, #34a853 0%, #eab308 100%)'
+                  : isCampusActive
+                  ? '#34a853'
+                  : isGroovelabActive
+                  ? '#eab308'
+                  : '#64748b',
                 color: '#ffffff',
-                boxShadow: localTab === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(30, 41, 59, 0.2)'
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
               }}
               className="hover-scale"
             >
               <Award size={14} />
-              <span>{localTab === 'campus' ? 'Campus Pass' : 'Member Pass'}</span>
+              <span>
+                {(isCampusActive && isGroovelabActive)
+                  ? 'Kombi Pass'
+                  : isCampusActive
+                  ? 'Campus Pass'
+                  : isGroovelabActive
+                  ? 'Member Pass'
+                  : 'Ausweis'}
+              </span>
             </button>
           )}
         </div>
