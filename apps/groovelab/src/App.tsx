@@ -3919,6 +3919,8 @@ function App() {
             });
           }
 
+          const schoolIdsSet = new Set(Array.from(schoolIds));
+
           const [uRes2, uResAll, uAllScheds, uAllOccs] = await Promise.all([
             supabase.from('users').select('*').eq('role', 'student').order('first_name'),
             supabase.from('users').select('*').order('first_name'),
@@ -3926,22 +3928,30 @@ function App() {
             supabase.from('schedule_occurrences').select('*, student:users!student_id(*)')
           ]);
 
-          ((uRes2 as any).data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+          ((uRes2 as any).data || []).forEach((u: any) => {
+            if (u && u.school_id && schoolIdsSet.has(u.school_id)) {
+              mergedUsersMap.set(u.id, u);
+            }
+          });
           ((uResAll as any).data || []).forEach((u: any) => {
             const r = (u.role || '').toLowerCase();
             if (r !== 'teacher' && r !== 'admin' && r !== 'secretary') {
-              if (!mergedUsersMap.has(u.id)) {
+              if (u.school_id && schoolIdsSet.has(u.school_id) && !mergedUsersMap.has(u.id)) {
                 mergedUsersMap.set(u.id, u);
               }
             }
           });
           ((uAllScheds as any).data || []).forEach((sc: any) => {
             const u = sc.student || sc.users;
-            if (u && u.id) mergedUsersMap.set(u.id, u);
+            if (u && u.id && u.school_id && schoolIdsSet.has(u.school_id)) {
+              mergedUsersMap.set(u.id, u);
+            }
           });
           ((uAllOccs as any).data || []).forEach((sc: any) => {
             const u = sc.student || sc.users;
-            if (u && u.id) mergedUsersMap.set(u.id, u);
+            if (u && u.id && u.school_id && schoolIdsSet.has(u.school_id)) {
+              mergedUsersMap.set(u.id, u);
+            }
           });
 
           try {
@@ -4801,16 +4811,14 @@ function App() {
       setStudentActivity(last7);
 
 
-      // Fetch school users for both student and teacher to support direct messaging (matches TeacherDashboard pattern)
-      const [uResExact, uResSchool, uResRoleStudent] = await Promise.all([
+      // Fetch school users strictly belonging to current schoolId (enforce multi-tenant isolation)
+      const [uResExact, uResSchool] = await Promise.all([
         supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student').order('first_name'),
-        supabase.from('users').select('*').eq('school_id', schoolId).order('first_name'),
-        supabase.from('users').select('*').eq('role', 'student').order('first_name')
+        supabase.from('users').select('*').eq('school_id', schoolId).order('first_name')
       ]);
       const mergedUsersMap = new Map<string, any>();
       (uResExact.data || []).forEach(u => mergedUsersMap.set(u.id, u));
       (uResSchool.data || []).forEach(u => mergedUsersMap.set(u.id, u));
-      (uResRoleStudent.data || []).forEach(u => mergedUsersMap.set(u.id, u));
       const allUsers = Array.from(mergedUsersMap.values());
       if (typeof window !== 'undefined') {
         (window as any).debugAllUsersLength = allUsers?.length;
