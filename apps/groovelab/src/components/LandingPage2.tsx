@@ -121,6 +121,10 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
       }
 
       localStorage.setItem('groovelab_active_platform', targetPlatform);
+      localStorage.setItem('groovelab_last_school_id', school.id);
+      if (school.subdomain) {
+        localStorage.setItem('groovelab_last_subdomain', school.subdomain);
+      }
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {

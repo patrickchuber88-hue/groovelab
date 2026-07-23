@@ -1433,7 +1433,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         setLoadingSchool(true);
 
         const urlParams = new URLSearchParams(window.location.search);
-        const schoolIdParam = urlParams.get('school_id') || urlParams.get('schoolId');
+        const schoolIdParam = urlParams.get('school_id') || urlParams.get('schoolId') || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_school_id') : null);
         const inviteSchoolId = urlParams.get('invite_school_id');
 
         // 1. Direct school_id parameter match (highest priority)
@@ -1442,6 +1442,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (!error && data) {
             setSchoolName(data.name);
             setSchoolData(data);
+            localStorage.setItem('groovelab_last_school_id', data.id);
+            if (data.subdomain) localStorage.setItem('groovelab_last_subdomain', data.subdomain);
             return;
           }
         }
@@ -1451,6 +1453,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (!error && data) {
             setSchoolName(data.name);
             setSchoolData(data);
+            localStorage.setItem('groovelab_last_school_id', data.id);
+            if (data.subdomain) localStorage.setItem('groovelab_last_subdomain', data.subdomain);
             return;
           }
         }
@@ -1528,6 +1532,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             if (matchedSchool) {
               setSchoolName(matchedSchool.name);
               setSchoolData(matchedSchool);
+              localStorage.setItem('groovelab_last_school_id', matchedSchool.id);
+              if (matchedSchool.subdomain) localStorage.setItem('groovelab_last_subdomain', matchedSchool.subdomain);
               return;
             }
           }
