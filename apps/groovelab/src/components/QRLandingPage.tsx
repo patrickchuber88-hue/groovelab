@@ -3970,33 +3970,40 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       </div>
     );
   };
+
+  const renderLessonInfoCard = (lesson: any, isToday: boolean, nextLesson?: any) => {
     if (isToday && lesson) {
       return (
         <div style={{
           ...styles.card,
-          padding: '10px 14px',
-          gap: '6px',
-          boxShadow: '0 2px 8px rgba(52, 168, 83, 0.08)',
-          border: '1px solid #bbf7d0',
-          background: '#f0fdf4'
+          padding: '16px',
+          gap: '12px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Heute Unterricht 🎵
-            </span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#166534' }}>
-              {lesson.start_time?.substring(0, 5)} Uhr ({lesson.duration || 45} Min)
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+              Heute Unterricht
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.75rem', color: '#15803d', fontWeight: 700, paddingTop: '2px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <User size={13} color="#166534" /> Lehrkraft zugewiesen
-            </span>
-            <span>·</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <MapPin size={13} color="#166534" /> {lesson.room_name || (lesson.room && lesson.room.name) || 'Groovelab Raum'}
-            </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Calendar size={16} color="#64748b" />
+              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                {lesson.start_time?.substring(0, 5)} Uhr ({lesson.duration || 45} Min)
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <User size={16} color="#64748b" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                Mit deiner Lehrkraft
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MapPin size={16} color="#64748b" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                {lesson.room_name || (lesson.room && lesson.room.name) || 'Groovelab Raum'}
+              </span>
+            </div>
           </div>
         </div>
       );
@@ -4004,36 +4011,46 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return (
         <div style={{
           ...styles.card,
-          padding: '10px 14px',
-          gap: '6px',
-          border: nextLesson.isPendingReview ? '1px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0'),
-          background: nextLesson.isPendingReview ? '#fefce8' : (styles.card ? styles.card.background : '#ffffff'),
-          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+          padding: '16px',
+          gap: '12px',
+          border: nextLesson.isPendingReview ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0'),
+          background: nextLesson.isPendingReview ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : (styles.card ? styles.card.background : '#ffffff')
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: nextLesson.isPendingReview ? '#b45309' : '#34a853', background: nextLesson.isPendingReview ? '#fef3c7' : '#e6f4ea', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Nächster Unterrichtstermin
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: nextLesson.isPendingReview ? '#b45309' : '#34a853', background: nextLesson.isPendingReview ? '#fef3c7' : '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+              Nächster Unterrichtstermin
+            </span>
+            {nextLesson.isPendingReview && (
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                ⏳ In Prüfung
               </span>
-              {nextLesson.isPendingReview && (
-                <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
-                  ⏳ In Prüfung
-                </span>
-              )}
-            </div>
-            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-              {nextLesson.dateStr}
-            </span>
+            )}
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, paddingTop: '2px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Clock size={13} color="#34a853" /> Start {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
-            </span>
-            <span>·</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <MapPin size={13} color="#34a853" /> {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
-            </span>
+ 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Calendar size={16} color="#64748b" />
+              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                {nextLesson.dateStr}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Clock size={16} color="#64748b" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MapPin size={16} color="#64748b" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
+              </span>
+            </div>
+            {nextLesson.isPendingReview && (
+              <div style={{ fontSize: '0.72rem', color: '#854d0e', fontWeight: 700, marginTop: '4px', background: '#fef9c3', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
+                Hinweis: Dieser Termin steht noch unter Vorbehalt der finalen Raumzuteilung durch das Sekretariat.
+              </div>
+            )}
           </div>
         </div>
       );
@@ -4041,29 +4058,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return (
       <div style={{
         ...styles.card,
-        padding: '10px 14px',
-        gap: '6px',
+        padding: '16px',
+        gap: '12px',
         border: '1px dashed #cbd5e1',
-        background: '#f8fafc',
-        boxShadow: 'none'
+        background: '#f8fafc'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
             Nächster Unterrichtstermin
-          </span>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>
-            Terminierung ausstehend
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, paddingTop: '2px' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Clock size={12} color="#94a3b8" /> Uhrzeit folgt
-          </span>
-          <span>·</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <MapPin size={12} color="#94a3b8" /> Raumzuweisung ausstehend
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Calendar size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>
+              Terminierung ausstehend
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.88rem', fontWeight: 650, color: '#64748b' }}>
+              Uhrzeit wird vom Sekretariat zugeteilt
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <MapPin size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.88rem', fontWeight: 650, color: '#64748b' }}>
+              Raumzuweisung ausstehend
+            </span>
+          </div>
         </div>
       </div>
     );
