@@ -9115,9 +9115,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           className="hover-scale-mini"
                         >
                           <select
-                            value={student.day_of_birth || 1}
+                            value={student.day_of_birth || ''}
                             onChange={async (e) => {
-                              const newDay = parseInt(e.target.value, 10);
+                              const val = e.target.value;
+                              if (!val) return;
+                              const newDay = parseInt(val, 10);
                               try {
                                 const { data: existing } = await supabase
                                   .from('activation_days')
@@ -9154,7 +9156,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                             style={{
                               fontSize: '0.74rem',
                               fontWeight: 800,
-                              color: '#1d1d1f',
+                              color: student.day_of_birth ? '#1d1d1f' : '#b45309',
                               background: 'transparent',
                               border: 'none',
                               outline: 'none',
@@ -9165,6 +9167,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                               MozAppearance: 'none'
                             }}
                           >
+                            {!student.day_of_birth && <option value="">Tag wählen</option>}
                             {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                               <option key={d} value={d}>
                                 Tag {d}
