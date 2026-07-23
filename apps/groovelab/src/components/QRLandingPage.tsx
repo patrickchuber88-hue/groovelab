@@ -842,20 +842,32 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             .select('student_id')
             .eq('student_id', userData.id)
             .maybeSingle();
-          hasPinCreated = Boolean(
+
+          const dbHasPin = Boolean(
             actDay ||
             userData.is_pin_activated === true ||
             (userData.personal_pin && String(userData.personal_pin).trim() !== '') ||
-            (userData.parent_pin && String(userData.parent_pin).trim() !== '') ||
-            (userData.onboarding_pin && String(userData.onboarding_pin).trim() !== '') ||
-            (userData.pin && String(userData.pin).trim() !== '')
+            (userData.parent_pin && String(userData.parent_pin).trim() !== '')
           );
+
+          if (!dbHasPin) {
+            hasPinCreated = false;
+            // Purge any stale local unlock caches if PIN was reset in DB
+            localStorage.removeItem(`groovelab_parent_unlocked_${token}`);
+            localStorage.removeItem(`groovelab_user_pin_${userData.id}`);
+            localStorage.removeItem(`groovelab_pin_${token}`);
+            sessionStorage.removeItem(`groovelab_lessons_unlocked_${userData.id}`);
+          } else {
+            hasPinCreated = true;
+          }
         } else {
           hasPinCreated = true;
         }
 
         // 1. Allererstes Öffnen der QR Landingpage 2: Wenn noch KEINE PIN in der DB hinterlegt ist, MUSS sofort zur PIN-Ersterstellung aufgefordert werden!
         if (userData.role === 'student' && !hasPinCreated) {
+          setParentUnlocked(false);
+          setLessonsUnlocked(false);
           setPinPurpose('setup_initial_pin');
           setPageState('pin_required');
           return;
