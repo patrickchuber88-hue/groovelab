@@ -1056,18 +1056,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        if (wasUnlocked) {
-          setParentUnlocked(true);
+        const isSessionUnlocked = sessionStorage.getItem(`groovelab_lessons_unlocked_${userData.id}`) === 'true';
+        if (isSessionUnlocked) {
           setLessonsUnlocked(true);
-          sessionStorage.setItem(`groovelab_lessons_unlocked_${userData.id}`, 'true');
+          setParentUnlocked(true);
         } else {
-          // 2. Wenn eine PIN in der DB existiert, aber dieses Gerät noch nicht gekoppelt ist -> PIN-Abfrage zum Entsperren!
-          setPinPurpose('unlock_preview');
-          setPageState('pin_required');
-          return;
+          setLessonsUnlocked(false);
+          setParentUnlocked(false);
         }
 
-        // 3. Ansonsten auf die Landingpage führen (für bereits aktivierte Nutzer)
+        // Always navigate to profile preview landing page (open area for Üben & Hausaufgaben)
         sessionStorage.setItem('groovelab_qr_token', token);
         setPageState('profile');
       } catch (err: any) {
@@ -2248,6 +2246,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         setPinInput('');
         
         if (pinPurpose === 'unlock_preview') {
+          setActiveTab('lessons');
           setPageState('profile');
         } else {
           await redirectToCampus(profile);
@@ -4160,17 +4159,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <button
           type="button"
           onClick={() => {
-            const hasExistingPin = Boolean(profile?.has_parent_pin || profile?.personal_pin || profile?.parent_pin || profile?.is_pin_activated);
-            if (profile && !hasExistingPin) {
-              setIsInitialPinSetup(true);
-              setParentPinErrorMsg(null);
-              setParentPinSuccessMsg(null);
-              setShowPinPrompt(true);
-            } else if (!lessonsUnlocked && !parentUnlocked) {
-              setIsInitialPinSetup(false);
-              setParentPinErrorMsg(null);
-              setParentPinSuccessMsg(null);
-              setShowPinPrompt(true);
+            const isSessionUnlocked = sessionStorage.getItem(`groovelab_lessons_unlocked_${profile?.id}`) === 'true';
+            if (!isSessionUnlocked) {
+              setPinPurpose('unlock_preview');
+              setPageState('pin_required');
             } else {
               setActiveTab('lessons');
             }
@@ -6622,9 +6614,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
                       Hallo {profile.first_name}! 🎵
                     </h2>
-                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
-                      {profile.instrument || 'Schüler'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
+                        {profile.instrument || 'Schüler'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPinPurpose('unlock_app');
+                          setPageState('pin_required');
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          fontWeight: 800,
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)',
+                          transition: 'transform 0.15s ease'
+                        }}
+                      >
+                        <Lock size={12} color="#ffffff" />
+                        <span>Vollzugriff</span>
+                      </button>
+                    </div>
                   </div>
                 )}
                 {renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
@@ -6825,9 +6844,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
                       Hallo {profile.first_name}! 🎵
                     </h2>
-                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
-                      {profile.instrument || 'Schüler'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
+                        {profile.instrument || 'Schüler'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPinPurpose('unlock_app');
+                          setPageState('pin_required');
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '4px 10px',
+                          borderRadius: '100px',
+                          fontWeight: 800,
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)',
+                          transition: 'transform 0.15s ease'
+                        }}
+                      >
+                        <Lock size={12} color="#ffffff" />
+                        <span>Vollzugriff</span>
+                      </button>
+                    </div>
                   </div>
                 )}
                 {!timerRunning && renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
@@ -7193,47 +7239,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 )}
 
 
-              </div>
-            )}
-
-            {/* Direct WebApp Full Login Button */}
-            {!timerRunning && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '14px', marginBottom: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPinPurpose('unlock_app');
-                    setPageState('pin_required');
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '100px',
-                    padding: '7px 16px',
-                    color: '#475569',
-                    fontWeight: 750,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#34a853';
-                    e.currentTarget.style.color = '#166534';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.borderColor = '#cbd5e1';
-                    e.currentTarget.style.color = '#475569';
-                  }}
-                >
-                  <Lock size={13} color="#34a853" />
-                  <span>Vollzugriff / WebApp Login</span>
-                </button>
               </div>
             )}
 
