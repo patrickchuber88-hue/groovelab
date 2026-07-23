@@ -1871,17 +1871,19 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const { error: updateErr } = await supabase
           .from('users')
           .update({
-            onboarding_pin: pinInput,
             personal_pin: pinInput,
-            is_pin_activated: true,
-            status: 'aktiv'
+            is_pin_activated: true
           })
           .eq('id', profile.id);
 
         if (updateErr) throw updateErr;
 
-        await supabase.from('students').update({ status: 'aktiv', is_pin_activated: true }).eq('id', profile.id);
-        await supabase.from('pending_students').update({ status: 'aktiv', is_pin_activated: true }).eq('id', profile.id);
+        try {
+          await supabase.from('students').update({ is_pin_activated: true }).eq('id', profile.id);
+          await supabase.from('pending_students').update({ is_pin_activated: true }).eq('id', profile.id);
+        } catch (e) {
+          console.warn('[QRLanding] Optional table update warning:', e);
+        }
 
         // Ensure activation_days record exists so Secretary Dashboard shows "Aktiv"
         const { data: existingAct } = await supabase
