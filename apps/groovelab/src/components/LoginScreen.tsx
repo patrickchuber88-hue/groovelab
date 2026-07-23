@@ -6040,8 +6040,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
-      {/* Admin Bypass for Localhost */}
-      {import.meta.env.DEV && (
+      {/* Admin Bypass for Localhost - Strict Tenant Isolation */}
+      {import.meta.env.DEV && schoolData?.id && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Patrick Huber Bypass (Teacher) */}
           {(import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || true) && (
@@ -6049,12 +6049,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={async () => {
                 try {
                   const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || '11079eae-664a-49a4-8692-771d83a3193c';
-                  console.log('[Bypass] Attempting Patrick Huber login with token:', token);
+                  console.log('[Bypass] Attempting Patrick Huber login with token for school:', schoolData.id);
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
                   const { data: user, error } = await supabase
                     .from('users')
-                    .select('id, role')
+                    .select('id, role, school_id')
+                    .eq('school_id', schoolData.id)
                     .or(`qr_token.eq.${token},id.eq.${token},and(first_name.eq.Patrick,last_name.eq.Huber)`)
                     .maybeSingle();
 
@@ -6072,8 +6073,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     onLogin(user.id, true);
                   } else {
                     sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Patrick Huber token:', token);
-                    alert('Patrick Huber wurde in der Datenbank nicht gefunden. Token: ' + token);
+                    console.warn('[Bypass] No user found with Patrick Huber token for this school:', schoolData.name);
+                    alert(`Patrick Huber ist für die Schule "${schoolData.name}" nicht registriert.`);
                   }
                 } catch (err: any) {
                   sessionStorage.removeItem('groovelab_qr_token');
@@ -6101,7 +6102,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
             >
-              🔓 BYPASS: PATRICK HUBER (LEHRER)
+              🔓 BYPASS: PATRICK HUBER (LEHRER - {schoolData.name})
             </button>
           )}
 
@@ -6111,12 +6112,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={async () => {
                 try {
                   const token = import.meta.env.VITE_BYPASS_PATRICK_TEST_TOKEN || import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN || '03fcc965-695e-48d8-a7b0-f6844443d80d';
-                  console.log('[Bypass] Attempting Patrick Test login with token:', token);
+                  console.log('[Bypass] Attempting Patrick Test login with token for school:', schoolData.id);
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
                   const { data: user, error } = await supabase
                     .from('users')
-                    .select('id, role')
+                    .select('id, role, school_id')
+                    .eq('school_id', schoolData.id)
                     .or(`qr_token.eq.${token},id.eq.${token},and(first_name.eq.Patrick,role.eq.student)`)
                     .maybeSingle();
 
@@ -6134,8 +6136,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     onLogin(user.id, true);
                   } else {
                     sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Patrick Test token:', token);
-                    alert('Patrick Test wurde in der Datenbank nicht gefunden. Token: ' + token);
+                    console.warn('[Bypass] No student found with Patrick Test token for this school:', schoolData.name);
+                    alert(`Der Schüler Patrick Test ist für die Schule "${schoolData.name}" nicht registriert.`);
                   }
                 } catch (err: any) {
                   sessionStorage.removeItem('groovelab_qr_token');
@@ -6163,23 +6165,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
             >
-              🔓 BYPASS: PATRICK TEST (SCHÜLER)
+              🔓 BYPASS: SCHÜLER-LOGIN ({schoolData.name})
             </button>
           )}
 
           {/* Manuel Wagner Bypass (Admin/Verwaltung) */}
-
           {import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN && (
             <button
               onClick={async () => {
                 try {
                   const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN;
-                  console.log('[Bypass] Attempting Manuel Wagner login with token:', token);
+                  console.log('[Bypass] Attempting Manuel Wagner login with token for school:', schoolData.id);
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
                   const { data: user, error } = await supabase
                     .from('users')
-                    .select('id, role')
+                    .select('id, role, school_id')
+                    .eq('school_id', schoolData.id)
                     .or(`qr_token.eq.${token},id.eq.${token}`)
                     .maybeSingle();
 
@@ -6197,8 +6199,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     onLogin(user.id, true);
                   } else {
                     sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Manuel Wagner token:', token);
-                    alert('Manuel Wagner wurde in der Datenbank nicht gefunden. Token: ' + token);
+                    console.warn('[Bypass] No user found with Manuel Wagner token for this school:', schoolData.name);
+                    alert(`Manuel Wagner ist für die Schule "${schoolData.name}" nicht registriert.`);
                   }
                 } catch (err: any) {
                   sessionStorage.removeItem('groovelab_qr_token');
@@ -6226,7 +6228,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; }}
             >
-              🔓 BYPASS: MANUEL WAGNER (VERWALTUNG)
+              🔓 BYPASS: MANUEL WAGNER (VERWALTUNG - {schoolData.name})
             </button>
           )}
 
