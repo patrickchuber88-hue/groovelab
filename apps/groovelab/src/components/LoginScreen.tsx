@@ -1817,6 +1817,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         finalStationId = null;
       }
 
+      // Set user_id immediately so customFetch interceptor injects user_id into x-client-info for RLS authorization
+      if (user?.id) {
+        sessionStorage.setItem('groovelab_user_id', user.id);
+        localStorage.setItem('groovelab_user_id', user.id);
+      }
+
       // 1.5 Check opening hours for sessions (Students only) - Bypassed per user request
       const withinHours = true;
       const enforceHours = false;
