@@ -125,6 +125,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [loadingTeacherSchedule, setLoadingTeacherSchedule] = useState(false);
   const [teacherModuleFilter, setTeacherModuleFilter] = useState<'all' | 'campus' | 'groovelab'>('all');
 
+  // Persist QR token so page reload stays on QR Landing Page
+  useEffect(() => {
+    if (token) {
+      sessionStorage.setItem('groovelab_qr_token', token);
+      localStorage.setItem('groovelab_last_qr_token', token);
+    }
+  }, [token]);
+
   // Inaktive Aktivierungs-States
   const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
   const [parentEmail, setParentEmail] = useState('');

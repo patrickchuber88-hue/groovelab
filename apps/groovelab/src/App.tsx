@@ -7072,15 +7072,20 @@ function App() {
     return <DeviceOnboardingPage token={deviceOnboardingPathMatch[1]} />;
   }
 
-  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan (Sofort abfangen vor allen States!)
-  if (qrPathMatch) {
+  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder gespeicherter QR Token (Sofort abfangen vor allen States!)
+  const urlParams = new URLSearchParams(location.search);
+  const queryQrToken = urlParams.get('token') || urlParams.get('qr_token');
+  const storedQrToken = queryQrToken || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_qr_token') || localStorage.getItem('groovelab_last_qr_token')) : null);
+  const effectiveQrToken = qrPathMatch ? qrPathMatch[1] : (storedQrToken && location.pathname !== '/login' && location.pathname !== '/signup' ? storedQrToken : null);
+
+  if (effectiveQrToken) {
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
     const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
 
     if (isStandalone && currentUserId) {
       // User is logged in via PWA standalone app.
       // Redirect the QR link to the external browser (Safari/Chrome) and auto-pair it
-      const externalUrl = `${window.location.origin}/qr/${qrPathMatch[1]}?auto_pair=true`;
+      const externalUrl = `${window.location.origin}/qr/${effectiveQrToken}?auto_pair=true`;
       window.open(externalUrl, '_blank');
       
       // Clean up the URL in the PWA so it returns to the dashboard
@@ -7088,7 +7093,7 @@ function App() {
     } else {
       return (
         <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Campus Pass...</div>}>
-          <QRLandingPage token={qrPathMatch[1]} />
+          <QRLandingPage token={effectiveQrToken} />
         </Suspense>
       );
     }
