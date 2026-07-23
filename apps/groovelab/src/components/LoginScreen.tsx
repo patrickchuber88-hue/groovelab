@@ -1625,8 +1625,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           // Enforce activation check (must have at least one active module)
           if (!user.is_campus_active && !user.is_groovelab_active) {
             if (user.role === 'student') {
-              alert("Dein Schüler-Profil ist noch inaktiv. Wir leiten dich jetzt zur Aktivierungsseite weiter...");
-              navigate(`/qr/${user.qr_token}`);
+              const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
+              sessionStorage.setItem('groovelab_user_id', user.id);
+              window.location.replace(`${window.location.origin}/qr/${tokenToUse}`);
               setLoading(false);
               return;
             } else {
@@ -1640,22 +1641,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
           if (isGroovelabKiosk) {
             if (!user.is_groovelab_active) {
-              alert("Login verweigert. Dein Benutzerkonto ist nicht für die GrooveLab-Plattform freigeschaltet.");
-              await supabase.auth.signOut();
-              setLoading(false);
-              return;
+              if (user.is_campus_active && user.role === 'student') {
+                localStorage.setItem('groovelab_active_platform', 'campus');
+              } else {
+                const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
+                sessionStorage.setItem('groovelab_user_id', user.id);
+                window.location.replace(`${window.location.origin}/qr/${tokenToUse}`);
+                setLoading(false);
+                return;
+              }
+            } else {
+              localStorage.setItem('groovelab_active_platform', 'groovelab');
             }
-            localStorage.setItem('groovelab_active_platform', 'groovelab');
           } else {
             if (!user.is_campus_active) {
-              alert("Login verweigert. Dein Benutzerkonto ist nicht für den Campus freigeschaltet.");
-              await supabase.auth.signOut();
-              setLoading(false);
-              return;
-            }
-            localStorage.setItem('groovelab_active_platform', 'campus');
-            if (user.role === 'student' || user.role === 'teacher') {
-              localStorage.setItem('campus_active_tab', 'briefing');
+              if (user.is_groovelab_active && user.role === 'student') {
+                localStorage.setItem('groovelab_active_platform', 'groovelab');
+              } else {
+                const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
+                sessionStorage.setItem('groovelab_user_id', user.id);
+                window.location.replace(`${window.location.origin}/qr/${tokenToUse}`);
+                setLoading(false);
+                return;
+              }
+            } else {
+              localStorage.setItem('groovelab_active_platform', 'campus');
+              if (user.role === 'student' || user.role === 'teacher') {
+                localStorage.setItem('campus_active_tab', 'briefing');
+              }
             }
           }
         } else {
@@ -7608,9 +7621,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     .from('users')
                     .update({
                       personal_pin: pinSetupInput,
-                      is_pin_activated: true,
-                      is_groovelab_active: isGroovelabKiosk ? true : pinSetupUser.is_groovelab_active,
-                      is_campus_active: !isGroovelabKiosk ? true : pinSetupUser.is_campus_active
+                      is_pin_activated: true
                     })
                     .eq('id', pinSetupUser.id);
 
@@ -7621,9 +7632,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const user = {
                     ...pinSetupUser,
                     personal_pin: pinSetupInput,
-                    is_pin_activated: true,
-                    is_groovelab_active: isGroovelabKiosk ? true : pinSetupUser.is_groovelab_active,
-                    is_campus_active: !isGroovelabKiosk ? true : pinSetupUser.is_campus_active
+                    is_pin_activated: true
                   };
                   setPinSetupUser(null);
                   
