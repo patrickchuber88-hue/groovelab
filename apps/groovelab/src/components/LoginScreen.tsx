@@ -1432,6 +1432,29 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       try {
         setLoadingSchool(true);
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const schoolIdParam = urlParams.get('school_id') || urlParams.get('schoolId');
+        const inviteSchoolId = urlParams.get('invite_school_id');
+
+        // 1. Direct school_id parameter match (highest priority)
+        if (schoolIdParam) {
+          const { data, error } = await supabase.from('schools').select('*').eq('id', schoolIdParam).maybeSingle();
+          if (!error && data) {
+            setSchoolName(data.name);
+            setSchoolData(data);
+            return;
+          }
+        }
+
+        if (inviteSchoolId) {
+          const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
+          if (!error && data) {
+            setSchoolName(data.name);
+            setSchoolData(data);
+            return;
+          }
+        }
+
         // Subdomain resolution logic
         const getSubdomain = () => {
           const host = window.location.hostname;
@@ -1457,26 +1480,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               sub = parts[0];
             }
           }
-          
+
           if (!sub) {
-            // Check query parameters as fallback (useful for local localhost dev bypass)
-            const urlParams = new URLSearchParams(window.location.search);
             sub = urlParams.get('school') || urlParams.get('subdomain');
           }
-          
+
           if (sub) {
-            const cleanSub = sub.toLowerCase().trim();
-            // Map variants of muasek-bad-saeckingen subdomain to the correct 'musaek-bad-saeckingen' slug
-            const musaekVariants = [
-              'muasek-bad-saeckingen', 
-              'musaek-bad-saeckingen'
-            ];
-            if (musaekVariants.includes(cleanSub)) {
-              return 'musaek-bad-saeckingen';
-            }
-            return cleanSub;
+            return sub.toLowerCase().trim();
           }
-          
+
           return null;
         };
 
@@ -1485,48 +1497,43 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         if (subdomain) {
           const { data: allSchools, error: allSchoolsErr } = await supabase.from('schools').select('*');
           if (!allSchoolsErr && allSchools) {
-            const slugify = (name: string) => {
-              return name
-                .toLowerCase()
-                .trim()
-                .replace(/[äöüß]/g, (match) => {
-                  const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
-                  return mapping[match] || match;
-                })
-                .replace(/[^a-z0-9]/g, '-')
-                .replace(/-+/g, '-')
-                .replace(/^-+|-+$/g, '');
-            };
+            const cleanSub = subdomain.toLowerCase().trim();
 
-            // 1. Try exact subdomain match first, then exact slugified name match
-            let matchedSchool = allSchools.find(s => {
-              const cleanSub = subdomain.toLowerCase().trim();
-              const exactSubMatch = s.subdomain && s.subdomain.toLowerCase().trim() === cleanSub;
-              const slug = slugify(s.name);
-              const slugMatch = slug === cleanSub || slug.replace(/-/g, '') === cleanSub.replace(/-/g, '');
-              return exactSubMatch || slugMatch;
-            });
+            // 1. Try exact ID match or exact subdomain match first
+            let matchedSchool = allSchools.find(s => 
+              s.id === cleanSub || (s.subdomain && s.subdomain.toLowerCase().trim() === cleanSub)
+            );
+
+            // 2. Fallback to slugified name match if exact subdomain match not found
+            if (!matchedSchool) {
+              const slugify = (name: string) => {
+                return name
+                  .toLowerCase()
+                  .trim()
+                  .replace(/[äöüß]/g, (match) => {
+                    const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+                    return mapping[match] || match;
+                  })
+                  .replace(/[^a-z0-9]/g, '-')
+                  .replace(/-+/g, '-')
+                  .replace(/^-+|-+$/g, '');
+              };
+
+              matchedSchool = allSchools.find(s => {
+                const slug = slugify(s.name);
+                return slug === cleanSub || slug.replace(/-/g, '') === cleanSub.replace(/-/g, '');
+              });
+            }
+
             if (matchedSchool) {
               setSchoolName(matchedSchool.name);
               setSchoolData(matchedSchool);
-              return; // Successfully resolved school via subdomain
+              return;
             }
           }
         }
 
-        if (inviteSchoolId) {
-          const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
-          if (!error && data) {
-            setSchoolName(data.name);
-            setSchoolData(data);
-          }
-        } else if (schoolIdParam) {
-          const { data, error } = await supabase.from('schools').select('*').eq('id', schoolIdParam).maybeSingle();
-          if (!error && data) {
-            setSchoolName(data.name);
-            setSchoolData(data);
-          }
-        } else if (effectiveStationId) {
+        if (effectiveStationId) {
           const { data: stData, error: stError } = await supabase
             .from('stations')
             .select('rooms(schools(*))')
@@ -1538,28 +1545,29 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             if (sc) {
               setSchoolName(sc.name);
               setSchoolData(sc);
+              return;
             }
           }
-        } else {
-          const kioskToken = localStorage.getItem('groovelab_kiosk_token');
-          if (kioskToken) {
-            console.log('[Login] Resolving school via groovelab_kiosk_token...');
-            const { data: kData, error: kError } = await supabase
-              .from('kiosks')
-              .select('school_id')
-              .eq('secret_token', kioskToken)
-              .maybeSingle() as any;
-              
-            if (!kError && kData?.school_id) {
-              const { data: sc, error: scErr } = await supabase
-                .from('schools')
-                .select('*')
-                .eq('id', kData.school_id)
-                .maybeSingle();
-              if (!scErr && sc) {
-                setSchoolName(sc.name);
-                setSchoolData(sc);
-              }
+        }
+
+        const kioskToken = localStorage.getItem('groovelab_kiosk_token');
+        if (kioskToken) {
+          console.log('[Login] Resolving school via groovelab_kiosk_token...');
+          const { data: kData, error: kError } = await supabase
+            .from('kiosks')
+            .select('school_id')
+            .eq('secret_token', kioskToken)
+            .maybeSingle() as any;
+            
+          if (!kError && kData?.school_id) {
+            const { data: sc, error: scErr } = await supabase
+              .from('schools')
+              .select('*')
+              .eq('id', kData.school_id)
+              .maybeSingle();
+            if (!scErr && sc) {
+              setSchoolName(sc.name);
+              setSchoolData(sc);
             }
           }
         }

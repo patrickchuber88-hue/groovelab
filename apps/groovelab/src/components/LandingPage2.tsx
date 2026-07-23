@@ -124,10 +124,10 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {
-        window.location.href = `http://${window.location.hostname}:${window.location.port}/?subdomain=${school.subdomain}&platform=${targetPlatform}`;
+        window.location.href = `http://${window.location.hostname}:${window.location.port}/?school_id=${school.id}&subdomain=${school.subdomain}&platform=${targetPlatform}`;
       } else {
         const baseDomain = window.location.hostname.replace('www.', ''); // e.g. campus-groovelab.de
-        window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?platform=${targetPlatform}`;
+        window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?school_id=${school.id}&platform=${targetPlatform}`;
       }
     }
   };
