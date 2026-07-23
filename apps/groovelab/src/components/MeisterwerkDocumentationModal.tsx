@@ -850,7 +850,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         const saveAudioMetadata = async (audioUrlString: string) => {
           try {
-            const creatorRole = readOnly ? 'student' : 'teacher';
+            const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+            const isStudentSession = userRoleInSession === 'student' || readOnly || (!isTeacherTools && student.id !== 'teacher-self');
+            const creatorRole = isStudentSession ? 'student' : 'teacher';
             const audioMetaStr = `AUDIO:${audioUrlString}|${durationInSeconds}|${new Date().toISOString()}|${audioLabel.trim() || 'Aufnahme'}|${creatorRole}`;
             setHomeworkNotesList(prev => [...prev, audioMetaStr]);
             
@@ -1028,7 +1030,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const getCurrentTeacherId = async (): Promise<string> => {
     if (teacherId) return teacherId;
+    if (student.teacher_id) return student.teacher_id;
     try {
+      if (student.id && student.id !== 'teacher-self') {
+        const { data: stUser } = await supabase.from('users').select('teacher_id').eq('id', student.id).maybeSingle();
+        if (stUser?.teacher_id) return stUser.teacher_id;
+      }
       const { data: { user } } = await supabase.auth.getUser();
       if (user) return user.id;
 
@@ -1044,8 +1051,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (e) {
       console.error('Error determining teacher ID:', e);
     }
-    // Hard fallback UUID
-    return 'd3b07384-d113-4ec2-a5d6-6d2c12345678';
+    // Valid teacher fallback UUID
+    return '11079eae-664a-49a4-8692-771d83a3193c';
   };
 
   const syncHomeworkNotes = async (notesList: string[]) => {
