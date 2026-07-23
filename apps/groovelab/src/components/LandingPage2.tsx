@@ -115,10 +115,12 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
 
   const handleSchoolSelect = (school: any) => {
     if (typeof window !== 'undefined') {
-      let targetPlatform = 'campus'; // Default to campus
+      let targetPlatform = 'campus'; // Default to campus when campus or campus+groovelab is booked
       if (!school.has_campus_subscription && school.has_groovelab_subscription) {
         targetPlatform = 'groovelab';
       }
+
+      localStorage.setItem('groovelab_active_platform', targetPlatform);
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {

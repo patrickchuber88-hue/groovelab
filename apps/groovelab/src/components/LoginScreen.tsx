@@ -1390,9 +1390,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   useEffect(() => {
     if (schoolData && !hasAutoCheckedPlatform) {
-      const hasCampus = schoolData.has_campus_subscription || !schoolData.is_billing_booked;
-      if (!hasCampus) {
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const platParam = urlParams?.get('platform');
+      const hasCampus = schoolData.has_campus_subscription !== false;
+      
+      if (platParam === 'campus' || (hasCampus && platParam !== 'groovelab')) {
+        setIsGroovelabKiosk(false);
+        localStorage.setItem('groovelab_active_platform', 'campus');
+      } else if (!hasCampus || platParam === 'groovelab') {
         setIsGroovelabKiosk(true);
+        localStorage.setItem('groovelab_active_platform', 'groovelab');
       }
       setHasAutoCheckedPlatform(true);
     }
