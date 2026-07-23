@@ -80,6 +80,8 @@ export interface IDBadgeCardProps {
     photo_url?: string;
     instrument?: string;
     qr_token?: string;
+    is_campus_active?: boolean;
+    is_groovelab_active?: boolean;
   };
   activePlatform?: string;
   qrValue?: string;
@@ -106,16 +108,14 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
 
   const userRolesList = user.roles || (user.role ? [user.role] : []);
   const hasVerwaltung = userRolesList.includes('admin') || userRolesList.includes('secretary') || user.role === 'admin' || user.role === 'secretary';
+  const isTeacher = user.role === 'teacher' || userRolesList.includes('teacher');
   
-  const schoolObj = (user as any)?.schools || (user as any)?.school;
-  const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
-  const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+  // Teachers and Admins have modules enabled by default. Students rely strictly on active flags.
+  const hasCampus = hasVerwaltung || isTeacher || user.is_campus_active === true;
+  const hasGrooveLab = hasVerwaltung || isTeacher || user.is_groovelab_active === true;
 
-  const hasCampus = schoolHasCampus;
-  const hasGrooveLab = schoolHasGroove;
-
-  // Multi-Color Spectrum Stripe (Tri-Tone)
-  let spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #eab308 100%)';
+  // Real-Time Multi-Color Spectrum Stripe & Dashed Border Logic
+  let spectrumGradient = 'repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 16px)'; // Gestrichelter grüner Balken bei 0 Modulen
   if (hasVerwaltung && hasCampus && hasGrooveLab) {
     spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #eab308 66.6%, #eab308 100%)';
   } else if (hasVerwaltung && hasCampus) {
@@ -123,13 +123,13 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   } else if (hasVerwaltung && hasGrooveLab) {
     spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #eab308 50%, #eab308 100%)';
   } else if (hasCampus && hasGrooveLab) {
-    spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
+    spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)'; // Halb Grün / Halb Gelb
   } else if (hasVerwaltung) {
     spectrumGradient = '#ea4335';
   } else if (hasCampus) {
-    spectrumGradient = '#34a853';
-  } else {
-    spectrumGradient = '#eab308';
+    spectrumGradient = '#34a853'; // Grüner Balken
+  } else if (hasGrooveLab) {
+    spectrumGradient = '#eab308'; // Gelber Balken
   }
 
   const effectiveQrValue = qrValue || (typeof window !== 'undefined' ? `${window.location.origin}/qr/${user.qr_token || user.id || ''}` : '');
@@ -204,7 +204,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
         </div>
       </div>
 
-      {/* Multi-Module Spectrum Stripe */}
+      {/* Real-time Dynamic Spectrum Header Line */}
       <div style={{ height: '8px', width: '100%', background: spectrumGradient, flexShrink: 0 }} />
 
       {/* Role Pill Badges Header */}
@@ -264,7 +264,8 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
         {!hasVerwaltung && !hasCampus && !hasGrooveLab && (
           <span style={{ 
             background: '#f1f5f9', 
-            color: '#475569', 
+            color: '#64748b', 
+            border: '1.5px dashed #cbd5e1',
             padding: '3px 8px', 
             borderRadius: '6px', 
             fontSize: '0.58rem', 
@@ -272,7 +273,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
             letterSpacing: '0.12em',
             textTransform: 'uppercase'
           }}>
-            {isTeacherRole ? 'LEHRER' : (isStudentRole ? 'SCHÜLER' : 'MEMBER')}
+            INAKTIV (0 MODULE)
           </span>
         )}
       </div>

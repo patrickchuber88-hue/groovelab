@@ -17,6 +17,8 @@ interface QRCodeModalProps {
     instrument?: string;
     school_id?: string;
     id?: string;
+    is_campus_active?: boolean;
+    is_groovelab_active?: boolean;
   };
   activePlatform?: string;
   onClose: () => void;
