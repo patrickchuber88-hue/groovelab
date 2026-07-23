@@ -1018,8 +1018,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             .maybeSingle();
 
           const dbHasPin = Boolean(
-            userData.is_pin_activated === true &&
-            (actDay || (userData.personal_pin && String(userData.personal_pin).trim() !== '') || (userData.parent_pin && String(userData.parent_pin).trim() !== ''))
+            Boolean(actDay) ||
+            userData.is_pin_activated === true ||
+            (userData.personal_pin && String(userData.personal_pin).trim() !== '') ||
+            (userData.parent_pin && String(userData.parent_pin).trim() !== '')
           );
 
           if (!dbHasPin) {
@@ -2148,15 +2150,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .update({
             personal_pin: pinInput,
             parent_pin: pinInput,
-            is_pin_activated: true
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            status: 'aktiv'
           })
           .eq('id', profile.id);
 
-        if (updateErr) console.warn('[QRLanding] user update note:', updateErr);
+        if (updateErr) {
+          console.error('[QRLanding] user update error:', updateErr);
+          setPinError('Fehler beim Speichern der PIN: ' + updateErr.message);
+          return;
+        }
 
         try {
-          await supabase.from('students').update({ is_pin_activated: true }).eq('id', profile.id);
-          await supabase.from('pending_students').update({ is_pin_activated: true }).eq('id', profile.id);
+          await supabase.from('students').update({ is_pin_activated: true, status: 'aktiv' }).eq('id', profile.id);
+          await supabase.from('pending_students').update({ is_pin_activated: true, status: 'aktiv' }).eq('id', profile.id);
         } catch (e) {
           console.warn('[QRLanding] Optional table update warning:', e);
         }
@@ -4419,12 +4427,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </h2>
             )}
             <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              {pinPurpose === 'setup_initial_pin' ? 'Wähle deine 4-stellige PIN' : 'Sicherheits-PIN eingeben'}
+              {pinPurpose === 'setup_initial_pin' ? 'Wähle deine 4-stellige PIN' : 'Sicherheits-PIN zum Einloggen'}
             </h1>
             <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
               {pinPurpose === 'setup_initial_pin'
                 ? 'Willkommen in deiner Musikschule! 🎵 Wähle deine persönliche 4-stellige PIN, um dein digitales Hausaufgabenheft und deinen Musikpass freizuschalten.'
-                : 'Gib deine 4-stellige PIN ein, um diesen Musikpass einmalig auf diesem Gerät freizuschalten.'}
+                : 'Willkommen zurück! 🎵 Gib deine gewählte 4-stellige PIN ein, um dich auf diesem Gerät anzumelden.'}
             </p>
           </div>
 
