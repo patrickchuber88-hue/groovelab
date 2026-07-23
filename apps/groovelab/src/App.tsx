@@ -2418,10 +2418,13 @@ function App() {
   useEffect(() => {
     if (loading) return; // wait until supabase auth/session loading is complete
     
-    const isAuth = !!loggedInUserId;
     const isPublicRoute = 
       location.pathname === '/' || 
       location.pathname === '/landingpage' || 
+      location.pathname === '/landingpage2' || 
+      location.pathname === '/startseite' || 
+      location.pathname === '/startseite2' || 
+      location.pathname === '/starseite2' || 
       location.pathname === '/login' || 
       location.pathname === '/signup' || 
       location.pathname.startsWith('/qr/') ||
