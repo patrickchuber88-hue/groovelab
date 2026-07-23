@@ -499,7 +499,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               <IDBadgeCard 
                 user={user} 
                 activePlatform={activePlatform} 
-                qrValue={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || ''}`} 
+                qrValue={`${qrOrigin}/qr/${localTeacherQrToken || localQrToken || user.teacher_qr_token || user.qr_token || user.id || ''}`} 
                 cardRef={cardRef} 
               />
 

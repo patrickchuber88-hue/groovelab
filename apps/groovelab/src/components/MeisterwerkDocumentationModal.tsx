@@ -6468,23 +6468,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     <Award size={15} />
                     Deine Meisterwerke
                   </button>
-                  {isCampusActive && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveModalTab('stickeralbum')}
-                      style={{
-                        flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                        background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
-                        boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
-                        transition: 'all 0.15s ease',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Star size={15} fill="#fff" />
-                      Sticker-Album
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveModalTab('stickeralbum')}
+                    style={{
+                      flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
+                      background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Star size={15} fill="#fff" />
+                    Sticker-Album
+                  </button>
                 </div>
               </>
         )}
@@ -8397,7 +8395,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
 
                         {/* Audio Play-Along Cassette Widget */}
-                        {isCampusActive && !readOnly && (
+                        {!readOnly && (
                           <div style={{
                             margin: '12px 0',
                             padding: '16px',
@@ -8597,7 +8595,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             )}
           </div>
         </>
-      ) : activeModalTab === 'stickeralbum' && isCampusActive ? (
+      ) : activeModalTab === 'stickeralbum' ? (
         /* STICKER SAMMELALBUM VIEW - 3D PANINI SAMMELALBUM (SENIOR DESIGNER LEVEL) */
         <div style={{
           flex: 1,

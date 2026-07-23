@@ -2036,7 +2036,7 @@ export function AdminDashboard({
       const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
         supabase.from('schedules').select('student_id').eq('teacher_id', teacherId),
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', teacherId),
-        supabase.from('groups').select('id').eq('teacher_id', teacherId)
+        supabase.from('bands').select('id').eq('coach_id', teacherId)
       ]);
 
       const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
@@ -2045,8 +2045,8 @@ export function AdminDashboard({
       let groupStudentIds: string[] = [];
       if (groupData && groupData.length > 0) {
         const groupIds = groupData.map(g => g.id);
-        const { data: gsData } = await supabase.from('group_students').select('student_id').in('group_id', groupIds);
-        groupStudentIds = (gsData || []).map(gs => gs.student_id).filter(Boolean);
+        const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
+        groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
       }
 
       assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]));

@@ -2794,16 +2794,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         .select('*, schools(*)');
       
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanPin);
-      const isTokenLogin = cleanPin.startsWith('t_') || isUuid;
+      const upperPin = cleanPin.toUpperCase();
 
-      if (isTokenLogin) {
-        if (isUuid) {
-          query = query.or(`qr_token.eq.${cleanPin},id.eq.${cleanPin}`);
-        } else {
-          query = query.eq('teacher_qr_token', cleanPin);
-        }
+      if (isUuid) {
+        query = query.or(`id.eq.${cleanPin},qr_token.eq.${cleanPin},teacher_qr_token.eq.${cleanPin}`);
       } else {
-        query = query.eq('ausweis_nummer', cleanPin.toUpperCase());
+        query = query.or(`teacher_qr_token.eq.${cleanPin},ausweis_nummer.eq.${cleanPin},ausweis_nummer.eq.${upperPin}`);
       }
 
       let { data: user, error: userErr } = await query.maybeSingle();
@@ -3099,16 +3095,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let query = supabase.from('users').select('*, schools(*)');
       
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qrToken);
-      const isTokenLogin = qrToken.startsWith('t_') || isUuid;
+      const upperToken = qrToken.toUpperCase();
 
-      if (isTokenLogin) {
-        if (isUuid) {
-          query = query.or(`qr_token.eq.${qrToken},id.eq.${qrToken}`);
-        } else {
-          query = query.eq('teacher_qr_token', qrToken);
-        }
+      if (isUuid) {
+        query = query.or(`id.eq.${qrToken},qr_token.eq.${qrToken},teacher_qr_token.eq.${qrToken}`);
       } else {
-        query = query.or(`ausweis_nummer.eq.${qrToken.toUpperCase()},teacher_qr_token.eq.${qrToken}`);
+        query = query.or(`teacher_qr_token.eq.${qrToken},ausweis_nummer.eq.${qrToken},ausweis_nummer.eq.${upperToken}`);
       }
       
       const { data: user, error: userErr } = await query.maybeSingle();
@@ -3135,8 +3127,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         user.day_of_birth = actDay?.day_of_birth || null;
       }
 
-      // Update school context if not yet active, so UI branding aligns with user's school
-      if (!schoolData && userSchool) {
+      // Automatically align school context with the scanned user's authentic school
+      if (userSchool) {
         setSchoolData(userSchool);
         setSchoolName(userSchool.name);
 
@@ -3162,24 +3154,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       }
 
-      // Enforce school matching: user must belong to the active school context
       const activeSchool = schoolData || userSchool;
-      if (activeSchool?.id) {
+      if (activeSchool?.id && user.school_id) {
         const isSchoolMatch = user.school_id === activeSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(activeSchool.id));
         if (!isSchoolMatch) {
-          throw new Error(`Login verweigert. Dieser QR-Code gehört nicht zur Schule "${activeSchool.name || schoolName}".`);
-        }
-      }
-
-      if (user.role === 'student') {
-        const effectiveSchool = schoolData || userSchool;
-        if (!effectiveSchool?.id) {
-          throw new Error('Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.');
-        }
-        const isStudentSchoolMatch = user.school_id === effectiveSchool.id || (isMusaekSchool(user.school_id) && isMusaekSchool(effectiveSchool.id));
-        if (!isStudentSchoolMatch) {
-          localStorage.removeItem('groovelab_station_id');
-          throw new Error('Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.');
+          // Auto-align if mismatch
+          setSchoolData(userSchool);
+          setSchoolName(userSchool.name);
         }
       }
 
@@ -3743,7 +3724,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <img 
               src="/campus_login_hero.png" 
               alt="Campus Chalk Illustration"
-              fetchPriority="high"
+
               style={{
                 width: '100%',
                 height: '100%',
@@ -3815,7 +3796,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <img 
               src={schoolData.logo_url} 
               alt="Logo" 
-              fetchPriority="high"
+
               style={{ 
                 maxHeight: '60px',
                 maxWidth: '100%',
