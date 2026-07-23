@@ -9737,23 +9737,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
   const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
     try {
+      let teacherInstrument: string | null = null;
+      if (teacherId) {
+        const { data: teacherUser } = await supabase
+          .from('users')
+          .select('instrument')
+          .eq('id', teacherId)
+          .maybeSingle();
+        if (teacherUser?.instrument) {
+          teacherInstrument = teacherUser.instrument;
+        }
+      }
+
+      const updatePayload: any = { teacher_id: teacherId };
+      if (teacherInstrument) {
+        updatePayload.instrument = teacherInstrument;
+      }
+
       // First try to update users table
       const { data, error } = await supabase
         .from('users')
-        .update({ teacher_id: teacherId })
+        .update(updatePayload)
         .eq('id', studentId)
         .select();
 
       if (error) throw error;
 
-      // If no row was updated in users, then this student is still pending onboarding in the 'students' table
-      if (!data || data.length === 0) {
-        const { error: studentErr } = await supabase
-          .from('students')
-          .update({ teacher_id: teacherId })
-          .eq('id', studentId);
-        if (studentErr) throw studentErr;
-      }
+      // Update students table as well
+      await supabase
+        .from('students')
+        .update(updatePayload)
+        .eq('id', studentId);
+
+      // Update pending_students table as well
+      await supabase
+        .from('pending_students')
+        .update(updatePayload)
+        .eq('id', studentId);
 
       fetchDashboardData();
     } catch (err: any) {

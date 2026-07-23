@@ -633,7 +633,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         const upperToken = token.toUpperCase();
-        const selectFields = 'id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
+        const selectFields = 'id, first_name, last_name, role, roles, school_id, teacher_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
 
         let userData: any = null;
 
@@ -732,24 +732,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
 
         let studentInstrument = userData.instrument || null;
+        let assignedTeacherId = userData.teacher_id || null;
+
         if (!studentInstrument && userData.id) {
           try {
             const { data: psData } = await supabase
               .from('pending_students')
-              .select('instrument')
+              .select('instrument, teacher_id')
               .eq('id', userData.id)
               .maybeSingle();
             if (psData?.instrument) studentInstrument = psData.instrument;
+            if (psData?.teacher_id && !assignedTeacherId) assignedTeacherId = psData.teacher_id;
           } catch (e) {}
 
           if (!studentInstrument) {
             try {
               const { data: stData } = await supabase
                 .from('students')
-                .select('instrument')
+                .select('instrument, teacher_id')
                 .or(`id.eq.${userData.id},user_id.eq.${userData.id}`)
                 .maybeSingle();
               if (stData?.instrument) studentInstrument = stData.instrument;
+              if (stData?.teacher_id && !assignedTeacherId) assignedTeacherId = stData.teacher_id;
             } catch (e) {}
           }
 
@@ -757,12 +761,25 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             try {
               const { data: schData } = await supabase
                 .from('schedules')
-                .select('instrument')
+                .select('instrument, teacher_id')
                 .eq('student_id', userData.id)
                 .not('instrument', 'is', null)
                 .limit(1)
                 .maybeSingle();
               if (schData?.instrument) studentInstrument = schData.instrument;
+              if (schData?.teacher_id && !assignedTeacherId) assignedTeacherId = schData.teacher_id;
+            } catch (e) {}
+          }
+
+          // Fallback: If student has no explicit instrument set, fall back to the assigned teacher's instrument!
+          if (!studentInstrument && assignedTeacherId) {
+            try {
+              const { data: teacherData } = await supabase
+                .from('users')
+                .select('instrument')
+                .eq('id', assignedTeacherId)
+                .maybeSingle();
+              if (teacherData?.instrument) studentInstrument = teacherData.instrument;
             } catch (e) {}
           }
         }
