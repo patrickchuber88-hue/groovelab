@@ -5376,17 +5376,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       onClick={() => handleSelectStudent(s.id)}
                       className={isShaking ? 'card-shake' : ''}
                       style={{ 
-                        background: isSelected 
-                          ? '#f8fafc' 
-                          : (isAssigned ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.65)'), 
+                        background: s.hasPreferences
+                          ? (isSelected ? '#f0fdf4' : (isAssigned ? 'rgba(52, 168, 83, 0.05)' : 'rgba(240, 253, 244, 0.8)'))
+                          : (isSelected ? '#f8fafc' : (isAssigned ? 'rgba(0, 0, 0, 0.02)' : 'rgba(248, 250, 252, 0.8)')), 
                         backdropFilter: isAssigned ? 'none' : 'blur(12px)',
                         WebkitBackdropFilter: isAssigned ? 'none' : 'blur(12px)',
-                        border: isSelected 
-                          ? '1.5px solid #0f172a' 
-                          : '1px solid rgba(0, 0, 0, 0.08)', 
-                        borderLeft: isSelected 
-                          ? '4px solid #0f172a' 
-                          : (isAssigned ? '3px solid #cbd5e1' : '3px solid #86868b'), 
+                        border: s.hasPreferences
+                          ? (isSelected ? '1.5px solid #16a34a' : '1px solid #bbf7d0')
+                          : (isSelected ? '1.5px solid #475569' : '1px solid #cbd5e1'), 
+                        borderLeft: s.hasPreferences
+                          ? (isSelected ? '4px solid #16a34a' : (isAssigned ? '3px solid #86efac' : '4px solid #34a853'))
+                          : (isSelected ? '4px solid #0f172a' : (isAssigned ? '3px solid #cbd5e1' : '4px solid #94a3b8')), 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
                         cursor: 'pointer', 
@@ -5395,7 +5395,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         flexDirection: 'column', 
                         gap: '4px',
                         boxShadow: isSelected 
-                          ? '0 4px 14px rgba(15, 23, 42, 0.14)' 
+                          ? (s.hasPreferences ? '0 4px 14px rgba(22, 163, 74, 0.18)' : '0 4px 14px rgba(15, 23, 42, 0.14)')
                           : (isAssigned ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.01)'),
                         transition: 'all 0.25s ease'
                       }}
@@ -5482,9 +5482,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   e.stopPropagation();
                                   handleResetPreferences(s.id);
                                 }}
-                                style={{ flex: 1, padding: '4px 8px', background: '#d97706', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                                style={{ flex: 1, padding: '5px 8px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                               >
-                                Zur Überarbeitung freigeben
+                                ✏️ Zur Überarbeitung freigeben
                               </button>
                             )}
                           </div>
