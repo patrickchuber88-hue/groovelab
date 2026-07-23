@@ -6244,6 +6244,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                  WEG 3: PARENT_HYBRID (Jüngere Kinder & Eltern)
                  ============================================================== */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {profile?.first_name && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
+                      Hallo {profile.first_name}! 🎵
+                    </h2>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, background: '#f1f5f9', padding: '3px 10px', borderRadius: '100px' }}>
+                      {profile.instrument || 'Schüler'}
+                    </span>
+                  </div>
+                )}
                 {renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
                 {renderSegmentedControl()}
                 {activeTab === 'action' ? (
@@ -6437,6 +6447,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                  WEG 2: STUDENT_ONLY (Selbstnutzer)
                  ============================================================== */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {!timerRunning && profile?.first_name && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '2px' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
+                      Hallo {profile.first_name}! 🎵
+                    </h2>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, background: '#f1f5f9', padding: '3px 10px', borderRadius: '100px' }}>
+                      {profile.instrument || 'Schüler'}
+                    </span>
+                  </div>
+                )}
                 {!timerRunning && renderLessonInfoCard(lessonToday, isLessonDay, nextLessonInfo)}
                 {profile.is_campus_active ? <>
                   {!timerRunning && renderSegmentedControl()}
