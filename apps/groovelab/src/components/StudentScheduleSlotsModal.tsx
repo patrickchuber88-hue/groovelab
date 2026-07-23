@@ -84,23 +84,40 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     if (!student?.id) return;
     setLoading(true);
     try {
+      let targetId = student.id;
+      const { data: directStudent } = await supabase
+        .from('students')
+        .select('id')
+        .eq('id', student.id)
+        .maybeSingle();
+      if (directStudent?.id) {
+        targetId = directStudent.id;
+      } else {
+        const { data: userStudent } = await supabase
+          .from('students')
+          .select('id')
+          .eq('user_id', student.id)
+          .maybeSingle();
+        if (userStudent?.id) targetId = userStudent.id;
+      }
+
       // 1. Fetch preferences from student_schedule_preferences
       const { data: prefData } = await supabase
         .from('student_schedule_preferences')
         .select('*')
-        .eq('student_id', student.id);
+        .eq('student_id', targetId);
 
       // 2. Fetch fixed schedules from schedules table
       const { data: schedData } = await supabase
         .from('schedules')
         .select('*')
-        .eq('student_id', student.id);
+        .eq('student_id', targetId);
 
       // 3. Check timetable_assigned_at in students / users
       const { data: stRow } = await supabase
         .from('students')
         .select('timetable_assigned_at')
-        .eq('id', student.id)
+        .eq('id', targetId)
         .maybeSingle();
 
       if (stRow?.timetable_assigned_at) {
@@ -175,10 +192,65 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     }));
   };
 
+  const getValidStudentId = async (): Promise<string> => {
+    if (!student?.id) throw new Error("Kein Schüler-Objekt vorhanden.");
+
+    // 1. Direct ID match in students table
+    const { data: directStudent } = await supabase
+      .from('students')
+      .select('id')
+      .eq('id', student.id)
+      .maybeSingle();
+    if (directStudent?.id) return directStudent.id;
+
+    // 2. User ID match in students table
+    const { data: userStudent } = await supabase
+      .from('students')
+      .select('id')
+      .eq('user_id', student.id)
+      .maybeSingle();
+    if (userStudent?.id) return userStudent.id;
+
+    // 3. Auto-create student row if missing in students table
+    const { data: createdStudent, error: createErr } = await supabase
+      .from('students')
+      .insert({
+        id: student.id,
+        school_id: student.school_id || null,
+        teacher_id: student.teacher_id || teacherId || null,
+        instrument: student.instrument || 'Musiker',
+        status: 'ausstehend'
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (createdStudent?.id) return createdStudent.id;
+
+    // 4. Fallback if explicit ID insert fails
+    const { data: autoStudent, error: autoErr } = await supabase
+      .from('students')
+      .insert({
+        school_id: student.school_id || null,
+        teacher_id: student.teacher_id || teacherId || null,
+        instrument: student.instrument || 'Musiker',
+        status: 'ausstehend'
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (autoStudent?.id) return autoStudent.id;
+    if (autoErr) throw autoErr;
+    if (createErr) throw createErr;
+
+    return student.id;
+  };
+
   const handleSavePreferences = async () => {
     if (!student?.id) return;
     setSaving(true);
     try {
+      const validStudentId = await getValidStudentId();
+
       // Build slots array for insertion
       const slotsToInsert: any[] = [];
       Object.entries(editedMatrix).forEach(([key, val]) => {
@@ -196,7 +268,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
           const formattedStartTime = `${startTime.slice(0, 5)}:00`;
 
           slotsToInsert.push({
-            student_id: student.id,
+            student_id: validStudentId,
             day_of_week: day,
             start_time: formattedStartTime,
             end_time: endTime,
@@ -209,7 +281,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       await supabase
         .from('student_schedule_preferences')
         .delete()
-        .eq('student_id', student.id);
+        .eq('student_id', validStudentId);
 
       // 2. Insert new preferences if any
       if (slotsToInsert.length > 0) {
@@ -224,7 +296,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       await supabase
         .from('students')
         .update({ timetable_assigned_at: nowIso })
-        .eq('id', student.id);
+        .eq('id', validStudentId);
 
       setTimetableAssignedAt(nowIso);
       setPreferences(slotsToInsert);
