@@ -133,6 +133,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
   }, [token]);
 
+  // Auto-switch to Hausaufgaben tab if Campus module is not booked
+  useEffect(() => {
+    if (profile && !profile.is_campus_active && activeTab === 'action') {
+      setActiveTab('homework');
+    }
+  }, [profile, activeTab]);
+
   // Inaktive Aktivierungs-States
   const [activationStep, setActivationStep] = useState<'landing' | 'email' | 'payment' | 'success'>('landing');
   const [parentEmail, setParentEmail] = useState('');
@@ -3651,6 +3658,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   const renderSegmentedControl = () => {
     const isParentMode = profile?.app_usage_mode === 'parent_hybrid';
+    const hasCampus = profile?.is_campus_active === true;
     return (
       <div style={{
         display: 'flex',
@@ -3664,29 +3672,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         border: '1px solid rgba(0, 0, 0, 0.04)',
         boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
       }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('action')}
-          style={{
-            flex: 1,
-            padding: '8px 12px',
-            border: 'none',
-            borderRadius: '11px',
-            background: activeTab === 'action' ? '#ffffff' : 'transparent',
-            color: activeTab === 'action' ? '#000000' : '#636366',
-            fontSize: '0.85rem',
-            fontWeight: activeTab === 'action' ? 700 : 550,
-            cursor: 'pointer',
-            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            boxShadow: activeTab === 'action' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
-        >
-          {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 4 }} /> Üben</>}
-        </button>
+        {hasCampus && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('action')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              border: 'none',
+              borderRadius: '11px',
+              background: activeTab === 'action' ? '#ffffff' : 'transparent',
+              color: activeTab === 'action' ? '#000000' : '#636366',
+              fontSize: '0.85rem',
+              fontWeight: activeTab === 'action' ? 700 : 550,
+              cursor: 'pointer',
+              transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxShadow: activeTab === 'action' ? '0px 3px 8px rgba(0,0,0,0.12), 0px 3px 1px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 4 }} /> Üben</>}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setActiveTab('homework')}
