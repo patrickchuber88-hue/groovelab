@@ -5040,7 +5040,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const hasCampus = profile.is_campus_active;
       const hasGrooveLab = profile.is_groovelab_active;
 
-      let spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #eab308 100%)';
+      let spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 100%)';
       if (hasVerwaltung && hasCampus && hasGrooveLab) {
         spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #eab308 66.6%, #eab308 100%)';
       } else if (hasVerwaltung && hasCampus) {
@@ -5051,10 +5051,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
       } else if (hasVerwaltung) {
         spectrumGradient = '#ea4335';
-      } else if (hasCampus) {
-        spectrumGradient = '#34a853';
       } else {
-        spectrumGradient = '#eab308';
+        spectrumGradient = '#34a853';
       }
 
       return (
@@ -5484,13 +5482,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     const hasCampusStudent = profile.is_campus_active;
     const hasGrooveLabStudent = profile.is_groovelab_active;
-    let studentSpectrumGradient = 'linear-gradient(90deg, #34a853 0%, #eab308 100%)';
+    let studentSpectrumGradient = '#34a853';
     if (hasCampusStudent && hasGrooveLabStudent) {
       studentSpectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
-    } else if (hasCampusStudent) {
-      studentSpectrumGradient = '#34a853';
-    } else {
+    } else if (hasGrooveLabStudent && !hasCampusStudent) {
       studentSpectrumGradient = '#eab308';
+    } else {
+      studentSpectrumGradient = '#34a853';
     }
 
     return (
@@ -7323,7 +7321,7 @@ const styles = {
     height: '36px',
     borderRadius: '50%',
     border: '3px solid #e2e8f0',
-    borderTopColor: '#eab308',
+    borderTopColor: '#34a853',
     animation: 'spin 0.8s linear infinite',
   },
   spinnerInline: {
