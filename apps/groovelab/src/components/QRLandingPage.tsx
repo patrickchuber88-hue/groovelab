@@ -326,32 +326,37 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-    return (
+    return createPortal(
       <div style={{
-        ...styles.card,
-        padding: '12px 14px',
-        background: '#f0fdf4',
-        border: '1px solid #bbf7d0',
-        borderRadius: '16px',
-        color: '#166534',
-        position: 'relative',
-        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.08)',
-        marginTop: '10px',
+        position: 'fixed',
+        bottom: '18px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'calc(100% - 24px)',
+        maxWidth: '440px',
+        zIndex: 9999,
+        background: 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(52, 168, 83, 0.3)',
+        borderRadius: '20px',
+        padding: '12px 16px',
+        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(52, 168, 83, 0.15)',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px'
       }}>
         {/* Main Row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           {/* Left: Icon & Text */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
             <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
+              width: '38px',
+              height: '38px',
+              borderRadius: '11px',
               overflow: 'hidden',
               flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
+              boxShadow: '0 3px 10px rgba(52, 168, 83, 0.25)',
               border: '1px solid rgba(52, 168, 83, 0.2)',
               background: '#ffffff'
             }}>
@@ -359,10 +364,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 900, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Campus App installieren
               </h4>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Schnellzugriff vom Startbildschirm
               </p>
             </div>
@@ -374,7 +379,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               type="button"
               onClick={handleInstallClick}
               style={{
-                padding: '6px 12px',
+                padding: '7px 14px',
                 borderRadius: '100px',
                 background: '#34a853',
                 color: '#ffffff',
@@ -385,7 +390,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)',
+                boxShadow: '0 3px 10px rgba(52, 168, 83, 0.3)',
                 whiteSpace: 'nowrap'
               }}
             >
@@ -398,12 +403,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               onClick={handleDismissInstall}
               aria-label="Schließen"
               style={{
-                background: 'rgba(52, 168, 83, 0.12)',
+                background: '#f1f5f9',
                 border: 'none',
-                color: '#166534',
+                color: '#64748b',
                 borderRadius: '50%',
-                width: '24px',
-                height: '24px',
+                width: '26px',
+                height: '26px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -411,7 +416,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 flexShrink: 0
               }}
             >
-              <X size={13} color="#166534" />
+              <X size={14} color="#64748b" />
             </button>
           </div>
         </div>
@@ -419,17 +424,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {/* iOS Step-by-Step Guide */}
         {showIOSInstallGuide && (
           <div style={{
-            background: '#ffffff',
-            borderRadius: '10px',
+            background: '#f8fafc',
+            borderRadius: '12px',
             padding: '10px 12px',
             fontSize: '0.75rem',
-            color: '#166534',
+            color: '#334155',
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            border: '1px solid #bbf7d0'
+            border: '1px solid #e2e8f0'
           }}>
-            <div style={{ fontWeight: 800, color: '#15803d', marginBottom: '1px' }}>
+            <div style={{ fontWeight: 800, color: '#166534', marginBottom: '1px' }}>
               So installierst du die App auf iOS/Safari:
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -442,7 +447,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           </div>
         )}
-      </div>
+      </div>,
+      document.body
     );
   };
 
@@ -3964,40 +3970,33 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       </div>
     );
   };
-
-  const renderLessonInfoCard = (lesson: any, isToday: boolean, nextLesson?: any) => {
     if (isToday && lesson) {
       return (
         <div style={{
           ...styles.card,
-          padding: '16px',
-          gap: '12px'
+          padding: '10px 14px',
+          gap: '6px',
+          boxShadow: '0 2px 8px rgba(52, 168, 83, 0.08)',
+          border: '1px solid #bbf7d0',
+          background: '#f0fdf4'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-              Heute Unterricht
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Heute Unterricht 🎵
+            </span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#166534' }}>
+              {lesson.start_time?.substring(0, 5)} Uhr ({lesson.duration || 45} Min)
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Calendar size={16} color="#64748b" />
-              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                {lesson.start_time?.substring(0, 5)} Uhr ({lesson.duration || 45} Min)
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <User size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                Mit deiner Lehrkraft
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <MapPin size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                {lesson.room_name || (lesson.room && lesson.room.name) || 'Groovelab Raum'}
-              </span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.75rem', color: '#15803d', fontWeight: 700, paddingTop: '2px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <User size={13} color="#166534" /> Lehrkraft zugewiesen
+            </span>
+            <span>·</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <MapPin size={13} color="#166534" /> {lesson.room_name || (lesson.room && lesson.room.name) || 'Groovelab Raum'}
+            </span>
           </div>
         </div>
       );
@@ -4005,46 +4004,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       return (
         <div style={{
           ...styles.card,
-          padding: '16px',
-          gap: '12px',
-          border: nextLesson.isPendingReview ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0'),
-          background: nextLesson.isPendingReview ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : (styles.card ? styles.card.background : '#ffffff')
+          padding: '10px 14px',
+          gap: '6px',
+          border: nextLesson.isPendingReview ? '1px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0'),
+          background: nextLesson.isPendingReview ? '#fefce8' : (styles.card ? styles.card.background : '#ffffff'),
+          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: nextLesson.isPendingReview ? '#b45309' : '#34a853', background: nextLesson.isPendingReview ? '#fef3c7' : '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-              Nächster Unterrichtstermin
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: nextLesson.isPendingReview ? '#b45309' : '#34a853', background: nextLesson.isPendingReview ? '#fef3c7' : '#e6f4ea', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Nächster Unterrichtstermin
+              </span>
+              {nextLesson.isPendingReview && (
+                <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', padding: '2px 6px', borderRadius: '6px' }}>
+                  ⏳ In Prüfung
+                </span>
+              )}
+            </div>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+              {nextLesson.dateStr}
             </span>
-            {nextLesson.isPendingReview && (
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                ⏳ In Prüfung
-              </span>
-            )}
           </div>
- 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Calendar size={16} color="#64748b" />
-              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                {nextLesson.dateStr}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Clock size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <MapPin size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
-              </span>
-            </div>
-            {nextLesson.isPendingReview && (
-              <div style={{ fontSize: '0.72rem', color: '#854d0e', fontWeight: 700, marginTop: '4px', background: '#fef9c3', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
-                Hinweis: Dieser Termin steht noch unter Vorbehalt der finalen Raumzuteilung durch das Sekretariat.
-              </div>
-            )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.75rem', color: '#64748b', fontWeight: 700, paddingTop: '2px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={13} color="#34a853" /> Start {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
+            </span>
+            <span>·</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <MapPin size={13} color="#34a853" /> {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
+            </span>
           </div>
         </div>
       );
@@ -4052,36 +4041,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return (
       <div style={{
         ...styles.card,
-        padding: '16px',
-        gap: '12px',
+        padding: '10px 14px',
+        gap: '6px',
         border: '1px dashed #cbd5e1',
-        background: '#f8fafc'
+        background: '#f8fafc',
+        boxShadow: 'none'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#e2e8f0', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Nächster Unterrichtstermin
+          </span>
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>
+            Terminierung ausstehend
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Calendar size={16} color="#94a3b8" />
-            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>
-              Terminierung ausstehend
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Clock size={16} color="#94a3b8" />
-            <span style={{ fontSize: '0.88rem', fontWeight: 650, color: '#64748b' }}>
-              Uhrzeit wird vom Sekretariat zugeteilt
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <MapPin size={16} color="#94a3b8" />
-            <span style={{ fontSize: '0.88rem', fontWeight: 650, color: '#64748b' }}>
-              Raumzuweisung ausstehend
-            </span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, paddingTop: '2px' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Clock size={12} color="#94a3b8" /> Uhrzeit folgt
+          </span>
+          <span>·</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <MapPin size={12} color="#94a3b8" /> Raumzuweisung ausstehend
+          </span>
         </div>
       </div>
     );
@@ -7187,6 +7169,47 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 )}
 
 
+              </div>
+            )}
+
+            {/* Direct WebApp Full Login Button */}
+            {!timerRunning && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '14px', marginBottom: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinPurpose('unlock_app');
+                    setPageState('pin_required');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '100px',
+                    padding: '7px 16px',
+                    color: '#475569',
+                    fontWeight: 750,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#34a853';
+                    e.currentTarget.style.color = '#166534';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  <Lock size={13} color="#34a853" />
+                  <span>Vollzugriff / WebApp Login</span>
+                </button>
               </div>
             )}
 
