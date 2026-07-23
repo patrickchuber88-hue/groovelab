@@ -584,9 +584,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('platform') === 'campus' || params.get('module') === 'campus') {
+      return false;
+    }
     const hasKioskToken = typeof window !== 'undefined' && !!localStorage.getItem('groovelab_kiosk_token');
-    const hasActivePlatformGroovelab = typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab';
-    return !!kioskStationId || hasKioskToken || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab' || hasActivePlatformGroovelab;
+    const isKioskModeActive = typeof window !== 'undefined' && localStorage.getItem('groovelab_kiosk_mode') === 'true';
+    return !!kioskStationId || hasKioskToken || isKioskModeActive || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab';
   });
   const [hasAutoCheckedPlatform, setHasAutoCheckedPlatform] = useState(false);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
@@ -7567,7 +7570,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             alignItems: 'center',
             textAlign: 'center'
           }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706', marginBottom: '16px' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: isGroovelabKiosk ? '#fef3c7' : '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isGroovelabKiosk ? '#d97706' : '#34a853', marginBottom: '16px' }}>
               <Key size={28} />
             </div>
             
