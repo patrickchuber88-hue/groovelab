@@ -6249,8 +6249,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
                       Hallo {profile.first_name}! 🎵
                     </h2>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, background: '#f1f5f9', padding: '3px 10px', borderRadius: '100px' }}>
-                      {profile.instrument || 'Schüler'}
+                    <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 800, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: '100px' }}>
+                      {profile.instrument || 'Musiker'}
                     </span>
                   </div>
                 )}
@@ -6452,8 +6452,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
                       Hallo {profile.first_name}! 🎵
                     </h2>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, background: '#f1f5f9', padding: '3px 10px', borderRadius: '100px' }}>
-                      {profile.instrument || 'Schüler'}
+                    <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 800, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: '100px' }}>
+                      {profile.instrument || 'Musiker'}
                     </span>
                   </div>
                 )}
