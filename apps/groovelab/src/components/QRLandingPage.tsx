@@ -786,34 +786,40 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_proposals: userData.parent_allow_proposals ?? true
         });
 
-        // Check if activation_days record or PIN exists for this student
-        let hasPinCreated = false;
-        // Check if parents unlocked preview previously on this device
+        // Check if device was previously unlocked in localStorage
         const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
-        if (wasUnlocked) {
-          setParentUnlocked(true);
-        }
 
+        // Check if activation_days record or PIN strictly exists in DB for this student
+        let hasPinCreated = false;
         if (userData.role === 'student') {
           const { data: actDay } = await supabase
             .from('activation_days')
-            .select('day_of_birth')
+            .select('student_id')
             .eq('student_id', userData.id)
             .maybeSingle();
-          hasPinCreated = Boolean(wasUnlocked || actDay || userData.is_pin_activated || userData.personal_pin || userData.parent_pin || userData.onboarding_pin || userData.pin);
+          hasPinCreated = Boolean(
+            actDay ||
+            userData.is_pin_activated === true ||
+            (userData.personal_pin && String(userData.personal_pin).trim() !== '') ||
+            (userData.parent_pin && String(userData.parent_pin).trim() !== '') ||
+            (userData.onboarding_pin && String(userData.onboarding_pin).trim() !== '') ||
+            (userData.pin && String(userData.pin).trim() !== '')
+          );
         } else {
           hasPinCreated = true;
         }
 
-        // 1.5 Allererstes Öffnen der QR Landingpage 2: Wenn noch keine PIN erstellt wurde (Status "Offen"), zur Ersterstellung auffordern!
+        // 1. Allererstes Öffnen der QR Landingpage 2: Wenn noch KEINE PIN in der DB hinterlegt ist, MUSS sofort zur PIN-Ersterstellung aufgefordert werden!
         if (userData.role === 'student' && !hasPinCreated) {
           setPinPurpose('setup_initial_pin');
           setPageState('pin_required');
           return;
         }
 
-        // 2. Wenn das Gerät noch nicht gekoppelt/entsperrt ist -> 1x PIN eingeben, um dieses Gerät zu freizuschalten!
-        if (!wasUnlocked) {
+        if (wasUnlocked) {
+          setParentUnlocked(true);
+        } else {
+          // 2. Wenn eine PIN in der DB existiert, aber dieses Gerät noch nicht gekoppelt ist -> PIN-Abfrage zum Entsperren!
           setPinPurpose('unlock_preview');
           setPageState('pin_required');
           return;
