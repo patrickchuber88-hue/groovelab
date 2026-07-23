@@ -4374,107 +4374,55 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 )}
               </div>
 
-              {/* Homework Section */}
+              {/* Homework Section - Ultra-Compressed (Page numbers only) */}
               <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px'}}>
                 <h3 style={{margin: 0, fontSize: '0.9rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px'}}>
                   <BookOpen size={16} color="#34a853" /> Deine Hausaufgaben
                 </h3>
-                {activeHWs.length > 0 || notesList.length > 0 ? (
+                {activeHWs.length > 0 ? (
                   <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                    {activeHWs.map((hw, i) => {
-                      const textNotes = cleanHomeworkNotesText(hw.teacher_notes || hw.notes || '');
-                      return (
-                        <div key={i} style={{display: 'flex', flexDirection: 'column', gap: '2px'}}>
-                          <div style={{display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#334155', fontWeight: 600}}>
-                            <Check size={16} color="#34a853" style={{marginTop: '2px', flexShrink: 0}} />
-                            <span>{hw.topic_name}</span>
-                          </div>
-                          {textNotes && (
-                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginLeft: '24px' }}>
-                              Bemerkung: {textNotes}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {(() => {
-                      let audioCount = 0;
-                      return notesList.map((note, i) => {
-                        const trimmedNote = (note || '').trim();
-                        if (trimmedNote.includes("STICKER:") || trimmedNote.includes("LATENCY:")) return null;
-                        
-                        const isAudio = trimmedNote.startsWith("AUDIO:");
-                        if (isAudio) {
-                          audioCount++;
-                          const parts = trimmedNote.substring(6).split('|');
-                          return (
-                            <div key={`note-${i}`} style={{display: 'flex', justifyContent: 'center', padding: '4px 0'}}>
-                              <InlineAudioPlayer url={parts[0]} label={parts[3] || `Play-Along #${audioCount}`} />
-                            </div>
-                          );
-                        }
-                        
-                        const isStudentNotePublic = trimmedNote.includes('STUDENT_NOTE_PUBLIC:');
-                        const isStudentNotePrivate = trimmedNote.includes('STUDENT_NOTE_PRIVATE:');
-
-                        if (isStudentNotePublic || isStudentNotePrivate) {
-                          let rawContent = trimmedNote;
-                          if (rawContent.includes('|')) {
-                            rawContent = rawContent.split('|').slice(1).join('|');
-                          } else {
-                            rawContent = rawContent.replace(/STUDENT_NOTE_PUBLIC:[^\s]*/gi, '').replace(/STUDENT_NOTE_PRIVATE:[^\s]*/gi, '');
-                          }
-                          const cleanQuestionText = rawContent.replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-
-                          if (!cleanQuestionText) return null;
-
-                          return (
-                            <div key={`note-${i}`} style={{
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: '8px',
-                              background: isStudentNotePrivate ? '#fef2f2' : '#f0fdf4',
-                              border: isStudentNotePrivate ? '1px solid #fecaca' : '1px solid #bbf7d0',
-                              padding: '8px 12px',
-                              borderRadius: '12px',
-                              fontSize: '0.78rem',
-                              color: '#1e293b',
-                              lineHeight: '1.4'
-                            }}>
-                              <MessageSquare size={15} style={{ color: isStudentNotePrivate ? '#dc2626' : '#166534', marginTop: '2px', flexShrink: 0 }} />
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: '0.64rem', fontWeight: 900, color: isStudentNotePrivate ? '#dc2626' : '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  {isStudentNotePrivate ? 'Deine private Notiz' : 'Deine Frage für den Unterricht'}
-                                </span>
-                                <span style={{ color: '#0f172a', fontWeight: 700, wordBreak: 'break-word' }}>
-                                  {cleanQuestionText}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        const cleanRegularNote = trimmedNote
-                          .replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '')
-                          .replace(/^❓\s*Frage für den Unterricht:\s*/i, '')
-                          .trim();
-
-                        if (!cleanRegularNote || cleanRegularNote.includes('LATENCY:')) return null;
-
-                        return (
-                          <div key={`note-${i}`} style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: '#334155', fontWeight: 600, background: '#f8fafc', padding: '6px 10px', borderRadius: '0 8px 8px 0', borderLeft: '3.5px solid #34a853'}}>
-                            <FileText size={12} style={{ color: '#34a853', flexShrink: 0 }} />
-                            <span>{cleanRegularNote}</span>
-                          </div>
-                        );
-                      });
-                    })()}
+                    {activeHWs.map((hw, i) => (
+                      <div key={i} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: '#1e293b', fontWeight: 750}}>
+                        <Check size={16} color="#34a853" style={{flexShrink: 0}} />
+                        <span>{hw.topic_name}</span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p style={{margin: 0, fontSize: '0.875rem', color: '#64748b', fontStyle: 'italic', fontWeight: 550}}>Keine aktuellen Hausaufgaben erfasst</p>
                 )}
               </div>
             </div>
+
+            {/* Minimalistic Upgrade Callout Button */}
+            {activationAllowed && (
+              <button
+                type="button"
+                onClick={() => setActivationStep('email')}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #34a853 0%, #288d45 100%)',
+                  color: '#ffffff',
+                  fontSize: '0.95rem',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'transform 0.15s ease'
+                }}
+                onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <Sparkles size={18} color="#ffffff" />
+                <span>Campus aktivieren</span>
+              </button>
+            )}
 
             {/* Activation callout or Notice */}
             {activationError && (
