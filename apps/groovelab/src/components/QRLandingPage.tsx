@@ -4425,10 +4425,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column'}}>
                   <h2 style={{margin: 0, fontSize: '1.25rem', fontWeight: 900, textShadow: '0 1px 2px rgba(0,0,0,0.1)'}}>
-                    Hallo {profile?.first_name || 'Schüler'}! 🎵
+                    Campus-Groovelab
                   </h2>
                   <span style={{fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600}}>
-                    Mein Campus Pass · {profile.instrument || 'Schüler'}
+                    {profile.instrument || 'Schüler'} · {profile.school_name}
                   </span>
                 </div>
               </div>
@@ -5664,7 +5664,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <Music size={14} />
                   </div>
                   <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Urbanist', 'Outfit', sans-serif" }}>
-                    {profile?.first_name ? `Hallo ${profile.first_name}! 🎵` : ((hasCampusStudent && hasGrooveLabStudent) ? 'Campus-Groovelab' : (hasGrooveLabStudent && !hasCampusStudent ? 'Groovelab' : 'Campus'))}
+                    Campus-Groovelab
                   </span>
                 </div>
 
