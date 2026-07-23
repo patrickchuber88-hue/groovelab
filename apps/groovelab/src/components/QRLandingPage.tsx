@@ -110,9 +110,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     // Force check out from active sessions on Campus login to prevent automatic check-in visibility
     await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('user_id', userData.id).is('check_out_time', null);
 
+    // CRITICAL: Clear QR token session locks so App.tsx routes to full WebApp Dashboard (e.g. Briefing Board)
+    sessionStorage.removeItem('groovelab_qr_token');
+    localStorage.removeItem('groovelab_last_qr_token');
+
     localStorage.setItem('groovelab_user_id', userData.id);
     sessionStorage.setItem('groovelab_user_id', userData.id);
-    sessionStorage.setItem('groovelab_qr_token', token);
     localStorage.setItem('groovelab_active_platform', 'campus');
     localStorage.setItem('campus_active_tab', 'briefing');
     window.location.replace('/');
