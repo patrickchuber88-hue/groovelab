@@ -3414,10 +3414,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         }
 
         if (u.role === 'student') {
+          const pendingMatch = pendingStudents?.find(p => p.id === u.id || (p.first_name && p.first_name === u.first_name));
+          const resolvedDay = activationDaysMap[u.id] || u.day_of_birth || pendingMatch?.day_of_birth || null;
+          const resolvedStatus = statusMap[u.id] || u.status || pendingMatch?.status || (u.is_campus_active || u.is_groovelab_active ? 'aktiv' : 'offen');
+          const isPending = pendingMatch ? (resolvedStatus === 'ausstehend' || resolvedStatus === 'offen' || (!u.is_campus_active && !u.is_groovelab_active)) : (resolvedStatus === 'ausstehend' || resolvedStatus === 'offen');
+
           studentsList.push({
             ...u,
-            day_of_birth: activationDaysMap[u.id] || null,
-            status: statusMap[u.id] || 'aktiv'
+            isPendingOnboarding: isPending,
+            day_of_birth: resolvedDay,
+            status: resolvedStatus
           });
         }
 
@@ -3491,9 +3497,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         }
       });
 
-      // Merge pending students into student list
+      // Merge pending students into student list (avoid duplicates)
       if (pendingStudents) {
         pendingStudents.forEach(ps => {
+          const exists = studentsList.some(s => s.id === ps.id || (s.first_name && s.first_name === ps.first_name));
+          if (!exists) {
           const fName = ps.first_name || 'Ausstehendes';
           const lName = ps.last_name || 'Onboarding';
           const fullName = `${fName} ${lName}`;
@@ -3519,8 +3527,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
             ausweis_nummer: 'Ausstehend (Onboarding)',
             created_at: ps.created_at || new Date().toISOString()
           });
-        });
-      }
+        }
+      });
+    }
 
       setUserMap(map);
       setCoaches(coachesList);
