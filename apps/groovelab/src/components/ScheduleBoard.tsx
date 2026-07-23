@@ -5387,15 +5387,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       className={isShaking ? 'card-shake' : ''}
                       style={{ 
                         background: isSelected 
-                          ? 'rgba(0, 122, 255, 0.08)' 
+                          ? '#f8fafc' 
                           : (isAssigned ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.65)'), 
                         backdropFilter: isAssigned ? 'none' : 'blur(12px)',
                         WebkitBackdropFilter: isAssigned ? 'none' : 'blur(12px)',
                         border: isSelected 
-                          ? '1.5px solid #007aff' 
-                          : '1px solid rgba(255, 255, 255, 0.6)', 
+                          ? '1.5px solid #0f172a' 
+                          : '1px solid rgba(0, 0, 0, 0.08)', 
                         borderLeft: isSelected 
-                          ? '4px solid #007aff' 
+                          ? '4px solid #0f172a' 
                           : (isAssigned ? '3px solid #cbd5e1' : '3px solid #86868b'), 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
@@ -5405,7 +5405,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         flexDirection: 'column', 
                         gap: '4px',
                         boxShadow: isSelected 
-                          ? '0 0 10px rgba(0, 122, 255, 0.25)' 
+                          ? '0 4px 14px rgba(15, 23, 42, 0.14)' 
                           : (isAssigned ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.01)'),
                         transition: 'all 0.25s ease'
                       }}
