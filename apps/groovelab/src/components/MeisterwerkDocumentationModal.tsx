@@ -369,7 +369,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       .from('users')
       .select('is_campus_active')
       .eq('id', student.id)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data && typeof data.is_campus_active === 'boolean') {
           setIsCampusActive(data.is_campus_active);
@@ -1115,7 +1115,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           .from('users')
           .select('school_id')
           .eq('id', student.id)
-          .single();
+          .maybeSingle();
 
         if (studentError) throw studentError;
 
@@ -1369,7 +1369,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             .from('users')
             .select('instrument, school_id')
             .eq('id', student.id)
-            .single();
+            .maybeSingle();
           if (!error && data) {
             if (data.instrument) {
               setStudentInstrument(data.instrument);
@@ -1383,7 +1383,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 .from('schools')
                 .select('name')
                 .eq('id', data.school_id)
-                .single();
+                .maybeSingle();
               if (schoolData && schoolData.name) {
                 setSchoolName(schoolData.name);
               }
