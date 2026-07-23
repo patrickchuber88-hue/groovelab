@@ -1847,15 +1847,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 if (overlapsExisting) continue;
 
                 // Verify that inserting this student does not push any existing student on the board into a Sperrzeit
-                const tempStudentsTest = [...board.students, { ...student, assignedDay: board.dayOfWeek, customStartTime: candidateStartStr }];
-                tempStudentsTest.sort((a, b) => {
-                  const timeA = a.customStartTime || a.assignedTime || '00:00';
-                  const timeB = b.customStartTime || b.assignedTime || '00:00';
-                  if (timeA !== timeB) return timeA.localeCompare(timeB);
-                  if (a.customStartTime && !b.customStartTime) return -1;
-                  if (!a.customStartTime && b.customStartTime) return 1;
-                  return 0;
-                });
+                let testInsertPos = board.students.length;
+                for (let i = 0; i < board.students.length; i++) {
+                  if (board.students[i].assignedTime) {
+                    const [sh, sm] = parseTime(board.students[i].assignedTime!);
+                    if (candidateMin < sh * 60 + sm) {
+                      testInsertPos = i;
+                      break;
+                    }
+                  }
+                }
+                const tempStudentsTest = [...board.students];
+                tempStudentsTest.splice(testInsertPos, 0, { ...student, assignedDay: board.dayOfWeek, customStartTime: candidateStartStr });
                 const tempBoardTest = recalculateBoardTimes({ ...board, students: tempStudentsTest });
                 let boardSperrzeitConflict = false;
                 for (const bs of tempBoardTest.students) {
@@ -1961,15 +1964,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               };
               const nextStudents = [...b.students];
               nextStudents.splice(bestCandidate!.insertIndex, 0, studentToAssign);
-              
-              nextStudents.sort((a, b) => {
-                const timeA = a.customStartTime || a.assignedTime || '00:00';
-                const timeB = b.customStartTime || b.assignedTime || '00:00';
-                if (timeA !== timeB) return timeA.localeCompare(timeB);
-                if (a.customStartTime && !b.customStartTime) return -1;
-                if (!a.customStartTime && b.customStartTime) return 1;
-                return 0;
-              });
 
               const updatedBoard = recalculateBoardTimes({ ...b, students: nextStudents });
               
