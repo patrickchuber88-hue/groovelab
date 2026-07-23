@@ -838,8 +838,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const loadedStudents: Student[] = [
         ...(sData || []).map(s => ({
           id: s.id,
-          first_name: s.first_name,
-          last_name: s.last_name,
+          first_name: s.first_name || (s as any).name || (s as any).full_name || 'Schüler',
+          last_name: s.last_name || '',
           instrument: s.instrument || 'Musiker',
           duration: s.lesson_duration || 45,
           status: (statusMap[s.id] || 'verplant') as any,
@@ -5138,7 +5138,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 </div>
                               </div>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {bs.first_name} {maskLastName(bs.last_name, showRealNames)}
+                                {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Gruppe').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                               </span>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name?.[0] ? s.last_name[0] + '.' : ''}`).join(', ')}
@@ -5235,7 +5235,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           </div>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <InstrumentBadge instrument={bs.instrument} color={textColor} />
-                            {bs.first_name} {maskLastName(bs.last_name, showRealNames)}
+                            {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Schüler').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                           </span>
                           {cardHeightPx > 52 && (
                             <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
@@ -5459,7 +5459,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>
-                          {s.first_name} {maskLastName(s.last_name, showRealNames)}
+                          {(s.first_name || (s as any).name || (s as any).full_name || 'Schüler').trim()} {maskLastName(s.last_name || '', showRealNames)}
                         </span>
                         {failedStudentIds.includes(s.id) ? (
                           <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
