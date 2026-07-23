@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Search, School, MapPin, Loader2, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-interface LandingPage2Props {
+interface Startseite2Props {
   onLogin: () => void;
   onRegister: (email?: string) => void;
   onShowPrivacy: () => void;
@@ -10,7 +10,7 @@ interface LandingPage2Props {
   onShowImpressum: () => void;
 }
 
-export const LandingPage2: React.FC<LandingPage2Props> = ({ 
+export const Startseite2: React.FC<Startseite2Props> = ({ 
   onLogin, 
   onRegister,
   onShowPrivacy,
@@ -516,3 +516,5 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
     </div>
   );
 };
+
+export const LandingPage2 = Startseite2;

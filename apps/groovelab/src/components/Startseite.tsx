@@ -4,12 +4,12 @@ import {
   Layers, ChevronDown, Check, ArrowRight, X, Menu, BookOpen, Sparkles
 } from 'lucide-react';
 
-interface LandingPageProps {
+interface StartseiteProps {
   onLogin: () => void;
   onRegister: (email?: string) => void;
 }
 
-export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
+export function Startseite({ onLogin, onRegister }: StartseiteProps) {
   const [activeTab, setActiveTab] = useState<number>(0);
   const [email, setEmail] = useState<string>('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -2150,3 +2150,5 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
     </div>
   );
 }
+
+export const LandingPage = Startseite;

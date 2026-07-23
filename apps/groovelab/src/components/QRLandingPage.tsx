@@ -125,11 +125,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [loadingTeacherSchedule, setLoadingTeacherSchedule] = useState(false);
   const [teacherModuleFilter, setTeacherModuleFilter] = useState<'all' | 'campus' | 'groovelab'>('all');
 
-  // Persist QR token so page reload stays on QR Landing Page
+  // Persist QR token in sessionStorage so page reload on /qr/ token stays on QR Landing Page
   useEffect(() => {
     if (token) {
       sessionStorage.setItem('groovelab_qr_token', token);
-      localStorage.setItem('groovelab_last_qr_token', token);
     }
   }, [token]);
 
@@ -7658,4 +7657,9 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
     </div>
   );
 };
+
+// Aliases for Active vs Inactive student pass views
+export const QRLandingPageActive = QRLandingPage;
+export const QRLandingPageInactive = QRLandingPage;
+export const QRLandingPage2 = QRLandingPage;
 

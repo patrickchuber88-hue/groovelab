@@ -4,8 +4,8 @@ import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
-import { LandingPage2 } from './components/LandingPage2';
-import { LandingPage } from './components/LandingPage';
+import { Startseite2 } from './components/Startseite2';
+import { Startseite } from './components/Startseite';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
 import { CampusPinUnlockModal } from './components/CampusPinUnlockModal';
@@ -7127,7 +7127,7 @@ function App() {
   // 1.1 DETAILED LANDING PAGE
   if (location.pathname === '/landingpage') {
     return (
-      <LandingPage 
+      <Startseite 
         onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
         onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
       />
@@ -7177,7 +7177,7 @@ function App() {
       }
 
       return (
-        <LandingPage2 
+        <Startseite2 
           onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
