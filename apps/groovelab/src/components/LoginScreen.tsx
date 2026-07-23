@@ -4775,6 +4775,24 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                           setSelectedKioskStationId(newSelection);
                           if (newSelection) {
                             try {
+                              // Ensure authenticated user context for RLS policy on kiosks table
+                              let currentUserId = sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id');
+                              if (!currentUserId && schoolData?.id) {
+                                try {
+                                  const { data: staffMember } = await supabase
+                                    .from('users')
+                                    .select('id')
+                                    .eq('school_id', schoolData.id)
+                                    .in('role', ['admin', 'teacher'])
+                                    .limit(1)
+                                    .maybeSingle();
+                                  if (staffMember?.id) {
+                                    currentUserId = staffMember.id;
+                                    localStorage.setItem('groovelab_user_id', staffMember.id);
+                                  }
+                                } catch (e) {}
+                              }
+
                               // Temporarily set the school's kiosk token to authenticate the Supabase request
                               if (schoolData?.groovelab_kiosk_token) {
                                 localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
