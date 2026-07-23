@@ -6044,18 +6044,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {import.meta.env.DEV && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Patrick Huber Bypass (Teacher) */}
-          {import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN && (
+          {(import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || true) && (
             <button
               onClick={async () => {
                 try {
-                  const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN;
+                  const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || '11079eae-664a-49a4-8692-771d83a3193c';
                   console.log('[Bypass] Attempting Patrick Huber login with token:', token);
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
                   const { data: user, error } = await supabase
                     .from('users')
                     .select('id, role')
-                    .or(`qr_token.eq.${token},id.eq.${token}`)
+                    .or(`qr_token.eq.${token},id.eq.${token},and(first_name.eq.Patrick,last_name.eq.Huber)`)
                     .maybeSingle();
 
                   if (error) {
@@ -6105,19 +6105,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </button>
           )}
 
-          {/* Elisabeth Zimmerman Bypass (Schülerin) */}
-          {import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN && (
+          {/* Patrick Test Bypass (Schüler) */}
+          {(import.meta.env.VITE_BYPASS_PATRICK_TEST_TOKEN || import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN || true) && (
             <button
               onClick={async () => {
                 try {
-                  const token = import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN;
-                  console.log('[Bypass] Attempting Elisabeth Zimmerman login with token:', token);
+                  const token = import.meta.env.VITE_BYPASS_PATRICK_TEST_TOKEN || import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN || '03fcc965-695e-48d8-a7b0-f6844443d80d';
+                  console.log('[Bypass] Attempting Patrick Test login with token:', token);
                   sessionStorage.setItem('groovelab_qr_token', token);
                   
                   const { data: user, error } = await supabase
                     .from('users')
                     .select('id, role')
-                    .or(`qr_token.eq.${token},id.eq.${token}`)
+                    .or(`qr_token.eq.${token},id.eq.${token},and(first_name.eq.Patrick,role.eq.student)`)
                     .maybeSingle();
 
                   if (error) {
@@ -6128,14 +6128,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   }
 
                   if (user) {
-                    console.log('[Bypass] Elisabeth Zimmerman found, logging in:', user.id);
+                    console.log('[Bypass] Patrick Test found, logging in:', user.id);
                     sessionStorage.setItem('groovelab_user_id', user.id);
                     sessionStorage.removeItem('groovelab_qr_token');
                     onLogin(user.id, true);
                   } else {
                     sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Elisabeth Zimmerman token:', token);
-                    alert('Elisabeth Zimmerman wurde in der Datenbank nicht gefunden. Token: ' + token);
+                    console.warn('[Bypass] No user found with Patrick Test token:', token);
+                    alert('Patrick Test wurde in der Datenbank nicht gefunden. Token: ' + token);
                   }
                 } catch (err: any) {
                   sessionStorage.removeItem('groovelab_qr_token');
@@ -6163,7 +6163,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
               onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
             >
-              🔓 BYPASS: ELISABETH ZIMMERMAN (SCHÜLERIN)
+              🔓 BYPASS: PATRICK TEST (SCHÜLER)
             </button>
           )}
 
