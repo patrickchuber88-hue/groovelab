@@ -1666,9 +1666,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
         if (aTotalScore !== bTotalScore) return bTotalScore - aTotalScore;
 
-        const aTime = aPrefs[0]?.created_at ? new Date(aPrefs[0].created_at).getTime() : Infinity;
-        const bTime = bPrefs[0]?.created_at ? new Date(bPrefs[0].created_at).getTime() : Infinity;
-        return aTime - bTime;
+        const aTime = aPrefs[0]?.created_at ? new Date(aPrefs[0].created_at).getTime() : 0;
+        const bTime = bPrefs[0]?.created_at ? new Date(bPrefs[0].created_at).getTime() : 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return a.first_name.localeCompare(b.first_name);
       });
 
       let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
