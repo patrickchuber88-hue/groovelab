@@ -7189,7 +7189,7 @@ function App() {
       }
 
       return (
-        <Startseite2 
+        <Startseite 
           onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
