@@ -746,7 +746,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           is_trial: userData.is_trial ?? false,
           trial_ends_at: userData.trial_ends_at,
           exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false,
-          has_parent_pin: userData.has_parent_pin ?? false,
+          has_parent_pin: Boolean(userData.has_parent_pin || userData.personal_pin || userData.parent_pin || userData.is_pin_activated),
           pin_enforced_for_preview: userData.pin_enforced_for_preview ?? false,
           parent_allow_chat: userData.parent_allow_chat ?? true,
           parent_allow_timer: userData.parent_allow_timer ?? true,
@@ -3794,12 +3794,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         <button
           type="button"
           onClick={() => {
-            if (profile && !profile.has_parent_pin) {
+            const hasExistingPin = Boolean(profile?.has_parent_pin || profile?.personal_pin || profile?.parent_pin || profile?.is_pin_activated);
+            if (profile && !hasExistingPin) {
               setIsInitialPinSetup(true);
               setParentPinErrorMsg(null);
               setParentPinSuccessMsg(null);
               setShowPinPrompt(true);
-            } else if (profile?.pin_enforced_for_preview !== false && !isPairedForToken(token) && !lessonsUnlocked) {
+            } else if (!lessonsUnlocked && !parentUnlocked) {
+              setIsInitialPinSetup(false);
+              setParentPinErrorMsg(null);
+              setParentPinSuccessMsg(null);
               setShowPinPrompt(true);
             } else {
               setActiveTab('lessons');
@@ -4497,12 +4501,16 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    if (profile && !profile.has_parent_pin) {
+                    const hasExistingPin = Boolean(profile?.has_parent_pin || profile?.personal_pin || profile?.parent_pin || profile?.is_pin_activated);
+                    if (profile && !hasExistingPin) {
                       setIsInitialPinSetup(true);
                       setParentPinErrorMsg(null);
                       setParentPinSuccessMsg(null);
                       setShowPinPrompt(true);
-                    } else if (!lessonsUnlocked) {
+                    } else if (!lessonsUnlocked && !parentUnlocked) {
+                      setIsInitialPinSetup(false);
+                      setParentPinErrorMsg(null);
+                      setParentPinSuccessMsg(null);
                       setShowPinPrompt(true);
                     } else {
                       setActiveTab('lessons');
@@ -5946,11 +5954,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 ) : (
                   <div>
                     <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <Users size={20} style={{ color: '#34a853' }} />
-                      Eltern-PIN eingeben
+                      <Lock size={20} style={{ color: '#34a853' }} />
+                      4-stellige PIN eingeben
                     </h3>
                     <p style={{ margin: '0 0 20px 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
-                      Bitte gib die 4-stellige Eltern-PIN ein, um den geschützten Eltern-Bereich freizuschalten.
+                      Bitte gib deine 4-stellige PIN ein, um dich einzuloggen.
                     </p>
                     <input
                       type="password"
@@ -5963,7 +5971,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         if (val.length === 4) {
                           if (parentPinLockoutUntil && Date.now() < parentPinLockoutUntil) {
                             const minsLeft = Math.ceil((parentPinLockoutUntil - Date.now()) / 60000);
-                            setParentPinErrorMsg(`Eltern-Bereich gesperrt. Bitte versuche es in ${minsLeft} Minuten erneut.`);
+                            setParentPinErrorMsg(`Bereich gesperrt. Bitte versuche es in ${minsLeft} Minuten erneut.`);
                             setParentPinInput('');
                             return;
                           }
@@ -5980,18 +5988,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                 }
                                 if (isCorrect) {
                                   setParentPinAttempts(0);
-                                  const isDefault = !profile.has_parent_pin || val === '0000';
-                                  if (isDefault) {
-                                    setIsInitialPinSetup(true);
-                                    setParentPinInput('');
-                                    setParentPinErrorMsg(null);
-                                  } else {
-                                    setParentUnlocked(true);
-                                    setShowPinPrompt(false);
-                                    setParentPinInput('');
-                                    setParentPinError(false);
-                                    setParentPinErrorMsg(null);
-                                  }
+                                  setParentUnlocked(true);
+                                  setLessonsUnlocked(true);
+                                  setShowPinPrompt(false);
+                                  setActiveTab('lessons');
+                                  setParentPinInput('');
+                                  setParentPinError(false);
+                                  setParentPinErrorMsg(null);
+                                  localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
                                 } else {
                                   const newAttempts = parentPinAttempts + 1;
                                   setParentPinAttempts(newAttempts);
