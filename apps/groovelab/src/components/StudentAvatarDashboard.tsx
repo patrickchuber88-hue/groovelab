@@ -13515,10 +13515,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </p>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (window.confirm('Möchtest du wirklich alle lokalen Daten und gespeicherten Übe-Sessions zurücksetzen? Die App wird danach neu geladen.')) {
+                        onClick={async () => {
+                          if (window.confirm('Möchtest du wirklich den lokalen Cache-Speicher leeren? Deine Anmeldung bleibt dabei vollständig erhalten.')) {
+                            try {
+                              if ('caches' in window) {
+                                const keys = await caches.keys();
+                                await Promise.all(keys.map(key => caches.delete(key)));
+                              }
+                            } catch (e) {
+                              console.warn('Could not clear PWA cache:', e);
+                            }
+                            // Purge non-essential caches while keeping login session intact
                             localStorage.removeItem('groovelab_active_practice_session');
                             localStorage.removeItem('student_lehrwerke_progress');
+                            localStorage.removeItem('groovelab_offline_user_cache');
+                            localStorage.removeItem('groovelab_cached_schools');
+                            localStorage.removeItem('groovelab_cached_user');
                             window.location.reload();
                           }
                         }}
@@ -13537,7 +13549,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           gap: '8px'
                         }}
                       >
-                        <RotateCcw size={14} /> Lokalen Cache leeren
+                        <RotateCcw size={14} /> Lokalen Cache leeren (ohne Abmeldung)
                       </button>
                     </div>
                   </div>
