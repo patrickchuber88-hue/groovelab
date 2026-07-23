@@ -329,111 +329,115 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     return (
       <div style={{
         ...styles.card,
-        padding: '18px 20px',
-        background: 'linear-gradient(135deg, #052e16 0%, #0f172a 100%)',
-        border: '1px solid rgba(52, 168, 83, 0.35)',
-        color: '#ffffff',
+        padding: '12px 14px',
+        background: '#f0fdf4',
+        border: '1px solid #bbf7d0',
+        borderRadius: '16px',
+        color: '#166534',
         position: 'relative',
-        boxShadow: '0 8px 24px rgba(52, 168, 83, 0.15)',
-        marginTop: '12px'
+        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.08)',
+        marginTop: '10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
       }}>
-        {/* Dismiss Button */}
-        <button
-          type="button"
-          onClick={handleDismissInstall}
-          aria-label="Schließen"
-          style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            background: 'rgba(255, 255, 255, 0.15)',
-            border: 'none',
-            color: '#94a3b8',
-            borderRadius: '50%',
-            width: '26px',
-            height: '26px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            fontSize: '0.85rem'
-          }}
-        >
-          <X size={14} color="#94a3b8" />
-        </button>
+        {/* Main Row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+          {/* Left: Icon & Text */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              overflow: 'hidden',
+              flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
+              border: '1px solid rgba(52, 168, 83, 0.2)',
+              background: '#ffffff'
+            }}>
+              <img src="/pwa-icon.png" alt="Campus App" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            flexShrink: 0,
-            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.45)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
-          }}>
-            <img src="/campus_pwa_icon_3d.png" alt="Campus App" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 900, color: '#166534', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Campus App installieren
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Schnellzugriff vom Startbildschirm
+              </p>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
-              Campus App installieren
-            </h4>
-            <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8', fontWeight: 500, lineHeight: '1.3' }}>
-              Schneller Zugriff auf dein Hausaufgabenheft, Übe-Timer &amp; Termine direkt vom Startbildschirm.
-            </p>
+          {/* Right: Install Button & Dismiss X */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '100px',
+                background: '#34a853',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 2px 6px rgba(52, 168, 83, 0.25)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Download size={13} />
+              <span>{deferredInstallPrompt ? 'Installieren' : (isIOS ? 'Anleitung' : 'Hinzufügen')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDismissInstall}
+              aria-label="Schließen"
+              style={{
+                background: 'rgba(52, 168, 83, 0.12)',
+                border: 'none',
+                color: '#166534',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              <X size={13} color="#166534" />
+            </button>
           </div>
         </div>
-
-        {/* Install Action Button */}
-        <button
-          type="button"
-          onClick={handleInstallClick}
-          style={{
-            marginTop: '14px',
-            width: '100%',
-            padding: '10px 16px',
-            borderRadius: '12px',
-            background: '#34a853',
-            color: '#ffffff',
-            border: 'none',
-            fontWeight: 800,
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)'
-          }}
-        >
-          <Download size={16} />
-          {deferredInstallPrompt ? 'Jetzt Campus App installieren' : (isIOS ? 'Anleitung: Zum Home-Bildschirm' : 'Campus App auf Startbildschirm hinzufügen')}
-        </button>
 
         {/* iOS Step-by-Step Guide */}
         {showIOSInstallGuide && (
           <div style={{
-            marginTop: '12px',
-            background: 'rgba(255, 255, 255, 0.07)',
+            background: '#ffffff',
             borderRadius: '10px',
-            padding: '12px',
-            fontSize: '0.78rem',
-            color: '#cbd5e1',
+            padding: '10px 12px',
+            fontSize: '0.75rem',
+            color: '#166534',
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid #bbf7d0'
           }}>
-            <div style={{ fontWeight: 800, color: '#ffffff', marginBottom: '2px' }}>
+            <div style={{ fontWeight: 800, color: '#15803d', marginBottom: '1px' }}>
               So installierst du die App auf iOS/Safari:
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ background: '#334155', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>1</span>
+              <span style={{ background: '#dcfce7', color: '#166534', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>1</span>
               <span>Tippe in Safari unten auf das <strong>Teilen-Symbol ↗️</strong></span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ background: '#334155', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>2</span>
+              <span style={{ background: '#dcfce7', color: '#166534', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>2</span>
               <span>Wähle <strong>'Zum Home-Bildschirm' ➕</strong></span>
             </div>
           </div>
