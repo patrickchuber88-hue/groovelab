@@ -1953,20 +1953,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 const candidateStartStr = `${String(Math.floor(candidateMin / 60)).padStart(2, '0')}:${String(candidateMin % 60).padStart(2, '0')}`;
 
-                // Check overlap with existing assigned students
-                let overlapsExisting = false;
-                for (const s of board.students) {
-                  if (!s.assignedTime) continue;
-                  const [ssh, ssm] = parseTime(s.assignedTime);
-                  const sStart = ssh * 60 + ssm;
-                  const sEnd = sStart + s.duration;
-                  if (candidateMin < sEnd && candidateEndMin > sStart) {
-                    overlapsExisting = true;
-                    break;
-                  }
-                }
-                if (overlapsExisting) continue;
-
                 // Verify that inserting this student does not push any existing student on the board into a Sperrzeit
                 let testInsertPos = board.students.length;
                 for (let i = 0; i < board.students.length; i++) {
@@ -2006,6 +1992,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   }
                 }
                 if (customStartTimeViolated) continue;
+
+                // Ensure last student in tempBoardTest doesn't exceed board availability end
+                const lastStudent = tempBoardTest.students[tempBoardTest.students.length - 1];
+                if (lastStudent && lastStudent.assignedTime) {
+                  const [lsh, lsm] = parseTime(lastStudent.assignedTime);
+                  if (lsh * 60 + lsm + lastStudent.duration > boardEndMin) {
+                    continue;
+                  }
+                }
 
                 const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin);
                 const sibBonus = siblingMatchBonus(student, board, candidateMin, candidateEndMin);
@@ -4626,6 +4621,37 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           <span style={{ fontSize: '0.65rem', fontWeight: 600, marginLeft: '1px', color: textAccentColor }}>Uhr</span>
                         </div>
                       </div>
+
+                      {/* TVöD / ArbZG Arbeitszeit-Warnhinweis */}
+                      {(() => {
+                        let maxContinuous = 0;
+                        let currentContinuous = 0;
+                        let totalAssigned = 0;
+                        for (const s of board.students) {
+                          if (s.isBreak) {
+                            currentContinuous = 0;
+                          } else {
+                            currentContinuous += s.duration;
+                            totalAssigned += s.duration;
+                            if (currentContinuous > maxContinuous) maxContinuous = currentContinuous;
+                          }
+                        }
+
+                        if (totalAssigned > 360 && maxContinuous > 360) {
+                          return (
+                            <div style={{ padding: '2px 6px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>⚠️ TVöD/ArbZG: &gt; 6 Std. ohne 30-Min-Pause</span>
+                            </div>
+                          );
+                        } else if (maxContinuous > 180) {
+                          return (
+                            <div style={{ padding: '2px 6px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>💡 TVöD-Empfehlung: &gt; 3 Std. ohne Pause</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
 
                     {/* ── PROPORTIONAL TIME-GRID ── */}
