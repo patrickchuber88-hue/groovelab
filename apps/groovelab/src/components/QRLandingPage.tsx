@@ -75,6 +75,9 @@ interface ProfileData {
   trial_ends_at?: string | null;
   exempt_from_direct_billing?: boolean;
   has_parent_pin?: boolean | null;
+  personal_pin?: string | null;
+  parent_pin?: string | null;
+  is_pin_activated?: boolean;
   pin_enforced_for_preview?: boolean;
   parent_allow_chat?: boolean;
   parent_allow_timer?: boolean;
@@ -728,11 +731,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
 
 
+        let studentInstrument = userData.instrument || null;
+        if (!studentInstrument && userData.id) {
+          try {
+            const { data: stData } = await supabase
+              .from('students')
+              .select('instrument')
+              .or(`id.eq.${userData.id},user_id.eq.${userData.id}`)
+              .maybeSingle();
+            if (stData?.instrument) studentInstrument = stData.instrument;
+          } catch (e) {}
+
+          if (!studentInstrument) {
+            try {
+              const { data: schData } = await supabase
+                .from('schedules')
+                .select('instrument')
+                .eq('student_id', userData.id)
+                .not('instrument', 'is', null)
+                .limit(1)
+                .maybeSingle();
+              if (schData?.instrument) studentInstrument = schData.instrument;
+            } catch (e) {}
+          }
+        }
+
         setProfile({
           id: userData.id,
           first_name: userData.first_name,
           last_name: userData.last_name,
-          instrument: userData.instrument || null,
+          instrument: studentInstrument || null,
           photo_url: userData.photo_url || null,
           role: userData.role || 'student',
           roles: userData.roles || [],
@@ -747,6 +775,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           trial_ends_at: userData.trial_ends_at,
           exempt_from_direct_billing: userData.exempt_from_direct_billing ?? false,
           has_parent_pin: Boolean(userData.has_parent_pin || userData.personal_pin || userData.parent_pin || userData.is_pin_activated),
+          personal_pin: userData.personal_pin || null,
+          parent_pin: userData.parent_pin || null,
+          is_pin_activated: userData.is_pin_activated ?? false,
           pin_enforced_for_preview: userData.pin_enforced_for_preview ?? false,
           parent_allow_chat: userData.parent_allow_chat ?? true,
           parent_allow_timer: userData.parent_allow_timer ?? true,
@@ -6253,7 +6284,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
                       Hallo {profile.first_name}! 🎵
                     </h2>
-                    <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 800, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: '100px' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
                       {profile.instrument || 'Musiker'}
                     </span>
                   </div>
@@ -6456,7 +6487,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', fontFamily: "'Urbanist', sans-serif" }}>
                       Hallo {profile.first_name}! 🎵
                     </h2>
-                    <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 800, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '3px 10px', borderRadius: '100px' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '100px' }}>
                       {profile.instrument || 'Musiker'}
                     </span>
                   </div>
