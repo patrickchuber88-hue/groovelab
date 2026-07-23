@@ -1405,11 +1405,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           // Fetch fokus_logs and sum up all minutes
           const { data: focusData, error: focusError } = await supabase
             .from('fokus_logs')
-            .select('seconds_spent')
+            .select('duration_seconds')
             .eq('student_id', student.id);
 
           if (!focusError && focusData) {
-            const totalSeconds = focusData.reduce((sum, item) => sum + (item.seconds_spent || 0), 0);
+            const totalSeconds = focusData.reduce((sum, item) => sum + (item.duration_seconds || 0), 0);
             setStudentPracticeMinutes(Math.floor(totalSeconds / 60));
           }
         } catch (e) {

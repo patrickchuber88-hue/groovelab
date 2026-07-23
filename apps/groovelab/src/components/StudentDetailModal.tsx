@@ -943,9 +943,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         // Fetch parent consent logs
         const { data: cLogs } = await supabase
           .from('parent_consent_logs')
-          .select('created_at, ip_address, user_agent, consent_type')
-          .eq('student_id', student.id)
-          .order('created_at', { ascending: false });
+          .select('ip_address, user_agent, consent_type')
+          .eq('student_id', student.id);
         if (cLogs) setConsentLogs(cLogs);
 
       // Fetch other school students (for group setup dropdown list)
