@@ -88,6 +88,24 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
         sessionStorage.removeItem('groovelab_qr_token');
         if (error) throw error;
 
+        // Ensure activation_days record exists for active student detection
+        try {
+          const { data: existingAct } = await supabase
+            .from('activation_days')
+            .select('student_id')
+            .eq('student_id', user.id)
+            .maybeSingle();
+
+          if (!existingAct) {
+            await supabase.from('activation_days').insert({
+              student_id: user.id,
+              day_of_birth: (user as any).day_of_birth || 1
+            });
+          }
+        } catch (actErr) {
+          console.warn('[CampusPinUnlockModal] Warning inserting activation_days:', actErr);
+        }
+
         // Update local user object representation if possible
         user.is_pin_activated = true;
         user.is_campus_active = true;

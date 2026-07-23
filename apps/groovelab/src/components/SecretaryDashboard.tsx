@@ -9181,6 +9181,45 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           }}>▼</span>
                         </div>
 
+                        {/* PIN Reset Quick Button */}
+                        <div style={{ width: '28px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                          <button
+                            onClick={async () => {
+                              const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
+                              if (!window.confirm(`PIN von ${sName} zurücksetzen?\n\nDer Schüler wird beim nächsten App-Aufruf dazu aufgefordert, seinen Geburtstagstag zu bestätigen und eine neue 4-stellige PIN zu vergeben.`)) {
+                                return;
+                              }
+                              try {
+                                await supabase.from('activation_days').delete().eq('student_id', student.id);
+                                await supabase.from('users').update({ onboarding_pin: null, pin: null, is_pin_activated: false }).eq('id', student.id);
+                                await supabase.from('students').update({ onboarding_pin: null, status: 'offen' }).eq('id', student.id);
+                                await supabase.from('pending_students').update({ status: 'offen' }).eq('id', student.id);
+                                fetchDashboardData();
+                                alert(`PIN von ${sName} wurde zurückgesetzt.`);
+                              } catch (err: any) {
+                                alert("Fehler beim Zurücksetzen der PIN: " + err.message);
+                              }
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#d97706',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'transform 0.15s'
+                            }}
+                            className="hover-scale-mini"
+                            title="PIN von diesem Schüler zurücksetzen (Schüler kann neue PIN wählen)"
+                          >
+                            <Key size={15} />
+                          </button>
+                        </div>
+
                         {/* Delete Button */}
                         <div style={{ width: '28px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                           <button

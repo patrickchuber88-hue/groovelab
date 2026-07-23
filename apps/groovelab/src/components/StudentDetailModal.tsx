@@ -233,6 +233,25 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
   }, [isPeerStudent]);
 
+  const handleResetStudentPin = async () => {
+    const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'dieses Schülers';
+    if (!window.confirm(`Möchtest du die PIN von ${sName} wirklich zurücksetzen?\n\nDer Schüler wird beim nächsten App-Aufruf dazu aufgefordert, seinen Geburtstagstag zu bestätigen und eine neue 4-stellige PIN zu vergeben.`)) {
+      return;
+    }
+    try {
+      await supabase.from('activation_days').delete().eq('student_id', student.id);
+      await supabase.from('users').update({ onboarding_pin: null, pin: null, is_pin_activated: false }).eq('id', student.id);
+      await supabase.from('students').update({ onboarding_pin: null, status: 'offen' }).eq('id', student.id);
+      await supabase.from('pending_students').update({ status: 'offen' }).eq('id', student.id);
+
+      alert(`Die PIN von ${sName} wurde erfolgreich zurückgesetzt. Das Profil ist für die Neueingabe der PIN freigeschaltet.`);
+      onClose();
+    } catch (err: any) {
+      console.error('Fehler beim Zurücksetzen der PIN:', err);
+      alert('Fehler beim Zurücksetzen der PIN: ' + err.message);
+    }
+  };
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       const loggedInUserId = sessionStorage.getItem('groovelab_user_id');
@@ -3353,6 +3372,37 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 {appUsageMode === 'parent_hybrid' && (
                   <>
                     <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+                {/* PIN-Zurücksetzung (Schüler-PIN) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Schüler-PIN</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Falls der Schüler seine 4-stellige PIN vergessen hat</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetStudentPin}
+                    style={{
+                      background: '#fee2e2',
+                      color: '#dc2626',
+                      border: '1px solid #fca5a5',
+                      borderRadius: '10px',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale-mini"
+                    title="PIN dieses Schülers löschen und Zurücksetzen für neue Vergabe veranlassen"
+                  >
+                    <RefreshCw size={14} />
+                    <span>PIN zurücksetzen</span>
+                  </button>
+                </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Eltern-PIN (4-stellig)</span>
