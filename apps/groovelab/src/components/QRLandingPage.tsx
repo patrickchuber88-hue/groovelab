@@ -6681,8 +6681,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   renderHomeworkWidget(false)
                 ) : (
                   renderLessonsWidget()
+                )}</> : (
+                  <>
+                    {!timerRunning && renderSegmentedControl()}
+                    {activeTab === 'lessons' ? renderLessonsWidget() : renderHomeworkWidget(true)}
+                  </>
                 )}
-                </> : renderHomeworkWidget(true)}
 
 
               </div>
