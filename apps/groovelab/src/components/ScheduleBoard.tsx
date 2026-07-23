@@ -1897,6 +1897,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 }
                 if (boardSperrzeitConflict) continue;
 
+                let customStartTimeViolated = false;
+                for (const bs of tempBoardTest.students) {
+                  if (bs.customStartTime && bs.assignedTime) {
+                    const [csh, csm] = parseTime(bs.customStartTime);
+                    const [ash, asm] = parseTime(bs.assignedTime);
+                    if (ash * 60 + asm > csh * 60 + csm) {
+                      customStartTimeViolated = true;
+                      break;
+                    }
+                  }
+                }
+                if (customStartTimeViolated) continue;
+
                 const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin);
                 const sibBonus = siblingMatchBonus(student, board, candidateMin, candidateEndMin);
                 let totalScore = 1000000 + fitnessScore + sibBonus; // 1.000.000 for wunschzeit window hit
@@ -1964,6 +1977,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   }
                 }
                 if (boardSperrzeitConflict) continue;
+
+                let customStartTimeViolated = false;
+                for (const bs of tempBoard.students) {
+                  if (bs.customStartTime && bs.assignedTime) {
+                    const [csh, csm] = parseTime(bs.customStartTime);
+                    const [ash, asm] = parseTime(bs.assignedTime);
+                    if (ash * 60 + asm > csh * 60 + csm) {
+                      customStartTimeViolated = true;
+                      break;
+                    }
+                  }
+                }
+                if (customStartTimeViolated) continue;
 
                 const wunschBonus = calculateWunschBonus(student.id, board.dayOfWeek, startMin, endMin);
                 const fitnessScore = calculateSlotFitness(board, startMin, endMin);
