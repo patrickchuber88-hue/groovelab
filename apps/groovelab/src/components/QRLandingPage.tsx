@@ -622,11 +622,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         // Stage 1: Try combined OR query
         try {
-          const { data, error } = await supabase
-            .from('users')
-            .select(selectFields)
-            .or(`id.eq.${token},qr_token.eq.${token},teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`)
-            .maybeSingle();
+          let stage1Query = supabase.from('users').select(selectFields);
+          if (isUuid) {
+            stage1Query = stage1Query.or(`id.eq.${token},qr_token.eq.${token},teacher_qr_token.eq.${token}`);
+          } else {
+            stage1Query = stage1Query.or(`teacher_qr_token.eq.${token},ausweis_nummer.eq.${token},ausweis_nummer.eq.${upperToken}`);
+          }
+          const { data, error } = await stage1Query.maybeSingle();
 
           if (!error && data) {
             userData = data;
