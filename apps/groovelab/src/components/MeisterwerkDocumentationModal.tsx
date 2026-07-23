@@ -3203,7 +3203,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // Assign to student in localStorage & state
       const stored = localStorage.getItem('student_lehrwerke_progress');
       const parsed = stored ? JSON.parse(stored) : [];
-      const isStudentCreator = currentUserRole === 'student' || (!teacherMode && !readOnly);
+      const isStudentCreator = readOnly || !teacherId;
       if (!parsed.some((item: any) => item.studentId === student.id && item.lehrwerkId === createdId)) {
         const newAssignment = {
           studentId: student.id,
