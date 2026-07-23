@@ -1773,6 +1773,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         return score;
       };
 
+      const siblingMatchBonus = (student: any, board: any, startMin: number, endMin: number) => {
+        if (!student.sibling_group_id) return 0;
+        for (const s of board.students) {
+          if (s.id !== student.id && s.sibling_group_id === student.sibling_group_id && s.assignedTime) {
+            const [ssh, ssm] = parseTime(s.assignedTime);
+            const sStart = ssh * 60 + ssm;
+            const sEnd = sStart + s.duration;
+            if (startMin === sEnd || endMin === sStart) {
+              return 500000; // 500.000 bonus for placing sibling back-to-back!
+            }
+            return 50000; // 50.000 bonus for same day
+          }
+        }
+        return 0;
+      };
+
       // PHASE 2 & 3 Combined Logic (Greedy Insertion)
       const assignStudents = (studentsList: any[], isPhase3: boolean) => {
         for (const student of studentsList) {
@@ -1782,7 +1798,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           let bestCandidate: { boardId: string; insertIndex: number; customStartTime?: string; score: number } | null = null;
           let highestScore = -Infinity;
 
-          // If Phase 2, try exact Wunschzeit customStartTime matches first
+          // If Phase 2, try Wunschzeit sliding window matches across entire pref time windows
           if (!isPhase3) {
             for (const pref of wunschPrefs) {
               const prefDay = Number(pref.day_of_week);
@@ -1790,48 +1806,66 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               if (!board) continue;
 
               const [psh, psm] = parseTime(pref.start_time);
-              const startMin = psh * 60 + psm;
-              const endMin = startMin + student.duration;
+              const prefStartMin = psh * 60 + psm;
+              const [peh, pem] = parseTime(pref.end_time || pref.start_time);
+              let prefEndMin = peh * 60 + pem;
+              if (prefEndMin <= prefStartMin) {
+                prefEndMin = prefStartMin + 180; // Default 3h window if end_time missing or equal
+              }
 
-              if (isSlotBlockedForStudent(student.id, board.dayOfWeek, startMin, endMin)) continue;
-
-              // Teacher availability check
+              // Teacher availability bounds
               const [bh, bm] = parseTime(board.startAnchor);
               const boardStartMin = bh * 60 + bm;
               const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
               const boardEndMin = beh * 60 + bem;
-              if (startMin < boardStartMin || endMin > boardEndMin) continue;
 
-              // Check overlap
-              let overlapsExisting = false;
-              for (const s of board.students) {
-                if (!s.assignedTime) continue;
-                const [ssh, ssm] = parseTime(s.assignedTime);
-                const sStart = ssh * 60 + ssm;
-                const sEnd = sStart + s.duration;
-                if (startMin < sEnd && endMin > sStart) {
-                  overlapsExisting = true;
-                  break;
-                }
-              }
-              if (overlapsExisting) continue;
+              // Slide in 15-minute steps across the entire Wunschzeit window
+              for (let candidateMin = prefStartMin; candidateMin + student.duration <= prefEndMin; candidateMin += 15) {
+                const candidateEndMin = candidateMin + student.duration;
 
-              const fitnessScore = calculateSlotFitness(board, startMin, endMin);
-              const totalScore = 1000000 + fitnessScore; // 1.000.000 for exact wunsch
+                // Check Sperrzeit for this student
+                if (isSlotBlockedForStudent(student.id, board.dayOfWeek, candidateMin, candidateEndMin)) continue;
 
-              if (totalScore > highestScore) {
-                let insertPos = board.students.length;
-                for (let i = 0; i < board.students.length; i++) {
-                  if (board.students[i].assignedTime) {
-                    const [sh, sm] = parseTime(board.students[i].assignedTime!);
-                    if (startMin < sh * 60 + sm) {
-                      insertPos = i;
-                      break;
-                    }
+                // Check Teacher availability
+                if (candidateMin < boardStartMin || candidateEndMin > boardEndMin) continue;
+
+                const candidateStartStr = `${String(Math.floor(candidateMin / 60)).padStart(2, '0')}:${String(candidateMin % 60).padStart(2, '0')}`;
+
+                // Check overlap with existing assigned students
+                let overlapsExisting = false;
+                for (const s of board.students) {
+                  if (!s.assignedTime) continue;
+                  const [ssh, ssm] = parseTime(s.assignedTime);
+                  const sStart = ssh * 60 + ssm;
+                  const sEnd = sStart + s.duration;
+                  if (candidateMin < sEnd && candidateEndMin > sStart) {
+                    overlapsExisting = true;
+                    break;
                   }
                 }
-                highestScore = totalScore;
-                bestCandidate = { boardId: board.id, insertIndex: insertPos, customStartTime: pref.start_time, score: totalScore };
+                if (overlapsExisting) continue;
+
+                const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin);
+                const sibBonus = siblingMatchBonus(student, board, candidateMin, candidateEndMin);
+                let totalScore = 1000000 + fitnessScore + sibBonus; // 1.000.000 for wunschzeit window hit
+                
+                // Bonus if exact start of wunschzeit window
+                if (candidateMin === prefStartMin) totalScore += 50000;
+
+                if (totalScore > highestScore) {
+                  let insertPos = board.students.length;
+                  for (let i = 0; i < board.students.length; i++) {
+                    if (board.students[i].assignedTime) {
+                      const [sh, sm] = parseTime(board.students[i].assignedTime!);
+                      if (candidateMin < sh * 60 + sm) {
+                        insertPos = i;
+                        break;
+                      }
+                    }
+                  }
+                  highestScore = totalScore;
+                  bestCandidate = { boardId: board.id, insertIndex: insertPos, customStartTime: candidateStartStr, score: totalScore };
+                }
               }
             }
           }
@@ -1867,7 +1901,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 const wunschBonus = calculateWunschBonus(student.id, board.dayOfWeek, startMin, endMin);
                 const fitnessScore = calculateSlotFitness(board, startMin, endMin);
-                const score = wunschBonus + fitnessScore;
+                const sibBonus = siblingMatchBonus(student, board, startMin, endMin);
+                const score = wunschBonus + fitnessScore + sibBonus;
 
                 if (score > highestScore) {
                   highestScore = score;
