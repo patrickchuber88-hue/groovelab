@@ -630,7 +630,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Vorab Namen des Schülers/Lehrers/Admins holen
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
         const upperToken = token.toUpperCase();
-        const selectFields = 'id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
+        const selectFields = 'id, first_name, last_name, role, roles, school_id, is_campus_active, is_groovelab_active, app_usage_mode, joker_used_at, created_at, is_pin_activated, personal_pin, parent_pin, instrument, photo_url, is_trial, trial_ends_at, exempt_from_direct_billing, has_parent_pin, pin_enforced_for_preview, parent_allow_chat, parent_allow_timer, parent_allow_leaderboard, parent_allow_groups, parent_allow_proposals';
 
         let userData: any = null;
 
@@ -757,21 +757,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
         // Check if activation_days record or PIN exists for this student
         let hasPinCreated = false;
+        // Check if parents unlocked preview previously on this device
+        const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
+        if (wasUnlocked) {
+          setParentUnlocked(true);
+        }
+
         if (userData.role === 'student') {
           const { data: actDay } = await supabase
             .from('activation_days')
             .select('day_of_birth')
             .eq('student_id', userData.id)
             .maybeSingle();
-          hasPinCreated = Boolean(actDay || userData.onboarding_pin || userData.personal_pin || userData.pin);
+          hasPinCreated = Boolean(wasUnlocked || actDay || userData.is_pin_activated || userData.personal_pin || userData.parent_pin || userData.onboarding_pin || userData.pin);
         } else {
           hasPinCreated = true;
-        }
-
-        // Check if parents unlocked preview previously on this device
-        const wasUnlocked = localStorage.getItem(`groovelab_parent_unlocked_${token}`) === 'true';
-        if (wasUnlocked) {
-          setParentUnlocked(true);
         }
 
         // 1.5 Allererstes Öffnen der QR Landingpage 2: Wenn noch keine PIN erstellt wurde (Status "Offen"), zur Ersterstellung auffordern!
@@ -1860,10 +1860,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setPinLoading(true);
       setPinError(null);
       try {
+        sessionStorage.setItem('groovelab_qr_token', token);
+        sessionStorage.setItem('groovelab_user_id', profile.id);
+
         const { error: updateErr } = await supabase
           .from('users')
           .update({
             personal_pin: pinInput,
+            parent_pin: pinInput,
             is_pin_activated: true
           })
           .eq('id', profile.id);
