@@ -7355,6 +7355,22 @@ function App() {
     );
   }
 
+  // 2.5c INACTIVE STUDENT MODULE ACCESS SECURITY GUARD
+  if (user.role?.toLowerCase() === 'student') {
+    const isCampusActive = user.is_campus_active === true;
+    const isGroovelabActive = user.is_groovelab_active === true;
+
+    // Case 1: Student has NO active modules -> Strictly block entry to GrooveLab & Campus dashboards, force QRLandingPage!
+    if (!isCampusActive && !isGroovelabActive) {
+      const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
+      return (
+        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Campus Pass...</div>}>
+          <QRLandingPage token={tokenToUse} />
+        </Suspense>
+      );
+    }
+  }
+
   // 2.6 DEACTIVATED / PAUSED SCHOOL CHECK
   if (isSchoolPaused) {
     return (
