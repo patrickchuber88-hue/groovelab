@@ -2487,13 +2487,18 @@ function App() {
   const [globalPlannedSlots, setGlobalPlannedSlots] = useState<any[]>([]);
   const [showMobileInfo, setShowMobileInfo] = useState(false);
   const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab' | 'ensembles'>(() => {
-    const isCampusDomain = typeof window !== 'undefined' && window.location.hostname.includes('campus');
-    const defaultPlat = isCampusDomain ? 'campus' : 'groovelab';
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const platParam = urlParams.get('platform');
+      if (platParam === 'campus' || platParam === 'groovelab' || platParam === 'ensembles') {
+        return platParam as any;
+      }
+    }
     const saved = localStorage.getItem('groovelab_active_platform');
     if (!showEnsemblesFeature && saved === 'ensembles') {
-      return defaultPlat;
+      return 'campus';
     }
-    return (saved as 'campus' | 'groovelab' | 'ensembles') || defaultPlat;
+    return (saved as 'campus' | 'groovelab' | 'ensembles') || 'campus';
   });
   const setActivePlatform = React.useCallback((val: any, forceUnlock = false) => {
     const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
