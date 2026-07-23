@@ -2831,16 +2831,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         query = query.or(`teacher_qr_token.eq.${cleanPin},ausweis_nummer.eq.${cleanPin},ausweis_nummer.eq.${upperPin}`);
       }
 
+      if (schoolData?.id) {
+        query = query.eq('school_id', schoolData.id);
+      }
+
       let { data: user, error: userErr } = await query.maybeSingle();
       sessionStorage.removeItem('groovelab_qr_token');
 
       // Fallback for custom admin passwords/PINs stored in ausweis_nummer
       if (!user) {
-        const { data: fallbackUser } = await supabase
+        let fallbackQuery = supabase
           .from('users')
-          .select('*, schools(*)')
-          .eq('ausweis_nummer', cleanPin)
-          .maybeSingle();
+          .select('*, schools(*)');
+        
+        if (schoolData?.id) {
+          fallbackQuery = fallbackQuery.eq('school_id', schoolData.id);
+        }
+        const { data: fallbackUser } = await fallbackQuery.eq('ausweis_nummer', cleanPin).maybeSingle();
         if (fallbackUser) {
           user = fallbackUser;
           userErr = null;
@@ -2849,6 +2856,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (userErr || !user) {
         throw new Error('Ungültiger Ausweis-PIN oder QR-Token.');
+      }
+
+      if (!user.is_master_admin && schoolData?.id && user.school_id && user.school_id !== schoolData.id) {
+        throw new Error(`Dieser Zugangs-PIN gehört nicht zu der ausgewählten Musikschule (${schoolData.name}).`);
       }
 
       if (user.is_master_admin) {
