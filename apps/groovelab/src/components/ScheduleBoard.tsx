@@ -5482,9 +5482,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   e.stopPropagation();
                                   handleResetPreferences(s.id);
                                 }}
-                                style={{ flex: 1, padding: '5px 8px', background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.62rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                                style={{ flex: 1, padding: '4px 8px', background: '#d97706', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
                               >
-                                ✏️ Zur Überarbeitung freigeben
+                                Zur Überarbeitung freigeben
                               </button>
                             )}
                           </div>
