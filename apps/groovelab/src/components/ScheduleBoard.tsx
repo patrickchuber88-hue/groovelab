@@ -1942,9 +1942,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const mergedWindows = getMergedStudentWunschWindows(studentId, dayOfWeek);
         for (const window of mergedWindows) {
           if (startMin >= window.startMin && endMin <= window.endMin) {
-            return 10000000; // High Wunschzeit-Treffer Bonus (100% inside merged window)
+            return 1000000; // High Wunschzeit-Treffer Bonus (100% inside merged window)
           } else if (startMin < window.endMin && endMin > window.startMin) {
-            return 5000000; // Partial overlap
+            return 500000; // Partial overlap with Wunschzeit window (e.g. 15 min inside Wunschzeit, 15 min neutral)
           }
         }
         return 0;
@@ -2038,11 +2038,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
 
         if (lueckenlos) {
-          score += 10000;
-        } else if (!isWunschCandidate) {
-          // Isolation penalty (only apply for non-Wunschzeit placements!)
-          if (gapBefore > 0) score -= Math.floor(gapBefore / 15) * 5000;
-          if (gapAfter > 0 && gapAfter < 1440) score -= Math.floor(gapAfter / 15) * 5000;
+          score += 50000000; // 50 MILLION Lückenlos Compaction Bonus!
+        } else {
+          // Heavy Gap Penalty for ANY isolated gap created in the middle of a board!
+          if (gapBefore > 0) score -= Math.floor(gapBefore / 15) * 10000000;
+          if (gapAfter > 0 && gapAfter < 1440) score -= Math.floor(gapAfter / 15) * 10000000;
         }
 
         return score;
@@ -2087,8 +2087,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
                 const boardEndMin = beh * 60 + bem;
 
-                // Slide in 15-minute steps across the entire merged Wunschzeit window
-                for (let candidateMin = prefStartMin; candidateMin + student.duration <= prefEndMin; candidateMin += 15) {
+                // Slide in 15-minute steps across extended Wunschzeit window (+-30 min to test partial Wunschzeit gap compaction)
+                const searchStartMin = Math.max(boardStartMin, prefStartMin - 30);
+                const searchEndMin = Math.min(boardEndMin, prefEndMin + 30);
+                for (let candidateMin = searchStartMin; candidateMin + student.duration <= searchEndMin; candidateMin += 15) {
                 const candidateEndMin = candidateMin + student.duration;
 
                 // Check Sperrzeit for this student
@@ -2137,9 +2139,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   }
                 }
 
+                const wunschBonus = calculateWunschBonus(student.id, board.dayOfWeek, candidateMin, candidateEndMin);
                 const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin, true);
                 const sibBonus = siblingMatchBonus(student, board, candidateMin, candidateEndMin);
-                let totalScore = 1000000 + fitnessScore + sibBonus; // 1.000.000 for wunschzeit window hit
+                let totalScore = wunschBonus + fitnessScore + sibBonus;
                 
                 // Bonus if exact start of wunschzeit window
                 if (candidateMin === prefStartMin) totalScore += 50000;
