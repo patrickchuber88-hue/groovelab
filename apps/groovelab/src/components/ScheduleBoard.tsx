@@ -5235,30 +5235,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     style={{ width: '38px', background: 'transparent', border: 'none', fontSize: '0.62rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
                                   />
                                 </div>
-                                 <span 
-                                   onClick={(e) => {
+                                 <select
+                                   value={bs.duration}
+                                   onClick={(e) => e.stopPropagation()}
+                                   onChange={(e) => {
                                      e.stopPropagation();
-                                     setEditingBreak({
-                                       boardId: board.id,
-                                       breakId: bs.id,
-                                       startTime: bs.customStartTime || bs.assignedTime || '15:00',
-                                       duration: bs.duration
-                                     });
+                                     const newDuration = Number(e.target.value);
+                                     setBoards(prev => prev.map(b => {
+                                       if (b.id !== board.id) return b;
+                                       const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDuration } : s);
+                                       return recalculateBoardTimes({ ...b, students: nextStudents });
+                                     }));
                                    }}
                                    style={{ 
-                                     background: 'rgba(255,255,255,0.85)', 
+                                     background: 'rgba(255,255,255,0.9)', 
                                      borderRadius: '5px', 
-                                     padding: '1px 5px', 
+                                     padding: '1px 3px', 
                                      fontSize: '0.62rem', 
                                      fontWeight: 800, 
                                      color: '#b45309',
                                      cursor: 'pointer',
-                                     border: '1px solid rgba(245,158,11,0.3)'
+                                     border: '1px solid rgba(245,158,11,0.4)',
+                                     outline: 'none',
+                                     fontFamily: 'inherit'
                                    }}
-                                   title="Klicken zum Anpassen der Pausenlänge"
+                                   title="Dauer der Pause wählen"
                                  >
-                                   {bs.duration}m ✏️
-                                 </span>
+                                   <option value={15}>15 Min.</option>
+                                   <option value={30}>30 Min.</option>
+                                   <option value={45}>45 Min.</option>
+                                   <option value={60}>60 Min.</option>
+                                   <option value={75}>75 Min.</option>
+                                   <option value={90}>90 Min.</option>
+                                 </select>
                                 <button 
                                   type="button" 
                                   onClick={(e) => {
