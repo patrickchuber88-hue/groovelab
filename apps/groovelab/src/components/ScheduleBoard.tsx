@@ -4834,7 +4834,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     whiteSpace: 'nowrap'
                                   }}>
                                     {isBlocked ? <Ban size={11} color="#dc2626" /> : <Star size={11} fill="#16a34a" color="#166534" />}
-                                    <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
+                                    <span>
+                                      {isBlocked 
+                                        ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` 
+                                        : `⭐ Wunschzeit (${(() => {
+                                            const activeStud = students.find(s => s.id === (selectedStudentId || draggedStudentId));
+                                            return activeStud ? `${activeStud.first_name} ${maskLastName(activeStud.last_name || '', showRealNames)}` : '';
+                                          })()} • ${blockStartTimeStr} - ${blockEndTimeStr})`}
+                                    </span>
                                   </div>
                                 </div>
                               );
@@ -5472,6 +5479,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               {bs.assignedTime}
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              {isInsideWunsch && (
+                                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: isInsideWunsch ? '#ffffff' : '#15803d', background: isInsideWunsch ? 'rgba(255,255,255,0.25)' : '#dcfce7', border: isInsideWunsch ? '1px solid rgba(255,255,255,0.4)' : '1px solid #86efac', borderRadius: '4px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Wunschtermin garantiert getroffen!">
+                                  ⭐ Wunsch-Slot
+                                </span>
+                              )}
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
                               <button 
                                 type="button" 
