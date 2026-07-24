@@ -2159,9 +2159,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 let customStartTimeViolated = false;
                 for (const bs of tempBoard.students) {
                   if (bs.customStartTime && bs.assignedTime) {
-                    const [csh, csm] = parseTime(bs.customStartTime);
-                    const [ash, asm] = parseTime(bs.assignedTime);
-                    if (ash * 60 + asm > csh * 60 + csm) {
+                    if (bs.assignedTime !== bs.customStartTime) {
                       customStartTimeViolated = true;
                       break;
                     }
