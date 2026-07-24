@@ -3387,7 +3387,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Remove a student from a day board (make them unassigned again)
   const handleRemoveStudentFromBoard = (boardId: string, studentId: string) => {
     if (studentId.startsWith('break-')) {
-      setDeleteBreakState({ boardId, breakId: studentId });
+      executeRemoveBreak(boardId, studentId, true);
       return;
     }
 
