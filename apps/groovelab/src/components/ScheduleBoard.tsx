@@ -2020,29 +2020,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           let bestCandidate: { boardId: string; insertIndex: number; customStartTime?: string; score: number } | null = null;
           let highestScore = -Infinity;
 
-          // If Phase 2, try Wunschzeit sliding window matches across entire pref time windows
+          // If Phase 1 (Wunschzeiten), try Wunschzeit sliding window matches across entire merged Wunschzeit windows
           if (!isPhase3) {
-            for (const pref of wunschPrefs) {
-              const prefDay = parseDayNumber(pref.day_of_week);
-              const board = currentBoards.find(b => parseDayNumber(b.dayOfWeek) === prefDay);
-              if (!board) continue;
+            for (const board of currentBoards) {
+              const mergedWindows = getMergedStudentWunschWindows(student.id, board.dayOfWeek);
+              for (const window of mergedWindows) {
+                const prefStartMin = window.startMin;
+                const prefEndMin = window.endMin;
 
-              const [psh, psm] = parseTime(pref.start_time);
-              const prefStartMin = psh * 60 + psm;
-              const [peh, pem] = parseTime(pref.end_time || pref.start_time);
-              let prefEndMin = peh * 60 + pem;
-              if (prefEndMin <= prefStartMin) {
-                prefEndMin = prefStartMin + 180; // Default 3h window if end_time missing or equal
-              }
+                // Teacher availability bounds
+                const [bh, bm] = parseTime(board.startAnchor);
+                const boardStartMin = bh * 60 + bm;
+                const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
+                const boardEndMin = beh * 60 + bem;
 
-              // Teacher availability bounds
-              const [bh, bm] = parseTime(board.startAnchor);
-              const boardStartMin = bh * 60 + bm;
-              const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
-              const boardEndMin = beh * 60 + bem;
-
-              // Slide in 15-minute steps across the entire Wunschzeit window
-              for (let candidateMin = prefStartMin; candidateMin + student.duration <= prefEndMin; candidateMin += 15) {
+                // Slide in 15-minute steps across the entire merged Wunschzeit window
+                for (let candidateMin = prefStartMin; candidateMin + student.duration <= prefEndMin; candidateMin += 15) {
                 const candidateEndMin = candidateMin + student.duration;
 
                 // Check Sperrzeit for this student
@@ -2139,8 +2132,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               }
             }
           }
+        }
 
-          // Fallback or Phase 3: Evaluate standard insertion points (before/after every existing student and at start of day)
+        // Fallback or Phase 3: Evaluate standard insertion points (before/after every existing student and at start of day)
           if (!bestCandidate) {
             for (const board of currentBoards) {
               const studentCount = board.students.length;
