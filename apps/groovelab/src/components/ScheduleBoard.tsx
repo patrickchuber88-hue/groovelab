@@ -287,6 +287,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [dragSourceBoardId, setDragSourceBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dragSnapState, setDragSnapState] = useState<{
+    boardId: string;
+    topPx: number;
+    timeStr: string;
+  } | null>(null);
 
   // Drag-and-Drop Instrument Selector state
   const [instrumentSelectorState, setInstrumentSelectorState] = useState<{
@@ -2598,6 +2603,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setDragSourceBoardId(null);
     setDragOverBoardId(null);
     setDragOverIndex(null);
+    setDragSnapState(null);
     if (!selectedStudentId) {
       setSelectedStudentPrefs([]);
     }
@@ -4846,7 +4852,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const clientY = e.clientY - rect.top;
                         const dragMinutes = clientY / PX_PER_MIN;
-                        
+
+                        const [bsh, bsm] = parseTime(board.startAnchor);
+                        const boardStartMin = bsh * 60 + bsm;
+                        const rawMinutes = boardStartMin + dragMinutes;
+                        const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
+                        const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+                        const snappedMins = snappedTotalMinutes % 60;
+                        const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+                        const topPx = (snappedTotalMinutes - boardStartMin) * PX_PER_MIN;
+
                         let accMin = 0;
                         let targetIndex = 0;
                         for (let i = 0; i < board.students.length; i++) {
@@ -4859,19 +4875,26 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           accMin += s.duration;
                           targetIndex = i + 1;
                         }
-                        
-                        if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex) {
+
+                        if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex || dragSnapState?.topPx !== topPx) {
                           setDragOverBoardId(board.id);
                           setDragOverIndex(targetIndex);
+                          setDragSnapState({
+                            boardId: board.id,
+                            topPx,
+                            timeStr: targetTime
+                          });
                         }
                       }}
                       onDragLeave={() => {
                         setDragOverBoardId(null);
                         setDragOverIndex(null);
+                        setDragSnapState(null);
                       }}
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        setDragSnapState(null);
                         const rect = e.currentTarget.getBoundingClientRect();
                         const clientY = e.clientY - rect.top;
                         const dragMinutes = clientY / PX_PER_MIN;
@@ -4931,6 +4954,47 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           </React.Fragment>
                         );
                       })}
+
+                      {/* Real-time Green Grid Snap Indicator Line */}
+                      {dragSnapState && dragSnapState.boardId === board.id && (
+                        <div 
+                          style={{ 
+                            position: 'absolute', 
+                            left: 0, 
+                            right: 0, 
+                            top: `${Math.max(dragSnapState.topPx, 0)}px`, 
+                            height: '2px', 
+                            background: '#34a853', 
+                            boxShadow: '0 0 10px rgba(52, 168, 83, 0.8), 0 0 4px rgba(52, 168, 83, 1)', 
+                            zIndex: 99, 
+                            pointerEvents: 'none',
+                            transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        >
+                          <div 
+                            style={{ 
+                              position: 'absolute', 
+                              right: '8px', 
+                              top: '-11px', 
+                              background: '#34a853', 
+                              color: '#ffffff', 
+                              fontSize: '0.68rem', 
+                              fontWeight: 800, 
+                              padding: '2px 8px', 
+                              borderRadius: '6px', 
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontFamily: 'Urbanist, sans-serif',
+                              letterSpacing: '0.02em'
+                            }}
+                          >
+                            <span>📍</span>
+                            <span>{dragSnapState.timeStr} Uhr</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
                        {(selectedStudentId || draggedStudentId) && (() => {
