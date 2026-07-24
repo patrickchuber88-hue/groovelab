@@ -1254,11 +1254,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         activeDays.forEach(i => {
           const hasDay = reconstructedBoards.some(b => b.dayOfWeek === i);
           if (!hasDay) {
-            const dayConfig = (teacherProfile.teacher_availability as any)[i];
+            const dayConfig = (teacherProfile?.teacher_availability as any)?.[i];
             reconstructedBoards.push({
               id: `board-${crypto.randomUUID()}`,
               dayOfWeek: i,
               startAnchor: dayConfig?.start || '14:00',
+              availabilityEnd: dayConfig?.end || '19:00',
               roomId: loadedRooms.length > 0 ? loadedRooms[0].id : '',
               students: []
             });
@@ -1805,8 +1806,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let bestNewlyAssigned: Record<string, { day: number; time: string }> = {};
 
       for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
-        // Start each iteration from clean board state (preserving Breaks)
-        let currentBoards = boards.map(b => ({ ...b, students: b.students.filter(s => s.isBreak) }));
+        // Start each iteration from clean board state (preserving Breaks and syncing availabilityEnd)
+        let currentBoards = boards.map(b => {
+          const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
+          return {
+            ...b,
+            availabilityEnd: dayConfig?.end || b.availabilityEnd || '19:00',
+            students: b.students.filter(s => s.isBreak)
+          };
+        });
         const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
 
         const fuzzedWunschStudents = [...wunschStudents];
