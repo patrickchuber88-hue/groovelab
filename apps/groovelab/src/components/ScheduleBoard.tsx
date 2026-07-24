@@ -5355,35 +5355,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 filter: 'none',
                                 pointerEvents: 'auto',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                overflow: 'visible',
+                                overflow: 'hidden',
                               }}
                             >
-                              {/* Apple Floating Edge Time Pill attached to Event with Real-Time Sync */}
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '-7px',
-                                  ...(board.dayOfWeek === 1 ? { right: '-32px' } : { left: '-32px' }),
-                                  background: 'rgba(255, 255, 255, 0.98)',
-                                  backdropFilter: 'blur(16px)',
-                                  WebkitBackdropFilter: 'blur(16px)',
-                                  border: '1px solid rgba(245, 158, 11, 0.4)',
-                                  borderRadius: '999px',
-                                  padding: '2px 7px',
-                                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  zIndex: 10,
-                                  pointerEvents: 'none',
-                                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                              >
-                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} />
-                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                                  {(dragSnapState && draggedStudentId === bs.id) ? dragSnapState.timeStr : bs.assignedTime}
-                                </span>
-                              </div>
 
                               <div 
                                 onClick={(e) => {
@@ -5709,39 +5683,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 zIndex: 2,
                                 boxShadow: isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                overflow: 'visible',
+                                overflow: 'hidden',
                               }}
                             >
-                              {/* Apple Floating Edge Time Pill attached to Event with Real-Time Sync */}
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '-7px',
-                                  ...(board.dayOfWeek === 1 ? { right: '-32px' } : { left: '-32px' }),
-                                  background: 'rgba(255, 255, 255, 0.98)',
-                                  backdropFilter: 'blur(16px)',
-                                  WebkitBackdropFilter: 'blur(16px)',
-                                  border: `1px solid ${cardBorderColor}`,
-                                  borderRadius: '999px',
-                                  padding: '2px 7px',
-                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  zIndex: 10,
-                                  pointerEvents: 'none',
-                                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                              >
-                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: highlightColor, boxShadow: `0 0 6px ${highlightColor}` }} />
-                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                                  {(dragSnapState && draggedStudentId === bs.id) ? dragSnapState.timeStr : bs.assignedTime}
-                                </span>
-                              </div>
-
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.72rem', fontWeight: 800, color: highlightColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  👥 Gruppe
+                                  👥 {bs.assignedTime}
                                 </span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   {!bs.group_id && (
@@ -5848,7 +5795,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
-                              overflow: 'visible',
+                              overflow: 'hidden',
                               boxShadow: finalShadow,
                               transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                             }}
@@ -5863,33 +5810,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }
                             }}
                           >
-                            {/* Apple Floating Edge Time Pill attached to Event with Real-Time Sync */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '-7px',
-                                ...(board.dayOfWeek === 1 ? { right: '-32px' } : { left: '-32px' }),
-                                background: 'rgba(255, 255, 255, 0.98)',
-                                backdropFilter: 'blur(16px)',
-                                WebkitBackdropFilter: 'blur(16px)',
-                                border: `1px solid ${hasConflict ? '#fecaca' : cardBorderColor}`,
-                                borderRadius: '999px',
-                                padding: '2px 7px',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                zIndex: 10,
-                                pointerEvents: 'none',
-                                transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                            >
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hasConflict ? '#ef4444' : (isInsideWunsch ? '#16a34a' : cardPrimaryColor), boxShadow: `0 0 6px ${hasConflict ? '#ef4444' : cardPrimaryColor}` }} />
-                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: hasConflict ? '#dc2626' : '#1e293b', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                                {(dragSnapState && draggedStudentId === bs.id) ? dragSnapState.timeStr : bs.assignedTime}
-                              </span>
-                            </div>
-
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 {hasConflict && (
@@ -5898,6 +5818,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 {isInsideWunsch && (
                                   <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
                                 )}
+                                {bs.assignedTime}
                               </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
