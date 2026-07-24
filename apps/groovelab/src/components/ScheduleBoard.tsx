@@ -2935,11 +2935,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       try {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', studentId);
-        if (e.dataTransfer.setDragImage && BLANK_DRAG_IMAGE) {
-          e.dataTransfer.setDragImage(BLANK_DRAG_IMAGE, 0, 0);
-        }
       } catch (err) {
-        // Fallback silently if setDragImage is blocked
+        // Fallback silently
       }
     }
 
@@ -3438,6 +3435,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const rawMoved = sourceBoard.students.find(s => s.id === sourceId);
         if (!rawMoved) return prev;
 
+        // Check if dropping directly onto an existing student on the target board -> Cross-Board 1-to-1 Swap!
+        if (index !== undefined && !droppedCustomTime && index < targetBoard.students.length && !targetBoard.students[index].isBreak) {
+          const targetStudentToSwap = targetBoard.students[index];
+          const sourceNextStudents = [...sourceBoard.students];
+          const targetNextStudents = [...targetBoard.students];
+
+          const srcIdx = sourceNextStudents.findIndex(s => s.id === sourceId);
+          if (srcIdx !== -1) {
+            // Perform 1-to-1 swap between boards
+            sourceNextStudents[srcIdx] = { ...targetStudentToSwap, assignedDay: sourceBoard.dayOfWeek };
+            targetNextStudents[index] = { ...rawMoved, assignedDay: targetBoard.dayOfWeek };
+
+            const updatedSource = recalculateBoardTimes({ ...sourceBoard, students: sourceNextStudents });
+            const updatedTarget = recalculateBoardTimes({ ...targetBoard, students: targetNextStudents });
+
+            setStudents(currentStudents => currentStudents.map(s => {
+              const inSource = updatedSource.students.find(bs => bs.id === s.id);
+              if (inSource) return { ...s, assignedDay: sourceBoard.dayOfWeek, assignedTime: inSource.assignedTime };
+              const inTarget = updatedTarget.students.find(bs => bs.id === s.id);
+              if (inTarget) return { ...s, assignedDay: targetBoard.dayOfWeek, assignedTime: inTarget.assignedTime };
+              return s;
+            }));
+
+            return prev.map(b => {
+              if (b.id === sourceBoard.id) return updatedSource;
+              if (b.id === targetBoard.id) return updatedTarget;
+              return b;
+            });
+          }
+        }
+
+        // Standard move to a different board column
         const cleaned = removeStudentFromBoardsList(prev, sourceId);
         const targetBoardCleaned = cleaned.find(b => b.id === targetBoardId);
         if (!targetBoardCleaned) return prev;
