@@ -4997,17 +4997,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       {/* Cubase Ghost Event Preview Frame & Magnetic Snap Line */}
                       {dragSnapState && dragSnapState.boardId === board.id && (() => {
                         // Evaluate preference matching for dragged student on this day/time slot
-                        const activeDragStudent = students.find(s => s.id === draggedStudentId) || boards.flatMap(b => b.students).find(s => s.id === draggedStudentId);
+                        const prefsToUse = (draggedStudentId && allStudentPrefsMap[draggedStudentId])
+                          ? allStudentPrefsMap[draggedStudentId]
+                          : selectedStudentPrefs;
                         let isWunsch = false;
                         let isBlocked = false;
 
-                        if (activeDragStudent && activeDragStudent.preferences && activeDragStudent.preferences.length > 0) {
+                        if (prefsToUse && prefsToUse.length > 0) {
                           const [sh, sm] = parseTime(dragSnapState.timeStr);
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + dragSnapState.duration;
 
-                          for (const pref of activeDragStudent.preferences) {
-                            if (pref.day_of_week === board.dayOfWeek) {
+                          for (const pref of prefsToUse) {
+                            if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
                               const [psh, psm] = parseTime(pref.start_time);
                               const [peh, pem] = parseTime(pref.end_time);
                               const pStart = psh * 60 + psm;
