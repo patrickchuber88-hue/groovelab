@@ -4956,8 +4956,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         height: `${columnHeightPx}px`, 
                         flexShrink: 0, 
                         marginTop: '4px',
-                        backgroundColor: dragOverBoardId === board.id ? lightBg : 'transparent',
-                        outline: dragOverBoardId === board.id ? `1.5px dashed ${brandColor}` : 'none',
+                        backgroundColor: dragOverBoardId === board.id ? colBgColor : 'transparent',
+                        outline: dragOverBoardId === board.id ? `1.5px dashed ${colOutlineColor}` : 'none',
                         borderRadius: '12px',
                         transition: 'all 0.15s ease'
                       }}
@@ -5876,6 +5876,43 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const finalShadow = isGroupModeActive && isSelectedForGroup
                           ? `0 0 12px ${highlightColor}`
                           : cardShadow;
+
+                        // Compute dynamic column dropzone outline: Slate gray for neutral, Campus Green for Wunschzeit, Red for Sperrzeit
+                        let colOutlineColor = '#cbd5e1';
+                        let colBgColor = 'rgba(248, 250, 252, 0.7)';
+
+                        if (dragOverBoardId === board.id && dragSnapState && selectedStudentPrefs && selectedStudentPrefs.length > 0) {
+                          const [th, tm] = parseTime(dragSnapState.timeStr);
+                          const startM = th * 60 + tm;
+                          const endM = startM + dragSnapState.duration;
+                          let hWunsch = false;
+                          let hBlocked = false;
+
+                          selectedStudentPrefs.forEach(pref => {
+                            if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
+                              const [psh, psm] = parseTime(pref.start_time);
+                              const [peh, pem] = parseTime(pref.end_time);
+                              const pStart = psh * 60 + psm;
+                              const pEnd = peh * 60 + pem;
+
+                              if (startM < pEnd && endM > pStart) {
+                                if (pref.preference_type === 'gesperrt') {
+                                  hBlocked = true;
+                                } else if (pref.preference_type === 'wunsch') {
+                                  hWunsch = true;
+                                }
+                              }
+                            }
+                          });
+
+                          if (hBlocked) {
+                            colOutlineColor = '#ef4444';
+                            colBgColor = 'rgba(254, 242, 242, 0.7)';
+                          } else if (hWunsch) {
+                            colOutlineColor = '#34a853';
+                            colBgColor = 'rgba(230, 244, 234, 0.7)';
+                          }
+                        }
 
                         return (
                           <div
