@@ -1763,6 +1763,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     let totalGapsMin = 0;
     let gapCount = 0;
     let totalAssigned = 0;
+    let wunschHits = 0;
 
     boardsList.forEach(b => {
       const assignedStudents = b.students
@@ -1792,10 +1793,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           gapCount++;
         }
         prevEndMin = sEnd;
+
+        // Check Wunsch hit matching card UI logic (any overlap with Wunschzeit window)
+        const sWunschWindows = getMergedStudentWunschWindows(s.id, b.dayOfWeek);
+        if (sWunschWindows.length > 0) {
+          for (const w of sWunschWindows) {
+            if (sStart < w.endMin && sEnd > w.startMin) {
+              wunschHits++;
+              break;
+            }
+          }
+        } else {
+          // Fallback check against raw prefs map
+          const studPrefs = allStudentPrefsMap[s.id] || [];
+          const wunschPrefs = studPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(b.dayOfWeek));
+          if (wunschPrefs.length > 0) {
+            for (const pref of wunschPrefs) {
+              const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+              if (sStart < prefEnd && sEnd > prefStart) {
+                wunschHits++;
+                break;
+              }
+            }
+          }
+        }
       });
     });
 
-    return { totalGapsMin, gapCount, totalAssigned };
+    return { totalGapsMin, gapCount, totalAssigned, wunschHits };
   };
 
   const handleAutoAssign = async () => {
@@ -2694,10 +2719,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             }
             prevEndMin = sEnd;
 
-            // Check Wunsch hit
+            // Check Wunsch hit (matching card UI overlap logic)
             const sWunschWindows = getMergedStudentWunschWindows(s.id, b.dayOfWeek);
             for (const w of sWunschWindows) {
-              if (sStart >= w.startMin && sEnd <= w.endMin) {
+              if (sStart < w.endMin && sEnd > w.startMin) {
                 reportWunschHits++;
                 break;
               }
@@ -4641,7 +4666,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   </h2>
                 </div>
                 {boards.some(b => b.students.some(s => !s.isBreak && s.assignedTime)) && (() => {
-                  const { totalGapsMin, gapCount, totalAssigned } = calculateLiveBoardGaps(boards);
+                  const { totalGapsMin, gapCount, totalAssigned, wunschHits } = calculateLiveBoardGaps(boards);
                   const unassignedCount = students.filter(s => !s.isBreak && !s.assignedTime).length;
                   const totalStudentsCount = unassignedCount + totalAssigned;
                   return (
@@ -4649,15 +4674,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       type="button"
                       onClick={() => {
                         const assignmentPct = totalStudentsCount > 0 ? (totalAssigned / totalStudentsCount) * 50 : 50;
+                        const wunschPct = totalAssigned > 0 ? (wunschHits / totalAssigned) * 35 : 35;
                         const gapBonus = gapCount === 0 ? 15 : Math.max(0, 15 - gapCount * 5);
-                        const overallScore = Math.min(100, Math.round(assignmentPct + gapBonus));
+                        const overallScore = Math.min(100, Math.round(assignmentPct + wunschPct + gapBonus));
 
                         setAutoScheduleReportData({
                           totalAssigned,
                           totalStudents: totalStudentsCount,
                           totalGapsMin,
                           gapCount,
-                          wunschHits: 0,
+                          wunschHits,
                           siblingHits: 0,
                           totalSiblings: 0,
                           overallScore
