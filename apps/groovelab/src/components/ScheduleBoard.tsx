@@ -843,9 +843,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .eq('role', 'student');
 
       if (stDbStudentIds.length > 0) {
-        userQuery = userQuery.or(`teacher_id.eq.${selectedTeacherId},id.in.(${stDbStudentIds.join(',')})`);
-      } else {
-        userQuery = userQuery.eq('teacher_id', selectedTeacherId);
+        userQuery = userQuery.in('id', stDbStudentIds);
       }
 
       const { data: sData } = await userQuery;
