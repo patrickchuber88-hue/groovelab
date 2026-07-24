@@ -285,6 +285,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     // Audio snap click disabled per user request
   };
 
+  // Pre-instantiated & pre-cached blank drag preview image (prevents first-load drag cancellation in WebKit/Safari)
+  const BLANK_DRAG_IMAGE = typeof window !== 'undefined' ? new Image() : null;
+  if (BLANK_DRAG_IMAGE) {
+    BLANK_DRAG_IMAGE.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  }
+
   const resolveInstrument = (inst?: string): string => {
     if (!inst || !inst.trim() || inst.trim().toLowerCase() === 'musiker') {
       const currentTeacher = teachers.find(t => t.id === selectedTeacherId);
@@ -2517,10 +2523,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       try {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', studentId);
-        if (e.dataTransfer.setDragImage) {
-          const emptyImg = document.createElement('img');
-          emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-          e.dataTransfer.setDragImage(emptyImg, 0, 0);
+        if (e.dataTransfer.setDragImage && BLANK_DRAG_IMAGE) {
+          e.dataTransfer.setDragImage(BLANK_DRAG_IMAGE, 0, 0);
         }
       } catch (err) {
         // Fallback silently if setDragImage is blocked
