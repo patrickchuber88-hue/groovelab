@@ -2065,7 +2065,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       let isStillInWunsch = false;
                       for (const pref of bsWunschPrefs) {
                         const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-                        if (startMin < prefEnd && endMin > prefStart) {
+                        if (startMin >= prefStart && endMin <= prefEnd) {
                           isStillInWunsch = true;
                           break;
                         }
@@ -2158,14 +2158,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 let customStartTimeViolated = false;
                 for (const bs of tempBoard.students) {
-                  if (bs.customStartTime && bs.assignedTime) {
-                    if (bs.assignedTime !== bs.customStartTime) {
-                      customStartTimeViolated = true;
-                      break;
+                  if (bs.assignedTime) {
+                    const [ash, asm] = parseTime(bs.assignedTime);
+                    const startMin = ash * 60 + asm;
+                    const endMin = startMin + bs.duration;
+
+                    const bsPrefs = prefsByStudentId[bs.id] || [];
+                    const bsWunschPrefs = bsPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(tempBoard.dayOfWeek));
+                    if (bsWunschPrefs.length > 0) {
+                      let isStillInWunsch = false;
+                      for (const pref of bsWunschPrefs) {
+                        const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+                        if (startMin >= prefStart && endMin <= prefEnd) {
+                          isStillInWunsch = true;
+                          break;
+                        }
+                      }
+                      if (!isStillInWunsch) {
+                        customStartTimeViolated = true;
+                        break;
+                      }
                     }
                   }
                 }
                 if (customStartTimeViolated) continue;
+
+                // Ensure last student on tempBoard doesn't exceed board availability end
+                const lastStudent = tempBoard.students[tempBoard.students.length - 1];
+                if (lastStudent && lastStudent.assignedTime) {
+                  const [lsh, lsm] = parseTime(lastStudent.assignedTime);
+                  if (lsh * 60 + lsm + lastStudent.duration > boardEndMin) {
+                    continue;
+                  }
+                }
 
                 const wunschBonus = calculateWunschBonus(student.id, board.dayOfWeek, startMin, endMin);
                 const fitnessScore = calculateSlotFitness(board, startMin, endMin);
