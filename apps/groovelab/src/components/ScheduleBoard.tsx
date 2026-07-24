@@ -6392,8 +6392,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               WebkitTouchCallout: 'none',
                               touchAction: 'none',
                               visibility: 'visible',
-                              opacity: 1,
-                              filter: 'none',
+                              opacity: (selectedStudentId !== null || draggedStudentId !== null)
+                                ? ((selectedStudentId === bs.id || draggedStudentId === bs.id) ? 1 : 0.22)
+                                : 1,
+                              filter: (selectedStudentId !== null && selectedStudentId !== bs.id && draggedStudentId !== bs.id) ? 'grayscale(35%)' : 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.015)' : 'none',
                               overflow: 'hidden',
