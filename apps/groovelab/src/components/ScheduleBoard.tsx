@@ -314,6 +314,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
   const [deleteBreakState, setDeleteBreakState] = useState<{ boardId: string, breakId: string } | null>(null);
 
+  interface EditingBreakState {
+    boardId: string;
+    breakId: string;
+    startTime: string;
+    duration: number;
+  }
+  const [editingBreak, setEditingBreak] = useState<EditingBreakState | null>(null);
+
   // Submission tracking states
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
   const [lastSubmittedTime, setLastSubmittedTime] = useState<string | null>(null);
@@ -5192,7 +5200,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 overflow: 'hidden',
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                              <div 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingBreak({
+                                    boardId: board.id,
+                                    breakId: bs.id,
+                                    startTime: bs.customStartTime || bs.assignedTime || '15:00',
+                                    duration: bs.duration
+                                  });
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, cursor: 'pointer' }}
+                                title="Klicken zum Bearbeiten der Pause"
+                              >
                                 <span style={{ fontSize: '0.75rem', flexShrink: 0 }}>☕</span>
                                 <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>Pause</span>
                                 <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 600 }}>{bs.assignedTime}</span>
@@ -5216,16 +5236,28 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   />
                                 </div>
                                  <span 
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     setEditingBreak({
+                                       boardId: board.id,
+                                       breakId: bs.id,
+                                       startTime: bs.customStartTime || bs.assignedTime || '15:00',
+                                       duration: bs.duration
+                                     });
+                                   }}
                                    style={{ 
-                                     background: 'rgba(255,255,255,0.6)', 
+                                     background: 'rgba(255,255,255,0.85)', 
                                      borderRadius: '5px', 
                                      padding: '1px 5px', 
                                      fontSize: '0.62rem', 
-                                     fontWeight: 700, 
-                                     color: '#b45309' 
+                                     fontWeight: 800, 
+                                     color: '#b45309',
+                                     cursor: 'pointer',
+                                     border: '1px solid rgba(245,158,11,0.3)'
                                    }}
+                                   title="Klicken zum Anpassen der Pausenlänge"
                                  >
-                                   {bs.duration}m
+                                   {bs.duration}m ✏️
                                  </span>
                                 <button 
                                   type="button" 
@@ -6540,6 +6572,121 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           </div>
         );
       })()}
+
+        {editingBreak && (
+          <div 
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 99999
+            }}
+            onClick={() => setEditingBreak(null)}
+          >
+            <div 
+              style={{
+                background: '#ffffff', borderRadius: '16px', padding: '24px',
+                width: '360px', maxWidth: '90vw', boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                border: '1px solid #fef08a'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ☕ Pause anpassen
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingBreak(null)}
+                  style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px' }}>
+                    Startzeit der Pause (Anker):
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="time"
+                      value={editingBreak.startTime}
+                      onChange={(e) => setEditingBreak(prev => prev ? { ...prev, startTime: e.target.value } : null)}
+                      style={{
+                        flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #fde047',
+                        fontSize: '0.95rem', fontWeight: 700, color: '#b45309', outline: 'none', background: '#fefce8'
+                      }}
+                    />
+                    {editingBreak.startTime && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingBreak(prev => prev ? { ...prev, startTime: '' } : null)}
+                        style={{ background: '#f3f4f6', border: 'none', padding: '8px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', cursor: 'pointer' }}
+                        title="Startzeit freigeben (automatisch nach vorherigem Schüler)"
+                      >
+                        Automatisch
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#4b5563', marginBottom: '6px' }}>
+                    Dauer der Pause:
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                    {[15, 30, 45, 60].map(dur => (
+                      <button
+                        key={dur}
+                        type="button"
+                        onClick={() => setEditingBreak(prev => prev ? { ...prev, duration: dur } : null)}
+                        style={{
+                          padding: '8px', borderRadius: '8px', border: editingBreak.duration === dur ? '2px solid #eab308' : '1px solid #e5e7eb',
+                          background: editingBreak.duration === dur ? '#fefce8' : '#ffffff',
+                          color: editingBreak.duration === dur ? '#b45309' : '#374151',
+                          fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                      >
+                        {dur}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editingBreak) return;
+                      const snappedStart = editingBreak.startTime ? snapTimeToGrid(editingBreak.startTime, gridSnapMinutes) : undefined;
+                      setBoards(prev => prev.map(b => {
+                        if (b.id !== editingBreak.boardId) return b;
+                        const nextStudents = b.students.map(s => {
+                          if (s.id !== editingBreak.breakId) return s;
+                          return {
+                            ...s,
+                            customStartTime: snappedStart,
+                            duration: editingBreak.duration
+                          };
+                        });
+                        return recalculateBoardTimes({ ...b, students: nextStudents });
+                      }));
+                      setEditingBreak(null);
+                    }}
+                    style={{
+                      flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#ffffff',
+                      border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(234,179,8,0.3)'
+                    }}
+                  >
+                    Pause Speichern
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
             {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
 
