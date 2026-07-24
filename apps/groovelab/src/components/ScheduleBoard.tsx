@@ -2113,6 +2113,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 const tempStudentsTest = [...board.students];
                 tempStudentsTest.splice(testInsertPos, 0, { ...student, assignedDay: board.dayOfWeek, customStartTime: candidateStartStr });
                 const tempBoardTest = recalculateBoardTimes({ ...board, students: tempStudentsTest });
+                // Only reject if customStartTimeViolated violates a hard Sperrzeit of existing student
+                // Wunschzeit students are allowed to slide into neutral slots if necessary for 100% schedule completion!
                 let boardSperrzeitConflict = false;
                 for (const bs of tempBoardTest.students) {
                   if (bs.isBreak || !bs.assignedTime) continue;
@@ -2125,32 +2127,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   }
                 }
                 if (boardSperrzeitConflict) continue;
-
-                let customStartTimeViolated = false;
-                for (const bs of tempBoardTest.students) {
-                  if (bs.assignedTime) {
-                    const [ash, asm] = parseTime(bs.assignedTime);
-                    const startMin = ash * 60 + asm;
-                    const endMin = startMin + bs.duration;
-
-                    // Hard-Lock: Verify that no Wunschzeit student is pushed out of their Wunschzeit window
-                    const bsWunschWindows = getMergedStudentWunschWindows(bs.id, tempBoardTest.dayOfWeek);
-                    if (bsWunschWindows.length > 0) {
-                      let isStillInWunsch = false;
-                      for (const window of bsWunschWindows) {
-                        if (startMin >= window.startMin && endMin <= window.endMin) {
-                          isStillInWunsch = true;
-                          break;
-                        }
-                      }
-                      if (!isStillInWunsch) {
-                        customStartTimeViolated = true;
-                        break;
-                      }
-                    }
-                  }
-                }
-                if (customStartTimeViolated) continue;
 
                 // Ensure last student in tempBoardTest doesn't exceed board availability end
                 const lastStudent = tempBoardTest.students[tempBoardTest.students.length - 1];
@@ -2230,31 +2206,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 }
                 if (boardSperrzeitConflict) continue;
 
-                let customStartTimeViolated = false;
-                for (const bs of tempBoard.students) {
-                  if (bs.assignedTime) {
-                    const [ash, asm] = parseTime(bs.assignedTime);
-                    const startMin = ash * 60 + asm;
-                    const endMin = startMin + bs.duration;
-
-                    const bsWunschWindows = getMergedStudentWunschWindows(bs.id, tempBoard.dayOfWeek);
-                    if (bsWunschWindows.length > 0) {
-                      let isStillInWunsch = false;
-                      for (const window of bsWunschWindows) {
-                        if (startMin >= window.startMin && endMin <= window.endMin) {
-                          isStillInWunsch = true;
-                          break;
-                        }
-                      }
-                      if (!isStillInWunsch) {
-                        customStartTimeViolated = true;
-                        break;
-                      }
-                    }
-                  }
-                }
-                if (customStartTimeViolated) continue;
-
                 // Ensure last student on tempBoard doesn't exceed board availability end
                 const lastStudent = tempBoard.students[tempBoard.students.length - 1];
                 if (lastStudent && lastStudent.assignedTime) {
@@ -2307,23 +2258,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Run Phase 3 (Flexible)
       assignStudents(fuzzedFlexibleStudents, true);
 
-      // Evaluate Global Score with 1 Billion Point Gravitational Magnet Force
+      // PHASE 4: Lehrer-Lücken-Füller / Sand-im-Getriebe Sweep for any unassigned students!
+      const remainingUnassigned = unassignedStudents.filter(s => !newlyAssignedStudentIds[s.id]);
+      if (remainingUnassigned.length > 0) {
+        assignStudents(remainingUnassigned, true);
+      }
+
+      // Evaluate Global Score with Teacher-First Hierarchy:
+      // Priority 1: 100% Student Assignment (+10,000,000 per student)
+      // Priority 2: Maximum Wunschzeit hits (+500,000 per student)
+      // Priority 3: Compact Lückenlose Blöcke (+100,000 per 0-gap connection)
       let globalScore = 0;
       const assignedIdsCount = Object.keys(newlyAssignedStudentIds).length;
+      globalScore += assignedIdsCount * 10000000;
 
-      // Count unfulfilled Wunschzeit students
-      for (const s of wunschStudents) {
+      for (const s of unassignedStudents) {
         const sAssigned = newlyAssignedStudentIds[s.id];
-        if (!sAssigned) {
-          globalScore -= 1000000000; // -1 BILLION PENALTY if Wunschzeit student is unassigned!
-          continue;
-        }
+        if (!sAssigned) continue;
+
         const board = currentBoards.find(b => b.dayOfWeek === sAssigned.day);
         const bStudent = board?.students.find(bs => bs.id === s.id);
         if (bStudent && bStudent.assignedTime) {
           const [ash, asm] = parseTime(bStudent.assignedTime);
           const startMin = ash * 60 + asm;
           const endMin = startMin + bStudent.duration;
+
+          // Hard Penalty if in Sperrzeit
+          if (isSlotBlockedForStudent(s.id, sAssigned.day, startMin, endMin)) {
+            globalScore -= 50000000;
+            continue;
+          }
 
           const sWunschWindows = getMergedStudentWunschWindows(s.id, sAssigned.day);
           let matchedWunsch = false;
@@ -2333,15 +2297,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               break;
             }
           }
+
           if (matchedWunsch) {
-            globalScore += 1000000000; // +1 BILLION MAGNET BONUS for fulfilling Wunschzeit window!
+            globalScore += 500000; // High bonus for Wunschzeit hit
           } else {
-            globalScore -= 500000000; // -500 MILLION PENALTY if placed outside Wunschzeit window!
+            globalScore += 50000; // Positive reward for neutral slot assignment (Sand im Getriebe)
           }
         }
       }
 
-      globalScore += assignedIdsCount * 100000; // Total student count is secondary to Wunschzeiten!
+      // Lückenlos-Bonus for Teacher day compactness
+      for (const board of currentBoards) {
+        let prevEndMin = -1;
+        for (const bs of board.students) {
+          if (!bs.assignedTime || bs.isBreak) {
+            prevEndMin = -1;
+            continue;
+          }
+          const [sh, sm] = parseTime(bs.assignedTime);
+          const sStart = sh * 60 + sm;
+          const sEnd = sStart + bs.duration;
+
+          if (prevEndMin !== -1) {
+            const gap = sStart - prevEndMin;
+            if (gap === 0) {
+              globalScore += 100000; // Lückenlos-Bonus!
+            } else {
+              globalScore -= gap * 500; // Penalty for gaps in teacher schedule
+            }
+          }
+          prevEndMin = sEnd;
+        }
+      }
 
       if (globalScore > bestGlobalScore) {
         bestGlobalScore = globalScore;
