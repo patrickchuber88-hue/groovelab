@@ -254,6 +254,19 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     }
   };
 
+  const handleCellRightClick = (e: React.MouseEvent, dayId: number, startTime: string) => {
+    e.preventDefault();
+    if (!isEditing) return;
+    const key = `${dayId}_${startTime}`;
+    setEditedMatrix(prev => ({
+      ...prev,
+      [key]: 'none'
+    }));
+    setRangeStart(null);
+    setToastMsg('Slot zurückgesetzt (Frei)');
+    setTimeout(() => setToastMsg(null), 2000);
+  };
+
   const getValidStudentId = async (): Promise<string> => {
     if (!student?.id) throw new Error("Kein Schüler-Objekt vorhanden.");
 
@@ -890,6 +903,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       <div
                         key={day.id}
                         onClick={() => handleCellClick(day.id, slot.start)}
+                        onContextMenu={(e) => handleCellRightClick(e, day.id, slot.start)}
                         style={{
                           padding: '4px 2px',
                           borderRight: day.id === 6 ? 'none' : '1px solid #f8fafc',
