@@ -5418,7 +5418,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               });
                             }
                           }}
-                          onDragLeave={() => {
+                          onDragLeave={(e) => {
+                            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
                             setDragOverBoardId(null);
                             setDragOverIndex(null);
                             setDragSnapState(null);
