@@ -273,6 +273,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default snap to 15 mins
 
+  // Grab offset ref for millimeter-precise mouse drag without cursor jump (ported from ScheduleCalendarView)
+  const grabOffsetRef = useRef<number>(20);
+
+  const cleanupDragGhost = () => {
+    if (typeof document !== 'undefined') {
+      const ghost = document.getElementById('drag-preview-ghost-designer');
+      if (ghost && ghost.parentNode) {
+        ghost.parentNode.removeChild(ghost);
+      }
+    }
+  };
+
    const snapTimeToGrid = (timeStr: string, snapMinutes: number): string => {
      if (!timeStr) return timeStr;
      const [hours, minutes] = timeStr.split(':').map(Number);
@@ -3078,6 +3090,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 };
 
   const handleDragEnd = () => {
+    cleanupDragGhost();
     setDraggedStudentId(null);
     setDragSource(null);
     setDragSourceBoardId(null);
@@ -5405,6 +5418,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }}
                           onDragLeave={(e) => {
                             if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                            cleanupDragGhost();
                             setDragOverBoardId(null);
                             setDragOverIndex(null);
                             setDragSnapState(null);
@@ -5412,9 +5426,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           onDrop={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            cleanupDragGhost();
                             setDragSnapState(null);
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const clientY = e.clientY - rect.top;
+                            const grabOffset = grabOffsetRef.current || 20;
+                            const clientY = Math.max(0, Math.min(e.clientY - rect.top - grabOffset, columnHeightPx));
                             const dragMinutes = clientY / PX_PER_MIN;
 
                             const [bsh, bsm] = parseTime(board.startAnchor);
@@ -6355,8 +6371,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             draggable={true}
                             onPointerDown={(e) => e.stopPropagation()}
                             onMouseDown={(e) => {
-                              (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
-                            }}
+                               const rect = e.currentTarget.getBoundingClientRect();
+                               grabOffsetRef.current = e.clientY - rect.top;
+                               (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
+                             }}
                             onMouseUp={(e) => {
                               (e.currentTarget as HTMLElement).style.cursor = isGroupModeActive ? 'pointer' : 'grab';
                             }}
