@@ -302,7 +302,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
-  const [draggedStudentId, setDraggedStudentId] = useState<string | null>(null);
+  const resolveInstrument = (inst?: string): string => {
+    if (!inst || !inst.trim() || inst.trim().toLowerCase() === 'musiker') {
+      const currentTeacher = teachers.find(t => t.id === selectedTeacherId);
+      if (currentTeacher) {
+        if (Array.isArray(currentTeacher.instruments) && currentTeacher.instruments.length > 0 && currentTeacher.instruments[0]?.trim()) {
+          return currentTeacher.instruments[0].trim();
+        }
+        if (currentTeacher.instrument && currentTeacher.instrument.trim() && currentTeacher.instrument.trim().toLowerCase() !== 'musiker') {
+          return currentTeacher.instrument.trim();
+        }
+      }
+      return 'Instrument';
+    }
+    return inst.trim();
+  };
   const [dragSource, setDragSource] = useState<'sidebar' | 'board' | null>(null);
   const [dragSourceBoardId, setDragSourceBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
@@ -5839,11 +5853,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             </div>
                           </div>
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <InstrumentBadge instrument={bs.instrument} color={textColor} />
+                            <InstrumentBadge instrument={resolveInstrument(bs.instrument)} color={textColor} />
                             {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Schüler').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bs.instrument}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{resolveInstrument(bs.instrument)}</span>
                           )}
                         </div>
                       );
@@ -6094,7 +6108,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#86868b' }}>
-                          {s.duration} Min
+                          {s.duration} Min • {resolveInstrument(s.instrument)}
                         </span>
 
                         {isAssigned && (
