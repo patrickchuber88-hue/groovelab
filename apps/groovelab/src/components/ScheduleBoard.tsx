@@ -4699,7 +4699,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <div
                     key={board.id}
                     onDragOver={handleDragOver}
-                    onDrop={() => handleDropOnBoard(board.id)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDropOnBoard(board.id);
+                    }}
                     style={{ 
                       flex: 1,
                       minWidth: focusedDayOfWeek !== null ? '100%' : '170px',
@@ -4844,7 +4848,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         setDragOverBoardId(null);
                         setDragOverIndex(null);
                       }}
-                      onDrop={() => {
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined);
                       }}
                       style={{ 
