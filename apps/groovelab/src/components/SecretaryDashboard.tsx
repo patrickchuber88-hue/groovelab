@@ -5360,6 +5360,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       setNewStudentDuration(30);
       setNewStudentTeacherId('');
       setShowAddStudentModal(false);
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Erstellen des Schülers: ' + err.message);
@@ -5410,6 +5411,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       setNewStudentDuration(30);
       setNewStudentTeacherId('');
       setShowAddGroovelabStudentModal(false);
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Erstellen des Schülers: ' + err.message);
@@ -5569,6 +5571,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       setStudentCsvText('');
       setIsStudentCsvExpanded(false);
       setIsAnonymizedImport(true);
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       fetchDashboardData();
       return;
     }
@@ -5694,6 +5697,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
     setStudentCsvText('');
     setIsStudentCsvExpanded(false);
+    window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
     fetchDashboardData();
   };
 

@@ -557,6 +557,43 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     loadInitialData();
   }, [schoolId, userId, selectedTeacherId]);
 
+  // Realtime & Event-based automatic student list synchronization
+  useEffect(() => {
+    if (!schoolId) return;
+
+    const handleStudentsUpdated = () => {
+      console.log('[ScheduleBoard] Received groovelab_students_updated event. Auto-refreshing designer...');
+      loadInitialData();
+    };
+
+    window.addEventListener('groovelab_students_updated', handleStudentsUpdated);
+
+    const channel = supabase
+      .channel(`schedule-board-realtime-students-${schoolId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` },
+        (payload) => {
+          console.log('[ScheduleBoard] Realtime users table change detected:', payload);
+          loadInitialData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'students', filter: `school_id=eq.${schoolId}` },
+        (payload) => {
+          console.log('[ScheduleBoard] Realtime students table change detected:', payload);
+          loadInitialData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('groovelab_students_updated', handleStudentsUpdated);
+      supabase.removeChannel(channel);
+    };
+  }, [schoolId, selectedTeacherId]);
+
   useEffect(() => {
     if (!isInitialLoadDone) return;
     if (selectedTeacherId) {

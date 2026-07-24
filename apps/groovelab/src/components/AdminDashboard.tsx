@@ -3272,6 +3272,7 @@ export function AdminDashboard({
       setStudents([...students, data]); 
       setShowAddStudent(false); 
       setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' }); 
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
     }
   };
 
@@ -3355,6 +3356,7 @@ export function AdminDashboard({
         setShowBulkAddStudents(false);
         setBulkInput('');
         setParsedStudents([]);
+        window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       }
     } catch (err: any) {
       alert('Fehler: ' + err.message);
