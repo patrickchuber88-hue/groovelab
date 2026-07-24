@@ -86,6 +86,22 @@ const getPrefStartEndMinutes = (pref: any): { startMin: number; endMin: number }
   return { startMin, endMin };
 };
 
+const parseDayNumber = (val: any): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const num = Number(val);
+  if (!isNaN(num)) return num;
+  const str = String(val).trim().toLowerCase();
+  if (str.includes('mon')) return 1;
+  if (str.includes('die') || str.includes('tue')) return 2;
+  if (str.includes('mit') || str.includes('wed')) return 3;
+  if (str.includes('don') || str.includes('thu')) return 4;
+  if (str.includes('fre') || str.includes('fri')) return 5;
+  if (str.includes('sam') || str.includes('sat')) return 6;
+  if (str.includes('son') || str.includes('sun')) return 7;
+  return 0;
+};
+
 const formatMinutes = (totalMins: number): string => {
   const h = Math.floor(totalMins / 60);
   const m = totalMins % 60;
@@ -1773,7 +1789,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const studentPrefs = prefsByStudentId[studentId] || [];
-        const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && Number(p.day_of_week) === Number(dayOfWeek));
+        const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
         for (const pref of blockedPrefs) {
           const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
@@ -1786,7 +1802,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const calculateWunschBonus = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const studentPrefs = prefsByStudentId[studentId] || [];
-        const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(dayOfWeek));
+        const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
         for (const pref of wunschPrefs) {
           const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
@@ -1924,8 +1940,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           // If Phase 2, try Wunschzeit sliding window matches across entire pref time windows
           if (!isPhase3) {
             for (const pref of wunschPrefs) {
-              const prefDay = Number(pref.day_of_week);
-              const board = currentBoards.find(b => Number(b.dayOfWeek) === prefDay);
+              const prefDay = parseDayNumber(pref.day_of_week);
+              const board = currentBoards.find(b => parseDayNumber(b.dayOfWeek) === prefDay);
               if (!board) continue;
 
               const [psh, psm] = parseTime(pref.start_time);
@@ -2136,7 +2152,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         for (const s of board.students) {
           if (newlyAssignedStudentIds[s.id]) {
             const sPrefs = prefsByStudentId[s.id] || [];
-            const isWunsch = sPrefs.some(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
+            const isWunsch = sPrefs.some(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
             if (isWunsch) {
               globalScore += 500000; // Priority #2: Maximize Wunschzeit hits
             }
@@ -5109,7 +5125,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
-                          const wunschPrefs = selectedStudentPrefs.filter(p => p.preference_type === 'wunsch' && Number(p.day_of_week) === Number(board.dayOfWeek));
+                          const wunschPrefs = selectedStudentPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
                           for (const pref of wunschPrefs) {
                             const [psh, psm] = parseTime(pref.start_time);
                             const [peh, pem] = parseTime(pref.end_time);
