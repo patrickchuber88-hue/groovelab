@@ -6380,9 +6380,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               position: 'absolute', left: 0, right: 0,
                               top: `${Math.max(cardTopPx, 0)}px`,
                               height: `${Math.max(cardHeightPx, 32)}px`,
-                              background: cardBg,
-                              border: isSelected ? '2px solid #16a34a' : finalBorder,
-                              borderLeft: isSelected ? '5px solid #15803d' : cardBorderLeft,
+                              background: (selectedStudentId !== null && !isSelected) ? 'rgba(255, 255, 255, 0.15)' : cardBg,
+                              border: isSelected ? '2px solid #16a34a' : ((selectedStudentId !== null && !isSelected) ? '1px solid rgba(0, 0, 0, 0.15)' : finalBorder),
+                              borderLeft: isSelected ? '5px solid #15803d' : ((selectedStudentId !== null && !isSelected) ? '4px solid rgba(0, 0, 0, 0.35)' : cardBorderLeft),
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
@@ -6392,14 +6392,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               WebkitTouchCallout: 'none',
                               touchAction: 'none',
                               visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
-                              opacity: draggedStudentId === bs.id ? 0 : ((selectedStudentId !== null || draggedStudentId !== null)
-                                ? ((selectedStudentId === bs.id) ? 1 : 0.22)
-                                : 1),
-                              filter: (selectedStudentId !== null && !isSelected) ? 'grayscale(35%)' : 'none',
+                              opacity: draggedStudentId === bs.id ? 0 : 1,
+                              filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.015)' : 'none',
                               overflow: 'hidden',
-                              boxShadow: isSelected ? '0 4px 16px rgba(22, 163, 74, 0.25)' : finalShadow,
+                              boxShadow: isSelected ? '0 4px 16px rgba(22, 163, 74, 0.25)' : ((selectedStudentId !== null && !isSelected) ? 'none' : finalShadow),
                               transition: 'all 0.15s ease',
                             }}
                             onMouseOver={e => {
@@ -6414,14 +6412,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: (selectedStudentId !== null && !isSelected) ? '#000000' : textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
                                 {bs.assignedTime}
                               </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'auto' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: (selectedStudentId !== null && !isSelected) ? '#000000' : badgeColor, background: (selectedStudentId !== null && !isSelected) ? 'rgba(255, 255, 255, 0.85)' : badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 {isInsideWunsch && (
                                   <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                     <Star size={9} fill="currentColor" color="currentColor" />
@@ -6439,7 +6437,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 style={{ 
                                   background: 'transparent', 
                                   border: 'none', 
-                                  color: badgeColor, 
+                                  color: (selectedStudentId !== null && !isSelected) ? '#000000' : badgeColor, 
                                   display: 'flex', 
                                   alignItems: 'center', 
                                   justifyContent: 'center',
@@ -6448,19 +6446,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   minWidth: '28px',
                                   minHeight: '28px',
                                   borderRadius: '6px',
-                                  opacity: 0.7, 
+                                  opacity: 0.8, 
                                   pointerEvents: 'auto' 
                                 }}
                                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = badgeColor; }}
+                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; (e.currentTarget as HTMLElement).style.color = (selectedStudentId !== null && !isSelected) ? '#000000' : badgeColor; }}
                                 title="Entfernen"
                               >
                                 <X size={12} strokeWidth={2.5} />
                               </button>
                             </div>
                           </div>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
-                            <InstrumentBadge instrument={resolveInstrument(bs.instrument)} color={textColor} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: (selectedStudentId !== null && !isSelected) ? '#000000' : textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
+                            <InstrumentBadge instrument={resolveInstrument(bs.instrument)} color={(selectedStudentId !== null && !isSelected) ? '#000000' : textColor} />
                             {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Schüler').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                           </span>
                           {cardHeightPx > 52 && (
