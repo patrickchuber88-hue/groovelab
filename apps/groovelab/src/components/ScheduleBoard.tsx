@@ -5958,7 +5958,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                             onMouseOver={e => {
                               if (!isSelected) {
-                                e.currentTarget.style.boxShadow = hasConflict ? '0 4px 14px rgba(239,68,68,0.25)' : `0 4px 14px ${shadowHoverColor}`;
+                                e.currentTarget.style.boxShadow = hasConflict ? '0 4px 14px rgba(239, 68, 68, 0.25)' : '0 4px 14px rgba(0, 0, 0, 0.08)';
                               }
                             }}
                             onMouseOut={e => {
