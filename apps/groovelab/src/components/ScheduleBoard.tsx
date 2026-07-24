@@ -5095,16 +5095,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: titleColor, fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {dragSnapState.studentName || 'Termin'}
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: titleColor, fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em' }}>
+                                  {dragSnapState.timeStr} Uhr
                                 </span>
                                 <span style={{ fontSize: '0.6rem', fontWeight: 700, color: pillColor, background: pillBg, padding: '1px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                                   {dragSnapState.duration} Min.
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '0.62rem', fontWeight: 600 }}>
-                                <span style={{ color: pillColor, fontWeight: 700 }}>{statusLabel}</span>
-                                <span style={{ color: timeColor, fontWeight: 700 }}>{dragSnapState.timeStr} Uhr</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', width: '100%' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: titleColor, fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {dragSnapState.studentName || 'Termin'}
+                                </span>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: pillColor, opacity: 0.95 }}>{statusLabel}</span>
                               </div>
                             </div>
 
@@ -5121,25 +5123,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 pointerEvents: 'none',
                                 transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
                               }}
-                            >
-                              <div 
-                                style={{ 
-                                  position: 'absolute', 
-                                  left: '6px', 
-                                  top: '-10px', 
-                                  background: '#1d1d1f', 
-                                  color: '#ffffff', 
-                                  fontSize: '0.64rem', 
-                                  fontWeight: 700, 
-                                  padding: '2px 7px', 
-                                  borderRadius: '5px', 
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                                  fontFamily: 'Urbanist, sans-serif'
-                                }}
-                              >
-                                {dragSnapState.timeStr} Uhr
-                              </div>
-                            </div>
+                            />
                           </>
                         );
                       })()}
@@ -5440,10 +5424,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 border: '1.5px dashed rgba(245, 158, 11, 0.3)',
                                 borderLeft: '4px solid #f59e0b',
                                 borderRadius: '8px', padding: '4px 8px', boxSizing: 'border-box',
-                                cursor: 'grab', display: 'flex', alignItems: 'center',
+                                cursor: 'grab', display: draggedStudentId === bs.id ? 'none' : 'flex', alignItems: 'center',
                                 justifyContent: 'space-between', gap: '4px',
                                 zIndex: selectedStudentId !== null ? 1 : 2,
-                                opacity: draggedStudentId === bs.id ? 0.15 : (selectedStudentId !== null ? 0.8 : 1),
+                                opacity: selectedStudentId !== null ? 0.8 : 1,
                                 filter: 'none',
                                 pointerEvents: 'auto',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -5878,12 +5862,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               border: finalBorder,
                               borderLeft: cardBorderLeft,
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
-                              cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
+                              cursor: isGroupModeActive ? 'pointer' : 'grab', display: draggedStudentId === bs.id ? 'none' : 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
-                              opacity: draggedStudentId === bs.id ? 0.15 : ((selectedStudentId !== null || draggedStudentId !== null)
+                              opacity: (selectedStudentId !== null || draggedStudentId !== null)
                                 ? ((selectedStudentId === bs.id) ? 1 : 0.6)
-                                : 1),
+                                : 1,
                               filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
