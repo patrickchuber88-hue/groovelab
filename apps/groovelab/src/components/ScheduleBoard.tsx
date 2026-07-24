@@ -5925,7 +5925,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               transform: isSelected ? 'scale(1.02)' : 'none',
                               overflow: 'hidden',
                               boxShadow: finalShadow,
-                              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                              transition: 'opacity 0.15s ease',
                             }}
                             onMouseOver={e => {
                               if (!isSelected) {
@@ -6201,7 +6201,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         boxShadow: isSelected 
                           ? (s.hasPreferences ? '0 4px 14px rgba(22, 163, 74, 0.18)' : '0 4px 14px rgba(15, 23, 42, 0.14)')
                           : (isAssigned ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.01)'),
-                        transition: 'all 0.25s ease'
+                        transition: 'opacity 0.15s ease'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
