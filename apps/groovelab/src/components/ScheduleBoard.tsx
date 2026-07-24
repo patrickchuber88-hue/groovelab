@@ -5973,29 +5973,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
-                              <span 
-                                style={{ 
-                                  fontSize: '0.72rem', 
-                                  fontWeight: 800, 
-                                  color: isInsideWunsch ? '#ffffff' : (hasConflict ? '#991b1b' : '#0f172a'), 
-                                  background: isInsideWunsch ? 'rgba(255, 255, 255, 0.25)' : (hasConflict ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)'),
-                                  border: isInsideWunsch ? '1px solid rgba(255, 255, 255, 0.4)' : (hasConflict ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(0, 0, 0, 0.08)'),
-                                  padding: '1px 6px',
-                                  borderRadius: '5px',
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '4px', 
-                                  pointerEvents: 'none' 
-                                }}
-                              >
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
                                 {isInsideWunsch && (
                                   <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
-                                )}
-                                {!isInsideWunsch && !hasConflict && (
-                                  <Clock size={10} color="#64748b" strokeWidth={2.5} />
                                 )}
                                 {bs.assignedTime}
                               </span>
@@ -6246,7 +6229,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         backdropFilter: 'blur(12px)',
                         WebkitBackdropFilter: 'blur(12px)',
                         border: isSelected ? `1.5px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.08)', 
-                        borderLeft: `4px solid ${brandColor}`, 
+                        borderLeft: s.hasPreferences
+                          ? `4px solid ${brandColor}`
+                          : '4px solid #94a3b8', 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
                         cursor: 'grab', 
@@ -6267,28 +6252,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           {(s.first_name || (s as any).name || (s as any).full_name || 'Schüler').trim()} {maskLastName(s.last_name || '', showRealNames)}
                         </span>
                         {failedStudentIds.includes(s.id) ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
                             <Ban size={9} color="#dc2626" />
                             <span>Sperrzeit-Konflikt</span>
                           </span>
                         ) : s.hasPreferences ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
                             <Star size={9} fill="#16a34a" color="#166534" />
                             <span>Zeiten da</span>
                           </span>
-                        ) : s.status === 'ausstehend' ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', pointerEvents: 'none' }} title="Noch keine Wunsch- & Sperrzeiten eingereicht (Stundenplan-Onboarding ausstehend)">Ausstehend</span>
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Stundenplan-Onboarding abgeschlossen">
-                            <span style={{
-                              height: '7px',
-                              width: '7px',
-                              borderRadius: '50%',
-                              background: '#34a853',
-                              boxShadow: '0 0 6px rgba(52, 168, 83, 0.35)',
-                              flexShrink: 0
-                            }}></span>
-                          </div>
+                          <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1.5px 6px', borderRadius: '5px', pointerEvents: 'none' }} title="Noch keine Wunsch- & Sperrzeiten eingereicht">
+                            Ohne Rückmeldung
+                          </span>
                         )}
                       </div>
 
