@@ -2435,8 +2435,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const targetTimeMin = csh * 60 + csm;
           const [curH, curM] = parseTime(currentTime);
 
-          if (targetTimeMin - (curH * 60 + curM) > 15) {
-            // Gap > 15 min detected! Attempt to shift preceding students forward to close gap
+          if (targetTimeMin - (curH * 60 + curM) > 0) {
+            // Gap detected! Attempt to shift preceding students forward to close gap to 0 minutes
             let precDuration = 0;
             const precIndices: number[] = [];
             for (let i = 0; i < compactedStudents.length; i++) {
