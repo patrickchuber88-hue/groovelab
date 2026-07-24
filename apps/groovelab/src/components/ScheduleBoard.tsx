@@ -1795,25 +1795,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         prevEndMin = sEnd;
 
         // Check Wunsch hit matching card UI logic (any overlap with Wunschzeit window)
-        const sWunschWindows = getMergedStudentWunschWindows(s.id, b.dayOfWeek);
-        if (sWunschWindows.length > 0) {
-          for (const w of sWunschWindows) {
-            if (sStart < w.endMin && sEnd > w.startMin) {
+        const studPrefs = allStudentPrefsMap[s.id] || [];
+        if (studPrefs.length > 0) {
+          const wunschPrefs = studPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(b.dayOfWeek));
+          for (const pref of wunschPrefs) {
+            const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+            if (sStart < prefEnd && sEnd > prefStart) {
               wunschHits++;
               break;
-            }
-          }
-        } else {
-          // Fallback check against raw prefs map
-          const studPrefs = allStudentPrefsMap[s.id] || [];
-          const wunschPrefs = studPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(b.dayOfWeek));
-          if (wunschPrefs.length > 0) {
-            for (const pref of wunschPrefs) {
-              const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-              if (sStart < prefEnd && sEnd > prefStart) {
-                wunschHits++;
-                break;
-              }
             }
           }
         }
