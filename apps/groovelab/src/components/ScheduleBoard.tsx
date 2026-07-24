@@ -6118,7 +6118,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   return (
                     <div
                       key={s.id}
-                      draggable={!isAssigned}
+                      draggable={true}
                       onDragStart={(e) => handleDragStart(s.id, 'sidebar', undefined, e)}
                       onDragEnd={handleDragEnd}
                       onClick={() => handleSelectStudent(s.id)}
@@ -6137,8 +6137,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           : (isSelected ? '4px solid #0f172a' : (isAssigned ? '3px solid #cbd5e1' : '4px solid #94a3b8')), 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
-                        cursor: 'pointer', 
-                        opacity: isSelected ? 1 : (isAssigned ? 0.6 : 1), 
+                        cursor: 'grab', 
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        opacity: isSelected ? 1 : (isAssigned ? 0.8 : 1), 
                         display: 'flex', 
                         flexDirection: 'column', 
                         gap: '4px',
