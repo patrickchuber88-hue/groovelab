@@ -277,20 +277,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
      const snappedMinutes = Math.round(totalMinutes / snapMinutes) * snapMinutes;
      const snappedHours = Math.floor(snappedMinutes / 60) % 24;
      const snappedMins = snappedMinutes % 60;
-     const hStr = String(snappedHours).padStart(2, '0');
-     const mStr = String(snappedMins).padStart(2, '0');
-     return `${hStr}:${mStr}`;
-   };
+  const playCubaseSnapClick = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(750, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(250, ctx.currentTime + 0.018);
+      gain.gain.setValueAtTime(0.06, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.018);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.018);
+    } catch (e) {
+      // Audio errors swallowed silently
+    }
+  };
 
   const [draggedStudentId, setDraggedStudentId] = useState<string | null>(null);
   const [dragSource, setDragSource] = useState<'sidebar' | 'board' | null>(null);
   const [dragSourceBoardId, setDragSourceBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggedDuration, setDraggedDuration] = useState<number>(30);
+  const [draggedStudentName, setDraggedStudentName] = useState<string>('Termin');
   const [dragSnapState, setDragSnapState] = useState<{
     boardId: string;
     topPx: number;
     timeStr: string;
+    duration: number;
+    studentName?: string;
   } | null>(null);
 
   // Drag-and-Drop Instrument Selector state
@@ -2495,6 +2515,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     if (boardId) setDragSourceBoardId(boardId);
     setDragOverBoardId(null);
     setDragOverIndex(null);
+
+    // Resolve dragged duration and name for Cubase ghost preview
+    let dur = 30;
+    let name = 'Termin';
+    if (studentId === 'sidebar-pause' || studentId.startsWith('break-')) {
+      dur = 15;
+      name = 'Pause';
+      if (studentId.startsWith('break-')) {
+        for (const b of boards) {
+          const bs = b.students.find(s => s.id === studentId);
+          if (bs) {
+            dur = bs.duration || 15;
+            break;
+          }
+        }
+      }
+    } else {
+      const foundSidebar = students.find(s => s.id === studentId);
+      if (foundSidebar) {
+        dur = foundSidebar.duration || 30;
+        name = `${foundSidebar.first_name} ${foundSidebar.last_name}`.trim();
+      } else {
+        for (const b of boards) {
+          const bs = b.students.find(s => s.id === studentId);
+          if (bs) {
+            dur = bs.duration || 30;
+            name = `${bs.first_name} ${bs.last_name}`.trim();
+            break;
+          }
+        }
+      }
+    }
+    setDraggedDuration(dur);
+    setDraggedStudentName(name);
 
     try {
       let targetStudentIds = [studentId];
@@ -4877,12 +4931,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         }
 
                         if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex || dragSnapState?.topPx !== topPx) {
+                          if (dragSnapState && dragSnapState.timeStr !== targetTime) {
+                            playCubaseSnapClick();
+                          }
                           setDragOverBoardId(board.id);
                           setDragOverIndex(targetIndex);
                           setDragSnapState({
                             boardId: board.id,
                             topPx,
-                            timeStr: targetTime
+                            timeStr: targetTime,
+                            duration: draggedDuration,
+                            studentName: draggedStudentName
                           });
                         }
                       }}
@@ -4919,81 +4978,121 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         transition: 'all 0.15s ease'
                       }}
                     >
-                       {/* Hour marker & 15-minute subdivision lines */}
-                      {hourMarkers.map(m => {
-                        const subMarkers = [];
-                        for (const minOffset of [15, 30, 45]) {
-                          const subTop = m.top + minOffset * PX_PER_MIN;
-                          if (subTop <= columnHeightPx) {
-                            subMarkers.push(
-                              <div
-                                key={`sub-${m.hour}-${minOffset}`}
-                                style={{ 
-                                  position: 'absolute', 
-                                  left: 0, 
-                                  right: 0, 
-                                  top: `${subTop}px`, 
-                                  borderTop: '1px dotted rgba(0,0,0,0.05)', 
-                                  pointerEvents: 'none', 
-                                  zIndex: 0 
-                                }}
-                              />
-                            );
-                          }
-                        }
-                        return (
-                          <React.Fragment key={m.hour}>
+                       {/* Dynamic Cubase DAW Grid Subdivision Lines */}
+                      {(() => {
+                        const [startH, startM] = parseTime(board.startAnchor);
+                        const boardStartMin = startH * 60 + startM;
+                        const totalMin = Math.floor((endMinutes - startMinutes) / gridSnapMinutes) * gridSnapMinutes;
+                        const gridLines = [];
+
+                        for (let m = 0; m <= totalMin; m += gridSnapMinutes) {
+                          const curMin = boardStartMin + m;
+                          const h = Math.floor(curMin / 60) % 24;
+                          const mins = curMin % 60;
+                          const topPx = m * PX_PER_MIN;
+                          const isHour = mins === 0;
+
+                          gridLines.push(
                             <div
-                              style={{ position: 'absolute', left: 0, right: 0, top: `${m.top}px`, borderTop: '1px dashed rgba(0,0,0,0.08)', pointerEvents: 'none', zIndex: 0 }}
+                              key={`cubase-grid-${m}`}
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                top: `${topPx}px`,
+                                borderTop: isHour 
+                                  ? '1.5px dashed rgba(0,0,0,0.12)' 
+                                  : '1px dotted rgba(0,0,0,0.06)',
+                                pointerEvents: 'none',
+                                zIndex: 0
+                              }}
                             >
-                              <span style={{ position: 'absolute', left: '2px', top: '-8px', fontSize: '0.58rem', color: 'rgba(0,0,0,0.25)', fontWeight: 700, userSelect: 'none' }}>
-                                {String(m.hour).padStart(2, '0')}:00
+                              {isHour && (
+                                <span style={{ position: 'absolute', left: '2px', top: '-8px', fontSize: '0.58rem', color: 'rgba(0,0,0,0.3)', fontWeight: 800, userSelect: 'none', fontFamily: 'Urbanist, sans-serif' }}>
+                                  {String(h).padStart(2, '0')}:00
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
+                        return gridLines;
+                      })()}
+
+                      {/* Cubase Ghost Event Preview Frame & Magnetic Snap Line */}
+                      {dragSnapState && dragSnapState.boardId === board.id && (
+                        <>
+                          {/* Cubase Ghost Event Frame */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '4px',
+                              right: '4px',
+                              top: `${Math.max(dragSnapState.topPx, 0)}px`,
+                              height: `${dragSnapState.duration * PX_PER_MIN}px`,
+                              background: 'rgba(52, 168, 83, 0.12)',
+                              border: '2px dashed #34a853',
+                              borderRadius: '8px',
+                              zIndex: 98,
+                              pointerEvents: 'none',
+                              boxSizing: 'border-box',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              padding: '4px 8px',
+                              backdropFilter: 'blur(2px)',
+                              transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1b4332', fontFamily: 'Urbanist, sans-serif' }}>
+                                🧲 {dragSnapState.studentName || 'Termin'}
+                              </span>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#2d6a4f', background: 'rgba(255,255,255,0.85)', padding: '1px 6px', borderRadius: '4px' }}>
+                                {dragSnapState.duration} Min.
                               </span>
                             </div>
-                            {subMarkers}
-                          </React.Fragment>
-                        );
-                      })}
+                          </div>
 
-                      {/* Real-time Green Grid Snap Indicator Line */}
-                      {dragSnapState && dragSnapState.boardId === board.id && (
-                        <div 
-                          style={{ 
-                            position: 'absolute', 
-                            left: 0, 
-                            right: 0, 
-                            top: `${Math.max(dragSnapState.topPx, 0)}px`, 
-                            height: '2px', 
-                            background: '#34a853', 
-                            boxShadow: '0 0 10px rgba(52, 168, 83, 0.8), 0 0 4px rgba(52, 168, 83, 1)', 
-                            zIndex: 99, 
-                            pointerEvents: 'none',
-                            transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
-                          }}
-                        >
+                          {/* Top Snap Line with Badge */}
                           <div 
                             style={{ 
                               position: 'absolute', 
-                              right: '8px', 
-                              top: '-11px', 
+                              left: 0, 
+                              right: 0, 
+                              top: `${Math.max(dragSnapState.topPx, 0)}px`, 
+                              height: '2px', 
                               background: '#34a853', 
-                              color: '#ffffff', 
-                              fontSize: '0.68rem', 
-                              fontWeight: 800, 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontFamily: 'Urbanist, sans-serif',
-                              letterSpacing: '0.02em'
+                              boxShadow: '0 0 12px rgba(52, 168, 83, 0.9), 0 0 4px rgba(52, 168, 83, 1)', 
+                              zIndex: 99, 
+                              pointerEvents: 'none',
+                              transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
                             }}
                           >
-                            <span>📍</span>
-                            <span>{dragSnapState.timeStr} Uhr</span>
+                            <div 
+                              style={{ 
+                                position: 'absolute', 
+                                right: '8px', 
+                                top: '-12px', 
+                                background: 'linear-gradient(135deg, #34a853 0%, #1e7e34 100%)', 
+                                color: '#ffffff', 
+                                fontSize: '0.68rem', 
+                                fontWeight: 800, 
+                                padding: '2px 8px', 
+                                borderRadius: '6px', 
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontFamily: 'Urbanist, sans-serif',
+                                letterSpacing: '0.02em'
+                              }}
+                            >
+                              <span>🧲</span>
+                              <span>{dragSnapState.timeStr} Uhr</span>
+                            </div>
                           </div>
-                        </div>
+                        </>
                       )}
 
                       {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
