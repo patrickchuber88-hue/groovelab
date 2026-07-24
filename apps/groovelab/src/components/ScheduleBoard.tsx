@@ -1469,20 +1469,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   // Helper to recalculate all lesson times in a column sequentially
   function recalculateBoardTimes(board: DayBoard): DayBoard {
-    // Sort students by customStartTime / assignedTime so cards render in chronological order
-    const sortedStudents = [...board.students].sort((a, b) => {
-      const aTime = a.customStartTime || a.assignedTime;
-      const bTime = b.customStartTime || b.assignedTime;
-      if (aTime && bTime) {
-        const [ah, am] = parseTime(aTime);
-        const [bh, bm] = parseTime(bTime);
-        return (ah * 60 + am) - (bh * 60 + bm);
-      }
-      return 0;
-    });
-
     let currentTime = board.startAnchor;
-    const updatedStudents = sortedStudents.map(s => {
+    const updatedStudents = board.students.map(s => {
       if (s.customStartTime) {
         const [csh, csm] = parseTime(s.customStartTime);
         const [curh, curm] = parseTime(currentTime);
@@ -3274,9 +3262,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               if (s.room_id !== targetBoard.roomId) return false;
               if (s.day_of_week !== targetBoard.dayOfWeek) return false;
 
-              const [bsh, bsm] = parseTime(s.start_time.substring(0, 5));
+              const [bsh, bsm] = parseTime(s.start_time ? s.start_time.substring(0, 5) : '00:00');
               const bStart = bsh * 60 + bsm;
-              const [beh, bem] = parseTime(s.end_time.substring(0, 5));
+              const [beh, bem] = parseTime(s.end_time ? s.end_time.substring(0, 5) : '23:59');
               const bEnd = beh * 60 + bem;
 
               return startMin < bEnd && endMin > bStart;
@@ -3296,6 +3284,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               setDragSourceBoardId(null);
               setDragOverBoardId(null);
               setDragOverIndex(null);
+              setDragSnapState(null);
               return;
             }
           }
@@ -3407,7 +3396,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               nextStudents[index] = temp;
             } else {
               const [moved] = nextStudents.splice(curIndex, 1);
-              const movedCleared = { ...moved, customStartTime: droppedCustomTime || moved.customStartTime };
+              const movedCleared = { ...moved, customStartTime: undefined };
               const insertAt = index !== undefined ? Math.min(index, nextStudents.length) : nextStudents.length;
               nextStudents.splice(insertAt, 0, movedCleared);
             }
@@ -3470,7 +3459,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (!targetBoardCleaned) return prev;
 
         const targetNextStudents = [...targetBoardCleaned.students];
-        const movedStudent = { ...rawMoved, customStartTime: droppedCustomTime || rawMoved.customStartTime };
+        const movedStudent = { ...rawMoved, customStartTime: undefined };
         const insertAt = index !== undefined ? Math.min(index, targetNextStudents.length) : targetNextStudents.length;
         targetNextStudents.splice(insertAt, 0, movedStudent);
 
@@ -5373,7 +5362,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       onDragOver={(e) => {
                             e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const clientY = e.clientY - rect.top;
+                            const clientY = Math.max(0, Math.min(e.clientY - rect.top, columnHeightPx));
                             const dragMinutes = clientY / PX_PER_MIN;
 
                             const [bsh, bsm] = parseTime(board.startAnchor);
