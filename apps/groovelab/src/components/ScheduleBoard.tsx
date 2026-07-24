@@ -5758,20 +5758,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   ? '0 4px 14px rgba(0, 0, 0, 0.08)'
                                   : '0 2px 8px rgba(0, 0, 0, 0.04)'));
 
-                        const shadowColor = isSubmitted 
-                          ? 'rgba(0,0,0,0.02)' 
-                          : 'rgba(0,0,0,0.03)';
-                        const shadowHoverColor = isSubmitted 
-                          ? 'rgba(0,0,0,0.06)' 
-                          : 'rgba(0,0,0,0.08)';
-                        const cardShadow = hasConflict
-                          ? '0 4px 10px rgba(239, 68, 68, 0.15)'
-                          : (isInsideWunsch
-                              ? `0 6px 16px ${cardPrimaryColor}33`
-                              : (isSelected 
-                                  ? `0 0 10px ${cardPrimaryColor}40`
-                                  : `0 2px 6px ${shadowColor}`));
-
                         const isSelectedForGroup = selectedForGroup.includes(bs.id);
                         const highlightColor = cardPrimaryColor;
 
@@ -6220,29 +6206,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       }}
                       className={isShaking ? 'card-shake' : ''}
                       style={{ 
-                        background: s.hasPreferences
-                          ? (isSelected ? '#f0fdf4' : (isAssigned ? 'rgba(52, 168, 83, 0.05)' : 'rgba(240, 253, 244, 0.8)'))
-                          : (isSelected ? '#f8fafc' : (isAssigned ? 'rgba(0, 0, 0, 0.02)' : 'rgba(248, 250, 252, 0.8)')), 
-                        backdropFilter: isAssigned ? 'none' : 'blur(12px)',
-                        WebkitBackdropFilter: isAssigned ? 'none' : 'blur(12px)',
-                        border: s.hasPreferences
-                          ? (isSelected ? '1.5px solid #16a34a' : '1px solid #bbf7d0')
-                          : (isSelected ? '1.5px solid #475569' : '1px solid #cbd5e1'), 
-                        borderLeft: s.hasPreferences
-                          ? (isSelected ? '4px solid #16a34a' : (isAssigned ? '3px solid #86efac' : '4px solid #34a853'))
-                          : (isSelected ? '4px solid #0f172a' : (isAssigned ? '3px solid #cbd5e1' : '4px solid #94a3b8')), 
+                        background: '#ffffff', 
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: isSelected ? `1.5px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.08)', 
+                        borderLeft: `4px solid ${brandColor}`, 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
                         cursor: 'grab', 
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        opacity: isSelected ? 1 : (isAssigned ? 0.8 : 1), 
+                        opacity: isSelected ? 1 : (isAssigned ? 0.75 : 1), 
                         display: 'flex', 
                         flexDirection: 'column', 
                         gap: '4px',
                         boxShadow: isSelected 
-                          ? (s.hasPreferences ? '0 4px 14px rgba(22, 163, 74, 0.18)' : '0 4px 14px rgba(15, 23, 42, 0.14)')
-                          : (isAssigned ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.01)'),
+                          ? '0 4px 14px rgba(0, 0, 0, 0.08)'
+                          : '0 2px 8px rgba(0, 0, 0, 0.04)',
                         transition: 'opacity 0.15s ease'
                       }}
                     >
