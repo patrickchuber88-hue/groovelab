@@ -3406,7 +3406,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               nextStudents[index] = temp;
             } else {
               const [moved] = nextStudents.splice(curIndex, 1);
-              const movedCleared = { ...moved, customStartTime: undefined };
+              const movedCleared = { ...moved, customStartTime: droppedCustomTime || moved.customStartTime };
               const insertAt = index !== undefined ? Math.min(index, nextStudents.length) : nextStudents.length;
               nextStudents.splice(insertAt, 0, movedCleared);
             }
@@ -3469,7 +3469,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (!targetBoardCleaned) return prev;
 
         const targetNextStudents = [...targetBoardCleaned.students];
-        const movedStudent = { ...rawMoved, customStartTime: undefined };
+        const movedStudent = { ...rawMoved, customStartTime: droppedCustomTime || rawMoved.customStartTime };
         const insertAt = index !== undefined ? Math.min(index, targetNextStudents.length) : targetNextStudents.length;
         targetNextStudents.splice(insertAt, 0, movedStudent);
 
@@ -6426,9 +6426,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
+                                )}
+                                {bs.customStartTime && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      setBoards(prev => prev.map(b => {
+                                        if (b.id !== board.id) return b;
+                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: undefined } : s);
+                                        return recalculateBoardTimes({ ...b, students: nextStudents });
+                                      }));
+                                      setToast({ message: 'Fixierung aufgehoben – Termin wieder flexibel!', type: 'info' });
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      padding: '1px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      pointerEvents: 'auto'
+                                    }}
+                                    title="Startzeit in Datenbank fixiert (Klick zum Aufheben)"
+                                  >
+                                    <Pin size={10} color="#f59e0b" fill="#f59e0b" style={{ transform: 'rotate(45deg)' }} />
+                                  </button>
                                 )}
                                 {bs.assignedTime}
                               </span>
