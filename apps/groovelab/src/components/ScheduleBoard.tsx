@@ -1850,6 +1850,28 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           }
         }
 
+      const getMergedStudentWunschWindows = (studentId: string, dayOfWeek: number) => {
+        const studentPrefs = prefsByStudentId[studentId] || [];
+        const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
+        if (wunschPrefs.length === 0) return [];
+
+        const intervals = wunschPrefs.map(p => getPrefStartEndMinutes(p)).sort((a, b) => a.startMin - b.startMin);
+        const merged: { startMin: number; endMin: number }[] = [];
+        for (const interval of intervals) {
+          if (merged.length === 0) {
+            merged.push({ ...interval });
+          } else {
+            const last = merged[merged.length - 1];
+            if (interval.startMin <= last.endMin) {
+              last.endMin = Math.max(last.endMin, interval.endMin);
+            } else {
+              merged.push({ ...interval });
+            }
+          }
+        }
+        return merged;
+      };
+
       const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const studentPrefs = prefsByStudentId[studentId] || [];
         const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
@@ -1864,13 +1886,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       };
 
       const calculateWunschBonus = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
-        const studentPrefs = prefsByStudentId[studentId] || [];
-        const wunschPrefs = studentPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
-        for (const pref of wunschPrefs) {
-          const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-
-          if (startMin < prefEnd && endMin > prefStart) {
-            return 10000000; // High Wunschzeit-Treffer Bonus
+        const mergedWindows = getMergedStudentWunschWindows(studentId, dayOfWeek);
+        for (const window of mergedWindows) {
+          if (startMin >= window.startMin && endMin <= window.endMin) {
+            return 10000000; // High Wunschzeit-Treffer Bonus (100% inside merged window)
+          } else if (startMin < window.endMin && endMin > window.startMin) {
+            return 5000000; // Partial overlap
           }
         }
         return 0;
@@ -2067,13 +2088,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     const endMin = startMin + bs.duration;
 
                     // Hard-Lock: Verify that no Wunschzeit student is pushed out of their Wunschzeit window
-                    const bsPrefs = prefsByStudentId[bs.id] || [];
-                    const bsWunschPrefs = bsPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(tempBoardTest.dayOfWeek));
-                    if (bsWunschPrefs.length > 0) {
+                    const bsWunschWindows = getMergedStudentWunschWindows(bs.id, tempBoardTest.dayOfWeek);
+                    if (bsWunschWindows.length > 0) {
                       let isStillInWunsch = false;
-                      for (const pref of bsWunschPrefs) {
-                        const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-                        if (startMin >= prefStart && endMin <= prefEnd) {
+                      for (const window of bsWunschWindows) {
+                        if (startMin >= window.startMin && endMin <= window.endMin) {
                           isStillInWunsch = true;
                           break;
                         }
@@ -2171,13 +2190,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     const startMin = ash * 60 + asm;
                     const endMin = startMin + bs.duration;
 
-                    const bsPrefs = prefsByStudentId[bs.id] || [];
-                    const bsWunschPrefs = bsPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(tempBoard.dayOfWeek));
-                    if (bsWunschPrefs.length > 0) {
+                    const bsWunschWindows = getMergedStudentWunschWindows(bs.id, tempBoard.dayOfWeek);
+                    if (bsWunschWindows.length > 0) {
                       let isStillInWunsch = false;
-                      for (const pref of bsWunschPrefs) {
-                        const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-                        if (startMin >= prefStart && endMin <= prefEnd) {
+                      for (const window of bsWunschWindows) {
+                        if (startMin >= window.startMin && endMin <= window.endMin) {
                           isStillInWunsch = true;
                           break;
                         }
@@ -2261,12 +2278,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const startMin = ash * 60 + asm;
           const endMin = startMin + bStudent.duration;
 
-          const sPrefs = prefsByStudentId[s.id] || [];
-          const wunschPrefs = sPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(sAssigned.day));
+          const sWunschWindows = getMergedStudentWunschWindows(s.id, sAssigned.day);
           let matchedWunsch = false;
-          for (const pref of wunschPrefs) {
-            const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-            if (startMin < prefEnd && endMin > prefStart) {
+          for (const window of sWunschWindows) {
+            if (startMin >= window.startMin && endMin <= window.endMin) {
               matchedWunsch = true;
               break;
             }
