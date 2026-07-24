@@ -5944,6 +5944,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
                               userSelect: 'none',
                               WebkitUserSelect: 'none',
+                              WebkitTouchCallout: 'none',
                               touchAction: 'none',
                               visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
                               opacity: draggedStudentId === bs.id ? 0 : ((selectedStudentId !== null || draggedStudentId !== null)
@@ -5968,17 +5969,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
+                              <span 
+                                style={{ 
+                                  fontSize: '0.72rem', 
+                                  fontWeight: 800, 
+                                  color: isInsideWunsch ? '#ffffff' : (hasConflict ? '#991b1b' : '#0f172a'), 
+                                  background: isInsideWunsch ? 'rgba(255, 255, 255, 0.25)' : (hasConflict ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.05)'),
+                                  border: isInsideWunsch ? '1px solid rgba(255, 255, 255, 0.4)' : (hasConflict ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(0, 0, 0, 0.08)'),
+                                  padding: '1px 6px',
+                                  borderRadius: '5px',
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px', 
+                                  pointerEvents: 'none' 
+                                }}
+                              >
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
                                 {isInsideWunsch && (
                                   <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
                                 )}
+                                {!isInsideWunsch && !hasConflict && (
+                                  <Clock size={10} color="#64748b" strokeWidth={2.5} />
+                                )}
                                 {bs.assignedTime}
                               </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'auto' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none' }}>{bs.duration}m</span>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none' }}>{bs.duration}m</span>
                               <button 
                                 type="button" 
                                 onClick={(e) => {
@@ -5986,12 +6004,26 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   e.preventDefault();
                                   handleRemoveStudentFromBoard(board.id, bs.id);
                                 }}
-                                style={{ background: 'transparent', border: 'none', color: badgeColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7, pointerEvents: 'auto' }}
+                                style={{ 
+                                  background: 'transparent', 
+                                  border: 'none', 
+                                  color: badgeColor, 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  cursor: 'pointer', 
+                                  padding: '4px', 
+                                  minWidth: '28px',
+                                  minHeight: '28px',
+                                  borderRadius: '6px',
+                                  opacity: 0.7, 
+                                  pointerEvents: 'auto' 
+                                }}
                                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
                                 onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = badgeColor; }}
                                 title="Entfernen"
                               >
-                                <X size={11} strokeWidth={2.5} />
+                                <X size={12} strokeWidth={2.5} />
                               </button>
                             </div>
                           </div>
