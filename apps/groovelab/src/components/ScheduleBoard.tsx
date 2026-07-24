@@ -3399,19 +3399,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const nextStudents = [...targetBoard.students];
           const curIndex = nextStudents.findIndex(s => s.id === sourceId);
           if (curIndex !== -1) {
-            if (index !== undefined && !droppedCustomTime && index < nextStudents.length && curIndex !== index) {
-              // Instant 1-to-1 Swap between source and target student
+            if (index !== undefined && index < nextStudents.length && curIndex !== index) {
+              // Instant 1-to-1 Swap between source and target student if dropping directly on a card
               const temp = nextStudents[curIndex];
               nextStudents[curIndex] = nextStudents[index];
               nextStudents[index] = temp;
             } else {
               const [moved] = nextStudents.splice(curIndex, 1);
-              const movedCleared = { ...moved, customStartTime: droppedCustomTime || undefined };
-              if (index !== undefined && !droppedCustomTime) {
-                nextStudents.splice(index, 0, movedCleared);
-              } else {
-                nextStudents.push(movedCleared);
-              }
+              const movedCleared = { ...moved, customStartTime: undefined };
+              const insertAt = index !== undefined ? Math.min(index, nextStudents.length) : nextStudents.length;
+              nextStudents.splice(insertAt, 0, movedCleared);
             }
             const updated = recalculateBoardTimes({ ...targetBoard, students: nextStudents });
             
@@ -3436,7 +3433,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (!rawMoved) return prev;
 
         // Check if dropping directly onto an existing student on the target board -> Cross-Board 1-to-1 Swap!
-        if (index !== undefined && !droppedCustomTime && index < targetBoard.students.length && !targetBoard.students[index].isBreak) {
+        if (index !== undefined && index < targetBoard.students.length && !targetBoard.students[index].isBreak) {
           const targetStudentToSwap = targetBoard.students[index];
           const sourceNextStudents = [...sourceBoard.students];
           const targetNextStudents = [...targetBoard.students];
@@ -3472,12 +3469,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (!targetBoardCleaned) return prev;
 
         const targetNextStudents = [...targetBoardCleaned.students];
-        const movedStudent = { ...rawMoved, customStartTime: droppedCustomTime || undefined };
-        if (index !== undefined && !droppedCustomTime) {
-          targetNextStudents.splice(index, 0, movedStudent);
-        } else {
-          targetNextStudents.push(movedStudent);
-        }
+        const movedStudent = { ...rawMoved, customStartTime: undefined };
+        const insertAt = index !== undefined ? Math.min(index, targetNextStudents.length) : targetNextStudents.length;
+        targetNextStudents.splice(insertAt, 0, movedStudent);
+
         const updatedTarget = recalculateBoardTimes({ ...targetBoardCleaned, students: targetNextStudents });
 
         setStudents(currentStudents => currentStudents.map(s => {
