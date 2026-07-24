@@ -1826,7 +1826,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       };
 
       // Helper to calculate slot fitness (Lückenlos-Bonus, Isolations-Strafe, etc.)
-      const calculateSlotFitness = (board: any, startMin: number, endMin: number) => {
+      const calculateSlotFitness = (board: any, startMin: number, endMin: number, isWunschCandidate = false) => {
         let score = 0;
         
         // 1. Check if within Teacher Availability (hard constraint)
@@ -1914,10 +1914,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
         if (lueckenlos) {
           score += 10000;
-        } else {
-          // Isolation penalty
+        } else if (!isWunschCandidate) {
+          // Isolation penalty (only apply for non-Wunschzeit placements!)
           if (gapBefore > 0) score -= Math.floor(gapBefore / 15) * 5000;
-          // Only penalize after gap if it's not simply the end of the day
           if (gapAfter > 0 && gapAfter < 1440) score -= Math.floor(gapAfter / 15) * 5000;
         }
 
@@ -2046,7 +2045,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   }
                 }
 
-                const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin);
+                const fitnessScore = calculateSlotFitness(board, candidateMin, candidateEndMin, true);
                 const sibBonus = siblingMatchBonus(student, board, candidateMin, candidateEndMin);
                 let totalScore = 1000000 + fitnessScore + sibBonus; // 1.000.000 for wunschzeit window hit
                 
