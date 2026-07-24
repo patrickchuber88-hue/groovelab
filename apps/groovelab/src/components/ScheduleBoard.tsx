@@ -5402,9 +5402,35 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 filter: 'none',
                                 pointerEvents: 'auto',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                overflow: 'hidden',
+                                overflow: 'visible',
                               }}
                             >
+                              {/* Apple Floating Edge Time Pill */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '-7px',
+                                  ...(board.dayOfWeek === 1 ? { right: '-22px' } : { left: '-22px' }),
+                                  background: 'rgba(255, 255, 255, 0.96)',
+                                  backdropFilter: 'blur(16px)',
+                                  WebkitBackdropFilter: 'blur(16px)',
+                                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                                  borderRadius: '999px',
+                                  padding: '2px 7px',
+                                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  zIndex: 10,
+                                  pointerEvents: 'none'
+                                }}
+                              >
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} />
+                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                                  {bs.assignedTime}
+                                </span>
+                              </div>
+
                               <div 
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -5420,7 +5446,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               >
                                 <span style={{ fontSize: '0.75rem', flexShrink: 0 }}>☕</span>
                                 <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap' }}>Pause</span>
-                                <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 600 }}>{bs.assignedTime}</span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
                                 <div 
@@ -5730,11 +5755,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 zIndex: 2,
                                 boxShadow: isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                overflow: 'visible',
                               }}
                             >
+                              {/* Apple Floating Edge Time Pill */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '-7px',
+                                  ...(board.dayOfWeek === 1 ? { right: '-22px' } : { left: '-22px' }),
+                                  background: 'rgba(255, 255, 255, 0.96)',
+                                  backdropFilter: 'blur(16px)',
+                                  WebkitBackdropFilter: 'blur(16px)',
+                                  border: `1px solid ${cardBorderColor}`,
+                                  borderRadius: '999px',
+                                  padding: '2px 7px',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  zIndex: 10,
+                                  pointerEvents: 'none'
+                                }}
+                              >
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: highlightColor, boxShadow: `0 0 6px ${highlightColor}` }} />
+                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                                  {bs.assignedTime}
+                                </span>
+                              </div>
+
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.72rem', fontWeight: 800, color: highlightColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  👥 {bs.assignedTime}
+                                  👥 Gruppe
                                 </span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   {!bs.group_id && (
@@ -5841,31 +5893,56 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
-                              overflow: 'hidden',
+                              overflow: 'visible',
                               boxShadow: finalShadow,
                               transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                             }}
-                          onMouseOver={e => {
-                            if (!isSelected) {
-                              e.currentTarget.style.boxShadow = hasConflict ? '0 4px 14px rgba(239,68,68,0.25)' : `0 4px 14px ${shadowHoverColor}`;
-                            }
-                          }}
-                          onMouseOut={e => {
-                            if (!isSelected) {
-                              e.currentTarget.style.boxShadow = cardShadow;
-                            }
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              {hasConflict && (
-                                <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
-                              )}
-                              {isInsideWunsch && (
-                                <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
-                              )}
-                              {bs.assignedTime}
-                            </span>
+                            onMouseOver={e => {
+                              if (!isSelected) {
+                                e.currentTarget.style.boxShadow = hasConflict ? '0 4px 14px rgba(239,68,68,0.25)' : `0 4px 14px ${shadowHoverColor}`;
+                              }
+                            }}
+                            onMouseOut={e => {
+                              if (!isSelected) {
+                                e.currentTarget.style.boxShadow = cardShadow;
+                              }
+                            }}
+                          >
+                            {/* Apple Floating Edge Time Pill */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '-7px',
+                                ...(board.dayOfWeek === 1 ? { right: '-22px' } : { left: '-22px' }),
+                                background: 'rgba(255, 255, 255, 0.96)',
+                                backdropFilter: 'blur(16px)',
+                                WebkitBackdropFilter: 'blur(16px)',
+                                border: `1px solid ${hasConflict ? '#fecaca' : cardBorderColor}`,
+                                borderRadius: '999px',
+                                padding: '2px 7px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.06)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                zIndex: 10,
+                                pointerEvents: 'none'
+                              }}
+                            >
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hasConflict ? '#ef4444' : (isInsideWunsch ? '#16a34a' : cardPrimaryColor), boxShadow: `0 0 6px ${hasConflict ? '#ef4444' : cardPrimaryColor}` }} />
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: hasConflict ? '#dc2626' : '#1e293b', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                                {bs.assignedTime}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                {hasConflict && (
+                                  <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
+                                )}
+                                {isInsideWunsch && (
+                                  <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
+                                )}
+                              </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
                               <button 
