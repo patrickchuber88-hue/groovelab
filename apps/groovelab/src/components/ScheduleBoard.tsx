@@ -322,6 +322,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // RoentgenMatrixView interactive behavior states
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedStudentPrefs, setSelectedStudentPrefs] = useState<any[]>([]);
+  const [allStudentPrefsMap, setAllStudentPrefsMap] = useState<Record<string, any[]>>({});
   const [selectedStudentNote, setSelectedStudentNote] = useState<string | null>(null);
   const [shakingStudentId, setShakingStudentId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
@@ -866,14 +867,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       ];
 
       const prefSubmittedSet = new Set<string>();
+      const prefMap: Record<string, any[]> = {};
       if (rawAllStudentIds.length > 0) {
         const { data: prefRows } = await supabase
           .from('student_schedule_preferences')
-          .select('student_id')
+          .select('*')
           .in('student_id', rawAllStudentIds);
 
-        prefRows?.forEach(p => prefSubmittedSet.add(p.student_id));
+        prefRows?.forEach(p => {
+          prefSubmittedSet.add(p.student_id);
+          if (!prefMap[p.student_id]) prefMap[p.student_id] = [];
+          prefMap[p.student_id].push(p);
+        });
       }
+      setAllStudentPrefsMap(prefMap);
 
       const loadedStudents: Student[] = [
         ...(sData || []).map(s => ({
@@ -5161,17 +5168,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                         // Check if student is scheduled within a preferred ('wunsch') slot
                         let isInsideWunsch = false;
-                        if (selectedStudentId === bs.id && selectedStudentPrefs.length > 0) {
+                        const studPrefs = allStudentPrefsMap[bs.id] || (selectedStudentId === bs.id ? selectedStudentPrefs : []);
+                        if (studPrefs.length > 0) {
                           const [sh, sm] = parseTime(bs.assignedTime || board.startAnchor);
                           const startMin = sh * 60 + sm;
                           const endMin = startMin + bs.duration;
 
-                          const wunschPrefs = selectedStudentPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
+                          const wunschPrefs = studPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
                           for (const pref of wunschPrefs) {
-                            const [psh, psm] = parseTime(pref.start_time);
-                            const [peh, pem] = parseTime(pref.end_time);
-                            const prefStart = psh * 60 + psm;
-                            const prefEnd = peh * 60 + pem;
+                            const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
                             if (startMin < prefEnd && endMin > prefStart) {
                               isInsideWunsch = true;
