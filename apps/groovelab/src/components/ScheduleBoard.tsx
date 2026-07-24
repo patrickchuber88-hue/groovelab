@@ -4785,6 +4785,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             className="mini-time-input"
                             onChange={(e) => {
                               const newVal = e.target.value;
+                              if (!newVal) return;
+                              setBoards(prev => prev.map(b => {
+                                if (b.id !== board.id) return b;
+                                return recalculateBoardTimes({ ...b, startAnchor: newVal });
+                              }));
+                            }}
+                            onBlur={(e) => {
+                              const newVal = e.target.value;
                               const snappedVal = newVal ? snapTimeToGrid(newVal, gridSnapMinutes) : '14:00';
                               setBoards(prev => prev.map(b => {
                                 if (b.id !== board.id) return b;
@@ -4792,7 +4800,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }));
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            style={{ fontSize: '0.78rem', fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: textAccentColor, padding: 0, width: '42px', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}
+                            style={{ fontSize: '0.78rem', fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: textAccentColor, padding: 0, width: '52px', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}
                             title="Startzeit ändern"
                           />
                           <span style={{ fontSize: '0.65rem', fontWeight: 600, marginLeft: '1px', color: textAccentColor }}>Uhr</span>
@@ -5255,11 +5263,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   <Clock size={10} strokeWidth={2.5} style={{ color: '#b45309', flexShrink: 0 }} />
                                   <input
                                     type="time"
-                                    step={900}
                                     value={bs.customStartTime || bs.assignedTime || '14:00'}
                                     className="mini-time-input"
                                     onClick={(e) => e.stopPropagation()}
                                     onChange={(e) => {
+                                      e.stopPropagation();
+                                      const newTime = e.target.value;
+                                      if (!newTime) return;
+                                      setBoards(prev => prev.map(b => {
+                                        if (b.id !== board.id) return b;
+                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: newTime } : s);
+                                        return recalculateBoardTimes({ ...b, students: nextStudents });
+                                      }));
+                                    }}
+                                    onBlur={(e) => {
                                       e.stopPropagation();
                                       const newTime = e.target.value;
                                       if (!newTime) return;
@@ -5270,7 +5287,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                         return recalculateBoardTimes({ ...b, students: nextStudents });
                                       }));
                                     }}
-                                    style={{ width: '54px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 800, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+                                    style={{ width: '56px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 800, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
                                     title="Pausen-Startzeit ändern"
                                   />
                                 </div>
