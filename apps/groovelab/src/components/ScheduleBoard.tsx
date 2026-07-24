@@ -5451,8 +5451,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           return (
                             <div
                               key={bs.id}
-                              draggable
-                              onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
                               onDragOver={(e) => {
                                 e.preventDefault();
@@ -5881,7 +5881,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           <div
                             key={bs.id}
                             draggable={true}
-                            onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                            onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => {
                               e.preventDefault();
@@ -5910,6 +5910,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: draggedStudentId === bs.id ? 'none' : 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none',
+                              touchAction: 'none',
                               opacity: (selectedStudentId !== null || draggedStudentId !== null)
                                 ? ((selectedStudentId === bs.id) ? 1 : 0.6)
                                 : 1,
@@ -5931,8 +5934,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
@@ -5941,8 +5944,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 )}
                                 {bs.assignedTime}
                               </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'auto' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none' }}>{bs.duration}m</span>
                               <button 
                                 type="button" 
                                 onClick={(e) => {
@@ -5950,7 +5953,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   e.preventDefault();
                                   handleRemoveStudentFromBoard(board.id, bs.id);
                                 }}
-                                style={{ background: 'transparent', border: 'none', color: badgeColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
+                                style={{ background: 'transparent', border: 'none', color: badgeColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7, pointerEvents: 'auto' }}
                                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
                                 onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = badgeColor; }}
                                 title="Entfernen"
@@ -5959,12 +5962,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               </button>
                             </div>
                           </div>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
                             <InstrumentBadge instrument={resolveInstrument(bs.instrument)} color={textColor} />
                             {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Schüler').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                           </span>
                           {cardHeightPx > 52 && (
-                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{resolveInstrument(bs.instrument)}</span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 600, color: isInsideWunsch ? 'rgba(255,255,255,0.85)' : (hasConflict ? '#991b1b' : (isSubmitted ? cardPrimaryColor : cardTextColor)), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', pointerEvents: 'none' }}>{resolveInstrument(bs.instrument)}</span>
                           )}
                         </div>
                       );
