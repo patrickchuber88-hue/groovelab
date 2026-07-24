@@ -282,24 +282,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
      return `${hStr}:${mStr}`;
    };
   const playCubaseSnapClick = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(750, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(250, ctx.currentTime + 0.018);
-      gain.gain.setValueAtTime(0.06, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.018);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.018);
-    } catch (e) {
-      // Audio errors swallowed silently
-    }
+    // Audio snap click disabled per user request
   };
 
   const resolveInstrument = (inst?: string): string => {
@@ -2527,15 +2510,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
-  // Drag start handler for students (either from sidebar or day board)
-  const handleDragStart = async (studentId: string, source: 'sidebar' | 'board', boardId?: string, e?: React.DragEvent) => {
+  // Drag start handler for students (100% Synchronous for 0ms Drag Latency!)
+  const handleDragStart = (studentId: string, source: 'sidebar' | 'board', boardId?: string, e?: React.DragEvent) => {
     setDraggedStudentId(studentId);
     setDragSource(source);
     if (boardId) setDragSourceBoardId(boardId);
     setDragOverBoardId(null);
     setDragOverIndex(null);
 
-    // Resolve dragged duration and name for Cubase ghost preview
+    // Suppress native drag preview image so ONLY the Cubase Ghost Event Frame glides on the timetable grid
+    if (e && e.dataTransfer) {
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', studentId);
+        if (e.dataTransfer.setDragImage) {
+          const emptyImg = document.createElement('img');
+          emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+          e.dataTransfer.setDragImage(emptyImg, 0, 0);
+        }
+      } catch (err) {
+        // Fallback silently if setDragImage is blocked
+      }
+    }
+
+    // Resolve dragged duration and name for Cubase ghost preview synchronously
     let dur = 30;
     let name = 'Termin';
     let inst = 'Instrument';
@@ -2573,20 +2571,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setDraggedDuration(dur);
     setDraggedStudentName(name);
 
-    // Suppress native drag preview image so ONLY the Cubase Ghost Event Frame glides on the timetable grid
-    if (e && e.dataTransfer && e.dataTransfer.setDragImage) {
+    // Fetch preferences asynchronously in background without blocking drag initialization
+    (async () => {
       try {
-        const emptyImg = document.createElement('img');
-        emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-        e.dataTransfer.setDragImage(emptyImg, 0, 0);
-      } catch (err) {
-        // Fallback silently if setDragImage is blocked
-      }
-    }
-
-    try {
-      let targetStudentIds = [studentId];
-      let grpId: string | null = null;
+        let targetStudentIds = [studentId];
+        let grpId: string | null = null;
       
       if (studentId.startsWith('group-')) {
         grpId = studentId.replace('group-', '');
@@ -2683,7 +2672,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     } catch (err) {
       console.error("Error loading preferences on drag start:", err);
     }
-  };
+  })();
+};
 
   const handleDragEnd = () => {
     setDraggedStudentId(null);
@@ -2700,6 +2690,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Drag over handler to allow dropping
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
   };
 
   const mergeStudentsViaDragAndDrop = (sourceId: string, targetId: string, targetBoardId: string) => {
@@ -5469,10 +5462,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 border: '1.5px dashed rgba(245, 158, 11, 0.3)',
                                 borderLeft: '4px solid #f59e0b',
                                 borderRadius: '8px', padding: '4px 8px', boxSizing: 'border-box',
-                                cursor: 'grab', display: draggedStudentId === bs.id ? 'none' : 'flex', alignItems: 'center',
+                                cursor: 'grab', display: 'flex', alignItems: 'center',
                                 justifyContent: 'space-between', gap: '4px',
                                 zIndex: selectedStudentId !== null ? 1 : 2,
-                                opacity: selectedStudentId !== null ? 0.8 : 1,
+                                visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
+                                opacity: draggedStudentId === bs.id ? 0 : (selectedStudentId !== null ? 0.8 : 1),
                                 filter: 'none',
                                 pointerEvents: 'auto',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -5779,8 +5773,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           return (
                             <div
                               key={bs.id}
-                              draggable
-                              onDragStart={() => handleDragStart(bs.id, 'board', board.id)}
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
                               onDragOver={(e) => {
                                 e.preventDefault();
@@ -5802,6 +5796,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 cursor: 'grab', display: 'flex', flexDirection: 'column',
                                 justifyContent: 'center', gap: '2px',
                                 zIndex: 2,
+                                visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
+                                opacity: draggedStudentId === bs.id ? 0 : 1,
                                 boxShadow: isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                 overflow: 'hidden',
@@ -5907,15 +5903,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               border: finalBorder,
                               borderLeft: cardBorderLeft,
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
-                              cursor: isGroupModeActive ? 'pointer' : 'grab', display: draggedStudentId === bs.id ? 'none' : 'flex', flexDirection: 'column',
+                              cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
                               userSelect: 'none',
                               WebkitUserSelect: 'none',
                               touchAction: 'none',
-                              opacity: (selectedStudentId !== null || draggedStudentId !== null)
+                              visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
+                              opacity: draggedStudentId === bs.id ? 0 : ((selectedStudentId !== null || draggedStudentId !== null)
                                 ? ((selectedStudentId === bs.id) ? 1 : 0.6)
-                                : 1,
+                                : 1),
                               filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
