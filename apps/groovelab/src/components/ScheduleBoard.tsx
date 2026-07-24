@@ -5038,28 +5038,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
 
-                        // Purist Apple Senior Design (Glassmorphism, Brand Colors, Zero Emojis)
+                        // Purist Apple Senior Design (Glassmorphic Neutral, Vibrant Campus Green for Wunschzeit, Soft Red for Blocked)
                         let cardBg = 'rgba(255, 255, 255, 0.96)';
                         let borderColor = brandColor;
                         let shadowStyle = `0 4px 16px ${brandColor}20`;
                         let statusLabel = 'Freier Slot';
                         let pillBg = 'rgba(0, 0, 0, 0.05)';
                         let pillColor = '#475569';
+                        let titleColor = '#1d1d1f';
+                        let timeColor = '#1d1d1f';
 
                         if (isBlocked) {
-                          cardBg = 'rgba(254, 242, 242, 0.96)';
+                          cardBg = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
                           borderColor = '#ef4444';
-                          shadowStyle = '0 4px 16px rgba(239, 68, 68, 0.2)';
+                          shadowStyle = '0 4px 16px rgba(239, 68, 68, 0.3)';
                           statusLabel = 'Sperrzeit (Verboten)';
-                          pillBg = '#fee2e2';
-                          pillColor = '#991b1b';
+                          pillBg = 'rgba(255, 255, 255, 0.25)';
+                          pillColor = '#ffffff';
+                          titleColor = '#ffffff';
+                          timeColor = '#ffffff';
                         } else if (isWunsch) {
-                          cardBg = 'rgba(240, 253, 244, 0.96)';
-                          borderColor = '#34a853';
-                          shadowStyle = '0 4px 16px rgba(52, 168, 83, 0.2)';
+                          cardBg = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
+                          borderColor = '#1e7e34';
+                          shadowStyle = '0 6px 20px rgba(52, 168, 83, 0.35)';
                           statusLabel = 'Wunschzeit getroffen!';
-                          pillBg = '#d1fae5';
-                          pillColor = '#065f46';
+                          pillBg = 'rgba(255, 255, 255, 0.25)';
+                          pillColor = '#ffffff';
+                          titleColor = '#ffffff';
+                          timeColor = '#ffffff';
                         }
 
                         return (
@@ -5089,7 +5095,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d1d1f', fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: titleColor, fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {dragSnapState.studentName || 'Termin'}
                                 </span>
                                 <span style={{ fontSize: '0.6rem', fontWeight: 700, color: pillColor, background: pillBg, padding: '1px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
@@ -5098,7 +5104,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '0.62rem', fontWeight: 600 }}>
                                 <span style={{ color: pillColor, fontWeight: 700 }}>{statusLabel}</span>
-                                <span style={{ color: '#1d1d1f', fontWeight: 700 }}>{dragSnapState.timeStr} Uhr</span>
+                                <span style={{ color: timeColor, fontWeight: 700 }}>{dragSnapState.timeStr} Uhr</span>
                               </div>
                             </div>
 
