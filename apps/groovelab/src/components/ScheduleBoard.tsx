@@ -5224,56 +5224,65 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 600 }}>{bs.assignedTime}</span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '5px', padding: '1px 3px' }}>
-                                  <Clock size={8} strokeWidth={2.5} style={{ color: '#b45309' }} />
+                                <div 
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '5px', padding: '1px 4px' }}
+                                >
+                                  <Clock size={10} strokeWidth={2.5} style={{ color: '#b45309', flexShrink: 0 }} />
                                   <input
-                                    type="time" value={bs.customStartTime || bs.assignedTime} className="mini-time-input"
+                                    type="time"
+                                    step={900}
+                                    value={bs.customStartTime || bs.assignedTime || '14:00'}
+                                    className="mini-time-input"
+                                    onClick={(e) => e.stopPropagation()}
                                     onChange={(e) => {
-                                      const newTime = e.target.value || undefined;
-                                      const snappedTime = newTime ? snapTimeToGrid(newTime, gridSnapMinutes) : undefined;
-                                      const resolvedTime = snappedTime === bs.assignedTime ? undefined : snappedTime;
+                                      e.stopPropagation();
+                                      const newTime = e.target.value;
+                                      if (!newTime) return;
+                                      const snappedTime = snapTimeToGrid(newTime, gridSnapMinutes);
                                       setBoards(prev => prev.map(b => {
                                         if (b.id !== board.id) return b;
-                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: resolvedTime } : s);
+                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: snappedTime } : s);
                                         return recalculateBoardTimes({ ...b, students: nextStudents });
                                       }));
                                     }}
-                                    style={{ width: '38px', background: 'transparent', border: 'none', fontSize: '0.62rem', fontWeight: 700, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+                                    style={{ width: '54px', background: 'transparent', border: 'none', fontSize: '0.68rem', fontWeight: 800, color: '#b45309', outline: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+                                    title="Pausen-Startzeit ändern"
                                   />
                                 </div>
-                                 <select
-                                   value={bs.duration}
-                                   onClick={(e) => e.stopPropagation()}
-                                   onChange={(e) => {
-                                     e.stopPropagation();
-                                     const newDuration = Number(e.target.value);
-                                     setBoards(prev => prev.map(b => {
-                                       if (b.id !== board.id) return b;
-                                       const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDuration } : s);
-                                       return recalculateBoardTimes({ ...b, students: nextStudents });
-                                     }));
-                                   }}
-                                   style={{ 
-                                     background: 'rgba(255,255,255,0.9)', 
-                                     borderRadius: '5px', 
-                                     padding: '1px 3px', 
-                                     fontSize: '0.62rem', 
-                                     fontWeight: 800, 
-                                     color: '#b45309',
-                                     cursor: 'pointer',
-                                     border: '1px solid rgba(245,158,11,0.4)',
-                                     outline: 'none',
-                                     fontFamily: 'inherit'
-                                   }}
-                                   title="Dauer der Pause wählen"
-                                 >
-                                   <option value={15}>15 Min.</option>
-                                   <option value={30}>30 Min.</option>
-                                   <option value={45}>45 Min.</option>
-                                   <option value={60}>60 Min.</option>
-                                   <option value={75}>75 Min.</option>
-                                   <option value={90}>90 Min.</option>
-                                 </select>
+                                <select
+                                  value={bs.duration}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const newDuration = Number(e.target.value);
+                                    setBoards(prev => prev.map(b => {
+                                      if (b.id !== board.id) return b;
+                                      const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDuration } : s);
+                                      return recalculateBoardTimes({ ...b, students: nextStudents });
+                                    }));
+                                  }}
+                                  style={{ 
+                                    background: 'rgba(255,255,255,0.9)', 
+                                    borderRadius: '5px', 
+                                    padding: '1px 3px', 
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 800, 
+                                    color: '#b45309',
+                                    cursor: 'pointer',
+                                    border: '1px solid rgba(245,158,11,0.4)',
+                                    outline: 'none',
+                                    fontFamily: 'inherit'
+                                  }}
+                                  title="Dauer der Pause wählen"
+                                >
+                                  <option value={15}>15 Min.</option>
+                                  <option value={30}>30 Min.</option>
+                                  <option value={45}>45 Min.</option>
+                                  <option value={60}>60 Min.</option>
+                                  <option value={75}>75 Min.</option>
+                                  <option value={90}>90 Min.</option>
+                                </select>
                                 <button 
                                   type="button" 
                                   onClick={(e) => {
