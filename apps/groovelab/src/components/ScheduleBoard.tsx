@@ -5731,21 +5731,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '0.62rem',
+                                gap: '5px',
+                                fontSize: '0.66rem',
                                 fontWeight: 800,
-                                color: isBlocked ? '#991b1b' : '#166534',
-                                background: isBlocked ? 'rgba(254, 242, 242, 0.88)' : 'rgba(240, 253, 244, 0.88)',
-                                padding: '2px 7px',
+                                color: '#ffffff',
+                                background: isBlocked ? 'linear-gradient(135deg, #b91c1c, #dc2626)' : 'linear-gradient(135deg, #15803d, #16a34a)',
+                                padding: '3px 9px',
                                 borderRadius: '6px',
-                                border: `1px solid ${isBlocked ? 'rgba(239, 68, 68, 0.3)' : 'rgba(52, 168, 83, 0.3)'}`,
-                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                                border: `1px solid ${isBlocked ? '#991b1b' : '#166534'}`,
+                                boxShadow: `0 2px 10px ${isBlocked ? 'rgba(185, 28, 28, 0.4)' : 'rgba(21, 128, 61, 0.4)'}`,
                                 backdropFilter: 'blur(12px)',
                                 WebkitBackdropFilter: 'blur(12px)',
                                 whiteSpace: 'nowrap',
                                 letterSpacing: '-0.01em'
                               }}>
-                                {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} color="currentColor" />}
+                                {isBlocked ? <Ban size={11} color="#ffffff" /> : <Star size={11} color="#ffffff" fill="#ffffff" />}
                                 <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
                               </div>
                             </div>
@@ -6380,9 +6380,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               position: 'absolute', left: 0, right: 0,
                               top: `${Math.max(cardTopPx, 0)}px`,
                               height: `${Math.max(cardHeightPx, 32)}px`,
-                              background: cardBg,
-                              border: finalBorder,
-                              borderLeft: cardBorderLeft,
+                              background: isSelected ? 'linear-gradient(135deg, #15803d, #16a34a)' : cardBg,
+                              border: isSelected ? '2px solid #22c55e' : finalBorder,
+                              borderLeft: isSelected ? '6px solid #14532d' : cardBorderLeft,
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
@@ -6397,9 +6397,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 : 1),
                               filter: (selectedStudentId !== null && !isSelected) ? 'grayscale(35%)' : 'none',
                               pointerEvents: 'auto',
-                              transform: isSelected ? 'scale(1.025)' : 'none',
+                              transform: isSelected ? 'scale(1.03)' : 'none',
                               overflow: 'hidden',
-                              boxShadow: isSelected ? '0 0 0 3px #16a34a, 0 8px 24px rgba(22, 163, 74, 0.28)' : finalShadow,
+                              boxShadow: isSelected ? '0 0 0 4px rgba(34, 197, 94, 0.35), 0 12px 28px rgba(22, 163, 74, 0.35)' : finalShadow,
                               transition: 'all 0.15s ease',
                             }}
                             onMouseOver={e => {
@@ -6414,14 +6414,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: isSelected ? '#ffffff' : textColor, display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }}>
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
                                 {bs.assignedTime}
                               </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'auto' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: isSelected ? '#ffffff' : badgeColor, background: isSelected ? 'rgba(255,255,255,0.22)' : badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 {isInsideWunsch && (
                                   <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                     <Star size={9} fill="currentColor" color="currentColor" />
@@ -6439,7 +6439,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 style={{ 
                                   background: 'transparent', 
                                   border: 'none', 
-                                  color: badgeColor, 
+                                  color: isSelected ? '#ffffff' : badgeColor, 
                                   display: 'flex', 
                                   alignItems: 'center', 
                                   justifyContent: 'center',
@@ -6448,19 +6448,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   minWidth: '28px',
                                   minHeight: '28px',
                                   borderRadius: '6px',
-                                  opacity: 0.7, 
+                                  opacity: 0.8, 
                                   pointerEvents: 'auto' 
                                 }}
                                 onMouseOver={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7'; (e.currentTarget as HTMLElement).style.color = badgeColor; }}
+                                onMouseOut={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8'; (e.currentTarget as HTMLElement).style.color = isSelected ? '#ffffff' : badgeColor; }}
                                 title="Entfernen"
                               >
                                 <X size={12} strokeWidth={2.5} />
                               </button>
                             </div>
                           </div>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
-                            <InstrumentBadge instrument={resolveInstrument(bs.instrument)} color={textColor} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? '#ffffff' : textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'none' }}>
+                            <InstrumentBadge instrument={resolveInstrument(bs.instrument)} color={isSelected ? '#ffffff' : textColor} />
                             {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Schüler').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                           </span>
                           {cardHeightPx > 52 && (
