@@ -5208,18 +5208,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '4px',
-                                    fontSize: '0.64rem',
+                                    fontSize: '0.62rem',
                                     fontWeight: 800,
                                     color: isBlocked ? '#991b1b' : '#166534',
-                                    background: isBlocked ? '#fef2f2' : '#f0fdf4',
-                                    padding: '2px 6px',
+                                    background: isBlocked ? 'rgba(254, 242, 242, 0.88)' : 'rgba(240, 253, 244, 0.88)',
+                                    padding: '2px 7px',
                                     borderRadius: '6px',
-                                    border: `1px solid ${isBlocked ? '#fecaca' : '#bbf7d0'}`,
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                    backdropFilter: 'blur(4px)',
-                                    whiteSpace: 'nowrap'
+                                    border: `1px solid ${isBlocked ? 'rgba(239, 68, 68, 0.3)' : 'rgba(52, 168, 83, 0.3)'}`,
+                                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                                    backdropFilter: 'blur(12px)',
+                                    WebkitBackdropFilter: 'blur(12px)',
+                                    whiteSpace: 'nowrap',
+                                    letterSpacing: '-0.01em'
                                   }}>
-                                    {isBlocked ? <Ban size={11} color="#dc2626" /> : null}
+                                    {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} fill="#16a34a" color="#166534" />}
                                     <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
                                   </div>
                                 </div>
@@ -5261,18 +5263,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                fontSize: '0.64rem',
+                                fontSize: '0.62rem',
                                 fontWeight: 800,
                                 color: isBlocked ? '#991b1b' : '#166534',
-                                background: isBlocked ? '#fef2f2' : '#f0fdf4',
-                                padding: '2px 6px',
+                                background: isBlocked ? 'rgba(254, 242, 242, 0.88)' : 'rgba(240, 253, 244, 0.88)',
+                                padding: '2px 7px',
                                 borderRadius: '6px',
-                                border: `1px solid ${isBlocked ? '#fecaca' : '#bbf7d0'}`,
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                backdropFilter: 'blur(4px)',
-                                whiteSpace: 'nowrap'
+                                border: `1px solid ${isBlocked ? 'rgba(239, 68, 68, 0.3)' : 'rgba(52, 168, 83, 0.3)'}`,
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                                backdropFilter: 'blur(12px)',
+                                WebkitBackdropFilter: 'blur(12px)',
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '-0.01em'
                               }}>
-                                {isBlocked ? <Ban size={11} color="#dc2626" /> : <Star size={11} fill="#16a34a" color="#166534" />}
+                                {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} fill="#16a34a" color="#166534" />}
                                 <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
                               </div>
                             </div>
