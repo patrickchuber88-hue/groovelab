@@ -7292,7 +7292,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             onClose={() => setSelectedSlotsStudent(null)}
             onPreferencesSaved={() => {
               setSelectedSlotsStudent(null);
-              fetchStudentPreferences();
             }}
           />
         )}
