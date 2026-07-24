@@ -74,6 +74,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
   const [isEditing, setIsEditing] = useState(false);
   const [activeBrush, setActiveBrush] = useState<'wunsch' | 'gesperrt' | 'clear'>('wunsch');
   const [editedMatrix, setEditedMatrix] = useState<Record<string, 'wunsch' | 'moeglich' | 'gesperrt' | 'none'>>({});
+  const [rangeStart, setRangeStart] = useState<{ dayId: number; startTime: string } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -172,24 +173,85 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
     return editedMatrix[key] || 'none';
   };
 
+  const handleColumnHeaderClick = (dayId: number) => {
+    if (!isEditing) return;
+
+    // Check if all slots in this day column already have activeBrush status
+    const allMatchBrush = TIME_SLOTS.every(slot => {
+      const key = `${dayId}_${slot.start}`;
+      return (editedMatrix[key] || 'none') === (activeBrush === 'clear' ? 'none' : activeBrush);
+    });
+
+    const targetStatus = allMatchBrush ? 'none' : (activeBrush === 'clear' ? 'none' : activeBrush);
+    const dayName = DAYS_OF_WEEK.find(d => d.id === dayId)?.name || 'Tag';
+
+    setEditedMatrix(prev => {
+      const updated = { ...prev };
+      TIME_SLOTS.forEach(slot => {
+        const key = `${dayId}_${slot.start}`;
+        updated[key] = targetStatus;
+      });
+      return updated;
+    });
+
+    setRangeStart(null);
+    setToastMsg(targetStatus === 'none' 
+      ? `${dayName} zurückgesetzt (alle Slots frei)` 
+      : `${dayName} vollständig ${targetStatus === 'gesperrt' ? 'geblockt' : 'als Wunschzeit markiert'}! ⚡`
+    );
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
   const handleCellClick = (dayId: number, startTime: string) => {
     if (!isEditing) return;
     const key = `${dayId}_${startTime}`;
     const current = editedMatrix[key] || 'none';
 
-    let next: 'wunsch' | 'moeglich' | 'gesperrt' | 'none' = 'none';
+    let nextStatus: 'wunsch' | 'moeglich' | 'gesperrt' | 'none' = 'none';
     if (activeBrush === 'clear') {
-      next = 'none';
-    } else if (current === activeBrush) {
-      next = 'none';
+      nextStatus = 'none';
+    } else if (current === activeBrush && !rangeStart) {
+      nextStatus = 'none';
     } else {
-      next = activeBrush;
+      nextStatus = activeBrush;
     }
 
-    setEditedMatrix(prev => ({
-      ...prev,
-      [key]: next
-    }));
+    if (!rangeStart) {
+      // 1. First click: set range start marker
+      setRangeStart({ dayId, startTime });
+      setEditedMatrix(prev => ({
+        ...prev,
+        [key]: nextStatus
+      }));
+      setToastMsg(`Start-Slot (${startTime}) gewählt. Klicke auf den Ziel-Slot, um den Bereich auszufüllen.`);
+      setTimeout(() => setToastMsg(null), 4000);
+    } else {
+      // 2. Second click: fill range from rangeStart to current slot
+      const startDay = rangeStart.dayId;
+      const endDay = dayId;
+      const minDay = Math.min(startDay, endDay);
+      const maxDay = Math.max(startDay, endDay);
+
+      const startSlotIdx = TIME_SLOTS.findIndex(s => s.start === rangeStart.startTime);
+      const endSlotIdx = TIME_SLOTS.findIndex(s => s.start === startTime);
+      const minSlotIdx = Math.min(startSlotIdx, endSlotIdx);
+      const maxSlotIdx = Math.max(startSlotIdx, endSlotIdx);
+
+      setEditedMatrix(prev => {
+        const updated = { ...prev };
+        for (let d = minDay; d <= maxDay; d++) {
+          for (let s = minSlotIdx; s <= maxSlotIdx; s++) {
+            const slotKey = `${d}_${TIME_SLOTS[s].start}`;
+            updated[slotKey] = nextStatus;
+          }
+        }
+        return updated;
+      });
+
+      setRangeStart(null);
+      setToastMsg(`Bereich (${TIME_SLOTS[minSlotIdx].start} - ${TIME_SLOTS[maxSlotIdx].start}) ausgefüllt! ✨`);
+      setTimeout(() => setToastMsg(null), 3000);
+    }
   };
 
   const getValidStudentId = async (): Promise<string> => {
@@ -603,10 +665,29 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                   <Sliders size={13} />
                   <span>Werkzeug:</span>
                 </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  {rangeStart && (
+                    <button
+                      type="button"
+                      onClick={() => { setRangeStart(null); setToastMsg('Bereichsauswahl abgebrochen'); setTimeout(() => setToastMsg(null), 2000); }}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        background: '#f8fafc',
+                        color: '#64748b',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      title="Start-Marker zurücksetzen"
+                    >
+                      Reset Range
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setActiveBrush('wunsch')}
+                    onClick={() => { setActiveBrush('wunsch'); setRangeStart(null); }}
                     style={{
                       padding: '5px 10px',
                       borderRadius: '8px',
@@ -625,7 +706,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveBrush('gesperrt')}
+                    onClick={() => { setActiveBrush('gesperrt'); setRangeStart(null); }}
                     style={{
                       padding: '5px 10px',
                       borderRadius: '8px',
@@ -644,7 +725,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveBrush('clear')}
+                    onClick={() => { setActiveBrush('clear'); setRangeStart(null); }}
                     style={{
                       padding: '5px 10px',
                       borderRadius: '8px',
@@ -722,8 +803,27 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
               }}>
                 <div style={{ padding: '10px 4px', borderRight: '1px solid #e2e8f0', background: '#f8fafc' }}>Zeit</div>
                 {DAYS_OF_WEEK.map(day => (
-                  <div key={day.id} style={{ padding: '10px 4px', borderRight: day.id === 6 ? 'none' : '1px solid #e2e8f0', background: '#f8fafc' }}>
-                    {day.name}
+                  <div 
+                    key={day.id} 
+                    onClick={() => handleColumnHeaderClick(day.id)}
+                    style={{ 
+                      padding: '10px 4px', 
+                      borderRight: day.id === 6 ? 'none' : '1px solid #e2e8f0', 
+                      background: isEditing ? '#f1f5f9' : '#f8fafc',
+                      cursor: isEditing ? 'pointer' : 'default',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      transition: 'all 0.15s'
+                    }}
+                    className={isEditing ? 'hover-scale-mini' : ''}
+                    title={isEditing ? `Klick auf ${day.name}: Gesamte Spalte ${activeBrush === 'clear' ? 'leeren' : (activeBrush === 'gesperrt' ? 'blockieren' : 'als Wunschzeit setzen')}` : day.name}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                      <span>{day.name}</span>
+                      {isEditing && (
+                        <Sliders size={9} color="#64748b" />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -784,6 +884,8 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       icon = <Ban size={11} color="#dc2626" />;
                     }
 
+                    const isRangeStartMarker = rangeStart && rangeStart.dayId === day.id && rangeStart.startTime === slot.start;
+
                     return (
                       <div
                         key={day.id}
@@ -803,7 +905,10 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                           minHeight: '36px',
                           fontWeight: 700,
                           fontSize: '0.7rem',
-                          boxSizing: 'border-box'
+                          boxSizing: 'border-box',
+                          outline: isRangeStartMarker ? '2px solid #2563eb' : (border !== '1px solid transparent' ? border : 'none'),
+                          outlineOffset: '-2px',
+                          boxShadow: isRangeStartMarker ? '0 0 10px rgba(37, 99, 235, 0.4)' : 'none'
                         }}
                         className={isEditing ? 'hover-scale-mini' : ''}
                       >
