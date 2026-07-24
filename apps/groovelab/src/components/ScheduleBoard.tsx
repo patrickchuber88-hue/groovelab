@@ -4877,15 +4877,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     backdropFilter: 'blur(4px)',
                                     whiteSpace: 'nowrap'
                                   }}>
-                                    {isBlocked ? <Ban size={11} color="#dc2626" /> : <Star size={11} fill="#16a34a" color="#166534" />}
-                                    <span>
-                                      {isBlocked 
-                                        ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` 
-                                        : `⭐ Wunschzeit (${(() => {
-                                            const activeStud = students.find(s => s.id === (selectedStudentId || draggedStudentId));
-                                            return activeStud ? `${activeStud.first_name} ${maskLastName(activeStud.last_name || '', showRealNames)}` : '';
-                                          })()} • ${blockStartTimeStr} - ${blockEndTimeStr})`}
-                                    </span>
+                                    {isBlocked ? <Ban size={11} color="#dc2626" /> : null}
+                                    <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
                                   </div>
                                 </div>
                               );
@@ -5519,6 +5512,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
                               {hasConflict && (
                                 <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
+                              )}
+                              {isInsideWunsch && (
+                                <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
                               )}
                               {bs.assignedTime}
                             </span>
