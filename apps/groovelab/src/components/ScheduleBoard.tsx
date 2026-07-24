@@ -354,7 +354,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     startTime: string;
     duration: number;
   }
-  const [editingBreak, setEditingBreak] = useState<EditingBreakState | null>(null);
+  const [editingBreak, setEditingBreak] = useState<{ boardId: string; breakId: string; startTime?: string; duration: number } | null>(null);
+  const [showAutoScheduleReportModal, setShowAutoScheduleReportModal] = useState(false);
+  const [autoScheduleReportData, setAutoScheduleReportData] = useState<{
+    totalAssigned: number;
+    totalStudents: number;
+    totalGapsMin: number;
+    wunschHits: number;
+    siblingHits: number;
+    totalSiblings: number;
+    overallScore: number;
+  } | null>(null);
 
   // Submission tracking states
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
@@ -2543,6 +2553,69 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             type: 'success'
           });
         }
+
+        // Compute Post-Calculation Scorecard Report
+        let reportTotalAssigned = 0;
+        let reportTotalGaps = 0;
+        let reportWunschHits = 0;
+        let reportSiblingHits = 0;
+        let totalSiblingsCount = 0;
+
+        currentBoards.forEach(b => {
+          let prevEndMin = -1;
+          b.students.forEach(s => {
+            if (s.isBreak || !s.assignedTime) return;
+            reportTotalAssigned++;
+            const [sh, sm] = parseTime(s.assignedTime);
+            const sStart = sh * 60 + sm;
+            const sEnd = sStart + s.duration;
+
+            if (prevEndMin !== -1 && sStart > prevEndMin) {
+              reportTotalGaps += (sStart - prevEndMin);
+            }
+            prevEndMin = sEnd;
+
+            // Check Wunsch hit
+            const sWunschWindows = getMergedStudentWunschWindows(s.id, b.dayOfWeek);
+            for (const w of sWunschWindows) {
+              if (sStart >= w.startMin && sEnd <= w.endMin) {
+                reportWunschHits++;
+                break;
+              }
+            }
+
+            // Check Sibling
+            if (s.sibling_group_id) {
+              totalSiblingsCount++;
+              const siblingAssigned = b.students.find(other => other.id !== s.id && other.sibling_group_id === s.sibling_group_id && other.assignedTime);
+              if (siblingAssigned && siblingAssigned.assignedTime) {
+                const [osh, osm] = parseTime(siblingAssigned.assignedTime);
+                const oStart = osh * 60 + osm;
+                const oEnd = oStart + siblingAssigned.duration;
+                if (sStart === oEnd || sEnd === oStart) {
+                  reportSiblingHits++;
+                }
+              }
+            }
+          });
+        });
+
+        const totalStudentsCount = unassignedStudents.length;
+        const assignmentPct = totalStudentsCount > 0 ? (reportTotalAssigned / totalStudentsCount) * 50 : 50;
+        const wunschPct = reportTotalAssigned > 0 ? (reportWunschHits / reportTotalAssigned) * 35 : 35;
+        const gapBonus = reportTotalGaps === 0 ? 15 : Math.max(0, 15 - Math.floor(reportTotalGaps / 15) * 5);
+        const overallScore = Math.min(100, Math.round(assignmentPct + wunschPct + gapBonus));
+
+        setAutoScheduleReportData({
+          totalAssigned: reportTotalAssigned,
+          totalStudents: totalStudentsCount,
+          totalGapsMin: reportTotalGaps,
+          wunschHits: reportWunschHits,
+          siblingHits: Math.floor(reportSiblingHits / 2),
+          totalSiblings: Math.floor(totalSiblingsCount / 2),
+          overallScore
+        });
+        setShowAutoScheduleReportModal(true);
       } else {
         setToast({
           message: "Keine Schüler konnten automatisch zugeteilt werden (Sperrzeit-Konflikte oder mangelnde Unterrichtszeit-Kapazitäten).",
@@ -7190,6 +7263,190 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     Pause Speichern
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Apple Glass Auto-Schedule Report Scorecard Modal */}
+        {showAutoScheduleReportModal && autoScheduleReportData && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.25s ease-out'
+          }}>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.92)',
+              borderRadius: '24px',
+              padding: '32px',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: '0 30px 80px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              position: 'relative'
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                    border: '1.5px solid #86efac',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#15803d',
+                    boxShadow: '0 8px 16px rgba(34, 197, 94, 0.15)'
+                  }}>
+                    <Sparkles size={24} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
+                      Stundenplan-Analyse
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '2px 0 0 0', fontWeight: 600 }}>
+                      Automatische Zuteilung erfolgreich berechnet!
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAutoScheduleReportModal(false)}
+                  style={{
+                    background: '#f3f4f6',
+                    border: 'none',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#6b7280',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Overall Score Badge */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                border: '1.5px solid #86efac',
+                borderRadius: '18px',
+                padding: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Gesamt-Qualität
+                  </div>
+                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.03em', marginTop: '2px' }}>
+                    {autoScheduleReportData.overallScore} <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>/ 100 Punkte</span>
+                  </div>
+                </div>
+                <div style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: '#ffffff',
+                  color: '#15803d',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  boxShadow: '0 4px 12px rgba(22, 101, 52, 0.08)'
+                }}>
+                  {autoScheduleReportData.overallScore >= 90 ? '✨ Exzellent' : '👍 Sehr gut'}
+                </div>
+              </div>
+
+              {/* Metrics Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#15803d', fontSize: '0.76rem', fontWeight: 800 }}>
+                    <CheckCircle size={13} color="#22c55e" /> Einteilungsquote
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                    {Math.round((autoScheduleReportData.totalAssigned / Math.max(1, autoScheduleReportData.totalStudents)) * 100)} %
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    {autoScheduleReportData.totalAssigned} von {autoScheduleReportData.totalStudents} Schülern eingeteilt
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0284c7', fontSize: '0.76rem', fontWeight: 800 }}>
+                    <Zap size={13} color="#0ea5e9" /> Lückenlosigkeit
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                    {autoScheduleReportData.totalGapsMin === 0 ? '0 Min Lücken' : `${autoScheduleReportData.totalGapsMin} Min Lücken`}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    {autoScheduleReportData.totalGapsMin === 0 ? '100% Kompakter Tagesplan' : 'Geringer Leerlauf'}
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '0.76rem', fontWeight: 800 }}>
+                    <Star size={13} fill="#22c55e" color="#16a34a" /> Wunschzeiten
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                    {autoScheduleReportData.wunschHits} / {autoScheduleReportData.totalAssigned}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Wunschfenster voll erfüllt
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#7c3aed', fontSize: '0.76rem', fontWeight: 800 }}>
+                    <Users size={13} color="#8b5cf6" /> Geschwister
+                  </div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                    {autoScheduleReportData.totalSiblings > 0 ? `${autoScheduleReportData.siblingHits} / ${autoScheduleReportData.totalSiblings} Paare` : 'Keine Paare'}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Direkt hintereinander
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAutoScheduleReportModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 6px 20px rgba(22, 163, 74, 0.25)',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <Sparkles size={16} /> Plan übernehmen
+                </button>
               </div>
             </div>
           </div>
