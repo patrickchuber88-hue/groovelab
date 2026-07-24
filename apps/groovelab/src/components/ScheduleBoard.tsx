@@ -2394,11 +2394,60 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             assignedTime
           };
         } else if (s.customStartTime) {
-          // Respect Sperrzeit jump
+          // Respect Sperrzeit jump, but check if preceding students can be shifted forward to close gap > 15 min!
           const [csh, csm] = parseTime(s.customStartTime);
-          if (csh * 60 + csm > candidateStartMin) {
+          const targetTimeMin = csh * 60 + csm;
+          const [curH, curM] = parseTime(currentTime);
+
+          if (targetTimeMin - (curH * 60 + curM) > 15) {
+            // Gap > 15 min detected! Attempt to shift preceding students forward to close gap
+            let precDuration = 0;
+            const precIndices: number[] = [];
+            for (let i = 0; i < compactedStudents.length; i++) {
+              if (!compactedStudents[i].isBreak) {
+                precDuration += compactedStudents[i].duration;
+                precIndices.push(i);
+              }
+            }
+
+            const proposedStartMin = targetTimeMin - precDuration;
+            const [bStartH, bStartM] = parseTime(b.startAnchor);
+            const boardStartMin = bStartH * 60 + bStartM;
+
+            if (proposedStartMin >= boardStartMin) {
+              let canShiftAll = true;
+              let shiftTime = proposedStartMin;
+              for (const idx of precIndices) {
+                const pStud = compactedStudents[idx];
+                if (isSlotBlockedForStudent(pStud.id, b.dayOfWeek, shiftTime, shiftTime + pStud.duration)) {
+                  canShiftAll = false;
+                  break;
+                }
+                shiftTime += pStud.duration;
+              }
+
+              if (canShiftAll) {
+                let applyTime = proposedStartMin;
+                for (const idx of precIndices) {
+                  const timeStr = `${String(Math.floor(applyTime / 60)).padStart(2, '0')}:${String(applyTime % 60).padStart(2, '0')}`;
+                  compactedStudents[idx] = {
+                    ...compactedStudents[idx],
+                    assignedTime: timeStr
+                  };
+                  newlyAssignedStudentIds[compactedStudents[idx].id] = { day: b.dayOfWeek, time: timeStr };
+                  applyTime += compactedStudents[idx].duration;
+                }
+                currentTime = `${String(Math.floor(targetTimeMin / 60)).padStart(2, '0')}:${String(targetTimeMin % 60).padStart(2, '0')}`;
+              } else if (csh * 60 + csm > curH * 60 + curM) {
+                currentTime = s.customStartTime;
+              }
+            } else if (csh * 60 + csm > curH * 60 + curM) {
+              currentTime = s.customStartTime;
+            }
+          } else if (csh * 60 + csm > curH * 60 + curM) {
             currentTime = s.customStartTime;
           }
+
           const assignedTime = currentTime;
           currentTime = addMinutesToTime(currentTime, s.duration);
           newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
