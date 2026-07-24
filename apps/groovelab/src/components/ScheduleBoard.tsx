@@ -22,7 +22,8 @@ import {
   Eye,
   EyeOff,
   Ban,
-  Star
+  Star,
+  Zap
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
@@ -1870,7 +1871,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const precomputedWunschMap = new Map<string, Array<{ startMin: number; endMin: number }>>();
       const precomputedBlockedMap = new Map<string, Array<{ startMin: number; endMin: number }>>();
 
-      allStudents.forEach(stud => {
+      unassignedStudents.forEach((stud: Student) => {
         const sPrefs = prefsByStudentId[stud.id] || [];
         [1, 2, 3, 4, 5, 6].forEach(dayNum => {
           const key = `${stud.id}_${dayNum}`;
@@ -4463,7 +4464,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     marginLeft: '8px'
                   }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <CheckCircle2 size={13} color="#34a853" />
+                      <CheckCircle size={13} color="#34a853" />
                       <span>{boards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak).length, 0)} Schüler eingeteilt</span>
                     </span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
