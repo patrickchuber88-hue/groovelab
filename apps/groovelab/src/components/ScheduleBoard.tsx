@@ -5715,46 +5715,48 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBg = hasConflict
                           ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
                           : (isInsideWunsch
-                              ? cardPrimaryColor
-                              : (isSelected 
-                                  ? cardLightBg
-                                  : (isSubmitted 
-                                      ? 'rgba(230, 244, 234, 0.5)' 
-                                      : cardLightBg)));
+                              ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                              : '#ffffff');
 
                         const cardBorder = hasConflict
                           ? '1.5px solid #ef4444'
                           : (isInsideWunsch
-                              ? `1px solid ${cardPrimaryColor}`
+                              ? '1px solid #1e7e34'
                               : (isSelected 
                                   ? `1.5px solid ${cardPrimaryColor}`
-                                  : `1px solid ${cardBorderColor}`));
+                                  : '1px solid rgba(0, 0, 0, 0.08)'));
 
                         const cardBorderLeft = hasConflict
                           ? '4px solid #dc2626'
                           : (isInsideWunsch
-                              ? `4px solid ${cardPrimaryColor}`
+                              ? '4px solid #f59e0b'
                               : `4px solid ${cardPrimaryColor}`);
 
                         const textColor = hasConflict
                           ? '#991b1b'
                           : (isInsideWunsch
                               ? '#ffffff'
-                              : (isSelected 
-                                  ? cardTextColor
-                                  : cardLightText));
+                              : '#1d1d1f');
 
                         const badgeBg = hasConflict
                           ? 'rgba(239, 68, 68, 0.1)'
                           : (isInsideWunsch
-                              ? 'rgba(255, 255, 255, 0.2)'
-                              : 'rgba(255, 255, 255, 0.45)');
+                              ? 'rgba(255, 255, 255, 0.25)'
+                              : 'rgba(0, 0, 0, 0.05)');
 
                         const badgeColor = hasConflict
                           ? '#ef4444'
                           : (isInsideWunsch
                               ? '#ffffff'
-                              : cardTextColor);
+                              : '#6e6e73');
+
+                        const cardShadow = hasConflict
+                          ? '0 2px 8px rgba(239, 68, 68, 0.15)'
+                          : (isInsideWunsch
+                              ? '0 4px 12px rgba(52, 168, 83, 0.25)'
+                              : (isSelected
+                                  ? '0 4px 14px rgba(0, 0, 0, 0.08)'
+                                  : '0 2px 8px rgba(0, 0, 0, 0.04)'));
 
                         const shadowColor = isSubmitted 
                           ? 'rgba(0,0,0,0.02)' 
