@@ -918,6 +918,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const loadedStudents: Student[] = Array.from(studentMap.values());
       
+      const prefSubmittedSet = new Set<string>();
+      const prefMap: Record<string, any[]> = {};
+
       const { data: allDbPrefs } = await supabase
         .from('student_schedule_preferences')
         .select('*');
