@@ -23,7 +23,8 @@ import {
   EyeOff,
   Ban,
   Star,
-  Zap
+  Zap,
+  Pin
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
@@ -6441,7 +6442,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                         const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: undefined } : s);
                                         return recalculateBoardTimes({ ...b, students: nextStudents });
                                       }));
-                                      setToast({ message: 'Fixierung aufgehoben – Termin wieder flexibel!', type: 'info' });
+                                      setToast({ message: 'Fixierung aufgehoben – Termin wieder flexibel!', type: 'warning' });
                                     }}
                                     style={{
                                       background: 'transparent',
