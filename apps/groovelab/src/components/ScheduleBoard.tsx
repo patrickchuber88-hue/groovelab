@@ -5950,7 +5950,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
                                 {isInsideWunsch && (
-                                  <Star size={11} color="currentColor" title="Wunschtermin garantiert getroffen!" />
+                                  <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                    <Star size={11} color="currentColor" />
+                                  </span>
                                 )}
                                 {bs.assignedTime}
                               </span>
