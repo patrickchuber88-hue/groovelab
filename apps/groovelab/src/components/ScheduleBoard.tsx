@@ -2514,6 +2514,71 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       };
     });
 
+    // PASS 5: 2-OPT PAIRWISE SWAP OPTIMIZER (Local Search for Wunschzeit Maximization)
+    // Sweeps all assigned student pairs on each board to test if swapping their assigned times improves total Wunschzeit satisfaction!
+    currentBoards = currentBoards.map(b => {
+      let bStudents = [...b.students];
+      let improved = true;
+      let passes = 0;
+
+      while (improved && passes < 5) {
+        improved = false;
+        passes++;
+
+        for (let i = 0; i < bStudents.length; i++) {
+          const sA = bStudents[i];
+          if (sA.isBreak || !sA.assignedTime) continue;
+
+          for (let j = i + 1; j < bStudents.length; j++) {
+            const sB = bStudents[j];
+            if (sB.isBreak || !sB.assignedTime) continue;
+            if (sA.duration !== sB.duration) continue; // Swap same-duration cards seamlessly
+
+            const [shA, smA] = parseTime(sA.assignedTime);
+            const startMinA = shA * 60 + smA;
+            const endMinA = startMinA + sA.duration;
+
+            const [shB, smB] = parseTime(sB.assignedTime);
+            const startMinB = shB * 60 + smB;
+            const endMinB = startMinB + sB.duration;
+
+            // Check if sA in B's slot violates sA's Sperrzeit
+            if (isSlotBlockedForStudent(sA.id, b.dayOfWeek, startMinB, endMinB)) continue;
+            // Check if sB in A's slot violates sB's Sperrzeit
+            if (isSlotBlockedForStudent(sB.id, b.dayOfWeek, startMinA, endMinA)) continue;
+
+            // Calculate current Wunschzeit score for sA & sB
+            const currentScoreA = calculateWunschBonus(sA.id, b.dayOfWeek, startMinA, endMinA);
+            const currentScoreB = calculateWunschBonus(sB.id, b.dayOfWeek, startMinB, endMinB);
+            const currentTotal = currentScoreA + currentScoreB;
+
+            // Calculate swapped Wunschzeit score for sA in B's slot & sB in A's slot
+            const swappedScoreA = calculateWunschBonus(sA.id, b.dayOfWeek, startMinB, endMinB);
+            const swappedScoreB = calculateWunschBonus(sB.id, b.dayOfWeek, startMinA, endMinA);
+            const swappedTotal = swappedScoreA + swappedScoreB;
+
+            if (swappedTotal > currentTotal) {
+              // Swap APPROVED! Perform 2-Opt Swap
+              const timeA = sA.assignedTime;
+              const timeB = sB.assignedTime;
+
+              bStudents[i] = { ...sA, assignedTime: timeB, customStartTime: timeB };
+              bStudents[j] = { ...sB, assignedTime: timeA, customStartTime: timeA };
+
+              newlyAssignedStudentIds[sA.id] = { day: b.dayOfWeek, time: timeB };
+              newlyAssignedStudentIds[sB.id] = { day: b.dayOfWeek, time: timeA };
+
+              improved = true;
+              break;
+            }
+          }
+          if (improved) break;
+        }
+      }
+
+      return recalculateBoardTimes({ ...b, students: bStudents });
+    });
+
     // Track unassignable student IDs
     const failedIds = unassignedStudents
       .filter(s => !newlyAssignedStudentIds[s.id])
