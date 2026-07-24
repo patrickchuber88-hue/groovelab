@@ -5915,7 +5915,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 justifyContent: 'space-between', gap: '4px',
                                 zIndex: selectedStudentId !== null ? 1 : 2,
                                 visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
-                                opacity: draggedStudentId === bs.id ? 0 : (selectedStudentId !== null ? 0.8 : 1),
+                                opacity: draggedStudentId === bs.id ? 0 : (selectedStudentId !== null ? 0.35 : 1),
                                 filter: 'none',
                                 pointerEvents: 'auto',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -6386,21 +6386,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
-                              zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
+                              zIndex: selectedStudentId !== null ? (isSelected ? 10 : 2) : 2,
                               userSelect: 'none',
                               WebkitUserSelect: 'none',
                               WebkitTouchCallout: 'none',
                               touchAction: 'none',
                               visibility: draggedStudentId === bs.id ? 'hidden' : 'visible',
                               opacity: draggedStudentId === bs.id ? 0 : ((selectedStudentId !== null || draggedStudentId !== null)
-                                ? ((selectedStudentId === bs.id) ? 1 : 0.6)
+                                ? ((selectedStudentId === bs.id) ? 1 : 0.22)
                                 : 1),
-                              filter: 'none',
+                              filter: (selectedStudentId !== null && !isSelected) ? 'grayscale(35%)' : 'none',
                               pointerEvents: 'auto',
-                              transform: isSelected ? 'scale(1.02)' : 'none',
+                              transform: isSelected ? 'scale(1.025)' : 'none',
                               overflow: 'hidden',
-                              boxShadow: finalShadow,
-                              transition: 'opacity 0.15s ease',
+                              boxShadow: isSelected ? '0 0 0 3px #16a34a, 0 8px 24px rgba(22, 163, 74, 0.28)' : finalShadow,
+                              transition: 'all 0.15s ease',
                             }}
                             onMouseOver={e => {
                               if (!isSelected) {
