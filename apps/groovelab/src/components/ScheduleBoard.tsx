@@ -828,25 +828,26 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // 2. Fetch student IDs and statuses assigned to this teacher from students table
       const { data: allStudentsDb } = await supabase
         .from('students')
-        .select('id, status, teacher_id')
+        .select('*')
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
       const statusMap: Record<string, string> = {};
-      const stDbStudentIds: string[] = [];
+      const stDbStudentIds = new Set<string>();
       allStudentsDb?.forEach(st => {
+        if (st.id) stDbStudentIds.add(st.id);
+        if ((st as any).user_id) stDbStudentIds.add((st as any).user_id);
+        if ((st as any).student_id) stDbStudentIds.add((st as any).student_id);
         statusMap[st.id] = st.status;
-        if (st.id) stDbStudentIds.push(st.id);
+        if ((st as any).user_id) statusMap[(st as any).user_id] = st.status;
       });
 
-      // Fetch students from users table assigned to this teacher (or linked via students table)
+      // Fetch students from users table
       const { data: allSchoolStudentUsers } = await supabase
         .from('users')
         .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
         .eq('school_id', schoolId)
         .eq('role', 'student');
-
-      const sData = (allSchoolStudentUsers || []).filter(u => stDbStudentIds.length === 0 || stDbStudentIds.includes(u.id));
 
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
@@ -855,42 +856,67 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
-      // Collect all student IDs to check student_schedule_preferences
-      const rawAllStudentIds = Array.from(new Set([
-        ...(allStudentsDb || []).map(s => s.id),
-        ...(sData || []).map(s => s.id),
-        ...(pendingData || []).map((s: any) => s.id)
-      ]));
+      const studentMap = new Map<string, Student>();
 
-      const prefSubmittedSet = new Set<string>();
-      const prefMap: Record<string, any[]> = {};
+      // A) Add all students from allStudentsDb if they have valid names
+      allStudentsDb?.forEach(s => {
+        const fname = resolveFirstName(s);
+        const lname = resolveLastName(s);
+        if (fname && fname !== 'Schüler') {
+          studentMap.set(s.id, {
+            id: s.id,
+            first_name: fname,
+            last_name: lname,
+            instrument: s.instrument || 'Musiker',
+            duration: s.lesson_duration || 30,
+            status: (s.status || 'verplant') as any,
+            sibling_group_id: s.sibling_group_id,
+            group_id: s.group_id,
+            isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || s.status === 'aktiv'),
+            hasPreferences: false
+          });
+        }
+      });
 
-      const loadedStudents: Student[] = [
-        ...(sData || []).map(s => ({
-          id: s.id,
-          first_name: resolveFirstName(s),
-          last_name: resolveLastName(s),
-          instrument: s.instrument || 'Musiker',
-          duration: s.lesson_duration || 30,
-          status: (statusMap[s.id] || 'verplant') as any,
-          sibling_group_id: s.sibling_group_id,
-          group_id: s.group_id,
-          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
-          hasPreferences: false
-        })),
-        ...(pendingData || []).map((s: any) => ({
-          id: s.id,
-          first_name: resolveFirstName(s),
-          last_name: resolveLastName(s),
-          instrument: s.instrument || 'Musiker',
-          duration: s.lesson_duration || 30,
-          status: 'ausstehend' as const,
-          sibling_group_id: s.sibling_group_id,
-          group_id: s.group_id || null,
-          isOnboarded: false,
-          hasPreferences: false
-        }))
-      ];
+      // B) Add all matching users table students
+      (allSchoolStudentUsers || []).forEach(s => {
+        if (stDbStudentIds.size === 0 || stDbStudentIds.has(s.id)) {
+          const fname = resolveFirstName(s);
+          const lname = resolveLastName(s);
+          studentMap.set(s.id, {
+            id: s.id,
+            first_name: fname,
+            last_name: lname,
+            instrument: s.instrument || 'Musiker',
+            duration: s.lesson_duration || 30,
+            status: (statusMap[s.id] || 'verplant') as any,
+            sibling_group_id: s.sibling_group_id,
+            group_id: s.group_id,
+            isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
+            hasPreferences: false
+          });
+        }
+      });
+
+      // C) Add pending students
+      (pendingData || []).forEach((s: any) => {
+        if (!studentMap.has(s.id)) {
+          studentMap.set(s.id, {
+            id: s.id,
+            first_name: resolveFirstName(s),
+            last_name: resolveLastName(s),
+            instrument: s.instrument || 'Musiker',
+            duration: s.lesson_duration || 30,
+            status: 'ausstehend',
+            sibling_group_id: s.sibling_group_id,
+            group_id: s.group_id || null,
+            isOnboarded: false,
+            hasPreferences: false
+          });
+        }
+      });
+
+      const loadedStudents: Student[] = Array.from(studentMap.values());
       
       const { data: allDbPrefs } = await supabase
         .from('student_schedule_preferences')
