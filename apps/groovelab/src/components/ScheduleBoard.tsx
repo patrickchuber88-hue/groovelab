@@ -6161,9 +6161,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     <div
                       key={s.id}
                       draggable={true}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => {
+                        (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
+                      }}
+                      onMouseUp={(e) => {
+                        (e.currentTarget as HTMLElement).style.cursor = 'grab';
+                      }}
                       onDragStart={(e) => handleDragStart(s.id, 'sidebar', undefined, e)}
                       onDragEnd={handleDragEnd}
-                      onClick={() => handleSelectStudent(s.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!draggedStudentId) {
+                          handleSelectStudent(s.id);
+                        }
+                      }}
                       className={isShaking ? 'card-shake' : ''}
                       style={{ 
                         background: s.hasPreferences
@@ -6192,24 +6204,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         transition: 'all 0.25s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f', display: 'block', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px', pointerEvents: 'none' }}>
                           {(s.first_name || (s as any).name || (s as any).full_name || 'Schüler').trim()} {maskLastName(s.last_name || '', showRealNames)}
                         </span>
                         {failedStudentIds.includes(s.id) ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
                             <Ban size={9} color="#dc2626" />
                             <span>Sperrzeit-Konflikt</span>
                           </span>
                         ) : s.hasPreferences ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
                             <Star size={9} fill="#16a34a" color="#166534" />
                             <span>Zeiten da</span>
                           </span>
                         ) : s.status === 'ausstehend' ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em' }} title="Noch keine Wunsch- & Sperrzeiten eingereicht (Stundenplan-Onboarding ausstehend)">Ausstehend</span>
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', pointerEvents: 'none' }} title="Noch keine Wunsch- & Sperrzeiten eingereicht (Stundenplan-Onboarding ausstehend)">Ausstehend</span>
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }} title="Stundenplan-Onboarding abgeschlossen">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Stundenplan-Onboarding abgeschlossen">
                             <span style={{
                               height: '7px',
                               width: '7px',
@@ -6222,13 +6234,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#86868b' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#86868b', pointerEvents: 'none' }}>
                           {s.duration} Min • {resolveInstrument(s.instrument)}
                         </span>
 
                         {isAssigned && (
-                          <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#34a853', background: 'rgba(230, 244, 234, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>
+                          <span style={{ fontSize: '0.58rem', fontWeight: 600, color: '#34a853', background: 'rgba(230, 244, 234, 0.6)', padding: '1px 4px', borderRadius: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em', pointerEvents: 'none' }} title={`${assignedDayLabel} um ${s.assignedTime}`}>
                             {assignedDayLabel} {s.assignedTime}
                           </span>
                         )}
