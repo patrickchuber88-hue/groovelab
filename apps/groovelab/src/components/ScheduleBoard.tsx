@@ -2397,7 +2397,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       });
 
       let currentTime = b.startAnchor;
-      const compactedStudents = sortedStudents.map(s => {
+      const compactedStudents: any[] = [];
+
+      for (const s of sortedStudents) {
         if (s.isBreak) {
           if (s.customStartTime || s.assignedTime) {
             const [curH, curM] = parseTime(currentTime);
@@ -2409,7 +2411,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           }
           const assignedTime = currentTime;
           currentTime = addMinutesToTime(currentTime, s.duration);
-          return { ...s, assignedTime };
+          compactedStudents.push({ ...s, assignedTime });
+          continue;
         }
 
         const [curH, curM] = parseTime(currentTime);
@@ -2424,17 +2427,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const assignedTime = currentTime;
           currentTime = addMinutesToTime(currentTime, s.duration);
           newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
-          return {
+          compactedStudents.push({
             ...s,
             customStartTime: undefined,
             assignedDay: b.dayOfWeek,
             assignedTime
-          };
+          });
         } else if (s.customStartTime) {
-          // Respect Sperrzeit jump, but check if preceding students can be shifted forward to close gap > 15 min!
+          // Respect Sperrzeit jump, but check if preceding students can be shifted forward to close gap > 0 min!
           const [csh, csm] = parseTime(s.customStartTime);
           const targetTimeMin = csh * 60 + csm;
-          const [curH, curM] = parseTime(currentTime);
 
           if (targetTimeMin - (curH * 60 + curM) > 0) {
             // Gap detected! Attempt to shift preceding students forward to close gap to 0 minutes
@@ -2488,22 +2490,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const assignedTime = currentTime;
           currentTime = addMinutesToTime(currentTime, s.duration);
           newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
-          return {
+          compactedStudents.push({
             ...s,
             assignedDay: b.dayOfWeek,
             assignedTime
-          };
+          });
         } else {
           const assignedTime = currentTime;
           currentTime = addMinutesToTime(currentTime, s.duration);
           newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
-          return {
+          compactedStudents.push({
             ...s,
             assignedDay: b.dayOfWeek,
             assignedTime
-          };
+          });
         }
-      });
+      }
 
       return {
         ...b,
