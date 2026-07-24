@@ -7486,7 +7486,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               </button>
             </div>
           </div>
-          </div>
         )}
 
             {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
