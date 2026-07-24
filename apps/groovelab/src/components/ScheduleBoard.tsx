@@ -5103,7 +5103,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.72rem', fontWeight: 800, color: gText, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   {isWunsch && (
-                                    <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }}>⭐</span>
+                                    <Star size={11} color="currentColor" />
                                   )}
                                   {dragSnapState.timeStr}
                                 </span>
@@ -5221,7 +5221,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     whiteSpace: 'nowrap',
                                     letterSpacing: '-0.01em'
                                   }}>
-                                    {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} fill="#16a34a" color="#166534" />}
+                                    {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} color="currentColor" />}
                                     <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
                                   </div>
                                 </div>
@@ -5276,7 +5276,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 whiteSpace: 'nowrap',
                                 letterSpacing: '-0.01em'
                               }}>
-                                {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} fill="#16a34a" color="#166534" />}
+                                {isBlocked ? <Ban size={10} color="#dc2626" /> : <Star size={10} color="currentColor" />}
                                 <span>{isBlocked ? `Sperrzeit (${blockStartTimeStr} - ${blockEndTimeStr})` : `Wunschzeit (${blockStartTimeStr} - ${blockEndTimeStr})`}</span>
                               </div>
                             </div>
@@ -5950,7 +5950,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
                                 {isInsideWunsch && (
-                                  <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }} title="Wunschtermin garantiert getroffen!">⭐</span>
+                                  <Star size={11} color="currentColor" title="Wunschtermin garantiert getroffen!" />
                                 )}
                                 {bs.assignedTime}
                               </span>
@@ -6230,7 +6230,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           </span>
                         ) : s.hasPreferences ? (
                           <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
-                            <Star size={9} fill="#16a34a" color="#166534" />
+                            <Star size={9} color="currentColor" />
                             <span>Zeiten da</span>
                           </span>
                         ) : null}
