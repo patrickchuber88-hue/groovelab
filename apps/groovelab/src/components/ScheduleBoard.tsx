@@ -4642,7 +4642,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </div>
                 {boards.some(b => b.students.some(s => !s.isBreak && s.assignedTime)) && (() => {
                   const { totalGapsMin, gapCount, totalAssigned } = calculateLiveBoardGaps(boards);
-                  const unassignedCount = unassignedStudents.length;
+                  const unassignedCount = students.filter(s => !s.isBreak && !s.assignedTime).length;
                   const totalStudentsCount = unassignedCount + totalAssigned;
                   return (
                     <button
