@@ -840,19 +840,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       });
 
       // Fetch students from users table assigned to this teacher (or linked via students table)
-      let userQuery = supabase
+      const { data: allSchoolStudentUsers } = await supabase
         .from('users')
         .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
         .eq('school_id', schoolId)
         .eq('role', 'student');
 
-      if (stDbStudentIds.length > 0) {
-        userQuery = userQuery.or(`teacher_id.eq.${selectedTeacherId},id.in.(${stDbStudentIds.join(',')})`);
-      } else {
-        userQuery = userQuery.eq('teacher_id', selectedTeacherId);
-      }
-
-      const { data: sData } = await userQuery;
+      const sData = (allSchoolStudentUsers || []).filter(u => stDbStudentIds.length === 0 || stDbStudentIds.includes(u.id));
 
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
