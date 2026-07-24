@@ -4995,81 +4995,140 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       })()}
 
                       {/* Cubase Ghost Event Preview Frame & Magnetic Snap Line */}
-                      {dragSnapState && dragSnapState.boardId === board.id && (
-                        <>
-                          {/* Cubase Ghost Event Frame */}
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: '4px',
-                              right: '4px',
-                              top: `${Math.max(dragSnapState.topPx, 0)}px`,
-                              height: `${dragSnapState.duration * PX_PER_MIN}px`,
-                              background: 'rgba(52, 168, 83, 0.12)',
-                              border: '2px dashed #34a853',
-                              borderRadius: '8px',
-                              zIndex: 98,
-                              pointerEvents: 'none',
-                              boxSizing: 'border-box',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              padding: '4px 8px',
-                              backdropFilter: 'blur(2px)',
-                              transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1b4332', fontFamily: 'Urbanist, sans-serif' }}>
-                                🧲 {dragSnapState.studentName || 'Termin'}
-                              </span>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#2d6a4f', background: 'rgba(255,255,255,0.85)', padding: '1px 6px', borderRadius: '4px' }}>
-                                {dragSnapState.duration} Min.
-                              </span>
-                            </div>
-                          </div>
+                      {dragSnapState && dragSnapState.boardId === board.id && (() => {
+                        // Evaluate preference matching for dragged student on this day/time slot
+                        const activeDragStudent = students.find(s => s.id === draggedStudentId) || boards.flatMap(b => b.students).find(s => s.id === draggedStudentId);
+                        let isWunsch = false;
+                        let isBlocked = false;
 
-                          {/* Top Snap Line with Badge */}
-                          <div 
-                            style={{ 
-                              position: 'absolute', 
-                              left: 0, 
-                              right: 0, 
-                              top: `${Math.max(dragSnapState.topPx, 0)}px`, 
-                              height: '2px', 
-                              background: '#34a853', 
-                              boxShadow: '0 0 12px rgba(52, 168, 83, 0.9), 0 0 4px rgba(52, 168, 83, 1)', 
-                              zIndex: 99, 
-                              pointerEvents: 'none',
-                              transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
-                            }}
-                          >
+                        if (activeDragStudent && activeDragStudent.preferences && activeDragStudent.preferences.length > 0) {
+                          const [sh, sm] = parseTime(dragSnapState.timeStr);
+                          const startMin = sh * 60 + sm;
+                          const endMin = startMin + dragSnapState.duration;
+
+                          for (const pref of activeDragStudent.preferences) {
+                            if (pref.day_of_week === board.dayOfWeek) {
+                              const [psh, psm] = parseTime(pref.start_time);
+                              const [peh, pem] = parseTime(pref.end_time);
+                              const pStart = psh * 60 + psm;
+                              const pEnd = peh * 60 + pem;
+
+                              // Check overlap
+                              if (startMin < pEnd && endMin > pStart) {
+                                if (pref.preference_type === 'gesperrt') {
+                                  isBlocked = true;
+                                } else if (pref.preference_type === 'wunsch') {
+                                  isWunsch = true;
+                                }
+                              }
+                            }
+                          }
+                        }
+
+                        // Determine solid full-color theme
+                        let bgStyle = 'linear-gradient(135deg, #334155 0%, #1e293b 100%)';
+                        let borderStyle = '2px solid #94a3b8';
+                        let shadowStyle = '0 8px 24px rgba(30, 41, 59, 0.45)';
+                        let badgeText = '📌 FREIER SLOT';
+                        let badgeBg = 'rgba(255, 255, 255, 0.2)';
+                        let lineColor = '#94a3b8';
+
+                        if (isBlocked) {
+                          bgStyle = 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
+                          borderStyle = '2px solid #fca5a5';
+                          shadowStyle = '0 8px 24px rgba(220, 38, 38, 0.45)';
+                          badgeText = '🛑 SPERRZEIT (VERBOTEN)';
+                          badgeBg = 'rgba(255, 255, 255, 0.25)';
+                          lineColor = '#ef4444';
+                        } else if (isWunsch) {
+                          bgStyle = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
+                          borderStyle = '2px solid #f59e0b';
+                          shadowStyle = '0 8px 24px rgba(22, 163, 74, 0.45), 0 0 16px rgba(245, 158, 11, 0.6)';
+                          badgeText = '⭐ WUNSCHZEIT!';
+                          badgeBg = 'rgba(245, 158, 11, 0.3)';
+                          lineColor = '#f59e0b';
+                        }
+
+                        return (
+                          <>
+                            {/* Cubase Ghost Event Frame (100% Full-Size, Solid Full-Color) */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '4px',
+                                right: '4px',
+                                top: `${Math.max(dragSnapState.topPx, 0)}px`,
+                                height: `${dragSnapState.duration * PX_PER_MIN}px`,
+                                background: bgStyle,
+                                border: borderStyle,
+                                borderRadius: '8px',
+                                zIndex: 98,
+                                pointerEvents: 'none',
+                                boxSizing: 'border-box',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                padding: '5px 8px',
+                                transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
+                                boxShadow: shadowStyle,
+                                color: '#ffffff'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff', fontFamily: 'Urbanist, sans-serif', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                                  🧲 {dragSnapState.studentName || 'Termin'}
+                                </span>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ffffff', background: badgeBg, padding: '2px 6px', borderRadius: '4px', backdropFilter: 'blur(4px)' }}>
+                                  {dragSnapState.duration} Min.
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
+                                <span>{badgeText}</span>
+                                <span>{dragSnapState.timeStr} Uhr</span>
+                              </div>
+                            </div>
+
+                            {/* Top Snap Line with Badge */}
                             <div 
                               style={{ 
                                 position: 'absolute', 
-                                right: '8px', 
-                                top: '-12px', 
-                                background: 'linear-gradient(135deg, #34a853 0%, #1e7e34 100%)', 
-                                color: '#ffffff', 
-                                fontSize: '0.68rem', 
-                                fontWeight: 800, 
-                                padding: '2px 8px', 
-                                borderRadius: '6px', 
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontFamily: 'Urbanist, sans-serif',
-                                letterSpacing: '0.02em'
+                                left: 0, 
+                                right: 0, 
+                                top: `${Math.max(dragSnapState.topPx, 0)}px`, 
+                                height: '2px', 
+                                background: lineColor, 
+                                boxShadow: `0 0 12px ${lineColor}, 0 0 4px ${lineColor}`, 
+                                zIndex: 99, 
+                                pointerEvents: 'none',
+                                transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
                               }}
                             >
-                              <span>🧲</span>
-                              <span>{dragSnapState.timeStr} Uhr</span>
+                              <div 
+                                style={{ 
+                                  position: 'absolute', 
+                                  right: '8px', 
+                                  top: '-12px', 
+                                  background: lineColor, 
+                                  color: '#ffffff', 
+                                  fontSize: '0.68rem', 
+                                  fontWeight: 800, 
+                                  padding: '2px 8px', 
+                                  borderRadius: '6px', 
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontFamily: 'Urbanist, sans-serif',
+                                  letterSpacing: '0.02em'
+                                }}
+                              >
+                                <span>🧲</span>
+                                <span>{dragSnapState.timeStr} Uhr</span>
+                              </div>
                             </div>
-                          </div>
-                        </>
-                      )}
+                          </>
+                        );
+                      })()}
 
                       {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
                        {(selectedStudentId || draggedStudentId) && (() => {
