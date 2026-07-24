@@ -5038,29 +5038,29 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
 
-                        // Determine solid full-color theme (Apple Crisp Light Gray for Neutral, Emerald Green + Gold for Wunsch, Ruby Red for Blocked)
-                        let bgStyle = 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
-                        let borderStyle = '2px solid #64748b';
-                        let shadowStyle = '0 6px 20px rgba(0, 0, 0, 0.12)';
+                        // Determine soft flat color theme (Soft Apple Light Gray for Neutral, Soft Emerald Green for Wunsch, Soft Ruby Red for Blocked)
+                        let bgStyle = '#f1f5f9';
+                        let borderStyle = '1.5px solid #94a3b8';
+                        let shadowStyle = '0 4px 12px rgba(0, 0, 0, 0.06)';
                         let badgeText = '📌 FREIER SLOT';
-                        let badgeBg = '#475569';
+                        let badgeBg = '#64748b';
                         let badgeColor = '#ffffff';
-                        let textColor = '#0f172a';
-                        let lineColor = '#475569';
+                        let textColor = '#334155';
+                        let lineColor = '#64748b';
 
                         if (isBlocked) {
-                          bgStyle = 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
+                          bgStyle = '#ef4444';
                           borderStyle = '2px solid #fca5a5';
-                          shadowStyle = '0 8px 24px rgba(220, 38, 38, 0.45)';
+                          shadowStyle = '0 6px 16px rgba(239, 68, 68, 0.25)';
                           badgeText = '🛑 SPERRZEIT (VERBOTEN)';
                           badgeBg = 'rgba(255, 255, 255, 0.25)';
                           badgeColor = '#ffffff';
                           textColor = '#ffffff';
                           lineColor = '#ef4444';
                         } else if (isWunsch) {
-                          bgStyle = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
+                          bgStyle = '#22c55e';
                           borderStyle = '2px solid #f59e0b';
-                          shadowStyle = '0 8px 24px rgba(22, 163, 74, 0.45), 0 0 16px rgba(245, 158, 11, 0.6)';
+                          shadowStyle = '0 6px 16px rgba(34, 197, 94, 0.25)';
                           badgeText = '⭐ WUNSCHZEIT!';
                           badgeBg = '#f59e0b';
                           badgeColor = '#1e293b';
