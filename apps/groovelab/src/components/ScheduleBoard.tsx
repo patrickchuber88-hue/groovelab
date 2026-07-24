@@ -878,24 +878,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
       });
 
-      // B) Add all matching users table students
+      // B) Add all users table students for this school
       (allSchoolStudentUsers || []).forEach(s => {
-        if (stDbStudentIds.size === 0 || stDbStudentIds.has(s.id)) {
-          const fname = resolveFirstName(s);
-          const lname = resolveLastName(s);
-          studentMap.set(s.id, {
-            id: s.id,
-            first_name: fname,
-            last_name: lname,
-            instrument: s.instrument || 'Musiker',
-            duration: s.lesson_duration || 30,
-            status: (statusMap[s.id] || 'verplant') as any,
-            sibling_group_id: s.sibling_group_id,
-            group_id: s.group_id,
-            isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
-            hasPreferences: false
-          });
-        }
+        const fname = resolveFirstName(s);
+        const lname = resolveLastName(s);
+        studentMap.set(s.id, {
+          id: s.id,
+          first_name: fname,
+          last_name: lname,
+          instrument: s.instrument || 'Musiker',
+          duration: s.lesson_duration || 30,
+          status: (statusMap[s.id] || 'verplant') as any,
+          sibling_group_id: s.sibling_group_id,
+          group_id: s.group_id,
+          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
+          hasPreferences: false
+        });
       });
 
       // C) Add pending students
