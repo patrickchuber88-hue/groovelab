@@ -864,25 +864,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const prefSubmittedSet = new Set<string>();
       const prefMap: Record<string, any[]> = {};
-      
-      const { data: allDbPrefs } = await supabase
-        .from('student_schedule_preferences')
-        .select('*');
-
-      allDbPrefs?.forEach(p => {
-        if (!p.student_id) return;
-        prefSubmittedSet.add(p.student_id);
-        
-        // Match by exact ID or by student name alias
-        const matchingStudent = loadedStudents.find(s => 
-          s.id === p.student_id
-        );
-        const targetId = matchingStudent ? matchingStudent.id : p.student_id;
-        prefSubmittedSet.add(targetId);
-        if (!prefMap[targetId]) prefMap[targetId] = [];
-        prefMap[targetId].push(p);
-      });
-      setAllStudentPrefsMap(prefMap);
 
       const loadedStudents: Student[] = [
         ...(sData || []).map(s => ({
@@ -895,7 +876,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           sibling_group_id: s.sibling_group_id,
           group_id: s.group_id,
           isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
-          hasPreferences: prefSubmittedSet.has(s.id)
+          hasPreferences: false
         })),
         ...(pendingData || []).map((s: any) => ({
           id: s.id,
@@ -907,9 +888,29 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           sibling_group_id: s.sibling_group_id,
           group_id: s.group_id || null,
           isOnboarded: false,
-          hasPreferences: prefSubmittedSet.has(s.id)
+          hasPreferences: false
         }))
       ];
+      
+      const { data: allDbPrefs } = await supabase
+        .from('student_schedule_preferences')
+        .select('*');
+
+      allDbPrefs?.forEach(p => {
+        if (!p.student_id) return;
+        prefSubmittedSet.add(p.student_id);
+        
+        const matchingStudent = loadedStudents.find(s => s.id === p.student_id);
+        const targetId = matchingStudent ? matchingStudent.id : p.student_id;
+        prefSubmittedSet.add(targetId);
+        if (!prefMap[targetId]) prefMap[targetId] = [];
+        prefMap[targetId].push(p);
+      });
+      setAllStudentPrefsMap(prefMap);
+
+      loadedStudents.forEach(s => {
+        s.hasPreferences = prefSubmittedSet.has(s.id);
+      });
 
       const { data: teacherProfile } = await supabase
         .from('users')
