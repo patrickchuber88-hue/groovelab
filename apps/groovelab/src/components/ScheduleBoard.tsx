@@ -1802,12 +1802,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const RUN_ITERATIONS = 100;
       let bestGlobalScore = -Infinity;
-      let bestBoardsState: any[] = [];
+      let bestBoardsState: DayBoard[] = boards;
       let bestNewlyAssigned: Record<string, { day: number; time: string }> = {};
 
       for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
         // Start each iteration from clean board state (preserving Breaks and syncing availabilityEnd)
-        let currentBoards = boards.map(b => {
+        let currentBoards: DayBoard[] = boards.map(b => {
           const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
           return {
             ...b,
