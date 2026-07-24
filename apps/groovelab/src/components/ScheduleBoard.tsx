@@ -7285,6 +7285,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
           </div>
         )}
+
         {/* Student Schedule Slots Modal */}
         {selectedSlotsStudent && (
           <StudentScheduleSlotsModal
@@ -7312,39 +7313,40 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             animation: 'fadeIn 0.25s ease-out'
           }}>
             <div style={{
-              background: 'rgba(255, 255, 255, 0.92)',
+              background: '#ffffff',
               borderRadius: '24px',
-              padding: '32px',
-              maxWidth: '520px',
+              padding: '28px 32px',
+              maxWidth: '500px',
               width: '100%',
-              boxShadow: '0 30px 80px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.8) inset',
+              boxShadow: '0 25px 70px rgba(0, 0, 0, 0.15)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '24px',
+              gap: '22px',
               position: 'relative'
             }}>
               {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                    border: '1.5px solid #86efac',
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: '#e6f4ea',
+                    border: '1px solid #ceead6',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#15803d',
-                    boxShadow: '0 8px 16px rgba(34, 197, 94, 0.15)'
+                    color: '#34a853',
+                    boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)'
                   }}>
-                    <Sparkles size={24} />
+                    <Sparkles size={22} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>
                       Stundenplan-Analyse
                     </h3>
-                    <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '2px 0 0 0', fontWeight: 600 }}>
+                    <p style={{ fontSize: '0.8rem', color: '#515154', margin: '2px 0 0 0', fontWeight: 600 }}>
                       Automatische Zuteilung erfolgreich berechnet!
                     </p>
                   </div>
@@ -7352,7 +7354,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 <button
                   onClick={() => setShowAutoScheduleReportModal(false)}
                   style={{
-                    background: '#f3f4f6',
+                    background: '#f5f5f7',
                     border: 'none',
                     width: '32px',
                     height: '32px',
@@ -7361,29 +7363,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#6b7280',
+                    color: '#86868b',
                     transition: 'all 0.15s'
                   }}
+                  className="hover-scale-mini"
                 >
                   <X size={16} />
                 </button>
               </div>
 
-              {/* Overall Score Badge */}
+              {/* Hero Overall Score Badge */}
               <div style={{
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '1.5px solid #86efac',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%)',
+                border: '1.5px solid #bbf7d0',
                 borderRadius: '18px',
-                padding: '20px',
+                padding: '18px 22px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'Urbanist' }}>
                     Gesamt-Qualität
                   </div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.03em', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.9rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.03em', marginTop: '2px' }}>
                     {autoScheduleReportData.overallScore} <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>/ 100 Punkte</span>
                   </div>
                 </div>
@@ -7394,90 +7397,95 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   color: '#15803d',
                   fontSize: '0.82rem',
                   fontWeight: 800,
-                  boxShadow: '0 4px 12px rgba(22, 101, 52, 0.08)'
+                  border: '1px solid #bbf7d0',
+                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)'
                 }}>
                   {autoScheduleReportData.overallScore >= 90 ? '✨ Exzellent' : '👍 Sehr gut'}
                 </div>
               </div>
 
-              {/* Metrics Grid */}
+              {/* 4 Grid Metrics */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#15803d', fontSize: '0.76rem', fontWeight: 800 }}>
-                    <CheckCircle size={13} color="#22c55e" /> Einteilungsquote
+                {/* 1. Einteilungsquote */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#15803d', fontSize: '0.75rem', fontWeight: 800 }}>
+                    <CheckCircle size={13} color="#34a853" /> Einteilungsquote
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
                     {Math.round((autoScheduleReportData.totalAssigned / Math.max(1, autoScheduleReportData.totalStudents)) * 100)} %
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                     {autoScheduleReportData.totalAssigned} von {autoScheduleReportData.totalStudents} Schülern eingeteilt
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0284c7', fontSize: '0.76rem', fontWeight: 800 }}>
+                {/* 2. Lückenlosigkeit */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0284c7', fontSize: '0.75rem', fontWeight: 800 }}>
                     <Zap size={13} color="#0ea5e9" /> Lückenlosigkeit
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
                     {autoScheduleReportData.totalGapsMin === 0 ? '0 Min Lücken' : `${autoScheduleReportData.totalGapsMin} Min Lücken`}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                     {autoScheduleReportData.totalGapsMin === 0 ? '100% Kompakter Tagesplan' : 'Geringer Leerlauf'}
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '0.76rem', fontWeight: 800 }}>
+                {/* 3. Wunschzeiten */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '0.75rem', fontWeight: 800 }}>
                     <Star size={13} fill="#22c55e" color="#16a34a" /> Wunschzeiten
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
                     {autoScheduleReportData.wunschHits} / {autoScheduleReportData.totalAssigned}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                     Wunschfenster voll erfüllt
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#7c3aed', fontSize: '0.76rem', fontWeight: 800 }}>
+                {/* 4. Geschwister */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#7c3aed', fontSize: '0.75rem', fontWeight: 800 }}>
                     <Users size={13} color="#8b5cf6" /> Geschwister
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1e293b' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
                     {autoScheduleReportData.totalSiblings > 0 ? `${autoScheduleReportData.siblingHits} / ${autoScheduleReportData.totalSiblings} Paare` : 'Keine Paare'}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                     Direkt hintereinander
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAutoScheduleReportModal(false)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: '12px',
-                    background: '#16a34a',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontWeight: 800,
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    boxShadow: '0 6px 20px rgba(22, 163, 74, 0.25)',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <Sparkles size={16} /> Plan übernehmen
-                </button>
-              </div>
+              {/* Action Button */}
+              <button
+                type="button"
+                onClick={() => setShowAutoScheduleReportModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '14px',
+                  background: '#34a853',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 6px 20px rgba(22, 163, 74, 0.25)',
+                  transition: 'all 0.15s'
+                }}
+                className="hover-scale-mini"
+              >
+                <Sparkles size={16} /> Plan übernehmen
+              </button>
             </div>
+          </div>
           </div>
         )}
 
