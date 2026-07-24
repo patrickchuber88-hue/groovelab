@@ -4645,14 +4645,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                         if (totalAssigned > 360 && maxContinuous > 360) {
                           return (
-                            <div style={{ padding: '2px 6px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>⚠️ TVöD/ArbZG: &gt; 6 Std. ohne 30-Min-Pause</span>
+                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>⚠️ Gesetzliche Pflichtpause fehlt (über 6 Std. ohne Pause)</span>
                             </div>
                           );
                         } else if (maxContinuous > 180) {
                           return (
-                            <div style={{ padding: '2px 6px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>💡 TVöD-Empfehlung: &gt; 3 Std. ohne Pause</span>
+                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>💡 Pause empfohlen (über 3 Std. am Stück)</span>
                             </div>
                           );
                         }
