@@ -871,18 +871,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       const prefSubmittedSet = new Set<string>();
       const prefMap: Record<string, any[]> = {};
-      if (rawAllStudentIds.length > 0) {
-        const { data: prefRows } = await supabase
-          .from('student_schedule_preferences')
-          .select('*')
-          .in('student_id', rawAllStudentIds);
+      
+      const { data: allDbPrefs } = await supabase
+        .from('student_schedule_preferences')
+        .select('*');
 
-        prefRows?.forEach(p => {
-          prefSubmittedSet.add(p.student_id);
-          if (!prefMap[p.student_id]) prefMap[p.student_id] = [];
-          prefMap[p.student_id].push(p);
-        });
-      }
+      allDbPrefs?.forEach(p => {
+        if (!p.student_id) return;
+        prefSubmittedSet.add(p.student_id);
+        
+        // Match by exact ID or by student name alias
+        const matchingStudent = loadedStudents.find(s => 
+          s.id === p.student_id
+        );
+        const targetId = matchingStudent ? matchingStudent.id : p.student_id;
+        prefSubmittedSet.add(targetId);
+        if (!prefMap[targetId]) prefMap[targetId] = [];
+        prefMap[targetId].push(p);
+      });
       setAllStudentPrefsMap(prefMap);
 
       const loadedStudents: Student[] = [
@@ -1683,15 +1689,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       
       const { data: prefs, error } = await supabase
         .from('student_schedule_preferences')
-        .select('*')
-        .in('student_id', studentIds);
+        .select('*');
 
       if (error) throw error;
 
       const prefsByStudentId: Record<string, any[]> = {};
       studentIds.forEach(id => { prefsByStudentId[id] = []; });
+      
       prefs?.forEach(p => {
-        if (p.student_id) prefsByStudentId[p.student_id].push(p);
+        if (!p.student_id) return;
+        const matchingStudent = unassignedStudents.find(s => s.id === p.student_id);
+        if (matchingStudent) {
+          prefsByStudentId[matchingStudent.id].push(p);
+        } else if (prefsByStudentId[p.student_id]) {
+          prefsByStudentId[p.student_id].push(p);
+        }
       });
 
       // Calculate blocked duration in minutes
@@ -5524,11 +5536,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               {bs.assignedTime}
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                              {isInsideWunsch && (
-                                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: isInsideWunsch ? '#ffffff' : '#15803d', background: isInsideWunsch ? 'rgba(255,255,255,0.25)' : '#dcfce7', border: isInsideWunsch ? '1px solid rgba(255,255,255,0.4)' : '1px solid #86efac', borderRadius: '4px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Wunschtermin garantiert getroffen!">
-                                  ⭐ Wunsch-Slot
-                                </span>
-                              )}
                               <span style={{ fontSize: '0.62rem', fontWeight: 600, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px' }}>{bs.duration}m</span>
                               <button 
                                 type="button" 
