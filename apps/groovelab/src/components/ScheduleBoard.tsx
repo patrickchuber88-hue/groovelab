@@ -6261,11 +6261,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             <Star size={9} fill="#16a34a" color="#166534" />
                             <span>Zeiten da</span>
                           </span>
-                        ) : (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '1.5px 6px', borderRadius: '5px', pointerEvents: 'none' }} title="Noch keine Wunsch- & Sperrzeiten eingereicht">
-                            Ohne Rückmeldung
-                          </span>
-                        )}
+                        ) : null}
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pointerEvents: 'none' }}>
