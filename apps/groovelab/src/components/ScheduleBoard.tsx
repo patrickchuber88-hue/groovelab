@@ -1421,8 +1421,20 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   // Helper to recalculate all lesson times in a column sequentially
   function recalculateBoardTimes(board: DayBoard): DayBoard {
+    // Sort students by customStartTime / assignedTime so cards render in chronological order
+    const sortedStudents = [...board.students].sort((a, b) => {
+      const aTime = a.customStartTime || a.assignedTime;
+      const bTime = b.customStartTime || b.assignedTime;
+      if (aTime && bTime) {
+        const [ah, am] = parseTime(aTime);
+        const [bh, bm] = parseTime(bTime);
+        return (ah * 60 + am) - (bh * 60 + bm);
+      }
+      return 0;
+    });
+
     let currentTime = board.startAnchor;
-    const updatedStudents = board.students.map(s => {
+    const updatedStudents = sortedStudents.map(s => {
       if (s.customStartTime) {
         const [csh, csm] = parseTime(s.customStartTime);
         const [curh, curm] = parseTime(currentTime);
@@ -2695,7 +2707,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   // Handle drops on columns
-  const handleDropOnBoard = async (targetBoardId: string, index?: number) => {
+  const handleDropOnBoard = async (targetBoardId: string, index?: number, droppedCustomTime?: string) => {
     if (!draggedStudentId) return;
 
     const isBreakDrag = draggedStudentId.startsWith('break-') || draggedStudentId === 'sidebar-pause';
@@ -2703,7 +2715,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     if (!student && !isBreakDrag) return;
 
     // Check if we dropped on a specific student card (cross-student drop)
-    if (index !== undefined && !isBreakDrag) {
+    if (index !== undefined && !isBreakDrag && !droppedCustomTime) {
       const targetBoard = boards.find(b => b.id === targetBoardId);
       if (targetBoard) {
         const targetStudent = targetBoard.students[index];
@@ -2723,10 +2735,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
 
     // Otherwise, execute standard drop immediately!
-    await executeStandardDrop(draggedStudentId, targetBoardId, index, dragSource, dragSourceBoardId);
+    await executeStandardDrop(draggedStudentId, targetBoardId, index, dragSource, dragSourceBoardId, undefined, droppedCustomTime);
   };
 
-  const executeStandardDrop = async (sourceId: string, targetBoardId: string, index?: number, source?: string | null, sourceBoardId?: string | null, chosenInstrument?: string) => {
+  const executeStandardDrop = async (sourceId: string, targetBoardId: string, index?: number, source?: string | null, sourceBoardId?: string | null, chosenInstrument?: string, droppedCustomTime?: string) => {
     const isBreakDrag = sourceId.startsWith('break-') || sourceId === 'sidebar-pause';
     const studentObj = students.find(s => s.id === sourceId);
 
@@ -2749,7 +2761,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     const student = studentObj ? {
       ...studentObj,
       instrument: chosenInstrument || studentObj.instrument || 'Musiker',
-      customStartTime: undefined
+      customStartTime: droppedCustomTime || undefined
     } : null;
 
     // Validate if the timeframe overlaps with a 'gesperrt' (blocked) preference for the student
@@ -2908,8 +2920,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const curIndex = nextStudents.findIndex(s => s.id === sourceId);
           if (curIndex !== -1) {
             const [moved] = nextStudents.splice(curIndex, 1);
-            const movedCleared = { ...moved, customStartTime: undefined };
-            if (index !== undefined) {
+            const movedCleared = { ...moved, customStartTime: droppedCustomTime || undefined };
+            if (index !== undefined && !droppedCustomTime) {
               nextStudents.splice(index, 0, movedCleared);
             } else {
               nextStudents.push(movedCleared);
@@ -2941,8 +2953,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (!targetBoardCleaned) return prev;
 
         const targetNextStudents = [...targetBoardCleaned.students];
-        const movedStudent = { ...rawMoved, customStartTime: undefined };
-        if (index !== undefined) {
+        const movedStudent = { ...rawMoved, customStartTime: droppedCustomTime || undefined };
+        if (index !== undefined && !droppedCustomTime) {
           targetNextStudents.splice(index, 0, movedStudent);
         } else {
           targetNextStudents.push(movedStudent);
@@ -2973,9 +2985,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             last_name: '',
             instrument: '',
             duration: 15,
-            isBreak: true
+            isBreak: true,
+            customStartTime: droppedCustomTime || undefined
           };
-          if (index !== undefined) {
+          if (index !== undefined && !droppedCustomTime) {
             targetNextStudents.splice(index, 0, newBreak);
           } else {
             targetNextStudents.push(newBreak);
@@ -3001,9 +3014,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         if (!targetBoardCleaned) return prev;
 
         const targetNextStudents = [...targetBoardCleaned.students];
-        const studentToAssign = { ...student, assignedDay: targetBoardCleaned.dayOfWeek };
+        const studentToAssign = { ...student, assignedDay: targetBoardCleaned.dayOfWeek, customStartTime: droppedCustomTime || undefined };
 
-        if (index !== undefined) {
+        if (index !== undefined && !droppedCustomTime) {
           targetNextStudents.splice(index, 0, studentToAssign);
         } else {
           targetNextStudents.push(studentToAssign);
@@ -4851,7 +4864,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clientY = e.clientY - rect.top;
+                        const dragMinutes = clientY / PX_PER_MIN;
+
+                        const [bsh, bsm] = parseTime(board.startAnchor);
+                        const rawMinutes = bsh * 60 + bsm + dragMinutes;
+                        const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
+                        const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+                        const snappedMins = snappedTotalMinutes % 60;
+                        const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+                        handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined, targetTime);
                       }}
                       style={{ 
                         position: 'relative', 
