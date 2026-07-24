@@ -277,6 +277,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
      const snappedMinutes = Math.round(totalMinutes / snapMinutes) * snapMinutes;
      const snappedHours = Math.floor(snappedMinutes / 60) % 24;
      const snappedMins = snappedMinutes % 60;
+     const hStr = String(snappedHours).padStart(2, '0');
+     const mStr = String(snappedMins).padStart(2, '0');
+     return `${hStr}:${mStr}`;
+   };
   const playCubaseSnapClick = () => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
