@@ -4822,54 +4822,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </button>
                       )}
                       <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f', marginBottom: '8px' }}>{dayLabel}</div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                        {/* Apple iOS-Style Time Pill */}
-                        <div 
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            background: lightBg,
-                            borderRadius: '6px',
-                            padding: '2px 5px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            color: textAccentColor,
-                          }}
-                          onMouseOver={(e) => { e.currentTarget.style.background = hoverBg; }}
-                          onMouseOut={(e) => { e.currentTarget.style.background = lightBg; }}
-                        >
-                          <input 
-                            type="time" 
-                            value={board.startAnchor} 
-                            className="mini-time-input"
-                            onChange={(e) => {
-                              const newVal = e.target.value;
-                              if (!newVal) return;
-                              setBoards(prev => prev.map(b => {
-                                if (b.id !== board.id) return b;
-                                return recalculateBoardTimes({ ...b, startAnchor: newVal });
-                              }));
-                            }}
-                            onBlur={(e) => {
-                              const newVal = e.target.value;
-                              const snappedVal = newVal ? snapTimeToGrid(newVal, gridSnapMinutes) : '14:00';
-                              setBoards(prev => prev.map(b => {
-                                if (b.id !== board.id) return b;
-                                return recalculateBoardTimes({ ...b, startAnchor: snappedVal });
-                              }));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{ fontSize: '0.78rem', fontWeight: 700, border: 'none', background: 'transparent', outline: 'none', color: textAccentColor, padding: 0, width: '52px', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}
-                            title="Startzeit ändern"
-                          />
-                          <span style={{ fontSize: '0.65rem', fontWeight: 600, marginLeft: '1px', color: textAccentColor }}>Uhr</span>
-                        </div>
-                      </div>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel}</div>
 
                       {/* TVöD / ArbZG Arbeitszeit-Warnhinweis */}
                       {(() => {
@@ -5405,16 +5358,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 overflow: 'visible',
                               }}
                             >
-                              {/* Apple Floating Edge Time Pill */}
+                              {/* Apple Floating Edge Time Pill attached to Event with Real-Time Sync */}
                               <div
                                 style={{
                                   position: 'absolute',
                                   top: '-7px',
-                                  ...(board.dayOfWeek === 1 ? { right: '-22px' } : { left: '-22px' }),
-                                  background: 'rgba(255, 255, 255, 0.96)',
+                                  ...(board.dayOfWeek === 1 ? { right: '-32px' } : { left: '-32px' }),
+                                  background: 'rgba(255, 255, 255, 0.98)',
                                   backdropFilter: 'blur(16px)',
                                   WebkitBackdropFilter: 'blur(16px)',
-                                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                                  border: '1px solid rgba(245, 158, 11, 0.4)',
                                   borderRadius: '999px',
                                   padding: '2px 7px',
                                   boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08)',
@@ -5422,12 +5375,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   alignItems: 'center',
                                   gap: '4px',
                                   zIndex: 10,
-                                  pointerEvents: 'none'
+                                  pointerEvents: 'none',
+                                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
                                 }}
                               >
                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} />
                                 <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                                  {bs.assignedTime}
+                                  {(dragSnapState && draggedStudentId === bs.id) ? dragSnapState.timeStr : bs.assignedTime}
                                 </span>
                               </div>
 
@@ -5758,13 +5712,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 overflow: 'visible',
                               }}
                             >
-                              {/* Apple Floating Edge Time Pill */}
+                              {/* Apple Floating Edge Time Pill attached to Event with Real-Time Sync */}
                               <div
                                 style={{
                                   position: 'absolute',
                                   top: '-7px',
-                                  ...(board.dayOfWeek === 1 ? { right: '-22px' } : { left: '-22px' }),
-                                  background: 'rgba(255, 255, 255, 0.96)',
+                                  ...(board.dayOfWeek === 1 ? { right: '-32px' } : { left: '-32px' }),
+                                  background: 'rgba(255, 255, 255, 0.98)',
                                   backdropFilter: 'blur(16px)',
                                   WebkitBackdropFilter: 'blur(16px)',
                                   border: `1px solid ${cardBorderColor}`,
@@ -5775,12 +5729,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   alignItems: 'center',
                                   gap: '4px',
                                   zIndex: 10,
-                                  pointerEvents: 'none'
+                                  pointerEvents: 'none',
+                                  transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
                                 }}
                               >
                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: highlightColor, boxShadow: `0 0 6px ${highlightColor}` }} />
                                 <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1e293b', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                                  {bs.assignedTime}
+                                  {(dragSnapState && draggedStudentId === bs.id) ? dragSnapState.timeStr : bs.assignedTime}
                                 </span>
                               </div>
 
@@ -5908,13 +5863,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }
                             }}
                           >
-                            {/* Apple Floating Edge Time Pill */}
+                            {/* Apple Floating Edge Time Pill attached to Event with Real-Time Sync */}
                             <div
                               style={{
                                 position: 'absolute',
                                 top: '-7px',
-                                ...(board.dayOfWeek === 1 ? { right: '-22px' } : { left: '-22px' }),
-                                background: 'rgba(255, 255, 255, 0.96)',
+                                ...(board.dayOfWeek === 1 ? { right: '-32px' } : { left: '-32px' }),
+                                background: 'rgba(255, 255, 255, 0.98)',
                                 backdropFilter: 'blur(16px)',
                                 WebkitBackdropFilter: 'blur(16px)',
                                 border: `1px solid ${hasConflict ? '#fecaca' : cardBorderColor}`,
@@ -5925,12 +5880,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 alignItems: 'center',
                                 gap: '4px',
                                 zIndex: 10,
-                                pointerEvents: 'none'
+                                pointerEvents: 'none',
+                                transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
                               }}
                             >
                               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: hasConflict ? '#ef4444' : (isInsideWunsch ? '#16a34a' : cardPrimaryColor), boxShadow: `0 0 6px ${hasConflict ? '#ef4444' : cardPrimaryColor}` }} />
                               <span style={{ fontSize: '0.68rem', fontWeight: 800, color: hasConflict ? '#dc2626' : '#1e293b', fontFamily: 'Urbanist, sans-serif', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                                {bs.assignedTime}
+                                {(dragSnapState && draggedStudentId === bs.id) ? dragSnapState.timeStr : bs.assignedTime}
                               </span>
                             </div>
 
