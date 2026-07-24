@@ -5068,46 +5068,85 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           timeColor = '#ffffff';
                         }
 
+                        // Match exact dropped card styling (Los-Lass-Modus) for 100% seamless transition
+                        const dragInst = resolveInstrument();
+                        let gBg = '#ffffff';
+                        let gBorder = `1px solid ${cardBorderColor}`;
+                        let gBorderLeft = `4px solid ${cardPrimaryColor}`;
+                        let gText = textColor;
+                        let gSubText = cardTextColor;
+                        let gBadgeBg = badgeBg;
+                        let gBadgeText = badgeColor;
+                        let gShadow = '0 6px 20px rgba(0,0,0,0.12)';
+
+                        if (isBlocked) {
+                          gBg = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                          gBorder = '1px solid #fca5a5';
+                          gBorderLeft = '4px solid #991b1b';
+                          gText = '#ffffff';
+                          gSubText = 'rgba(255,255,255,0.9)';
+                          gBadgeBg = 'rgba(255, 255, 255, 0.25)';
+                          gBadgeText = '#ffffff';
+                          gShadow = '0 6px 20px rgba(239, 68, 68, 0.35)';
+                        } else if (isWunsch) {
+                          gBg = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
+                          gBorder = '1px solid #86efac';
+                          gBorderLeft = '4px solid #f59e0b';
+                          gText = '#ffffff';
+                          gSubText = 'rgba(255,255,255,0.9)';
+                          gBadgeBg = 'rgba(255, 255, 255, 0.25)';
+                          gBadgeText = '#ffffff';
+                          gShadow = '0 6px 20px rgba(52, 168, 83, 0.35)';
+                        }
+
                         return (
                           <>
-                            {/* Purist Apple Glass Ghost Event Frame */}
+                            {/* Ghost Event Frame (1-zu-1 identisch mit gedroppter Karte) */}
                             <div
                               style={{
                                 position: 'absolute',
-                                left: '4px',
-                                right: '4px',
+                                left: 0,
+                                right: 0,
                                 top: `${Math.max(dragSnapState.topPx, 0)}px`,
-                                height: `${dragSnapState.duration * PX_PER_MIN}px`,
-                                background: cardBg,
-                                backdropFilter: 'blur(16px)',
-                                WebkitBackdropFilter: 'blur(16px)',
-                                border: `1.5px solid ${borderColor}`,
-                                borderRadius: '10px',
-                                zIndex: 98,
-                                pointerEvents: 'none',
+                                height: `${dragSnapState.duration * PX_PER_MIN - 4}px`,
+                                background: gBg,
+                                border: gBorder,
+                                borderLeft: gBorderLeft,
+                                borderRadius: '8px',
+                                padding: '5px 8px',
                                 boxSizing: 'border-box',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                justifyContent: 'space-between',
-                                padding: '6px 10px',
-                                transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
-                                boxShadow: shadowStyle,
+                                justifyContent: 'center',
+                                gap: '2px',
+                                zIndex: 98,
+                                pointerEvents: 'none',
+                                boxShadow: gShadow,
+                                transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: titleColor, fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em' }}>
-                                  {dragSnapState.timeStr} Uhr
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: gText, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  {isWunsch && (
+                                    <span style={{ color: '#f59e0b', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center' }}>⭐</span>
+                                  )}
+                                  {dragSnapState.timeStr}
                                 </span>
-                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: pillColor, background: pillBg, padding: '1px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
-                                  {dragSnapState.duration} Min.
+                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: gBadgeText, background: gBadgeBg, padding: '1px 5px', borderRadius: '4px' }}>
+                                  {dragSnapState.duration}m
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', width: '100%' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: titleColor, fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {dragSnapState.studentName || 'Termin'}
+
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: gText, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <InstrumentBadge instrument={dragInst} color={gText} />
+                                {dragSnapState.studentName || 'Schüler'}
+                              </span>
+
+                              {dragSnapState.duration >= 30 && (
+                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: gSubText, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {isWunsch ? 'Wunschzeit getroffen!' : (isBlocked ? 'Sperrzeit (Verboten)' : dragInst)}
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: pillColor, opacity: 0.95 }}>{statusLabel}</span>
-                              </div>
+                              )}
                             </div>
 
                             {/* Minimalist Apple Snap Line */}
