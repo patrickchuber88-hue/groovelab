@@ -5039,71 +5039,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
 
-                        // Purist Apple Senior Design (Glassmorphic Neutral, Vibrant Campus Green for Wunschzeit, Soft Red for Blocked)
-                        let cardBg = 'rgba(255, 255, 255, 0.96)';
-                        let borderColor = brandColor;
-                        let shadowStyle = `0 4px 16px ${brandColor}20`;
-                        let statusLabel = 'Freier Slot';
-                        let pillBg = 'rgba(0, 0, 0, 0.05)';
-                        let pillColor = '#475569';
-                        let titleColor = '#1d1d1f';
-                        let timeColor = '#1d1d1f';
-
-                        if (isBlocked) {
-                          cardBg = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-                          borderColor = '#ef4444';
-                          shadowStyle = '0 4px 16px rgba(239, 68, 68, 0.3)';
-                          statusLabel = 'Sperrzeit (Verboten)';
-                          pillBg = 'rgba(255, 255, 255, 0.25)';
-                          pillColor = '#ffffff';
-                          titleColor = '#ffffff';
-                          timeColor = '#ffffff';
-                        } else if (isWunsch) {
-                          cardBg = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
-                          borderColor = '#1e7e34';
-                          shadowStyle = '0 6px 20px rgba(52, 168, 83, 0.35)';
-                          statusLabel = 'Wunschzeit getroffen!';
-                          pillBg = 'rgba(255, 255, 255, 0.25)';
-                          pillColor = '#ffffff';
-                          titleColor = '#ffffff';
-                          timeColor = '#ffffff';
-                        }
-
                         // Match exact dropped card styling (Los-Lass-Modus) for 100% seamless transition
                         const dragInst = resolveInstrument();
-                        const defBorderColor = isCampus ? 'rgba(52, 168, 83, 0.2)' : (isGroovelab ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 67, 53, 0.2)');
-                        const defPrimaryColor = brandColor;
-                        const defTextColor = '#1d1d1f';
-                        const defSubTextColor = '#86868b';
-                        const defBadgeBg = isCampus ? 'rgba(52, 168, 83, 0.1)' : 'rgba(0, 0, 0, 0.05)';
 
                         let gBg = '#ffffff';
-                        let gBorder = `1px solid ${defBorderColor}`;
-                        let gBorderLeft = `4px solid ${defPrimaryColor}`;
-                        let gText = defTextColor;
-                        let gSubText = defSubTextColor;
-                        let gBadgeBg = defBadgeBg;
-                        let gBadgeText = defPrimaryColor;
-                        let gShadow = '0 6px 20px rgba(0,0,0,0.12)';
+                        let gBorder = '1px solid rgba(0, 0, 0, 0.08)';
+                        let gBorderLeft = '4px solid #94a3b8';
+                        let gText = '#1d1d1f';
+                        let gSubText = '#64748b';
+                        let gBadgeBg = 'rgba(0, 0, 0, 0.05)';
+                        let gBadgeText = '#475569';
+                        let gShadow = '0 6px 20px rgba(0, 0, 0, 0.08)';
+                        let borderColor = '#cbd5e1';
 
                         if (isBlocked) {
                           gBg = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-                          gBorder = '1px solid #fca5a5';
-                          gBorderLeft = '4px solid #991b1b';
+                          gBorder = '1.5px solid #ef4444';
+                          gBorderLeft = '4px solid #dc2626';
                           gText = '#ffffff';
-                          gSubText = 'rgba(255,255,255,0.9)';
+                          gSubText = 'rgba(255, 255, 255, 0.85)';
                           gBadgeBg = 'rgba(255, 255, 255, 0.25)';
                           gBadgeText = '#ffffff';
-                          gShadow = '0 6px 20px rgba(239, 68, 68, 0.35)';
+                          gShadow = '0 6px 20px rgba(239, 68, 68, 0.3)';
+                          borderColor = '#ef4444';
                         } else if (isWunsch) {
                           gBg = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
-                          gBorder = '1px solid #86efac';
+                          gBorder = '1.5px solid #1e7e34';
                           gBorderLeft = '4px solid #f59e0b';
                           gText = '#ffffff';
-                          gSubText = 'rgba(255,255,255,0.9)';
+                          gSubText = 'rgba(255, 255, 255, 0.85)';
                           gBadgeBg = 'rgba(255, 255, 255, 0.25)';
                           gBadgeText = '#ffffff';
                           gShadow = '0 6px 20px rgba(52, 168, 83, 0.35)';
+                          borderColor = '#34a853';
                         }
 
                         return (
