@@ -28,6 +28,7 @@ import {
 import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
+import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 interface Student {
   id: string;
   first_name: string;
@@ -355,6 +356,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     duration: number;
   }
   const [editingBreak, setEditingBreak] = useState<{ boardId: string; breakId: string; startTime?: string; duration: number } | null>(null);
+  const [selectedSlotsStudent, setSelectedSlotsStudent] = useState<Student | null>(null);
   const [showAutoScheduleReportModal, setShowAutoScheduleReportModal] = useState(false);
   const [autoScheduleReportData, setAutoScheduleReportData] = useState<{
     totalAssigned: number;
@@ -6536,11 +6538,27 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleResetPreferences(s.id);
+                                  setSelectedSlotsStudent(s);
                                 }}
-                                style={{ flex: 1, padding: '4px 8px', background: '#d97706', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                                style={{
+                                  flex: 1,
+                                  padding: '5px 10px',
+                                  background: '#34a853',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px',
+                                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.2)',
+                                  transition: 'all 0.15s'
+                                }}
                               >
-                                Zur Überarbeitung freigeben
+                                <Clock size={11} /> Zeitfenster anpassen
                               </button>
                             )}
                           </div>
@@ -7267,6 +7285,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
           </div>
         )}
+        {/* Student Schedule Slots Modal */}
+        {selectedSlotsStudent && (
+          <StudentScheduleSlotsModal
+            student={selectedSlotsStudent}
+            onClose={() => setSelectedSlotsStudent(null)}
+            onPreferencesSaved={() => {
+              setSelectedSlotsStudent(null);
+              fetchStudentPreferences();
+            }}
+          />
+        )}
+
         {/* Apple Glass Auto-Schedule Report Scorecard Modal */}
         {showAutoScheduleReportModal && autoScheduleReportData && (
           <div style={{
