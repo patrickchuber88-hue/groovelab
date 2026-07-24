@@ -2573,6 +2573,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     setDraggedDuration(dur);
     setDraggedStudentName(name);
 
+    // Suppress native drag preview image so ONLY the Cubase Ghost Event Frame glides on the timetable grid
+    if (e && e.dataTransfer && e.dataTransfer.setDragImage) {
+      try {
+        const emptyImg = document.createElement('img');
+        emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        e.dataTransfer.setDragImage(emptyImg, 0, 0);
+      } catch (err) {
+        // Fallback silently if setDragImage is blocked
+      }
+    }
+
     try {
       let targetStudentIds = [studentId];
       let grpId: string | null = null;
@@ -5027,13 +5038,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
 
-                        // Determine solid full-color theme
-                        let bgStyle = 'linear-gradient(135deg, #334155 0%, #1e293b 100%)';
-                        let borderStyle = '2px solid #94a3b8';
-                        let shadowStyle = '0 8px 24px rgba(30, 41, 59, 0.45)';
+                        // Determine solid full-color theme (Apple Crisp Light Gray for Neutral, Emerald Green + Gold for Wunsch, Ruby Red for Blocked)
+                        let bgStyle = 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
+                        let borderStyle = '2px solid #64748b';
+                        let shadowStyle = '0 6px 20px rgba(0, 0, 0, 0.12)';
                         let badgeText = '📌 FREIER SLOT';
-                        let badgeBg = 'rgba(255, 255, 255, 0.2)';
-                        let lineColor = '#94a3b8';
+                        let badgeBg = '#475569';
+                        let badgeColor = '#ffffff';
+                        let textColor = '#0f172a';
+                        let lineColor = '#475569';
 
                         if (isBlocked) {
                           bgStyle = 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
@@ -5041,13 +5054,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           shadowStyle = '0 8px 24px rgba(220, 38, 38, 0.45)';
                           badgeText = '🛑 SPERRZEIT (VERBOTEN)';
                           badgeBg = 'rgba(255, 255, 255, 0.25)';
+                          badgeColor = '#ffffff';
+                          textColor = '#ffffff';
                           lineColor = '#ef4444';
                         } else if (isWunsch) {
                           bgStyle = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
                           borderStyle = '2px solid #f59e0b';
                           shadowStyle = '0 8px 24px rgba(22, 163, 74, 0.45), 0 0 16px rgba(245, 158, 11, 0.6)';
                           badgeText = '⭐ WUNSCHZEIT!';
-                          badgeBg = 'rgba(245, 158, 11, 0.3)';
+                          badgeBg = '#f59e0b';
+                          badgeColor = '#1e293b';
+                          textColor = '#ffffff';
                           lineColor = '#f59e0b';
                         }
 
@@ -5073,18 +5090,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 padding: '5px 8px',
                                 transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
                                 boxShadow: shadowStyle,
-                                color: '#ffffff'
+                                color: textColor
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff', fontFamily: 'Urbanist, sans-serif', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, fontFamily: 'Urbanist, sans-serif' }}>
                                   🧲 {dragSnapState.studentName || 'Termin'}
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#ffffff', background: badgeBg, padding: '2px 6px', borderRadius: '4px', backdropFilter: 'blur(4px)' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: badgeColor, background: badgeBg, padding: '2px 6px', borderRadius: '4px', backdropFilter: 'blur(4px)' }}>
                                   {dragSnapState.duration} Min.
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.6rem', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.6rem', fontWeight: 800, color: textColor }}>
                                 <span>{badgeText}</span>
                                 <span>{dragSnapState.timeStr} Uhr</span>
                               </div>
