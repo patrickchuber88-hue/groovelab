@@ -2359,6 +2359,65 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         assignStudents(remainingUnassigned, true);
       }
 
+      // Run 2-Opt Pairwise Swap Optimizer on candidate boards BEFORE evaluating globalScore
+      currentBoards = currentBoards.map(b => {
+        let bStudents = [...b.students];
+        let improved = true;
+        let passes = 0;
+
+        while (improved && passes < 5) {
+          improved = false;
+          passes++;
+
+          for (let i = 0; i < bStudents.length; i++) {
+            const sA = bStudents[i];
+            if (sA.isBreak || !sA.assignedTime) continue;
+
+            for (let j = i + 1; j < bStudents.length; j++) {
+              const sB = bStudents[j];
+              if (sB.isBreak || !sB.assignedTime) continue;
+              if (sA.duration !== sB.duration) continue;
+
+              const [shA, smA] = parseTime(sA.assignedTime);
+              const startMinA = shA * 60 + smA;
+              const endMinA = startMinA + sA.duration;
+
+              const [shB, smB] = parseTime(sB.assignedTime);
+              const startMinB = shB * 60 + smB;
+              const endMinB = startMinB + sB.duration;
+
+              if (isSlotBlockedForStudent(sA.id, b.dayOfWeek, startMinB, endMinB)) continue;
+              if (isSlotBlockedForStudent(sB.id, b.dayOfWeek, startMinA, endMinA)) continue;
+
+              const currentScoreA = calculateWunschBonus(sA.id, b.dayOfWeek, startMinA, endMinA);
+              const currentScoreB = calculateWunschBonus(sB.id, b.dayOfWeek, startMinB, endMinB);
+              const currentTotal = currentScoreA + currentScoreB;
+
+              const swappedScoreA = calculateWunschBonus(sA.id, b.dayOfWeek, startMinB, endMinB);
+              const swappedScoreB = calculateWunschBonus(sB.id, b.dayOfWeek, startMinA, endMinA);
+              const swappedTotal = swappedScoreA + swappedScoreB;
+
+              if (swappedTotal > currentTotal) {
+                const timeA = sA.assignedTime;
+                const timeB = sB.assignedTime;
+
+                bStudents[i] = { ...sA, assignedTime: timeB, customStartTime: timeB };
+                bStudents[j] = { ...sB, assignedTime: timeA, customStartTime: timeA };
+
+                newlyAssignedStudentIds[sA.id] = { day: b.dayOfWeek, time: timeB };
+                newlyAssignedStudentIds[sB.id] = { day: b.dayOfWeek, time: timeA };
+
+                improved = true;
+                break;
+              }
+            }
+            if (improved) break;
+          }
+        }
+
+        return recalculateBoardTimes({ ...b, students: bStudents });
+      });
+
       // Evaluate Global Score with Teacher-First Hierarchy:
       // Priority 1: 100% Student Assignment (+10,000,000 per student)
       // Priority 2: Maximum Wunschzeit hits (+500,000 per student)
@@ -2387,7 +2446,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const sWunschWindows = getMergedStudentWunschWindows(s.id, sAssigned.day);
           let matchedWunsch = false;
           for (const window of sWunschWindows) {
-            if (startMin >= window.startMin && endMin <= window.endMin) {
+            if (startMin < window.endMin && endMin > window.startMin) {
               matchedWunsch = true;
               break;
             }
