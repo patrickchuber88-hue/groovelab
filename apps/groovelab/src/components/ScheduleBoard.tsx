@@ -5053,24 +5053,24 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         let borderColor = '#cbd5e1';
 
                         if (isBlocked) {
-                          gBg = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-                          gBorder = '1.5px solid #ef4444';
-                          gBorderLeft = '4px solid #dc2626';
+                          gBg = '#ef4444';
+                          gBorder = '1px solid #dc2626';
+                          gBorderLeft = '4px solid #b91c1c';
                           gText = '#ffffff';
-                          gSubText = 'rgba(255, 255, 255, 0.85)';
+                          gSubText = 'rgba(255, 255, 255, 0.9)';
                           gBadgeBg = 'rgba(255, 255, 255, 0.25)';
                           gBadgeText = '#ffffff';
-                          gShadow = '0 6px 20px rgba(239, 68, 68, 0.3)';
+                          gShadow = '0 4px 12px rgba(239, 68, 68, 0.25)';
                           borderColor = '#ef4444';
                         } else if (isWunsch) {
-                          gBg = 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)';
-                          gBorder = '1.5px solid #1e7e34';
+                          gBg = '#34a853';
+                          gBorder = '1px solid #2e7d32';
                           gBorderLeft = '4px solid #f59e0b';
                           gText = '#ffffff';
-                          gSubText = 'rgba(255, 255, 255, 0.85)';
+                          gSubText = 'rgba(255, 255, 255, 0.9)';
                           gBadgeBg = 'rgba(255, 255, 255, 0.25)';
                           gBadgeText = '#ffffff';
-                          gShadow = '0 6px 20px rgba(52, 168, 83, 0.35)';
+                          gShadow = '0 4px 12px rgba(52, 168, 83, 0.2)';
                           borderColor = '#34a853';
                         }
 
@@ -5685,39 +5685,39 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         }
 
                         const cardBg = hasConflict
-                          ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+                          ? '#ef4444'
                           : (isInsideWunsch
-                              ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                              ? '#34a853'
                               : '#ffffff');
 
                         const cardBorder = hasConflict
-                          ? '1.5px solid #ef4444'
+                          ? '1px solid #dc2626'
                           : (isInsideWunsch
-                              ? '1px solid #1e7e34'
+                              ? '1px solid #2e7d32'
                               : (isSelected 
                                   ? `1.5px solid ${cardPrimaryColor}`
                                   : '1px solid rgba(0, 0, 0, 0.08)'));
 
                         const cardBorderLeft = hasConflict
-                          ? '4px solid #dc2626'
+                          ? '4px solid #b91c1c'
                           : (isInsideWunsch
                               ? '4px solid #f59e0b'
                               : `4px solid ${cardPrimaryColor}`);
 
                         const textColor = hasConflict
-                          ? '#991b1b'
+                          ? '#ffffff'
                           : (isInsideWunsch
                               ? '#ffffff'
                               : '#1d1d1f');
 
                         const badgeBg = hasConflict
-                          ? 'rgba(239, 68, 68, 0.1)'
+                          ? 'rgba(255, 255, 255, 0.25)'
                           : (isInsideWunsch
                               ? 'rgba(255, 255, 255, 0.25)'
                               : 'rgba(0, 0, 0, 0.05)');
 
                         const badgeColor = hasConflict
-                          ? '#ef4444'
+                          ? '#ffffff'
                           : (isInsideWunsch
                               ? '#ffffff'
                               : '#6e6e73');
@@ -5725,7 +5725,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const cardShadow = hasConflict
                           ? '0 2px 8px rgba(239, 68, 68, 0.15)'
                           : (isInsideWunsch
-                              ? '0 4px 12px rgba(52, 168, 83, 0.25)'
+                              ? '0 2px 8px rgba(52, 168, 83, 0.18)'
                               : (isSelected
                                   ? '0 4px 14px rgba(0, 0, 0, 0.08)'
                                   : '0 2px 8px rgba(0, 0, 0, 0.04)'));
