@@ -1858,6 +1858,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let bestBoardsState: DayBoard[] = boards;
       let bestNewlyAssigned: Record<string, { day: number; time: string }> = {};
 
+      const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
+        const studentPrefs = prefsByStudentId[studentId] || [];
+        const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
+        for (const pref of blockedPrefs) {
+          const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+
+          if (startMin < prefEnd && endMin > prefStart) {
+            return true; // Overlaps with Sperrzeit
+          }
+        }
+        return false;
+      };
+
       for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
         // Start each iteration from clean board state (preserving Breaks and syncing availabilityEnd)
         let currentBoards: DayBoard[] = boards.map(b => {
@@ -1925,18 +1938,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         return merged;
       };
 
-      const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
-        const studentPrefs = prefsByStudentId[studentId] || [];
-        const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
-        for (const pref of blockedPrefs) {
-          const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
-          if (startMin < prefEnd && endMin > prefStart) {
-            return true; // Overlaps with Sperrzeit
-          }
-        }
-        return false;
-      };
 
       const calculateWunschBonus = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const mergedWindows = getMergedStudentWunschWindows(studentId, dayOfWeek);
