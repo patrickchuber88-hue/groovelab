@@ -2191,32 +2191,38 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Run Phase 3 (Flexible)
       assignStudents(fuzzedFlexibleStudents, true);
 
-      // Evaluate Global Score
+      // Evaluate Global Score with 1 Billion Point Gravitational Magnet Force
       let globalScore = 0;
       const assignedIdsCount = Object.keys(newlyAssignedStudentIds).length;
 
-      for (const board of currentBoards) {
-        for (const s of board.students) {
-          if (newlyAssignedStudentIds[s.id] && !s.isBreak) {
-            const sPrefs = prefsByStudentId[s.id] || [];
-            if (s.assignedTime) {
-              const [ash, asm] = parseTime(s.assignedTime);
-              const startMin = ash * 60 + asm;
-              const endMin = startMin + s.duration;
+      // Count unfulfilled Wunschzeit students
+      for (const s of wunschStudents) {
+        const sAssigned = newlyAssignedStudentIds[s.id];
+        if (!sAssigned) {
+          globalScore -= 1000000000; // -1 BILLION PENALTY if Wunschzeit student is unassigned!
+          continue;
+        }
+        const board = currentBoards.find(b => b.dayOfWeek === sAssigned.day);
+        const bStudent = board?.students.find(bs => bs.id === s.id);
+        if (bStudent && bStudent.assignedTime) {
+          const [ash, asm] = parseTime(bStudent.assignedTime);
+          const startMin = ash * 60 + asm;
+          const endMin = startMin + bStudent.duration;
 
-              const wunschPrefs = sPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
-              let matchedWunsch = false;
-              for (const pref of wunschPrefs) {
-                const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-                if (startMin < prefEnd && endMin > prefStart) {
-                  matchedWunsch = true;
-                  break;
-                }
-              }
-              if (matchedWunsch) {
-                globalScore += 100000000; // 100 MILLION BONUS for fulfilling Wunschzeit window!
-              }
+          const sPrefs = prefsByStudentId[s.id] || [];
+          const wunschPrefs = sPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(sAssigned.day));
+          let matchedWunsch = false;
+          for (const pref of wunschPrefs) {
+            const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+            if (startMin < prefEnd && endMin > prefStart) {
+              matchedWunsch = true;
+              break;
             }
+          }
+          if (matchedWunsch) {
+            globalScore += 1000000000; // +1 BILLION MAGNET BONUS for fulfilling Wunschzeit window!
+          } else {
+            globalScore -= 500000000; // -500 MILLION PENALTY if placed outside Wunschzeit window!
           }
         }
       }
