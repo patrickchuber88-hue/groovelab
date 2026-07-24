@@ -818,7 +818,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .from('rooms')
         .select('id, name')
         .eq('school_id', schoolId)
-        .eq(isCampus ? 'is_campus_active' : 'is_groovelab_active', true)
         .order('name');
       const loadedRooms = rData || [];
       setRooms(loadedRooms);
@@ -927,7 +926,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setIsOnboardingCompleted(teacherProfile?.teacher_onboarding_completed ?? false);
       setTeacherAvailability(teacherProfile?.teacher_availability ?? {});
 
-      const rawPlanned = (teacherProfile as any)?.[columnName] || teacherProfile?.planned_boards;
+      const rawPlanned = teacherProfile?.planned_boards;
       const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`);
       const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${selectedTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${selectedTeacherId}`);
       const hasSavedDrafts = !!(
