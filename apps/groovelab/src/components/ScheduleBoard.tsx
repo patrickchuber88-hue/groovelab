@@ -362,6 +362,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     totalAssigned: number;
     totalStudents: number;
     totalGapsMin: number;
+    gapCount: number;
     wunschHits: number;
     siblingHits: number;
     totalSiblings: number;
@@ -2559,6 +2560,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         // Compute Post-Calculation Scorecard Report
         let reportTotalAssigned = 0;
         let reportTotalGaps = 0;
+        let reportGapCount = 0;
         let reportWunschHits = 0;
         let reportSiblingHits = 0;
         let totalSiblingsCount = 0;
@@ -2566,14 +2568,23 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         currentBoards.forEach(b => {
           let prevEndMin = -1;
           b.students.forEach(s => {
-            if (s.isBreak || !s.assignedTime) return;
-            reportTotalAssigned++;
+            if (!s.assignedTime) return;
             const [sh, sm] = parseTime(s.assignedTime);
             const sStart = sh * 60 + sm;
             const sEnd = sStart + s.duration;
 
+            if (s.isBreak) {
+              // Intentional break set by teacher - bridges timeline, NOT an unplanned gap!
+              prevEndMin = sEnd;
+              return;
+            }
+
+            reportTotalAssigned++;
+
             if (prevEndMin !== -1 && sStart > prevEndMin) {
-              reportTotalGaps += (sStart - prevEndMin);
+              const gapSize = sStart - prevEndMin;
+              reportTotalGaps += gapSize;
+              reportGapCount++;
             }
             prevEndMin = sEnd;
 
@@ -2602,16 +2613,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           });
         });
 
-        const totalStudentsCount = unassignedStudents.length;
+        const totalStudentsCount = reportTotalAssigned + unassignedCount;
         const assignmentPct = totalStudentsCount > 0 ? (reportTotalAssigned / totalStudentsCount) * 50 : 50;
         const wunschPct = reportTotalAssigned > 0 ? (reportWunschHits / reportTotalAssigned) * 35 : 35;
-        const gapBonus = reportTotalGaps === 0 ? 15 : Math.max(0, 15 - Math.floor(reportTotalGaps / 15) * 5);
+        const gapBonus = reportGapCount === 0 ? 15 : Math.max(0, 15 - reportGapCount * 5);
         const overallScore = Math.min(100, Math.round(assignmentPct + wunschPct + gapBonus));
 
         setAutoScheduleReportData({
           totalAssigned: reportTotalAssigned,
           totalStudents: totalStudentsCount,
           totalGapsMin: reportTotalGaps,
+          gapCount: reportGapCount,
           wunschHits: reportWunschHits,
           siblingHits: Math.floor(reportSiblingHits / 2),
           totalSiblings: Math.floor(totalSiblingsCount / 2),
@@ -7425,10 +7437,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     <Zap size={13} color="#0ea5e9" /> Lückenlosigkeit
                   </div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
-                    {autoScheduleReportData.totalGapsMin === 0 ? '0 Min Lücken' : `${autoScheduleReportData.totalGapsMin} Min Lücken`}
+                    {autoScheduleReportData.gapCount === 0 
+                      ? '0 Lücken (0 Min)' 
+                      : `${autoScheduleReportData.gapCount} ${autoScheduleReportData.gapCount === 1 ? 'Lücke' : 'Lücken'} (${autoScheduleReportData.totalGapsMin} Min)`}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    {autoScheduleReportData.totalGapsMin === 0 ? '100% Kompakter Tagesplan' : 'Geringer Leerlauf'}
+                    {autoScheduleReportData.gapCount === 0 ? '100% Lückenloser Tagesplan' : `${autoScheduleReportData.totalGapsMin} Min Ungeplanter Leerlauf`}
                   </div>
                 </div>
 
