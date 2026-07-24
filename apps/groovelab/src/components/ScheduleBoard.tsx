@@ -1759,6 +1759,45 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
+  const calculateLiveBoardGaps = (boardsList: DayBoard[]) => {
+    let totalGapsMin = 0;
+    let gapCount = 0;
+    let totalAssigned = 0;
+
+    boardsList.forEach(b => {
+      const assignedStudents = b.students
+        .filter(s => s.assignedTime)
+        .sort((a, b) => {
+          const [ah, am] = parseTime(a.assignedTime);
+          const [bh, bm] = parseTime(b.assignedTime);
+          return (ah * 60 + am) - (bh * 60 + bm);
+        });
+
+      let prevEndMin = -1;
+      assignedStudents.forEach(s => {
+        const [sh, sm] = parseTime(s.assignedTime);
+        const sStart = sh * 60 + sm;
+        const sEnd = sStart + s.duration;
+
+        if (s.isBreak) {
+          prevEndMin = sEnd;
+          return;
+        }
+
+        totalAssigned++;
+
+        if (prevEndMin !== -1 && sStart > prevEndMin) {
+          const gapSize = sStart - prevEndMin;
+          totalGapsMin += gapSize;
+          gapCount++;
+        }
+        prevEndMin = sEnd;
+      });
+    });
+
+    return { totalGapsMin, gapCount, totalAssigned };
+  };
+
   const handleAutoAssign = async () => {
     // 1. Collect ALL non-break students for this teacher (both pool and board) for clean-slate optimization
     const unassignedStudents = students.filter(s => !s.isBreak);
@@ -4601,33 +4640,62 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     Stundenplan-Designer
                   </h2>
                 </div>
-                {/* Erfolgs-Metric Badge */}
-                {boards.some(b => b.students.some(s => !s.isBreak)) && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    background: 'rgba(52, 168, 83, 0.08)',
-                    border: '1px solid rgba(52, 168, 83, 0.25)',
-                    borderRadius: '20px',
-                    padding: '4px 12px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    color: '#15803d',
-                    backdropFilter: 'blur(10px)',
-                    marginLeft: '8px'
-                  }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <CheckCircle size={13} color="#34a853" />
-                      <span>{boards.reduce((acc, b) => acc + b.students.filter(s => !s.isBreak).length, 0)} Schüler eingeteilt</span>
-                    </span>
-                    <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d' }}>
-                      <Zap size={12} color="#16a34a" />
-                      <span>0 Min Lücken (Lückenlos)</span>
-                    </span>
-                  </div>
-                )}
+                {boards.some(b => b.students.some(s => !s.isBreak && s.assignedTime)) && (() => {
+                  const { totalGapsMin, gapCount, totalAssigned } = calculateLiveBoardGaps(boards);
+                  const unassignedCount = unassignedStudents.length;
+                  const totalStudentsCount = unassignedCount + totalAssigned;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const assignmentPct = totalStudentsCount > 0 ? (totalAssigned / totalStudentsCount) * 50 : 50;
+                        const gapBonus = gapCount === 0 ? 15 : Math.max(0, 15 - gapCount * 5);
+                        const overallScore = Math.min(100, Math.round(assignmentPct + gapBonus));
+
+                        setAutoScheduleReportData({
+                          totalAssigned,
+                          totalStudents: totalStudentsCount,
+                          totalGapsMin,
+                          gapCount,
+                          wunschHits: 0,
+                          siblingHits: 0,
+                          totalSiblings: 0,
+                          overallScore
+                        });
+                        setShowAutoScheduleReportModal(true);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '5px 12px',
+                        borderRadius: '20px',
+                        background: totalGapsMin === 0 ? '#f0fdf4' : '#fffbeb',
+                        border: `1px solid ${totalGapsMin === 0 ? '#bbf7d0' : '#fde68a'}`,
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        color: totalGapsMin === 0 ? '#15803d' : '#b45309',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                        transition: 'all 0.15s',
+                        marginLeft: '8px'
+                      }}
+                      className="hover-scale-mini"
+                      title="Klicken, um die Auswertung & Erfolgsanalyse erneut zu öffnen"
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle size={13} color={totalGapsMin === 0 ? "#34a853" : "#d97706"} />
+                        <span>{totalAssigned} Schüler eingeteilt</span>
+                      </span>
+                      <span style={{ color: '#cbd5e1' }}>•</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Zap size={12} color={totalGapsMin === 0 ? "#16a34a" : "#d97706"} />
+                        <span>{gapCount === 0 ? '0 Min Lücken (Lückenlos)' : `${totalGapsMin} Min ${gapCount === 1 ? 'Lücke' : 'Lücken'}`}</span>
+                      </span>
+                      <Sparkles size={12} style={{ marginLeft: '2px', opacity: 0.8 }} />
+                    </button>
+                  );
+                })()}
               </div>
 
               {/* Center: Tab-Switcher + Tour + Raster */}
