@@ -4272,15 +4272,18 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-          {/* Header Panel — same 2-row layout as ScheduleCalendarView */}
+          {/* Header Panel — sticky on iPad / desktop */}
           <div style={{ 
-            background: 'rgba(255, 255, 255, 0.65)', 
+            position: 'sticky',
+            top: '10px',
+            zIndex: 50,
+            background: 'rgba(255, 255, 255, 0.75)', 
             backdropFilter: 'blur(30px) saturate(210%)', 
             WebkitBackdropFilter: 'blur(30px) saturate(210%)',
             borderRadius: '16px', 
             padding: '12px 16px', 
             border: '1px solid rgba(255, 255, 255, 0.6)', 
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)', 
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.04)', 
             display: 'flex',
             flexDirection: 'column',
             gap: '10px'
@@ -4755,7 +4758,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               borderRadius: '24px',
               padding: '20px 8px',
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              overflow: 'hidden'
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch'
             }}>
               {boards.filter(b => focusedDayOfWeek === null || b.dayOfWeek === focusedDayOfWeek).map((board, index, arr) => {
                 const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
