@@ -104,11 +104,15 @@ const parseDayNumber = (val: any): number => {
 
 const resolveFirstName = (s: any): string => {
   if (s && s.first_name && typeof s.first_name === 'string' && s.first_name.trim()) return s.first_name.trim();
+  const fullName = s?.full_name || s?.name || s?.display_name || '';
+  if (fullName && typeof fullName === 'string' && fullName.trim()) return fullName.trim().split(' ')[0];
   return 'Schüler';
 };
 
 const resolveLastName = (s: any): string => {
   if (s && s.last_name && typeof s.last_name === 'string' && s.last_name.trim()) return s.last_name.trim();
+  const fullName = s?.full_name || s?.name || s?.display_name || '';
+  if (fullName && typeof fullName === 'string' && fullName.trim().includes(' ')) return fullName.trim().split(' ').slice(1).join(' ');
   return '';
 };
 
