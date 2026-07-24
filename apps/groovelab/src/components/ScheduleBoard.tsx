@@ -5101,13 +5101,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: gText, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  {isWunsch && (
-                                    <Star size={11} color="currentColor" />
-                                  )}
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: gText, pointerEvents: 'none' }}>
                                   {dragSnapState.timeStr}
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: gBadgeText, background: gBadgeBg, padding: '1px 5px', borderRadius: '4px' }}>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: gBadgeText, background: gBadgeBg, padding: '1px 5px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  {isWunsch && (
+                                    <Star size={9} fill="currentColor" color="currentColor" />
+                                  )}
                                   {dragSnapState.duration}m
                                 </span>
                               </div>
@@ -5949,15 +5949,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
                                 )}
-                                {isInsideWunsch && (
-                                  <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                    <Star size={11} color="currentColor" />
-                                  </span>
-                                )}
                                 {bs.assignedTime}
                               </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'auto' }}>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none' }}>{bs.duration}m</span>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                {isInsideWunsch && (
+                                  <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                    <Star size={9} fill="currentColor" color="currentColor" />
+                                  </span>
+                                )}
+                                {bs.duration}m
+                              </span>
                               <button 
                                 type="button" 
                                 onClick={(e) => {
