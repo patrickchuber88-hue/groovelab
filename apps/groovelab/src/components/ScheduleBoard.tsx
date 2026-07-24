@@ -5070,13 +5070,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                         // Match exact dropped card styling (Los-Lass-Modus) for 100% seamless transition
                         const dragInst = resolveInstrument();
+                        const defBorderColor = isCampus ? 'rgba(52, 168, 83, 0.2)' : (isGroovelab ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 67, 53, 0.2)');
+                        const defPrimaryColor = brandColor;
+                        const defTextColor = '#1d1d1f';
+                        const defSubTextColor = '#86868b';
+                        const defBadgeBg = isCampus ? 'rgba(52, 168, 83, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
                         let gBg = '#ffffff';
-                        let gBorder = `1px solid ${cardBorderColor}`;
-                        let gBorderLeft = `4px solid ${cardPrimaryColor}`;
-                        let gText = textColor;
-                        let gSubText = cardTextColor;
-                        let gBadgeBg = badgeBg;
-                        let gBadgeText = badgeColor;
+                        let gBorder = `1px solid ${defBorderColor}`;
+                        let gBorderLeft = `4px solid ${defPrimaryColor}`;
+                        let gText = defTextColor;
+                        let gSubText = defSubTextColor;
+                        let gBadgeBg = defBadgeBg;
+                        let gBadgeText = defPrimaryColor;
                         let gShadow = '0 6px 20px rgba(0,0,0,0.12)';
 
                         if (isBlocked) {
