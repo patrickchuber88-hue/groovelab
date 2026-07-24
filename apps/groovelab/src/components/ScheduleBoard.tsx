@@ -1627,10 +1627,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleAutoAssign = async () => {
-    // 1. Find all unassigned students for this teacher
-    const unassignedStudents = students.filter(s => !s.assignedDay && !s.isBreak);
+    // 1. Collect ALL non-break students for this teacher (both pool and board) for clean-slate optimization
+    const unassignedStudents = students.filter(s => !s.isBreak);
     if (unassignedStudents.length === 0) {
-      setToast({ message: "Alle Schüler sind bereits eingeteilt!", type: 'success' });
+      setToast({ message: "Keine Schüler zum Einteilen vorhanden!", type: 'warning' });
       return;
     }
 
@@ -1734,7 +1734,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let bestNewlyAssigned: Record<string, { day: number; time: string }> = {};
 
       for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
-        let currentBoards = boards.map(b => ({ ...b, students: [...b.students] }));
+        // Start each iteration from clean board state (preserving Breaks)
+        let currentBoards = boards.map(b => ({ ...b, students: b.students.filter(s => s.isBreak) }));
         const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
 
         const fuzzedWunschStudents = [...wunschStudents];
@@ -2162,6 +2163,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Update state
       setBoards(currentBoards);
       setStudents(currentStudents => currentStudents.map(s => {
+        if (s.isBreak) return s;
         if (newlyAssignedStudentIds[s.id]) {
           return {
             ...s,
@@ -2169,7 +2171,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             assignedTime: newlyAssignedStudentIds[s.id].time
           };
         }
-        return s;
+        return {
+          ...s,
+          assignedDay: undefined,
+          assignedTime: undefined
+        };
       }));
 
       const assignedCount = Object.keys(newlyAssignedStudentIds).length;
