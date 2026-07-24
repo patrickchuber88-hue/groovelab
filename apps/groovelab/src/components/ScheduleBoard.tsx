@@ -2343,6 +2343,87 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     let currentBoards = bestBoardsState;
     const newlyAssignedStudentIds = bestNewlyAssigned;
 
+    // GRANDMASTER PAWN-CHAIN COMPACTOR SWEEP:
+    // Compact all boards lückenlos from startAnchor, stripping customStartTime gaps unless Sperrzeit is hit!
+    currentBoards = currentBoards.map(b => {
+      const sortedStudents = [...b.students].sort((a, b) => {
+        const aTime = a.customStartTime || a.assignedTime;
+        const bTime = b.customStartTime || b.assignedTime;
+        if (aTime && bTime) {
+          const [ah, am] = parseTime(aTime);
+          const [bh, bm] = parseTime(bTime);
+          return (ah * 60 + am) - (bh * 60 + bm);
+        }
+        return 0;
+      });
+
+      let currentTime = b.startAnchor;
+      const compactedStudents = sortedStudents.map(s => {
+        if (s.isBreak) {
+          if (s.customStartTime || s.assignedTime) {
+            const [curH, curM] = parseTime(currentTime);
+            const breakTime = s.customStartTime || s.assignedTime!;
+            const [bh, bm] = parseTime(breakTime);
+            if (bh * 60 + bm > curH * 60 + curM) {
+              currentTime = breakTime;
+            }
+          }
+          const assignedTime = currentTime;
+          currentTime = addMinutesToTime(currentTime, s.duration);
+          return { ...s, assignedTime };
+        }
+
+        const [curH, curM] = parseTime(currentTime);
+        const candidateStartMin = curH * 60 + curM;
+        const candidateEndMin = candidateStartMin + s.duration;
+
+        // Check if candidate position violates student's Sperrzeit
+        const isSperrzeit = isSlotBlockedForStudent(s.id, b.dayOfWeek, candidateStartMin, candidateEndMin);
+
+        if (!isSperrzeit) {
+          // Free to compact! Strip customStartTime gap and assign back-to-back
+          const assignedTime = currentTime;
+          currentTime = addMinutesToTime(currentTime, s.duration);
+          newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
+          return {
+            ...s,
+            customStartTime: undefined,
+            assignedDay: b.dayOfWeek,
+            assignedTime
+          };
+        } else if (s.customStartTime) {
+          // Respect Sperrzeit jump
+          const [csh, csm] = parseTime(s.customStartTime);
+          if (csh * 60 + csm > candidateStartMin) {
+            currentTime = s.customStartTime;
+          }
+          const assignedTime = currentTime;
+          currentTime = addMinutesToTime(currentTime, s.duration);
+          newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
+          return {
+            ...s,
+            assignedDay: b.dayOfWeek,
+            assignedTime
+          };
+        } else {
+          const assignedTime = currentTime;
+          currentTime = addMinutesToTime(currentTime, s.duration);
+          newlyAssignedStudentIds[s.id] = { day: b.dayOfWeek, time: assignedTime };
+          return {
+            ...s,
+            assignedDay: b.dayOfWeek,
+            assignedTime
+          };
+        }
+      });
+
+      return {
+        ...b,
+        students: compactedStudents,
+        endAnchor: currentTime
+      };
+    });
+
     // Track unassignable student IDs
     const failedIds = unassignedStudents
       .filter(s => !newlyAssignedStudentIds[s.id])
