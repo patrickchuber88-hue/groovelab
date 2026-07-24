@@ -1858,6 +1858,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       let bestBoardsState: DayBoard[] = boards;
       let bestNewlyAssigned: Record<string, { day: number; time: string }> = {};
 
+      const SOLVER_TIERS = {
+        ASSIGNMENT_PRIORITY: 100000, // Tier 1: 100% Student Assignment (Highest Priority)
+        GAP_COMPACTION: 10000,       // Tier 2: Lückenlosigkeit & zero gaps
+        WUNSCHZEIT_HIT: 1000,        // Tier 3: Wunschzeit window hits
+        NEUTRAL_ASSIGNMENT: 100,     // Tier 3b: Neutral slot hits (Sand im Getriebe)
+        SIBLING_MATCH: 50            // Tier 4: Sibling back-to-back
+      } as const;
+
       const isSlotBlockedForStudent = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const studentPrefs = prefsByStudentId[studentId] || [];
         const blockedPrefs = studentPrefs.filter(p => p.preference_type === 'gesperrt' && parseDayNumber(p.day_of_week) === parseDayNumber(dayOfWeek));
@@ -1944,9 +1952,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const mergedWindows = getMergedStudentWunschWindows(studentId, dayOfWeek);
         for (const window of mergedWindows) {
           if (startMin >= window.startMin && endMin <= window.endMin) {
-            return 1000000; // High Wunschzeit-Treffer Bonus (100% inside merged window)
+            return SOLVER_TIERS.WUNSCHZEIT_HIT; // High Wunschzeit-Treffer Bonus (100% inside merged window)
           } else if (startMin < window.endMin && endMin > window.startMin) {
-            return 500000; // Partial overlap with Wunschzeit window (e.g. 15 min inside Wunschzeit, 15 min neutral)
+            return Math.floor(SOLVER_TIERS.WUNSCHZEIT_HIT / 2); // Partial overlap with Wunschzeit window
           }
         }
         return 0;
@@ -2040,11 +2048,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
 
         if (lueckenlos) {
-          score += 50000000; // 50 MILLION Lückenlos Compaction Bonus!
+          score += SOLVER_TIERS.GAP_COMPACTION; // Lückenlos Compaction Bonus!
         } else {
-          // Heavy Gap Penalty for ANY isolated gap created in the middle of a board!
-          if (gapBefore > 0) score -= Math.floor(gapBefore / 15) * 10000000;
-          if (gapAfter > 0 && gapAfter < 1440) score -= Math.floor(gapAfter / 15) * 10000000;
+          if (gapBefore > 0) score -= Math.floor(gapBefore / 15) * Math.floor(SOLVER_TIERS.GAP_COMPACTION / 2);
+          if (gapAfter > 0 && gapAfter < 1440) score -= Math.floor(gapAfter / 15) * Math.floor(SOLVER_TIERS.GAP_COMPACTION / 2);
         }
 
         return score;
@@ -2275,7 +2282,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Priority 3: Compact Lückenlose Blöcke (+100,000 per 0-gap connection)
       let globalScore = 0;
       const assignedIdsCount = Object.keys(newlyAssignedStudentIds).length;
-      globalScore += assignedIdsCount * 10000000;
+      globalScore += assignedIdsCount * SOLVER_TIERS.ASSIGNMENT_PRIORITY;
 
       for (const s of unassignedStudents) {
         const sAssigned = newlyAssignedStudentIds[s.id];
@@ -2290,7 +2297,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
           // Hard Penalty if in Sperrzeit
           if (isSlotBlockedForStudent(s.id, sAssigned.day, startMin, endMin)) {
-            globalScore -= 50000000;
+            globalScore -= SOLVER_TIERS.ASSIGNMENT_PRIORITY * 10;
             continue;
           }
 
@@ -2304,9 +2311,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           }
 
           if (matchedWunsch) {
-            globalScore += 500000; // High bonus for Wunschzeit hit
+            globalScore += SOLVER_TIERS.WUNSCHZEIT_HIT; // Bonus for Wunschzeit hit
           } else {
-            globalScore += 50000; // Positive reward for neutral slot assignment (Sand im Getriebe)
+            globalScore += SOLVER_TIERS.NEUTRAL_ASSIGNMENT; // Reward for neutral slot assignment (Sand im Getriebe)
           }
         }
       }
@@ -2326,9 +2333,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           if (prevEndMin !== -1) {
             const gap = sStart - prevEndMin;
             if (gap === 0) {
-              globalScore += 100000; // Lückenlos-Bonus!
+              globalScore += SOLVER_TIERS.GAP_COMPACTION; // Lückenlos-Bonus!
             } else {
-              globalScore -= gap * 500; // Penalty for gaps in teacher schedule
+              globalScore -= Math.floor(gap / 15) * Math.floor(SOLVER_TIERS.GAP_COMPACTION / 2);
             }
           }
           prevEndMin = sEnd;
