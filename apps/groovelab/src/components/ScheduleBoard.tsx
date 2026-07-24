@@ -102,6 +102,20 @@ const parseDayNumber = (val: any): number => {
   return 0;
 };
 
+const resolveFirstName = (s: any): string => {
+  if (s.first_name && typeof s.first_name === 'string' && s.first_name.trim()) return s.first_name.trim();
+  const fullName = s.full_name || s.name || '';
+  if (fullName && typeof fullName === 'string' && fullName.trim()) return fullName.trim().split(' ')[0];
+  return 'Schüler';
+};
+
+const resolveLastName = (s: any): string => {
+  if (s.last_name && typeof s.last_name === 'string' && s.last_name.trim()) return s.last_name.trim();
+  const fullName = s.full_name || s.name || '';
+  if (fullName && typeof fullName === 'string' && fullName.trim().includes(' ')) return fullName.trim().split(' ').slice(1).join(' ');
+  return '';
+};
+
 const formatMinutes = (totalMins: number): string => {
   const h = Math.floor(totalMins / 60);
   const m = totalMins % 60;
@@ -828,7 +842,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch students from users table assigned to this teacher (or linked via students table)
       let userQuery = supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
+        .select('id, first_name, last_name, name, full_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
         .eq('school_id', schoolId)
         .eq('role', 'student');
 
@@ -843,7 +857,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
         .from('pending_students_decrypted')
-        .select('id, first_name, last_name, instrument, lesson_duration')
+        .select('id, first_name, last_name, name, full_name, instrument, lesson_duration')
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
@@ -866,8 +880,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const loadedStudents: Student[] = [
         ...(sData || []).map(s => ({
           id: s.id,
-          first_name: s.first_name || (s as any).name || (s as any).full_name || 'Schüler',
-          last_name: s.last_name || '',
+          first_name: resolveFirstName(s),
+          last_name: resolveLastName(s),
           instrument: s.instrument || 'Musiker',
           duration: s.lesson_duration || 30,
           status: (statusMap[s.id] || 'verplant') as any,
@@ -878,8 +892,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         })),
         ...(pendingData || []).map((s: any) => ({
           id: s.id,
-          first_name: s.first_name,
-          last_name: s.last_name,
+          first_name: resolveFirstName(s),
+          last_name: resolveLastName(s),
           instrument: s.instrument || 'Musiker',
           duration: s.lesson_duration || 30,
           status: 'ausstehend' as const,
@@ -1999,12 +2013,27 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                 let customStartTimeViolated = false;
                 for (const bs of tempBoardTest.students) {
-                  if (bs.customStartTime && bs.assignedTime) {
-                    const [csh, csm] = parseTime(bs.customStartTime);
+                  if (bs.assignedTime) {
                     const [ash, asm] = parseTime(bs.assignedTime);
-                    if (ash * 60 + asm > csh * 60 + csm) {
-                      customStartTimeViolated = true;
-                      break;
+                    const startMin = ash * 60 + asm;
+                    const endMin = startMin + bs.duration;
+
+                    // Hard-Lock: Verify that no Wunschzeit student is pushed out of their Wunschzeit window
+                    const bsPrefs = prefsByStudentId[bs.id] || [];
+                    const bsWunschPrefs = bsPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(tempBoardTest.dayOfWeek));
+                    if (bsWunschPrefs.length > 0) {
+                      let isStillInWunsch = false;
+                      for (const pref of bsWunschPrefs) {
+                        const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+                        if (startMin < prefEnd && endMin > prefStart) {
+                          isStillInWunsch = true;
+                          break;
+                        }
+                      }
+                      if (!isStillInWunsch) {
+                        customStartTimeViolated = true;
+                        break;
+                      }
                     }
                   }
                 }
@@ -2146,19 +2175,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Evaluate Global Score
       let globalScore = 0;
       const assignedIdsCount = Object.keys(newlyAssignedStudentIds).length;
-      globalScore += assignedIdsCount * 10000000; // Maximizing total assignments is priority #1
 
       for (const board of currentBoards) {
         for (const s of board.students) {
-          if (newlyAssignedStudentIds[s.id]) {
+          if (newlyAssignedStudentIds[s.id] && !s.isBreak) {
             const sPrefs = prefsByStudentId[s.id] || [];
-            const isWunsch = sPrefs.some(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
-            if (isWunsch) {
-              globalScore += 500000; // Priority #2: Maximize Wunschzeit hits
+            if (s.assignedTime) {
+              const [ash, asm] = parseTime(s.assignedTime);
+              const startMin = ash * 60 + asm;
+              const endMin = startMin + s.duration;
+
+              const wunschPrefs = sPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
+              let matchedWunsch = false;
+              for (const pref of wunschPrefs) {
+                const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+                if (startMin < prefEnd && endMin > prefStart) {
+                  matchedWunsch = true;
+                  break;
+                }
+              }
+              if (matchedWunsch) {
+                globalScore += 100000000; // 100 MILLION BONUS for fulfilling Wunschzeit window!
+              }
             }
           }
         }
       }
+
+      globalScore += assignedIdsCount * 100000; // Total student count is secondary to Wunschzeiten!
 
       if (globalScore > bestGlobalScore) {
         bestGlobalScore = globalScore;
