@@ -5038,39 +5038,33 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           }
                         }
 
-                        // Determine soft flat color theme (Soft Apple Light Gray for Neutral, Soft Emerald Green for Wunsch, Soft Ruby Red for Blocked)
-                        let bgStyle = '#f1f5f9';
-                        let borderStyle = '1.5px solid #94a3b8';
-                        let shadowStyle = '0 4px 12px rgba(0, 0, 0, 0.06)';
-                        let badgeText = '📌 FREIER SLOT';
-                        let badgeBg = '#64748b';
-                        let badgeColor = '#ffffff';
-                        let textColor = '#334155';
-                        let lineColor = '#64748b';
+                        // Purist Apple Senior Design (Glassmorphism, Brand Colors, Zero Emojis)
+                        let cardBg = 'rgba(255, 255, 255, 0.96)';
+                        let borderColor = brandColor;
+                        let shadowStyle = `0 4px 16px ${brandColor}20`;
+                        let statusLabel = 'Freier Slot';
+                        let pillBg = 'rgba(0, 0, 0, 0.05)';
+                        let pillColor = '#475569';
 
                         if (isBlocked) {
-                          bgStyle = '#ef4444';
-                          borderStyle = '2px solid #fca5a5';
-                          shadowStyle = '0 6px 16px rgba(239, 68, 68, 0.25)';
-                          badgeText = '🛑 SPERRZEIT (VERBOTEN)';
-                          badgeBg = 'rgba(255, 255, 255, 0.25)';
-                          badgeColor = '#ffffff';
-                          textColor = '#ffffff';
-                          lineColor = '#ef4444';
+                          cardBg = 'rgba(254, 242, 242, 0.96)';
+                          borderColor = '#ef4444';
+                          shadowStyle = '0 4px 16px rgba(239, 68, 68, 0.2)';
+                          statusLabel = 'Sperrzeit (Verboten)';
+                          pillBg = '#fee2e2';
+                          pillColor = '#991b1b';
                         } else if (isWunsch) {
-                          bgStyle = '#22c55e';
-                          borderStyle = '2px solid #f59e0b';
-                          shadowStyle = '0 6px 16px rgba(34, 197, 94, 0.25)';
-                          badgeText = '⭐ WUNSCHZEIT!';
-                          badgeBg = '#f59e0b';
-                          badgeColor = '#1e293b';
-                          textColor = '#ffffff';
-                          lineColor = '#f59e0b';
+                          cardBg = 'rgba(240, 253, 244, 0.96)';
+                          borderColor = '#34a853';
+                          shadowStyle = '0 4px 16px rgba(52, 168, 83, 0.2)';
+                          statusLabel = 'Wunschzeit getroffen!';
+                          pillBg = '#d1fae5';
+                          pillColor = '#065f46';
                         }
 
                         return (
                           <>
-                            {/* Cubase Ghost Event Frame (100% Full-Size, Solid Full-Color) */}
+                            {/* Purist Apple Glass Ghost Event Frame */}
                             <div
                               style={{
                                 position: 'absolute',
@@ -5078,45 +5072,45 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 right: '4px',
                                 top: `${Math.max(dragSnapState.topPx, 0)}px`,
                                 height: `${dragSnapState.duration * PX_PER_MIN}px`,
-                                background: bgStyle,
-                                border: borderStyle,
-                                borderRadius: '8px',
+                                background: cardBg,
+                                backdropFilter: 'blur(16px)',
+                                WebkitBackdropFilter: 'blur(16px)',
+                                border: `1.5px solid ${borderColor}`,
+                                borderRadius: '10px',
                                 zIndex: 98,
                                 pointerEvents: 'none',
                                 boxSizing: 'border-box',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
-                                padding: '5px 8px',
+                                padding: '6px 10px',
                                 transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
                                 boxShadow: shadowStyle,
-                                color: textColor
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, fontFamily: 'Urbanist, sans-serif' }}>
-                                  🧲 {dragSnapState.studentName || 'Termin'}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d1d1f', fontFamily: 'Urbanist, sans-serif', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {dragSnapState.studentName || 'Termin'}
                                 </span>
-                                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: badgeColor, background: badgeBg, padding: '2px 6px', borderRadius: '4px', backdropFilter: 'blur(4px)' }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: pillColor, background: pillBg, padding: '1px 6px', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                                   {dragSnapState.duration} Min.
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.6rem', fontWeight: 800, color: textColor }}>
-                                <span>{badgeText}</span>
-                                <span>{dragSnapState.timeStr} Uhr</span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', fontSize: '0.62rem', fontWeight: 600 }}>
+                                <span style={{ color: pillColor, fontWeight: 700 }}>{statusLabel}</span>
+                                <span style={{ color: '#1d1d1f', fontWeight: 700 }}>{dragSnapState.timeStr} Uhr</span>
                               </div>
                             </div>
 
-                            {/* Top Snap Line with Badge */}
+                            {/* Minimalist Apple Snap Line */}
                             <div 
                               style={{ 
                                 position: 'absolute', 
                                 left: 0, 
                                 right: 0, 
                                 top: `${Math.max(dragSnapState.topPx, 0)}px`, 
-                                height: '2px', 
-                                background: lineColor, 
-                                boxShadow: `0 0 12px ${lineColor}, 0 0 4px ${lineColor}`, 
+                                height: '1.5px', 
+                                background: borderColor, 
                                 zIndex: 99, 
                                 pointerEvents: 'none',
                                 transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -5125,24 +5119,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               <div 
                                 style={{ 
                                   position: 'absolute', 
-                                  right: '8px', 
-                                  top: '-12px', 
-                                  background: lineColor, 
+                                  right: '6px', 
+                                  top: '-10px', 
+                                  background: '#1d1d1f', 
                                   color: '#ffffff', 
-                                  fontSize: '0.68rem', 
-                                  fontWeight: 800, 
-                                  padding: '2px 8px', 
-                                  borderRadius: '6px', 
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontFamily: 'Urbanist, sans-serif',
-                                  letterSpacing: '0.02em'
+                                  fontSize: '0.64rem', 
+                                  fontWeight: 700, 
+                                  padding: '2px 7px', 
+                                  borderRadius: '5px', 
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                  fontFamily: 'Urbanist, sans-serif'
                                 }}
                               >
-                                <span>🧲</span>
-                                <span>{dragSnapState.timeStr} Uhr</span>
+                                {dragSnapState.timeStr} Uhr
                               </div>
                             </div>
                           </>
