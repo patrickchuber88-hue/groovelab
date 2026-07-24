@@ -2510,15 +2510,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
   };
 
-  // Drag start handler for students (100% Synchronous for 0ms Drag Latency!)
+  // Drag start handler for students (100% Synchronous for 0ms Instant Drag Latency!)
   const handleDragStart = (studentId: string, source: 'sidebar' | 'board', boardId?: string, e?: React.DragEvent) => {
-    setDraggedStudentId(studentId);
-    setDragSource(source);
-    if (boardId) setDragSourceBoardId(boardId);
-    setDragOverBoardId(null);
-    setDragOverIndex(null);
-
-    // Suppress native drag preview image so ONLY the Cubase Ghost Event Frame glides on the timetable grid
+    // 1. FIRST LINE: DataTransfer setup for 0ms browser drag loop initialization!
     if (e && e.dataTransfer) {
       try {
         e.dataTransfer.effectAllowed = 'move';
@@ -2532,6 +2526,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         // Fallback silently if setDragImage is blocked
       }
     }
+
+    setDraggedStudentId(studentId);
+    setDragSource(source);
+    if (boardId) setDragSourceBoardId(boardId);
+    setDragOverBoardId(null);
+    setDragOverIndex(null);
 
     // Resolve dragged duration and name for Cubase ghost preview synchronously
     let dur = 30;
@@ -5877,6 +5877,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           <div
                             key={bs.id}
                             draggable={true}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => {
+                              (e.currentTarget as HTMLElement).style.cursor = 'grabbing';
+                            }}
+                            onMouseUp={(e) => {
+                              (e.currentTarget as HTMLElement).style.cursor = isGroupModeActive ? 'pointer' : 'grab';
+                            }}
                             onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => {
