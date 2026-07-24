@@ -3217,27 +3217,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     const student = students.find(s => s.id === draggedStudentId);
     if (!student && !isBreakDrag) return;
 
-    // Check if we dropped on a specific student card (cross-student drop)
-    if (index !== undefined && !isBreakDrag && !droppedCustomTime) {
-      const targetBoard = boards.find(b => b.id === targetBoardId);
-      if (targetBoard) {
-        const targetStudent = targetBoard.students[index];
-        if (targetStudent && targetStudent.id !== draggedStudentId && !targetStudent.isBreak) {
-          // Open decision popup
-          setDropDecisionState({ 
-            sourceId: draggedStudentId, 
-            targetId: targetStudent.id, 
-            targetBoardId, 
-            index,
-            dragSource,
-            dragSourceBoardId
-          });
-          return;
-        }
-      }
-    }
-
-    // Otherwise, execute standard drop immediately!
+    // Otherwise, execute standard drop immediately with instant swap / reordering!
     await executeStandardDrop(draggedStudentId, targetBoardId, index, dragSource, dragSourceBoardId, undefined, droppedCustomTime);
   };
 
@@ -3422,12 +3402,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           const nextStudents = [...targetBoard.students];
           const curIndex = nextStudents.findIndex(s => s.id === sourceId);
           if (curIndex !== -1) {
-            const [moved] = nextStudents.splice(curIndex, 1);
-            const movedCleared = { ...moved, customStartTime: droppedCustomTime || undefined };
-            if (index !== undefined && !droppedCustomTime) {
-              nextStudents.splice(index, 0, movedCleared);
+            if (index !== undefined && !droppedCustomTime && index < nextStudents.length && curIndex !== index) {
+              // Instant 1-to-1 Swap between source and target student
+              const temp = nextStudents[curIndex];
+              nextStudents[curIndex] = nextStudents[index];
+              nextStudents[index] = temp;
             } else {
-              nextStudents.push(movedCleared);
+              const [moved] = nextStudents.splice(curIndex, 1);
+              const movedCleared = { ...moved, customStartTime: droppedCustomTime || undefined };
+              if (index !== undefined && !droppedCustomTime) {
+                nextStudents.splice(index, 0, movedCleared);
+              } else {
+                nextStudents.push(movedCleared);
+              }
             }
             const updated = recalculateBoardTimes({ ...targetBoard, students: nextStudents });
             
@@ -6382,7 +6369,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               height: `${Math.max(cardHeightPx, 32)}px`,
                               background: cardBg,
                               border: draggedStudentId === bs.id ? '2px dashed #16a34a' : (isSelected ? '2px solid #16a34a' : finalBorder),
-                              borderLeft: isSelected ? '5px solid #15803d' : cardBorderLeft,
+                              borderLeft: isSelected ? `5px solid ${hasConflict ? '#b91c1c' : (isInsideWunsch ? '#f59e0b' : cardPrimaryColor)}` : cardBorderLeft,
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
