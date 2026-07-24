@@ -103,16 +103,12 @@ const parseDayNumber = (val: any): number => {
 };
 
 const resolveFirstName = (s: any): string => {
-  if (s.first_name && typeof s.first_name === 'string' && s.first_name.trim()) return s.first_name.trim();
-  const fullName = s.full_name || s.name || '';
-  if (fullName && typeof fullName === 'string' && fullName.trim()) return fullName.trim().split(' ')[0];
+  if (s && s.first_name && typeof s.first_name === 'string' && s.first_name.trim()) return s.first_name.trim();
   return 'Schüler';
 };
 
 const resolveLastName = (s: any): string => {
-  if (s.last_name && typeof s.last_name === 'string' && s.last_name.trim()) return s.last_name.trim();
-  const fullName = s.full_name || s.name || '';
-  if (fullName && typeof fullName === 'string' && fullName.trim().includes(' ')) return fullName.trim().split(' ').slice(1).join(' ');
+  if (s && s.last_name && typeof s.last_name === 'string' && s.last_name.trim()) return s.last_name.trim();
   return '';
 };
 
@@ -842,7 +838,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch students from users table assigned to this teacher (or linked via students table)
       let userQuery = supabase
         .from('users')
-        .select('id, first_name, last_name, name, full_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
+        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
         .eq('school_id', schoolId)
         .eq('role', 'student');
 
@@ -857,7 +853,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
         .from('pending_students_decrypted')
-        .select('id, first_name, last_name, name, full_name, instrument, lesson_duration')
+        .select('id, first_name, last_name, instrument, lesson_duration')
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
