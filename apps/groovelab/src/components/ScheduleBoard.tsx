@@ -315,8 +315,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
       return 'Instrument';
     }
-    return inst.trim();
+    return inst ? inst.trim() : 'Instrument';
   };
+  const [draggedStudentId, setDraggedStudentId] = useState<string | null>(null);
   const [dragSource, setDragSource] = useState<'sidebar' | 'board' | null>(null);
   const [dragSourceBoardId, setDragSourceBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
@@ -2527,7 +2528,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   // Drag start handler for students (either from sidebar or day board)
-  const handleDragStart = async (studentId: string, source: 'sidebar' | 'board', boardId?: string) => {
+  const handleDragStart = async (studentId: string, source: 'sidebar' | 'board', boardId?: string, e?: React.DragEvent) => {
     setDraggedStudentId(studentId);
     setDragSource(source);
     if (boardId) setDragSourceBoardId(boardId);
@@ -2537,9 +2538,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     // Resolve dragged duration and name for Cubase ghost preview
     let dur = 30;
     let name = 'Termin';
+    let inst = 'Instrument';
     if (studentId === 'sidebar-pause' || studentId.startsWith('break-')) {
       dur = 15;
       name = 'Pause';
+      inst = 'Pause';
       if (studentId.startsWith('break-')) {
         for (const b of boards) {
           const bs = b.students.find(s => s.id === studentId);
@@ -2553,13 +2556,15 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const foundSidebar = students.find(s => s.id === studentId);
       if (foundSidebar) {
         dur = foundSidebar.duration || 30;
-        name = `${foundSidebar.first_name} ${foundSidebar.last_name}`.trim();
+        name = `${foundSidebar.first_name || ''} ${foundSidebar.last_name || ''}`.trim();
+        inst = resolveInstrument(foundSidebar.instrument);
       } else {
         for (const b of boards) {
           const bs = b.students.find(s => s.id === studentId);
           if (bs) {
             dur = bs.duration || 30;
-            name = `${bs.first_name} ${bs.last_name}`.trim();
+            name = `${bs.first_name || ''} ${bs.last_name || ''}`.trim();
+            inst = resolveInstrument(bs.instrument);
             break;
           }
         }
@@ -5959,7 +5964,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               <div
                 id="tour-special-features"
                 draggable
-                onDragStart={() => handleDragStart('sidebar-pause', 'sidebar')}
+                onDragStart={(e) => handleDragStart('sidebar-pause', 'sidebar', undefined, e)}
                 onDragEnd={handleDragEnd}
                 style={{
                   background: 'rgba(254, 243, 199, 0.5)',
@@ -6047,7 +6052,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     <div
                       key={s.id}
                       draggable={!isAssigned}
-                      onDragStart={() => handleDragStart(s.id, 'sidebar')}
+                      onDragStart={(e) => handleDragStart(s.id, 'sidebar', undefined, e)}
                       onDragEnd={handleDragEnd}
                       onClick={() => handleSelectStudent(s.id)}
                       className={isShaking ? 'card-shake' : ''}
