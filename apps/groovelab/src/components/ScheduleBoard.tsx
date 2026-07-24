@@ -826,26 +826,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         setNewBoardRoom(loadedRooms[0].id);
       }
       
-      // 2. Fetch full student data from students table assigned to this teacher
+      // 2. Fetch student IDs and statuses assigned to this teacher from students table
       const { data: allStudentsDb } = await supabase
         .from('students')
-        .select('id, first_name, last_name, instrument, lesson_duration, status, teacher_id, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
+        .select('id, status, teacher_id')
         .eq('school_id', schoolId)
         .eq('teacher_id', selectedTeacherId);
 
-      const stDbStudentIds: string[] = (allStudentsDb || []).map(s => s.id).filter(Boolean);
+      const statusMap: Record<string, string> = {};
+      const stDbStudentIds: string[] = [];
+      allStudentsDb?.forEach(st => {
+        statusMap[st.id] = st.status;
+        if (st.id) stDbStudentIds.push(st.id);
+      });
 
       // Fetch students from users table assigned to this teacher (or linked via students table)
-      let sData: any[] | null = null;
+      let userQuery = supabase
+        .from('users')
+        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
+        .eq('school_id', schoolId)
+        .eq('role', 'student');
+
       if (stDbStudentIds.length > 0) {
-        const { data: uRes } = await supabase
-          .from('users')
-          .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active')
-          .eq('school_id', schoolId)
-          .eq('role', 'student')
-          .in('id', stDbStudentIds);
-        sData = uRes;
+        userQuery = userQuery.or(`teacher_id.eq.${selectedTeacherId},id.in.(${stDbStudentIds.join(',')})`);
+      } else {
+        userQuery = userQuery.eq('teacher_id', selectedTeacherId);
       }
+
+      const { data: sData } = await userQuery;
 
       // Fetch pending students from pending_students_decrypted view
       const { data: pendingData } = await supabase
@@ -877,64 +885,32 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
       setAllStudentPrefsMap(prefMap);
 
-      // Multi-source student merger: Combine students table, users table, and pending_students_decrypted view
-      const studentMap = new Map<string, Student>();
-
-      allStudentsDb?.forEach(s => {
-        const fname = resolveFirstName(s);
-        const lname = resolveLastName(s);
-        studentMap.set(s.id, {
+      const loadedStudents: Student[] = [
+        ...(sData || []).map(s => ({
           id: s.id,
-          first_name: fname,
-          last_name: lname,
+          first_name: resolveFirstName(s),
+          last_name: resolveLastName(s),
           instrument: s.instrument || 'Musiker',
           duration: s.lesson_duration || 30,
-          status: (s.status || 'verplant') as any,
+          status: (statusMap[s.id] || 'verplant') as any,
           sibling_group_id: s.sibling_group_id,
           group_id: s.group_id,
-          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || s.status === 'aktiv'),
+          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || statusMap[s.id] === 'aktiv'),
           hasPreferences: prefSubmittedSet.has(s.id)
-        });
-      });
-
-      sData?.forEach(s => {
-        const existing = studentMap.get(s.id);
-        const fname = resolveFirstName(s);
-        const lname = resolveLastName(s);
-        studentMap.set(s.id, {
+        })),
+        ...(pendingData || []).map((s: any) => ({
           id: s.id,
-          first_name: (fname !== 'Schüler' ? fname : existing?.first_name) || 'Schüler',
-          last_name: lname || existing?.last_name || '',
-          instrument: s.instrument || existing?.instrument || 'Musiker',
-          duration: s.lesson_duration || existing?.duration || 30,
-          status: existing?.status || 'verplant',
-          sibling_group_id: s.sibling_group_id || existing?.sibling_group_id,
-          group_id: s.group_id || existing?.group_id,
-          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || existing?.isOnboarded),
+          first_name: resolveFirstName(s),
+          last_name: resolveLastName(s),
+          instrument: s.instrument || 'Musiker',
+          duration: s.lesson_duration || 30,
+          status: 'ausstehend' as const,
+          sibling_group_id: s.sibling_group_id,
+          group_id: s.group_id || null,
+          isOnboarded: false,
           hasPreferences: prefSubmittedSet.has(s.id)
-        });
-      });
-
-      pendingData?.forEach((s: any) => {
-        if (!studentMap.has(s.id)) {
-          const fname = resolveFirstName(s);
-          const lname = resolveLastName(s);
-          studentMap.set(s.id, {
-            id: s.id,
-            first_name: fname,
-            last_name: lname,
-            instrument: s.instrument || 'Musiker',
-            duration: s.lesson_duration || 30,
-            status: 'ausstehend',
-            sibling_group_id: s.sibling_group_id,
-            group_id: s.group_id || null,
-            isOnboarded: false,
-            hasPreferences: prefSubmittedSet.has(s.id)
-          });
-        }
-      });
-
-      const loadedStudents: Student[] = Array.from(studentMap.values());
+        }))
+      ];
 
       const { data: teacherProfile } = await supabase
         .from('users')
