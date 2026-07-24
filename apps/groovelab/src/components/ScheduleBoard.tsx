@@ -4884,46 +4884,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     </div>
 
                     {/* ── PROPORTIONAL TIME-GRID ── */}
-                    {(() => {
-                      let colOutlineColor = '#cbd5e1';
-                      let colBgColor = 'rgba(248, 250, 252, 0.7)';
-
-                      if (dragOverBoardId === board.id && dragSnapState && selectedStudentPrefs && selectedStudentPrefs.length > 0) {
-                        const [th, tm] = parseTime(dragSnapState.timeStr);
-                        const startM = th * 60 + tm;
-                        const endM = startM + dragSnapState.duration;
-                        let hWunsch = false;
-                        let hBlocked = false;
-
-                        selectedStudentPrefs.forEach(pref => {
-                          if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
-                            const [psh, psm] = parseTime(pref.start_time);
-                            const [peh, pem] = parseTime(pref.end_time);
-                            const pStart = psh * 60 + psm;
-                            const pEnd = peh * 60 + pem;
-
-                            if (startM < pEnd && endM > pStart) {
-                              if (pref.preference_type === 'gesperrt') {
-                                hBlocked = true;
-                              } else if (pref.preference_type === 'wunsch') {
-                                hWunsch = true;
-                              }
-                            }
-                          }
-                        });
-
-                        if (hBlocked) {
-                          colOutlineColor = '#ef4444';
-                          colBgColor = 'rgba(254, 242, 242, 0.7)';
-                        } else if (hWunsch) {
-                          colOutlineColor = '#34a853';
-                          colBgColor = 'rgba(230, 244, 234, 0.7)';
-                        }
-                      }
-
-                      return (
-                        <div
-                          onDragOver={(e) => {
+                    <div
+                      onDragOver={(e) => {
                             e.preventDefault();
                             const rect = e.currentTarget.getBoundingClientRect();
                             const clientY = e.clientY - rect.top;
@@ -4980,26 +4942,82 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                             const clientY = e.clientY - rect.top;
                             const dragMinutes = clientY / PX_PER_MIN;
 
-                            const [bsh, bsm] = parseTime(board.startAnchor);
-                            const rawMinutes = bsh * 60 + bsm + dragMinutes;
-                            const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
-                            const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
-                            const snappedMins = snappedTotalMinutes % 60;
-                            const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+                          e.preventDefault();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clientY = e.clientY - rect.top;
+                          const dragMinutes = clientY / PX_PER_MIN;
 
-                            handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined, targetTime);
-                          }}
-                          style={{ 
-                            position: 'relative', 
-                            height: `${columnHeightPx}px`, 
-                            flexShrink: 0, 
-                            marginTop: '4px',
-                            backgroundColor: dragOverBoardId === board.id ? colBgColor : 'transparent',
-                            outline: dragOverBoardId === board.id ? `1.5px dashed ${colOutlineColor}` : 'none',
-                            borderRadius: '12px',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
+                          const [bsh, bsm] = parseTime(board.startAnchor);
+                          const boardStartMin = bsh * 60 + bsm;
+                          const rawMinutes = boardStartMin + dragMinutes;
+                          const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
+                          const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+                          const snappedMins = snappedTotalMinutes % 60;
+                          const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+                          const topPx = (snappedTotalMinutes - boardStartMin) * PX_PER_MIN;
+
+                          let accMin = 0;
+                          let targetIndex = 0;
+                          for (let i = 0; i < board.students.length; i++) {
+                            const s = board.students[i];
+                            const cardStart = accMin;
+                            const cardEnd = accMin + s.duration;
+                            if (dragMinutes < (cardStart + cardEnd) / 2) {
+                              break;
+                            }
+                            accMin += s.duration;
+                            targetIndex = i + 1;
+                          }
+
+                          if (dragOverBoardId !== board.id || dragOverIndex !== targetIndex || dragSnapState?.topPx !== topPx) {
+                            if (dragSnapState && dragSnapState.timeStr !== targetTime) {
+                              playCubaseSnapClick();
+                            }
+                            setDragOverBoardId(board.id);
+                            setDragOverIndex(targetIndex);
+                            setDragSnapState({
+                              boardId: board.id,
+                              topPx,
+                              timeStr: targetTime,
+                              duration: draggedDuration,
+                              studentName: draggedStudentName
+                            });
+                          }
+                        }}
+                        onDragLeave={() => {
+                          setDragOverBoardId(null);
+                          setDragOverIndex(null);
+                          setDragSnapState(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragSnapState(null);
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clientY = e.clientY - rect.top;
+                          const dragMinutes = clientY / PX_PER_MIN;
+
+                          const [bsh, bsm] = parseTime(board.startAnchor);
+                          const rawMinutes = bsh * 60 + bsm + dragMinutes;
+                          const snappedTotalMinutes = Math.round(rawMinutes / gridSnapMinutes) * gridSnapMinutes;
+                          const snappedHours = Math.floor(snappedTotalMinutes / 60) % 24;
+                          const snappedMins = snappedTotalMinutes % 60;
+                          const targetTime = `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+
+                          handleDropOnBoard(board.id, dragOverIndex !== null ? dragOverIndex : undefined, targetTime);
+                        }}
+                        style={{ 
+                          position: 'relative', 
+                          height: `${columnHeightPx}px`, 
+                          flexShrink: 0, 
+                          marginTop: '4px',
+                          backgroundColor: dragOverBoardId === board.id ? 'rgba(248, 250, 252, 0.8)' : 'transparent',
+                          outline: dragOverBoardId === board.id ? '1.5px dashed #cbd5e1' : 'none',
+                          borderRadius: '12px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
                        {/* Dynamic Cubase DAW Grid Subdivision Lines */}
                       {(() => {
                         const [startH, startM] = parseTime(board.startAnchor);
@@ -6092,8 +6110,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         );
                       })()}
                     </div>
-                  );
-                })()}
 
                     {/* Column summary */}
                     {board.students.length > 0 && (
