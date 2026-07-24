@@ -1929,55 +1929,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         return precomputedWunschMap.get(key) || [];
       };
 
-      for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
-        // Start each iteration from clean board state (preserving Breaks and syncing availabilityEnd)
-        let currentBoards: DayBoard[] = boards.map(b => {
-          const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
-          return {
-            ...b,
-            availabilityEnd: dayConfig?.end || b.availabilityEnd || '19:00',
-            students: b.students.filter(s => s.isBreak)
-          };
-        });
-        const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
-
-        const fuzzedWunschStudents = [...wunschStudents];
-        if (iteration > 0) {
-          for (let i = 0; i < fuzzedWunschStudents.length - 1; i++) {
-            if (Math.random() < 0.2) {
-              const temp = fuzzedWunschStudents[i];
-              fuzzedWunschStudents[i] = fuzzedWunschStudents[i+1];
-              fuzzedWunschStudents[i+1] = temp;
-            }
-          }
-        }
-
-        const fuzzedSperrzeitStudents = [...sperrzeitStudents];
-        if (iteration > 0) {
-          for (let i = 0; i < fuzzedSperrzeitStudents.length - 1; i++) {
-            if (Math.random() < 0.2) {
-              const temp = fuzzedSperrzeitStudents[i];
-              fuzzedSperrzeitStudents[i] = fuzzedSperrzeitStudents[i+1];
-              fuzzedSperrzeitStudents[i+1] = temp;
-            }
-          }
-        }
-
-        const fuzzedFlexibleStudents = [...flexibleStudents];
-        if (iteration > 0) {
-          for (let i = 0; i < fuzzedFlexibleStudents.length - 1; i++) {
-            if (Math.random() < 0.2) {
-              const temp = fuzzedFlexibleStudents[i];
-              fuzzedFlexibleStudents[i] = fuzzedFlexibleStudents[i+1];
-              fuzzedFlexibleStudents[i+1] = temp;
-            }
-          }
-        }
-
-
-
-
-
       const calculateWunschBonus = (studentId: string, dayOfWeek: number, startMin: number, endMin: number) => {
         const mergedWindows = getMergedStudentWunschWindows(studentId, dayOfWeek);
         for (const window of mergedWindows) {
@@ -2102,6 +2053,55 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         }
         return 0;
       };
+
+      for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
+        // Start each iteration from clean board state (preserving Breaks and syncing availabilityEnd)
+        let currentBoards: DayBoard[] = boards.map(b => {
+          const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
+          return {
+            ...b,
+            availabilityEnd: dayConfig?.end || b.availabilityEnd || '19:00',
+            students: b.students.filter(s => s.isBreak)
+          };
+        });
+        const newlyAssignedStudentIds: Record<string, { day: number; time: string }> = {};
+
+        const fuzzedWunschStudents = [...wunschStudents];
+        if (iteration > 0) {
+          for (let i = 0; i < fuzzedWunschStudents.length - 1; i++) {
+            if (Math.random() < 0.2) {
+              const temp = fuzzedWunschStudents[i];
+              fuzzedWunschStudents[i] = fuzzedWunschStudents[i+1];
+              fuzzedWunschStudents[i+1] = temp;
+            }
+          }
+        }
+
+        const fuzzedSperrzeitStudents = [...sperrzeitStudents];
+        if (iteration > 0) {
+          for (let i = 0; i < fuzzedSperrzeitStudents.length - 1; i++) {
+            if (Math.random() < 0.2) {
+              const temp = fuzzedSperrzeitStudents[i];
+              fuzzedSperrzeitStudents[i] = fuzzedSperrzeitStudents[i+1];
+              fuzzedSperrzeitStudents[i+1] = temp;
+            }
+          }
+        }
+
+        const fuzzedFlexibleStudents = [...flexibleStudents];
+        if (iteration > 0) {
+          for (let i = 0; i < fuzzedFlexibleStudents.length - 1; i++) {
+            if (Math.random() < 0.2) {
+              const temp = fuzzedFlexibleStudents[i];
+              fuzzedFlexibleStudents[i] = fuzzedFlexibleStudents[i+1];
+              fuzzedFlexibleStudents[i+1] = temp;
+            }
+          }
+        }
+
+
+
+ 
 
       // PHASE 2 & 3 Combined Logic (Greedy Insertion)
       const assignStudents = (studentsList: any[], isPhase3: boolean) => {
