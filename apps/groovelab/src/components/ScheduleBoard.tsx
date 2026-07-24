@@ -5119,7 +5119,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               <div 
                                 style={{ 
                                   position: 'absolute', 
-                                  right: '6px', 
+                                  left: '6px', 
                                   top: '-10px', 
                                   background: '#1d1d1f', 
                                   color: '#ffffff', 
@@ -5437,7 +5437,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 cursor: 'grab', display: 'flex', alignItems: 'center',
                                 justifyContent: 'space-between', gap: '4px',
                                 zIndex: selectedStudentId !== null ? 1 : 2,
-                                opacity: selectedStudentId !== null ? 0.8 : 1,
+                                opacity: draggedStudentId === bs.id ? 0.15 : (selectedStudentId !== null ? 0.8 : 1),
                                 filter: 'none',
                                 pointerEvents: 'auto',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -5875,9 +5875,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
                               zIndex: selectedStudentId !== null ? (isSelected ? 4 : 2) : 2,
-                              opacity: (selectedStudentId !== null || draggedStudentId !== null)
-                                ? ((selectedStudentId === bs.id || draggedStudentId === bs.id) ? 1 : 0.6)
-                                : 1,
+                              opacity: draggedStudentId === bs.id ? 0.15 : ((selectedStudentId !== null || draggedStudentId !== null)
+                                ? ((selectedStudentId === bs.id) ? 1 : 0.6)
+                                : 1),
                               filter: 'none',
                               pointerEvents: 'auto',
                               transform: isSelected ? 'scale(1.02)' : 'none',
