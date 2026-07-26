@@ -7137,7 +7137,7 @@ function App() {
   if (location.pathname === '/landingpage' || location.pathname === '/startseite') {
     return (
       <Startseite 
-        onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
+        onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
         onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
       />
     );
@@ -7146,7 +7146,7 @@ function App() {
   if (location.pathname === '/landingpage2' || location.pathname === '/startseite2' || location.pathname === '/starseite2') {
     return (
       <Startseite2 
-        onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
+        onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
         onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
         onShowPrivacy={() => setShowPrivacy(true)}
         onShowAgb={() => setShowAgb(true)}
@@ -7199,7 +7199,7 @@ function App() {
 
       return (
         <Startseite 
-          onLogin={() => navigate('/login?school=musaek-bad-saeckingen&groovelab=true')} 
+          onLogin={() => navigate('/login?school=musaek-bs&groovelab=true')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}

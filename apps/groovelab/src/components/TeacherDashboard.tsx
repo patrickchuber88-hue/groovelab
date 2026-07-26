@@ -4373,6 +4373,41 @@ export function TeacherDashboard({
         setAllBands(bData || []);
 
         // 7. Students
+        const deduplicateStudents = (students: any[]): any[] => {
+          if (!Array.isArray(students)) return [];
+          const seenIds = new Set<string>();
+          const studentMap = new Map<string, any>();
+
+          for (const student of students) {
+            if (!student) continue;
+            if (student.id && seenIds.has(student.id)) continue;
+
+            const fn = (student.first_name || '').trim().toLowerCase();
+            const ln = (student.last_name || '').trim().toLowerCase();
+            const nameKey = `${fn}_${ln}`;
+
+            if (nameKey !== '_') {
+              if (studentMap.has(nameKey)) {
+                const existing = studentMap.get(nameKey);
+                if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
+                  if (existing.id) seenIds.delete(existing.id);
+                  studentMap.set(nameKey, student);
+                  if (student.id) seenIds.add(student.id);
+                }
+                continue;
+              }
+              studentMap.set(nameKey, student);
+            } else {
+              const fallbackKey = student.id || `anon_${Math.random()}`;
+              studentMap.set(fallbackKey, student);
+            }
+
+            if (student.id) seenIds.add(student.id);
+          }
+
+          return Array.from(studentMap.values());
+        };
+
         let filteredStudData = (studData || []).filter((student: any) => {
           return true;
         });
@@ -4386,9 +4421,10 @@ export function TeacherDashboard({
             return endDate > limitDate;
           });
         }
-        setAllStudents(filteredStudData);
+        const dedupedStudents = deduplicateStudents(filteredStudData);
+        setAllStudents(dedupedStudents);
         if (typeof window !== 'undefined') {
-          (window as any).__groovelabAllStudents = filteredStudData;
+          (window as any).__groovelabAllStudents = dedupedStudents;
         }
 
         // 8. Help
@@ -5928,7 +5964,7 @@ export function TeacherDashboard({
               {activeTab !== 'live' && (
                 <>
                   <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                    {activeTab === 'students' ? '🎓 Schülerverwaltung' : '👥 Bands'}
+                    {activeTab === 'students' ? `🎓 Schülerverwaltung (${allStudents.length})` : `👥 Bands (${allBands.length})`}
                   </h2>
                   <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
                     {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}

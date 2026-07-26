@@ -846,6 +846,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           assignedTime,
           status: members.some(m => m.status === 'ausstehend') ? 'ausstehend' : 'verplant',
           isGroup: true,
+          hasPreferences: members.some(m => Boolean(m.hasPreferences)),
           group_id: groupId,
           groupStudents: members.map(m => ({
             ...m,
@@ -1486,8 +1487,54 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         });
       }
 
+      // Clean loadedStudents: filter out placeholder 'Schüler' entries without valid names, and deduplicate
+      const validStudents = loadedStudents.filter(s => {
+        if (!s) return false;
+        const fn = (s.first_name || '').trim();
+        const ln = (s.last_name || '').trim();
+        if (fn === 'Schüler' && (!ln || ln === '')) return false;
+        return true;
+      });
+
+      const deduplicateScheduleStudents = (students: Student[]): Student[] => {
+        if (!Array.isArray(students)) return [];
+        const seenIds = new Set<string>();
+        const studentMap = new Map<string, Student>();
+
+        for (const student of students) {
+          if (!student) continue;
+          if (student.id && seenIds.has(student.id)) continue;
+
+          const fn = (student.first_name || '').trim().toLowerCase();
+          const ln = (student.last_name || '').trim().toLowerCase();
+          const nameKey = `${fn}_${ln}`;
+
+          if (nameKey !== '_') {
+            if (studentMap.has(nameKey)) {
+              const existing = studentMap.get(nameKey)!;
+              if (!existing.isOnboarded && student.isOnboarded) {
+                if (existing.id) seenIds.delete(existing.id);
+                studentMap.set(nameKey, student);
+                if (student.id) seenIds.add(student.id);
+              }
+              continue;
+            }
+            studentMap.set(nameKey, student);
+          } else {
+            const fallbackKey = student.id || `anon_${Math.random()}`;
+            studentMap.set(fallbackKey, student);
+          }
+
+          if (student.id) seenIds.add(student.id);
+        }
+
+        return Array.from(studentMap.values());
+      };
+
+      const cleanStudents = deduplicateScheduleStudents(validStudents);
+
       // Consolidate database groups across all boards and pool
-      const consolidated = consolidateDatabaseGroups(reconstructedBoards, loadedStudents);
+      const consolidated = consolidateDatabaseGroups(reconstructedBoards, cleanStudents);
       reconstructedBoards = consolidated.boards;
       const finalGroupedStudents = consolidated.pool;
 
@@ -2043,7 +2090,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         prevEndMin = sEnd;
 
         // Check Wunsch hit matching card UI logic (any overlap with Wunschzeit window)
-        const studPrefs = allStudentPrefsMap[s.id] || [];
+        const gMemberIds = s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [];
+        const studPrefs = s.isGroup
+          ? gMemberIds.flatMap(mId => allStudentPrefsMap[mId] || [])
+          : (allStudentPrefsMap[s.id] || []);
         const hasWunschPref = studPrefs.some(p => p.preference_type === 'wunsch');
         if (hasWunschPref) {
           studentsWithWunsch++;
@@ -2791,6 +2841,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             }
             return;
           }
+          if (s.id === studentId) {
+            // Card matches exactly (individual student or group block ID)
+            return;
+          }
           if (s.isGroup && s.groupStudents) {
             const remaining = s.groupStudents.filter(gs => gs.id !== studentId);
             if (remaining.length > 1) {
@@ -3019,7 +3073,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     });
   };
 
-  // Remove a student from a day board (make them unassigned again)
+  // Remove a student or group from a day board (make them unassigned again)
   const handleRemoveStudentFromBoard = (boardId: string, studentId: string) => {
     if (studentId.startsWith('break-')) {
       executeRemoveBreak(boardId, studentId, true);
@@ -3030,11 +3084,16 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const board = prev.find(b => b.id === boardId);
       if (!board) return prev;
 
+      const targetStudent = board.students.find(s => s.id === studentId);
       const nextStudents = board.students.filter(s => s.id !== studentId);
       const updatedBoard = recalculateBoardTimes({ ...board, students: nextStudents });
 
+      const memberIds = targetStudent?.isGroup && targetStudent.groupStudents
+        ? targetStudent.groupStudents.map(gs => gs.id)
+        : [studentId];
+
       setStudents(currentStudents => currentStudents.map(s => {
-        if (s.id === studentId) {
+        if (s.id === studentId || memberIds.includes(s.id)) {
           return { ...s, assignedDay: undefined, assignedTime: undefined };
         }
         return s;
@@ -3076,11 +3135,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
     const newGroupBlock: Student = {
       id: `group-${crypto.randomUUID()}`,
-      first_name: groupStudents[0].first_name,
-      last_name: groupStudents[0].last_name,
-      instrument: groupStudents.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join(', '),
-      duration: groupStudents.reduce((acc, s) => acc + s.duration, 0),
+      first_name: groupStudents.map(s => s.first_name).join(' & '),
+      last_name: '',
+      instrument: groupStudents.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join('/'),
+      duration: Math.max(...groupStudents.map(s => s.duration || 30)),
       isGroup: true,
+      hasPreferences: groupStudents.some(s => Boolean(s.hasPreferences)),
       groupStudents: groupStudents.map(s => ({
         id: s.id,
         first_name: s.first_name,
@@ -5181,7 +5241,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                           const blockEnd = blockStart + 15;
                           
                           selectedStudentPrefs.forEach(pref => {
-                            if (pref.day_of_week === board.dayOfWeek) {
+                            if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
                               const [ph, pm] = parseTime(pref.start_time);
                               const [peh, pem] = parseTime(pref.end_time);
                               const prefStart = ph * 60 + pm;
@@ -5591,7 +5651,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                         // Check if student is scheduled within a preferred ('wunsch') slot
                         let isInsideWunsch = false;
-                        const studPrefs = allStudentPrefsMap[bs.id] || (selectedStudentId === bs.id ? selectedStudentPrefs : []);
+                        const groupMemberIds = bs.isGroup && bs.groupStudents ? bs.groupStudents.map(gs => gs.id) : [];
+                        const studPrefs = bs.isGroup
+                          ? (groupMemberIds.flatMap(mId => allStudentPrefsMap[mId] || []).length > 0
+                              ? groupMemberIds.flatMap(mId => allStudentPrefsMap[mId] || [])
+                              : (selectedStudentId === bs.id ? selectedStudentPrefs : []))
+                          : (allStudentPrefsMap[bs.id] || (selectedStudentId === bs.id ? selectedStudentPrefs : []));
+
                         if (studPrefs.length > 0) {
                           const [sh, sm] = parseTime(bs.assignedTime || board.startAnchor);
                           const startMin = sh * 60 + sm;
@@ -5750,11 +5816,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   ? `1.5px solid ${cardPrimaryColor}`
                                   : '1px solid rgba(0, 0, 0, 0.08)'));
 
-                        const cardBorderLeft = hasConflict
-                          ? '4px solid #b91c1c'
-                          : (isInsideWunsch
-                              ? '4px solid #f59e0b'
-                              : `4px solid ${cardPrimaryColor}`);
+                        const hasAnyGroupMemberPrefs = groupMemberIds.some(mId => (allStudentPrefsMap[mId] && allStudentPrefsMap[mId].length > 0)) || (selectedStudentId === bs.id && selectedStudentPrefs.length > 0);
+
+                        const studentHasPrefs = bs.isGroup
+                          ? hasAnyGroupMemberPrefs
+                          : Boolean(bs.hasPreferences || studentInPool?.hasPreferences || (allStudentPrefsMap[bs.id] && allStudentPrefsMap[bs.id].length > 0));
+
+                        const cardBorderLeft = !studentHasPrefs
+                          ? '4px solid #94a3b8'
+                          : (hasConflict
+                              ? '4px solid #b91c1c'
+                              : (isInsideWunsch
+                                  ? '4px solid #f59e0b'
+                                  : `4px solid ${cardPrimaryColor}`));
 
                         const textColor = hasConflict
                           ? '#ffffff'
@@ -5784,8 +5858,36 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                         const isSelectedForGroup = selectedForGroup.includes(bs.id);
                         const highlightColor = cardPrimaryColor;
+                        const isGroupSelected = selectedStudentId === bs.id;
 
                         if (bs.isGroup) {
+                          const groupBg = hasConflict
+                            ? '#ef4444'
+                            : (isInsideWunsch
+                                ? '#34a853'
+                                : cardLightBg);
+
+                          const groupBorder = hasConflict
+                            ? '1px solid #dc2626'
+                            : (isInsideWunsch
+                                ? '1px solid #2e7d32'
+                                : (draggedStudentId === bs.id ? '2px dashed #f59e0b' : (isGroupSelected ? '2px solid #16a34a' : `1px solid ${cardBorderColor}`)));
+
+                          const groupBorderLeft = !studentHasPrefs
+                            ? (isGroupSelected ? '5px solid #94a3b8' : '4px solid #94a3b8')
+                            : (hasConflict
+                                ? (isGroupSelected ? '5px solid #b91c1c' : '4px solid #b91c1c')
+                                : (isInsideWunsch
+                                    ? (isGroupSelected ? '5px solid #f59e0b' : '4px solid #f59e0b')
+                                    : (isGroupSelected ? `5px solid ${cardPrimaryColor}` : `4px solid ${cardPrimaryColor}`)));
+
+                          const groupTimeColor = hasConflict || isInsideWunsch ? '#ffffff' : highlightColor;
+                          const groupTitleColor = hasConflict || isInsideWunsch ? '#ffffff' : '#1f2937';
+                          const groupSubtextColor = hasConflict || isInsideWunsch ? 'rgba(255, 255, 255, 0.85)' : '#4b5563';
+                          const groupBadgeBg = hasConflict || isInsideWunsch ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.7)';
+                          const groupBadgeColor = hasConflict || isInsideWunsch ? '#ffffff' : highlightColor;
+                          const groupActionColor = hasConflict || isInsideWunsch ? '#ffffff' : highlightColor;
+
                           return (
                             <div
                               key={bs.id}
@@ -5799,28 +5901,31 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 setDragOverIndex(cardIndex);
                               }}
                               onDrop={(e) => { e.stopPropagation(); handleDropOnBoard(board.id, cardIndex); }}
-                              onClick={(e) => { e.stopPropagation(); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectStudent(bs.id);
+                              }}
                               className={`${isShaking ? 'card-shake' : ''} designer-student-card`}
                               style={{
                                 position: 'absolute', left: 0, right: 0,
                                 top: `${Math.max(cardTopPx, 0)}px`,
                                 height: `${Math.max(cardHeightPx, 32)}px`,
-                                background: cardLightBg,
-                                border: draggedStudentId === bs.id ? '2px dashed #f59e0b' : (isSelected ? `1.5px solid ${cardPrimaryColor}` : `1px solid ${cardBorderColor}`),
-                                borderLeft: `4px solid ${cardPrimaryColor}`,
+                                background: groupBg,
+                                border: groupBorder,
+                                borderLeft: groupBorderLeft,
                                 borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                                 cursor: 'grab', display: 'flex', flexDirection: 'column',
                                 justifyContent: 'center', gap: '2px',
                                 zIndex: 2,
                                 visibility: 'visible',
                                 opacity: draggedStudentId === bs.id ? 0.25 : 1,
-                                boxShadow: isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)',
+                                boxShadow: hasConflict ? '0 2px 8px rgba(239, 68, 68, 0.15)' : (isInsideWunsch ? '0 2px 8px rgba(52, 168, 83, 0.18)' : (isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)')),
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                 overflow: 'hidden',
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: highlightColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: groupTimeColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   👥 {bs.assignedTime}
                                 </span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -5831,7 +5936,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                       style={{
                                         background: 'transparent',
                                         border: 'none',
-                                        color: highlightColor,
+                                        color: groupActionColor,
                                         fontSize: '0.62rem',
                                         fontWeight: 700,
                                         cursor: 'pointer',
@@ -5846,18 +5951,22 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                       Aufteilen
                                     </button>
                                   )}
-                                   <span 
-                                     style={{ 
-                                       background: 'rgba(255,255,255,0.7)', 
-                                       borderRadius: '5px', 
-                                       padding: '1px 5px', 
-                                       fontSize: '0.62rem', 
-                                       fontWeight: 700, 
-                                       color: highlightColor 
-                                     }}
-                                   >
-                                     {bs.duration}m
-                                   </span>
+                                  <span 
+                                    style={{ 
+                                      background: groupBadgeBg, 
+                                      borderRadius: '5px', 
+                                      padding: '1px 5px', 
+                                      fontSize: '0.62rem', 
+                                      fontWeight: 700, 
+                                      color: groupBadgeColor,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '2px'
+                                    }}
+                                  >
+                                    {isInsideWunsch && <span style={{ color: '#ffffff', fontSize: '0.65rem' }}>★</span>}
+                                    {bs.duration}m
+                                  </span>
                                   <button 
                                     type="button" 
                                     onClick={(e) => {
@@ -5865,17 +5974,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                       e.preventDefault();
                                       handleRemoveStudentFromBoard(board.id, bs.id);
                                     }}
-                                    style={{ background: 'transparent', border: 'none', color: highlightColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.7 }}
+                                    style={{ background: 'transparent', border: 'none', color: groupActionColor, display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1px', opacity: 0.8 }}
                                     title="Entfernen"
                                   >
                                     <X size={11} strokeWidth={2.5} />
                                   </button>
                                 </div>
                               </div>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: groupTitleColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {(bs.first_name || (bs as any).name || (bs as any).full_name || 'Gruppe').trim()} {maskLastName(bs.last_name || '', showRealNames)}
                               </span>
-                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 600, color: groupSubtextColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {bs.groupStudents?.map(s => `${s.first_name} ${s.last_name?.[0] ? s.last_name[0] + '.' : ''}`).join(', ')}
                               </span>
                             </div>
@@ -5975,7 +6084,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               height: `${Math.max(cardHeightPx, 32)}px`,
                               background: cardBg,
                               border: draggedStudentId === bs.id ? '2px dashed #16a34a' : (isSelected ? '2px solid #16a34a' : finalBorder),
-                              borderLeft: isSelected ? `5px solid ${hasConflict ? '#b91c1c' : (isInsideWunsch ? '#f59e0b' : cardPrimaryColor)}` : cardBorderLeft,
+                              borderLeft: !studentHasPrefs
+                                ? (isSelected ? '5px solid #94a3b8' : '4px solid #94a3b8')
+                                : (isSelected ? `5px solid ${hasConflict ? '#b91c1c' : (isInsideWunsch ? '#f59e0b' : cardPrimaryColor)}` : cardBorderLeft),
                               borderRadius: '8px', padding: '5px 8px', boxSizing: 'border-box',
                               cursor: isGroupModeActive ? 'pointer' : 'grab', display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', gap: '2px',
@@ -6019,33 +6130,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '4px', pointerEvents: 'auto' }}>
                                 {hasConflict && (
                                   <span style={{ color: '#ef4444', cursor: 'help', fontWeight: 800 }} title={conflictMsg}>⚠️</span>
-                                )}
-                                {bs.customStartTime && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      setBoards(prev => prev.map(b => {
-                                        if (b.id !== board.id) return b;
-                                        const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, customStartTime: undefined } : s);
-                                        return recalculateBoardTimes({ ...b, students: nextStudents });
-                                      }));
-                                      setToast({ message: 'Fixierung aufgehoben – Termin wieder flexibel!', type: 'warning' });
-                                    }}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      padding: '1px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      pointerEvents: 'auto'
-                                    }}
-                                    title="Startzeit in Datenbank fixiert (Klick zum Aufheben)"
-                                  >
-                                    <Pin size={10} color="#f59e0b" fill="#f59e0b" style={{ transform: 'rotate(45deg)' }} />
-                                  </button>
                                 )}
                                 {editingTimeStudent?.studentId === bs.id && editingTimeStudent?.boardId === board.id ? (
                                   <input
@@ -6245,7 +6329,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             }}>
               <div>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1d1d1f', margin: 0 }}>
-                  Schüler-Pool
+                  Schüler-Pool ({students.length})
                 </h4>
                 <p style={{ color: '#86868b', fontSize: '0.68rem', fontWeight: 500, marginTop: '1px' }}>
                   Drag & Drop auf die Spalten.
@@ -6369,7 +6453,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         borderBottom: isSelected ? `1.5px solid ${brandColor}` : '1px solid rgba(0, 0, 0, 0.08)', 
                         borderLeft: s.hasPreferences
                           ? `4px solid ${brandColor}`
-                          : (isSelected ? `4px solid ${brandColor}` : '4px solid #94a3b8'), 
+                          : '4px solid #94a3b8', 
                         borderRadius: '8px', 
                         padding: '6px 8px', 
                         cursor: 'grab', 

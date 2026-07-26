@@ -2028,6 +2028,42 @@ export function AdminDashboard({
     }
   }, [activeTab, selectedCampusRoomId, isDateFilterActive, bookingStartTime]);
 
+  const deduplicateStudents = (students: any[]): any[] => {
+    if (!Array.isArray(students)) return [];
+    const seenIds = new Set<string>();
+    const studentMap = new Map<string, any>();
+
+    for (const student of students) {
+      if (!student) continue;
+
+      if (student.id && seenIds.has(student.id)) continue;
+
+      const fn = (student.first_name || '').trim().toLowerCase();
+      const ln = (student.last_name || '').trim().toLowerCase();
+      const nameKey = `${fn}_${ln}`;
+
+      if (nameKey !== '_') {
+        if (studentMap.has(nameKey)) {
+          const existing = studentMap.get(nameKey);
+          if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
+            if (existing.id) seenIds.delete(existing.id);
+            studentMap.set(nameKey, student);
+            if (student.id) seenIds.add(student.id);
+          }
+          continue;
+        }
+        studentMap.set(nameKey, student);
+      } else {
+        const fallbackKey = student.id || `anon_${Math.random()}`;
+        studentMap.set(fallbackKey, student);
+      }
+
+      if (student.id) seenIds.add(student.id);
+    }
+
+    return Array.from(studentMap.values());
+  };
+
   const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string) => {
     let sq = supabase.from('users').select('*').eq('school_id', schoolId).eq('role', 'student');
     let assignedStudentIds: string[] = [];
@@ -2082,8 +2118,23 @@ export function AdminDashboard({
 
       if (pendingData && pendingData.length > 0) {
         const registeredIds = new Set(registeredStudents.map((s: any) => s.id));
+        const registeredNameKeys = new Set(
+          registeredStudents.map((s: any) => `${(s.first_name || '').trim().toLowerCase()}_${(s.last_name || '').trim().toLowerCase()}`)
+        );
+        const seenPendingNames = new Set<string>();
+
         mappedPending = pendingData
-          .filter((ps: any) => !registeredIds.has(ps.id) && (ps.teacher_id === teacherId || assignedStudentIds.includes(ps.id)))
+          .filter((ps: any) => {
+            if (!ps) return false;
+            if (registeredIds.has(ps.id)) return false;
+            const nameKey = `${(ps.first_name || '').trim().toLowerCase()}_${(ps.last_name || '').trim().toLowerCase()}`;
+            if (nameKey !== '_' && registeredNameKeys.has(nameKey)) return false;
+            if (nameKey !== '_') {
+              if (seenPendingNames.has(nameKey)) return false;
+              seenPendingNames.add(nameKey);
+            }
+            return ps.teacher_id === teacherId || assignedStudentIds.includes(ps.id);
+          })
           .map((ps: any) => ({
             id: ps.id,
             school_id: ps.school_id,
@@ -2108,7 +2159,7 @@ export function AdminDashboard({
     }
 
     // Combine registered + pending onboarding students
-    const combined = [...registeredStudents, ...mappedPending];
+    const combined = deduplicateStudents([...registeredStudents, ...mappedPending]);
     combined.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
     return combined;
   };
@@ -2127,6 +2178,172 @@ export function AdminDashboard({
         fetchError = error;
       } else {
         adminData = data;
+      }
+      if (!adminData && currentAdmin) {
+        adminData = currentAdmin;
+      }
+      if (adminData) {
+        setAdmin(adminData);
+      }
+
+      if (!adminData) return;
+
+      const userRole = adminData.role?.toLowerCase() || 'student';
+      if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'secretary') {
+        return;
+      }
+
+      if (activeTab === 'live' || activeTab === 'schedule') {
+        // Fetch live / schedule resources
+      } else if (activeTab === 'students') {
+        const canSeeAllStudents = adminData.role === 'admin' || adminData.role === 'secretary';
+        let studentsData: any[] = [];
+
+        if (canSeeAllStudents) {
+          let sq = supabase.from('users').select('*').eq('school_id', adminData.school_id).eq('role', 'student');
+          if (activePlatform === 'campus') sq = sq.eq('is_campus_active', true);
+          else sq = sq.eq('is_groovelab_active', true);
+          const { data: regData } = await sq.order('first_name');
+          const registered = regData || [];
+          const regIds = new Set(registered.map((s: any) => s.id));
+          const registeredNameKeys = new Set(
+            registered.map((s: any) => `${(s.first_name || '').trim().toLowerCase()}_${(s.last_name || '').trim().toLowerCase()}`)
+          );
+          const seenPendingNames = new Set<string>();
+
+          let pendingMapped: any[] = [];
+          try {
+            const { data: pendingData } = await supabase
+              .from('pending_students_decrypted')
+              .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+              .eq('school_id', adminData.school_id);
+            if (pendingData) {
+              pendingMapped = pendingData
+                .filter((ps: any) => {
+                  if (!ps) return false;
+                  if (regIds.has(ps.id)) return false;
+                  const nameKey = `${(ps.first_name || '').trim().toLowerCase()}_${(ps.last_name || '').trim().toLowerCase()}`;
+                  if (nameKey !== '_' && registeredNameKeys.has(nameKey)) return false;
+                  if (nameKey !== '_') {
+                    if (seenPendingNames.has(nameKey)) return false;
+                    seenPendingNames.add(nameKey);
+                  }
+                  return true;
+                })
+                .map((ps: any) => ({
+                  id: ps.id,
+                  school_id: ps.school_id,
+                  teacher_id: ps.teacher_id,
+                  role: 'student',
+                  first_name: ps.first_name || 'Ausstehender Schüler',
+                  last_name: ps.last_name || '',
+                  email: '',
+                  instrument: ps.instrument || 'Gitarre',
+                  is_active: false,
+                  is_campus_active: false,
+                  is_groovelab_active: false,
+                  status: 'inactive',
+                  isPendingOnboarding: true,
+                  day_of_birth: ps.day_of_birth || null,
+                  ausweis_nummer: 'Ausstehend (Onboarding)',
+                  created_at: ps.created_at || new Date().toISOString()
+                }));
+            }
+          } catch (e) {
+            console.warn('Pending fetch warning in canSeeAllStudents:', e);
+          }
+          studentsData = deduplicateStudents([...registered, ...pendingMapped]);
+          studentsData.sort((a, b) => (a.first_name || '').localeCompare(b.first_name || '', 'de'));
+        } else {
+          studentsData = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform);
+        }
+
+        if (studentsData) {
+          // Auto-sync missing users.teacher_id in background for DB consistency
+          if (adminData.role === 'teacher' && studentsData.length > 0) {
+            const unlinkedStudents = studentsData.filter((s: any) => !s.teacher_id).map((s: any) => s.id);
+            if (unlinkedStudents.length > 0) {
+              supabase.from('users').update({ teacher_id: adminData.id }).in('id', unlinkedStudents).then(() => {
+                console.log(`[Teacher Board] Auto-synced teacher_id for ${unlinkedStudents.length} students.`);
+              });
+            }
+          }
+          // --- AUTO-CLEANUP DELETED/ARCHIVED STUDENTS ---
+          const expiredStudents = studentsData.filter((s: any) => s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now());
+          const expiredIds = expiredStudents.map((s: any) => s.id);
+          
+          let activeStudentsForState = studentsData;
+
+          if (expiredIds.length > 0) {
+            // Remove all expired users from bands to free the spot
+            await supabase.from('band_members').delete().in('user_id', expiredIds);
+            
+            // Hard delete users who requested deletion
+            const toDelete = expiredStudents.filter((s: any) => s.delete_after_contract === true).map((s: any) => s.id);
+            if (toDelete.length > 0) {
+              await deleteUserStorageAssets(toDelete);
+              await supabase.from('bands').update({ coach_id: null }).in('coach_id', toDelete);
+              await supabase.from('user_song_skills').delete().in('user_id', toDelete);
+              await supabase.from('user_song_skills').update({ verified_by_id: null }).in('verified_by_id', toDelete);
+              await supabase.from('sessions').delete().in('user_id', toDelete);
+              await supabase.from('band_songs').update({ suggested_by: null }).in('suggested_by', toDelete);
+              await supabase.from('lab_planning').delete().in('user_id', toDelete);
+              await supabase.from('band_shoutbox').delete().in('user_id', toDelete);
+              await supabase.from('band_song_slots').delete().in('user_id', toDelete);
+              await supabase.from('help_requests').delete().in('user_id', toDelete);
+              await supabase.from('avatars').delete().in('user_id', toDelete);
+              await supabase.from('users').delete().in('id', toDelete);
+              
+              activeStudentsForState = studentsData.filter((s: any) => !toDelete.includes(s.id));
+            }
+          }
+
+          setStudents(activeStudentsForState);
+          const studentIds = activeStudentsForState.map((s: any) => s.id);
+          
+          // Fetch active sessions for school's students
+          const { data: sData } = await supabase
+            .from('sessions')
+            .select('*, profiles:users!inner(*), stations(*)')
+            .eq('profiles.school_id', adminData.school_id)
+            .is('check_out_time', null);
+          setActiveSessions(sData || []);
+
+          if (studentIds.length > 0) {
+            // Fetch skills for XP calculation
+            const { data: skillsData } = await supabase
+              .from('user_song_skills')
+              .select('user_id, instrument, is_stage_ready')
+              .in('user_id', studentIds);
+
+            // Fetch band song slots for Vocals XP
+            const { data: slotsData } = await supabase
+              .from('band_song_slots')
+              .select('user_id, instrument, status')
+              .in('user_id', studentIds);
+
+            const xpMap: Record<string, number> = {};
+            activeStudentsForState.forEach((student: any) => {
+              const studentSkills = (skillsData || []).filter((sk: any) => sk.user_id === student.id);
+              const studentSlots = (slotsData || []).filter((sl: any) => sl.user_id === student.id);
+
+              const stageReadyCount = studentSkills.filter((sk: any) => {
+                const isVocal = (sk.instrument || '').toLowerCase().includes('vocal') || (sk.instrument || '').toLowerCase().includes('gesang');
+                return sk.is_stage_ready && !isVocal;
+              }).length;
+
+              const vocalsCount = studentSlots.filter((sl: any) => {
+                const isVocal = (sl.instrument || '').toLowerCase().includes('vocal') || (sl.instrument || '').toLowerCase().includes('gesang');
+                return isVocal && sl.status !== 'declined';
+              }).length;
+
+              xpMap[student.id] = (stageReadyCount + vocalsCount) * 100;
+            });
+            setStudentsXP(xpMap);
+          } else {
+            setStudentsXP({});
+          }
+        }
       }
     } catch (e: any) {
       fetchError = e;

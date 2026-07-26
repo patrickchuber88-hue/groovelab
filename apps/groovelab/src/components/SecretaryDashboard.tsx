@@ -3553,7 +3553,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       })) || []);
       setBypassTeachers(bypassList);
       setEmployees(employeesList);
-      setStudents(studentsList);
+      const deduplicateStudents = (students: any[]): any[] => {
+        if (!Array.isArray(students)) return [];
+        const seenIds = new Set<string>();
+        const studentMap = new Map<string, any>();
+
+        for (const student of students) {
+          if (!student) continue;
+          if (student.id && seenIds.has(student.id)) continue;
+
+          const fn = (student.first_name || '').trim().toLowerCase();
+          const ln = (student.last_name || '').trim().toLowerCase();
+          const nameKey = `${fn}_${ln}`;
+
+          if (nameKey !== '_') {
+            if (studentMap.has(nameKey)) {
+              const existing = studentMap.get(nameKey);
+              if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
+                if (existing.id) seenIds.delete(existing.id);
+                studentMap.set(nameKey, student);
+                if (student.id) seenIds.add(student.id);
+              }
+              continue;
+            }
+            studentMap.set(nameKey, student);
+          } else {
+            const fallbackKey = student.id || `anon_${Math.random()}`;
+            studentMap.set(fallbackKey, student);
+          }
+
+          if (student.id) seenIds.add(student.id);
+        }
+
+        return Array.from(studentMap.values());
+      };
+
+      setStudents(deduplicateStudents(studentsList));
 
       // Fetch logged in user profile details
       if (userId) {
@@ -8109,7 +8144,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Users size={22} style={{ color: '#0f172a' }} />
                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                  Schülerboard
+                  Schülerboard ({totalStudents})
                 </h3>
               </div>
               

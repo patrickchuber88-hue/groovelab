@@ -34,84 +34,116 @@ export const Startseite: React.FC<StartseiteProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fallback schools for offline/connection failure scenarios
+  // Real fallback schools for offline/connection failure scenarios
   const FALLBACK_SCHOOLS = [
     {
-      id: 'musaek-bad-saeckingen-static-id',
-      name: 'Musikschule Bad Säckingen',
-      subdomain: 'musaek-bad-saeckingen',
+      id: 'cc05137f-5904-4774-80be-6a172c52bf99',
+      name: 'Musäk BS',
+      subdomain: 'musaek-bs',
       city: 'Bad Säckingen',
       has_campus_subscription: true,
       has_groovelab_subscription: true,
       logo_url: null
     },
     {
-      id: 'groovelab-demo-static-id',
-      name: 'GrooveLab Demo',
-      subdomain: 'demo',
-      city: 'Stuttgart',
-      has_campus_subscription: true,
+      id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c',
+      name: 'Musäk Bad Säckingen',
+      subdomain: 'musaek-bad-saeckingen-old',
+      city: 'Bad Säckingen',
+      has_campus_subscription: false,
       has_groovelab_subscription: true,
-      logo_url: null
+      logo_url: 'https://www.musaek.de/wp-content/uploads/2021/03/musaek-logo-black-300x140.png'
     }
   ];
 
-  // Debounced search
+  const [allSchools, setAllSchools] = useState<any[]>([]);
+
+  // Helper for normalizing umlauts & special chars
+  const normalizeText = (str: string) => {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .trim()
+      .replace(/[äöüß]/g, (match) => {
+        const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+        return mapping[match] || match;
+      })
+      .replace(/[^a-z0-9]/g, '');
+  };
+
+  // Fetch all active schools on mount & store in state & cache
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchQuery.trim().length < 2) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
+    let isMounted = true;
+
+    // Load cached schools immediately if available
+    try {
+      const cached = localStorage.getItem('groovelab_cached_schools');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAllSchools(parsed);
+        }
       }
+    } catch (e) {}
 
-      setIsSearching(true);
+    const fetchSchools = async () => {
       try {
-        const queryPromise = supabase
+        const { data, error } = await supabase
           .from('schools')
-          .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription')
-          .ilike('name', `%${searchQuery.trim()}%`)
-          .not('subdomain', 'is', null)
-          .limit(6);
+          .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription, is_active')
+          .not('is_active', 'eq', false);
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Query timeout')), 2500)
-        );
-
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
-
-        if (!error && data) {
-          setSearchResults(data);
-          // Cache successful school list
+        if (!error && data && data.length > 0) {
+          if (isMounted) {
+            setAllSchools(data);
+          }
           try {
             localStorage.setItem('groovelab_cached_schools', JSON.stringify(data));
           } catch (e) {}
-        } else {
-          throw error || new Error('No data');
         }
       } catch (err) {
-        console.error('Search error, using fallback:', err);
-        // Load from local storage cache if available
-        let fallbackList = FALLBACK_SCHOOLS;
-        try {
-          const cached = localStorage.getItem('groovelab_cached_schools');
-          if (cached) {
-            fallbackList = JSON.parse(cached);
-          }
-        } catch (e) {}
-        
-        const filtered = fallbackList.filter((s: any) => 
-          (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-          (s.city || '').toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setSearchResults(filtered);
-      } finally {
-        setIsSearching(false);
+        console.error('Error fetching schools:', err);
       }
-    }, 300); // 300ms debounce
+    };
 
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    fetchSchools();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Compute filtered search results seamlessly
+  useEffect(() => {
+    const listToFilter = allSchools.length > 0 ? allSchools : FALLBACK_SCHOOLS;
+    const query = searchQuery.trim();
+
+    if (!query) {
+      setSearchResults(listToFilter);
+      return;
+    }
+
+    const normQuery = normalizeText(query);
+    const filtered = listToFilter.filter((school: any) => {
+      const rawName = (school.name || '').toLowerCase();
+      const rawCity = (school.city || '').toLowerCase();
+      const rawSub = (school.subdomain || '').toLowerCase();
+
+      const normName = normalizeText(school.name);
+      const normCity = normalizeText(school.city);
+      const normSub = normalizeText(school.subdomain);
+
+      const lowerQuery = query.toLowerCase();
+
+      return (
+        rawName.includes(lowerQuery) ||
+        rawCity.includes(lowerQuery) ||
+        rawSub.includes(lowerQuery) ||
+        (normName && normName.includes(normQuery)) ||
+        (normCity && normCity.includes(normQuery)) ||
+        (normSub && normSub.includes(normQuery))
+      );
+    });
+
+    setSearchResults(filtered);
+  }, [searchQuery, allSchools]);
 
   const handleSchoolSelect = (school: any) => {
     if (typeof window !== 'undefined') {
@@ -416,7 +448,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
           </div>
 
           {/* Results Dropdown */}
-          <div className={`search-results-dropdown ${showResults && searchQuery.length >= 2 ? 'visible' : ''}`}>
+          <div className={`search-results-dropdown ${showResults ? 'visible' : ''}`}>
             {searchResults.length > 0 ? (
               searchResults.map((school) => (
                 <div 
@@ -479,7 +511,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                   </div>
                 </div>
               ))
-            ) : !isSearching && searchQuery.length >= 2 ? (
+            ) : !isSearching ? (
               <div style={{ padding: '32px 20px', textAlign: 'center', color: '#71717a' }}>
                 <School size={32} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
                 <div style={{ fontWeight: 500, marginBottom: '4px' }}>Keine Schule gefunden</div>

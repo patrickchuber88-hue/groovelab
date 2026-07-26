@@ -137,12 +137,13 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
 
   prefs?.forEach(p => {
     if (!p.student_id) return;
-    const matchingStudent = unassignedStudents.find(s => s.id === p.student_id);
-    if (matchingStudent) {
-      prefsByStudentId[matchingStudent.id].push(p);
-    } else if (prefsByStudentId[p.student_id]) {
-      prefsByStudentId[p.student_id].push(p);
-    }
+    unassignedStudents.forEach(s => {
+      if (s.id === p.student_id) {
+        prefsByStudentId[s.id].push(p);
+      } else if (s.isGroup && s.groupStudents && s.groupStudents.some((gs: any) => gs.id === p.student_id)) {
+        prefsByStudentId[s.id].push(p);
+      }
+    });
   });
 
   // STUFE 1: PRE-COMPUTATION LOOKUP-MAPS FOR O(1) INSTANT LOOKUPS
@@ -519,11 +520,71 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
     return 0;
   };
 
-  // STUFE 10: 500-ITERATION MONTE-CARLO FUZZING & OPTIMIZATION LOOP
+  // REUSABLE DEEP INTER-BOARD CROSS-SWAP RESCUE PASS
+  const performDeepCrossSwapRescue = (boardsState: DayBoard[], newlyAssignedMap: Record<string, { day: number; time: string }>) => {
+    let anySwapped = false;
+    for (const b1 of boardsState) {
+      for (let i = 0; i < b1.students.length; i++) {
+        const s1 = b1.students[i];
+        if (s1.isBreak || !s1.assignedTime) continue;
+        const [s1h, s1m] = parseTime(s1.assignedTime);
+        const s1Start = s1h * 60 + s1m;
+        const s1End = s1Start + s1.duration;
+        const hasWunsch1 = (hasWunschPrefMap.get(s1.id) || false);
+        const isHit1 = calculateWunschBonus(s1.id, b1.dayOfWeek, s1Start, s1End) > 0;
+
+        if (hasWunsch1 && !isHit1) {
+          let itemSwapped = false;
+          for (const b2 of boardsState) {
+            if (itemSwapped) break;
+            for (let j = 0; j < b2.students.length; j++) {
+              const s2 = b2.students[j];
+              if (s2.isBreak || !s2.assignedTime) continue;
+              const hasWunsch2 = (hasWunschPrefMap.get(s2.id) || false);
+
+              if (!hasWunsch2 && s1.duration === s2.duration) {
+                const [s2h, s2m] = parseTime(s2.assignedTime);
+                const s2Start = s2h * 60 + s2m;
+                const s2End = s2Start + s2.duration;
+
+                const wunschBonusOnB2 = calculateWunschBonus(s1.id, b2.dayOfWeek, s2Start, s2End);
+                const blockedOnB2 = isSlotBlockedForStudent(s1.id, b2.dayOfWeek, s2Start, s2End);
+                const blockedOnB1 = isSlotBlockedForStudent(s2.id, b1.dayOfWeek, s1Start, s1End);
+
+                if (wunschBonusOnB2 > 0 && !blockedOnB2 && !blockedOnB1) {
+                  const t1Time = s1.assignedTime;
+                  const t2Time = s2.assignedTime;
+
+                  b1.students[i] = { ...s2, assignedDay: b1.dayOfWeek, assignedTime: t1Time, customStartTime: t1Time };
+                  b2.students[j] = { ...s1, assignedDay: b2.dayOfWeek, assignedTime: t2Time, customStartTime: t2Time };
+
+                  b1.students = recalculateBoardTimesFn(b1).students;
+                  b2.students = recalculateBoardTimesFn(b2).students;
+
+                  newlyAssignedMap[s1.id] = { day: b2.dayOfWeek, time: t2Time };
+                  newlyAssignedMap[s2.id] = { day: b1.dayOfWeek, time: t1Time };
+
+                  itemSwapped = true;
+                  anySwapped = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return anySwapped;
+  };
+
+  // STUFE 10: 5000-ITERATION MONTE-CARLO FUZZING & OPTIMIZATION LOOP
+  const PASS_1_LIMIT = Math.floor(RUN_ITERATIONS * 0.5); // 2500 Iterationen (50% von 5000)
   for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
-    if (onProgress && iteration % 25 === 0) {
+    if (onProgress && iteration % 50 === 0) {
       const pct = Math.min(90, Math.round(15 + (iteration / RUN_ITERATIONS) * 75));
-      const phaseText = iteration < 250 ? 'Pass 1: Max-Wunschzeiten Erkundung' : 'Pass 2: Lücken-Minimierung';
+      const phaseText = iteration < PASS_1_LIMIT
+        ? `Pass 1: Max-Wunschzeiten Erkundung (${iteration}/${PASS_1_LIMIT})`
+        : `Pass 2: Lücken-Minimierung (${iteration - PASS_1_LIMIT}/${RUN_ITERATIONS - PASS_1_LIMIT})`;
       onProgress(pct, `Stufe 10: Monte-Carlo (${iteration}/${RUN_ITERATIONS}) - ${phaseText}...`);
       await new Promise(resolve => setTimeout(resolve, 0));
     }
@@ -531,6 +592,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
       return {
         ...b,
+        startAnchor: dayConfig?.start || b.startAnchor || '14:00',
         availabilityEnd: dayConfig?.end || b.availabilityEnd || '19:00',
         students: b.students.filter(s => s.isBreak)
       };
@@ -699,6 +761,11 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
                 const sibBonus = siblingMatchBonus(student, board, startMin, endMin);
                 let totalScore = wunschBonus + fitnessScore + sibBonus + SOLVER_TIERS.NEUTRAL_ASSIGNMENT;
 
+                const isFlexibleStudent = !hasWunschPrefMap.get(student.id);
+                if (isFlexibleStudent && fitnessScore > 500000) {
+                  totalScore += 5000000; // 🌟 Master Bonus: Flexible student bridges an exact gap between two Wunschzeit blocks!
+                }
+
                 if (totalScore > highestScore) {
                   highestScore = totalScore;
                   bestCandidate = { boardId: board.id, insertIndex: pos, customStartTime: candidateCustomStart, score: totalScore };
@@ -733,12 +800,15 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
     assignStudents(fuzzedSperrzeitStudents, false, false);
     assignStudents(fuzzedFlexibleStudents, true, false);
 
-    // STUFE 11: MULTI-PHASE EMERGENCY SWEEP & RESCUE PASS
+    // STUFE 11: MULTI-PHASE EMERGENCY SWEEP & INTER-BOARD DEEP CROSS-SWAP RESCUE PASS
     const assignedCount = unassignedStudents.filter(s => !!newlyAssignedStudentIds[s.id]).length;
     if (assignedCount < unassignedStudents.length) {
       const remainingUnassigned = unassignedStudents.filter(s => !newlyAssignedStudentIds[s.id]);
       assignStudents(remainingUnassigned, true, true);
     }
+
+    // Checkpoint 1 (Stufe 11): Inter-Board Deep Cross-Swap Rescue
+    performDeepCrossSwapRescue(currentBoards, newlyAssignedStudentIds);
 
     // STUFE 11 & 12: GLOBAL FITNESS SCORING, SIBLING & WUNSCHZEIT TARGET ENFORCEMENT
     let totalAssignedCount = 0;
@@ -837,13 +907,13 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       }
     });
 
-    // 2. Track maximum Wunschzeit hits found across early exploration phase (Pass 1)
-    if (iteration < 250) {
+    // 2. Track maximum Wunschzeit hits found across early exploration phase (Pass 1: 0 - 2500 Iterations)
+    if (iteration < PASS_1_LIMIT) {
       if (wunschHits > maxWunschHitsFound) {
         maxWunschHitsFound = wunschHits;
       }
     } else {
-      // Pass 2: Strictly penalize any iteration that drops below maxWunschHitsFound!
+      // Pass 2 (2500 - 5000 Iterations): Strictly penalize any iteration that drops below maxWunschHitsFound!
       if (wunschHits < maxWunschHitsFound) {
         iterationScore -= 100000000; // Disqualify states that sacrifice Wunschzeiten!
       }
@@ -889,11 +959,6 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       bestStudentsWithWunsch = wunschStudents.length;
       bestGapCount = totalGapCount;
       bestTotalGapsMin = totalInternalGapMinutes;
-    }
-
-    // 🚀 EARLY TERMINATION SHIELD: If 100% Wunschzeit hits & <= 1 gap (Masterpiece) achieved, stop instantly!
-    if (wunschHits >= wunschStudents.length && wunschStudents.length > 0 && totalGapCount <= 1) {
-      break;
     }
   }
 
@@ -1484,27 +1549,42 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
     return changed ? recalculateBoardTimesFn({ ...board, students: studs }) : board;
   });
 
-  // Re-evaluate final gap metrics
+  // STUFE 15: ALLERLETZTER GRANDMASTER FINAL CHECK (Exhaustive Final Swap Audit right before returning!)
+  performDeepCrossSwapRescue(bestBoardsState, bestNewlyAssigned);
+
+  // Re-evaluate final gap & wunschzeit metrics
   let finalGaps = 0;
   let finalGapMin = 0;
+  let finalWunschHits = 0;
+
+  bestBoardsState = bestBoardsState.map(b => recalculateBoardTimesFn(b));
+
   bestBoardsState.forEach(b => {
     const bStuds = b.students.filter(st => !st.isBreak && st.assignedTime);
-    for (let k = 1; k < bStuds.length; k++) {
-      const [psh, psm] = parseTime(bStuds[k - 1].assignedTime!);
-      const [csh, csm] = parseTime(bStuds[k].assignedTime!);
-      const pEnd = psh * 60 + psm + bStuds[k - 1].duration;
-      const cStart = csh * 60 + csm;
-      if (cStart > pEnd) {
-        finalGaps++;
-        finalGapMin += (cStart - pEnd);
+    for (let k = 0; k < bStuds.length; k++) {
+      const st = bStuds[k];
+      const [sh, sm] = parseTime(st.assignedTime!);
+      const startMin = sh * 60 + sm;
+      const endMin = startMin + st.duration;
+
+      if (calculateWunschBonus(st.id, b.dayOfWeek, startMin, endMin) > 0) {
+        finalWunschHits++;
+      }
+
+      if (k > 0) {
+        const [psh, psm] = parseTime(bStuds[k - 1].assignedTime!);
+        const pEnd = psh * 60 + psm + bStuds[k - 1].duration;
+        if (startMin > pEnd) {
+          finalGaps++;
+          finalGapMin += (startMin - pEnd);
+        }
       }
     }
   });
+
+  bestWunschHits = Math.max(bestWunschHits, finalWunschHits);
   bestGapCount = finalGaps;
   bestTotalGapsMin = finalGapMin;
-
-  // RECALCULATE & RETURN BEST STATE
-  bestBoardsState = bestBoardsState.map(b => recalculateBoardTimesFn(b));
 
   const defaultPlan: SolverPlan = {
     boardsState: bestBoardsState,

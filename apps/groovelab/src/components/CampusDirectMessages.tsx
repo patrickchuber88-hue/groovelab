@@ -543,7 +543,43 @@ export default function CampusDirectMessages({
           }
         }
 
-        const result = Array.from(studentMap.values());
+        const rawResult = Array.from(studentMap.values());
+        const deduplicateStudents = (students: any[]): any[] => {
+          if (!Array.isArray(students)) return [];
+          const seenIds = new Set<string>();
+          const studentMap = new Map<string, any>();
+
+          for (const student of students) {
+            if (!student) continue;
+            if (student.id && seenIds.has(student.id)) continue;
+
+            const fn = (student.first_name || '').trim().toLowerCase();
+            const ln = (student.last_name || '').trim().toLowerCase();
+            const nameKey = `${fn}_${ln}`;
+
+            if (nameKey !== '_') {
+              if (studentMap.has(nameKey)) {
+                const existing = studentMap.get(nameKey);
+                if (existing.isPendingOnboarding && !student.isPendingOnboarding) {
+                  if (existing.id) seenIds.delete(existing.id);
+                  studentMap.set(nameKey, student);
+                  if (student.id) seenIds.add(student.id);
+                }
+                continue;
+              }
+              studentMap.set(nameKey, student);
+            } else {
+              const fallbackKey = student.id || `anon_${Math.random()}`;
+              studentMap.set(fallbackKey, student);
+            }
+
+            if (student.id) seenIds.add(student.id);
+          }
+
+          return Array.from(studentMap.values());
+        };
+
+        const result = deduplicateStudents(rawResult);
         console.log('[CampusDirectMessages] Strictly assigned students for teacher:', teacherId, 'Count:', result.length);
         setAssignedStudents(result);
       } catch (err) {
@@ -724,7 +760,7 @@ export default function CampusDirectMessages({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <MessageSquare size={22} color="#1e293b" />
-                <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b', margin: '0' }}>Nachrichten</h2>
+                <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b', margin: '0' }}>Nachrichten ({assignedStudents.length})</h2>
               </div>
               <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                 {isStudent ? 'Kommunikation mit deinen Lehrern' : 'Kommunikation mit deinen Schülern'}
@@ -1306,7 +1342,7 @@ export default function CampusDirectMessages({
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'white', margin: 0 }}>
-                    Campus-Groovelab Nachrichten & Shoutbox
+                    Campus-Groovelab Nachrichten & Shoutbox ({assignedStudents.length})
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
                     100% DSGVO-konforme Direktnachrichten & termingekoppelte Abstimmungen

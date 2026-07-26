@@ -67,6 +67,10 @@
 ## Loopstation Rules
 - **Looping Pause**: Es wird eine zwingende 4-Takte-Pause zwischen den Aufnahme-Spuren verwendet (Variante 1), um eine 100% sample-genaue Synchronität (kein Swallowed Attack) sicherzustellen.
 
+## User & Data Protection Shield Rules
+- **Absolute User Data Protection**: Echte Benutzerdaten, Schülerprofile, Namen und bestehende Datenbankeinträge dürfen NIEMALS über Codeänderungen, Skripte oder direkte Datenbankbefehle verändert, überschrieben, gefälscht oder gelöscht werden.
+- **Data Protection Auditor Subagent**: Vor jeder Änderung am Datenmodell oder an der Benutzerverarbeitung muss der Subagent `user_data_protection_auditor` zur Prüfung herangezogen werden, um sicherzustellen, dass keine echten Userdaten beeinträchtigt werden.
+
 ## Datenschutz & Kindersicherheits-Audit Rules
 - **Datenschutz-Standard**: Bei jeder Code-Änderung oder Funktions-Implementierung muss geprüft werden, ob der absolute Datenschutzstandard für Schulsoftware (Minimierung von personenbezogenen Daten von Minderjährigen nach DSGVO/COPPA) gewährleistet wird.
 - **Datenminimierung**: Da wir auf absolute Datenkomprimierung bei Usern setzen, um den Datenschutz bestmöglich zu erfüllen, werden keine SEPA-, Zahlungs-, Vertragsdaten und auch keine E-Mail-Adressen von Schülern gespeichert.
