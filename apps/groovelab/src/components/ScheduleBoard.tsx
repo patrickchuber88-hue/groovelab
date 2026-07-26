@@ -34,7 +34,7 @@ import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
-import { run12StageSolver } from '../engine/Schedule12StageSolverEngine';
+import { run15StageSolver } from '../engine/Schedule15StageSolverEngine';
 export interface Student {
   id: string;
   first_name: string;
@@ -1685,10 +1685,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   // Helper to insert a student into a board's student list at its exact chronological position
   function insertStudentChronologically(studentList: Student[], studentToInsert: Student, targetTime?: string, targetIndex?: number): Student[] {
     const list = [...studentList];
-    if (targetIndex !== undefined) {
-      const insertIdx = Math.min(Math.max(0, targetIndex), list.length);
-      list.splice(insertIdx, 0, studentToInsert);
-    } else if (targetTime) {
+    if (targetTime) {
       const [tHours, tMins] = parseTime(targetTime);
       const targetMin = tHours * 60 + tMins;
       
@@ -1703,6 +1700,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         insertIdx = list.length;
       }
 
+      list.splice(insertIdx, 0, studentToInsert);
+    } else if (targetIndex !== undefined) {
+      const insertIdx = Math.min(Math.max(0, targetIndex), list.length);
       list.splice(insertIdx, 0, studentToInsert);
     } else {
       list.push(studentToInsert);
@@ -2075,13 +2075,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     }
 
     try {
-      setLoading(true);
       setIsSolverRunning(true);
       setSolverProgress(5);
       setSolverStageText('Stufe 1-3: O(1) Pre-Computation & Sperrzeit-Shield...');
       pushUndoSnapshot();
 
-      const solverResult = await run12StageSolver({
+      const solverResult = await run15StageSolver({
         unassignedStudents,
         boards,
         supabase,
@@ -2098,16 +2097,34 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const { planWunschzeit, planLueckenlos, bestBoardsState, newlyAssignedMap } = solverResult;
 
       const computePlanMetrics = (plan: any) => {
-        let totalAssigned = Object.keys(plan.newlyAssignedMap || {}).length;
+        const totalAssigned = Object.keys(plan.newlyAssignedMap || {}).length;
         const totalStudentsCount = unassignedStudents.length;
-        const assignmentPct = totalStudentsCount > 0 ? (totalAssigned / totalStudentsCount) * 35 : 35;
-        const wunschRatio = (plan.studentsWithWunsch || 1) > 0 ? ((plan.wunschHits || 0) / plan.studentsWithWunsch) : 1;
-        const wunschPct = wunschRatio * 55;
-        const gapBonus = (plan.gapCount || 0) <= 1 ? 10 : Math.max(0, 10 - ((plan.gapCount || 0) - 1) * 3);
-        let overallScore = Math.min(100, Math.round(assignmentPct + wunschPct + gapBonus));
-        if (wunschRatio < 0.90) {
-          overallScore = Math.min(84, overallScore);
+        const studentsWithWunsch = plan.studentsWithWunsch || 1;
+        const wunschHits = plan.wunschHits || 0;
+        const missedWunschCount = Math.max(0, studentsWithWunsch - wunschHits);
+        const gapCount = plan.gapCount || 0;
+        const unassignedCount = Math.max(0, totalStudentsCount - totalAssigned);
+
+        // Strict Senior Developer Scoring Matrix (100 Points Base)
+        // - Unassigned Student: -15 Pts per student
+        // - Missed Wunschzeit: -7.5 Pts per missed preference
+        // - Gap (15 Min): -6 Pts per gap slot
+        let overallScore = 100;
+        overallScore -= unassignedCount * 15;
+        overallScore -= missedWunschCount * 7.5;
+        overallScore -= gapCount * 6;
+
+        // Strict Quality Threshold Caps:
+        // Exzellent (95-100) is reserved ONLY for 100% Wunschzeiten and max 1 gap!
+        if (missedWunschCount >= 2 || gapCount >= 2) {
+          overallScore = Math.min(84, overallScore); // Max "Gut" (Yellow)
         }
+        if (missedWunschCount >= 4 || gapCount >= 4 || unassignedCount >= 1) {
+          overallScore = Math.min(74, overallScore); // Max "Befriedigend"
+        }
+
+        overallScore = Math.max(10, Math.min(100, Math.round(overallScore)));
+
         return {
           ...plan,
           totalAssigned,
@@ -2168,7 +2185,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           });
         } else {
           setToast({
-            message: `${assignedCount} Schüler wurden erfolgreich durch den geschützten 12-Stufen-Solver zugeteilt!`,
+            message: `${assignedCount} Schüler wurden erfolgreich durch den geschützten 15-Stufen-Solver zugeteilt!`,
             type: 'success'
           });
         }
@@ -2185,7 +2202,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         type: 'warning'
       });
     } finally {
-      setLoading(false);
+      setSolverProgress(100);
+      setSolverStageText('Zuteilung perfekt abgeschlossen! 🎉');
+      await new Promise(r => setTimeout(r, 600));
       setIsSolverRunning(false);
     }
   };
@@ -4679,7 +4698,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             marginBottom: '4px'
           }}>
             <span style={{ fontSize: '1rem' }}>💡</span>
-            <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 12-Stufen-Zuteilung oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im 15-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
+            <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 15-Stufen-Zuteilung oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im 15-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
           </div>
 
           {/* Form to Add Day Board */}
@@ -7500,7 +7519,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', fontWeight: 800, color: '#166534', fontFamily: 'Urbanist, sans-serif' }}>
-                  <span>12-STUFEN GROSSMEISTER SOLVER</span>
+                  <span>15-STUFEN GROSSMEISTER SOLVER</span>
                   <span>{solverProgress}%</span>
                 </div>
               </div>

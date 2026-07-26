@@ -66,6 +66,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [firstName, setFirstName] = useState<string>(student.first_name || '');
   const [lastName, setLastName] = useState<string>(student.last_name || '');
+  const [isLastNameRevealedLocally, setIsLastNameRevealedLocally] = useState<boolean>(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
@@ -333,6 +334,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       alert('Fehler beim Speichern des Namens: ' + err.message);
     }
   };
+
+  useEffect(() => {
+    setIsLastNameRevealedLocally(false);
+    if (student.first_name) setFirstName(student.first_name);
+    if (student.last_name) setLastName(student.last_name);
+
+    const fetchFullStudentName = async () => {
+      if (student.id) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('first_name, last_name')
+            .eq('id', student.id)
+            .single();
+          if (data) {
+            if (data.first_name) setFirstName(data.first_name);
+            if (data.last_name) setLastName(data.last_name);
+          }
+        } catch (err) {
+          console.error('Error fetching full student name in StudentDetailModal:', err);
+        }
+      }
+    };
+    fetchFullStudentName();
+  }, [student.id, student.first_name, student.last_name]);
 
   useEffect(() => {
     const fetchQrToken = async () => {
@@ -1892,10 +1918,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           ) : (
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <span>
-                {firstName} {maskLastName(lastName, showRealNames)}
+                {firstName} {isLastNameRevealedLocally ? lastName : maskLastName(lastName, true)}
                 {groupStudents.length > 0 && (
                   <span style={{ color: '#3b82f6', fontWeight: 800 }}>
-                    {groupStudents.map(g => ` & ${g.first_name} ${maskLastName(g.last_name, showRealNames)}`).join('')}
+                    {groupStudents.map(g => ` & ${g.first_name} ${isLastNameRevealedLocally ? g.last_name : maskLastName(g.last_name, true)}`).join('')}
                   </span>
                 )}
               </span>
@@ -1913,22 +1939,22 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 </span>
               )}
               <button 
-                onClick={() => toggleRealNames()}
+                onClick={() => setIsLastNameRevealedLocally(prev => !prev)}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#64748b',
+                  color: isLastNameRevealedLocally ? '#3b82f6' : '#64748b',
                   display: 'flex',
                   alignItems: 'center',
                   padding: '4px',
                   borderRadius: '50%',
                   transition: 'all 0.15s ease'
                 }}
-                title={showRealNames ? "Namen anonymisieren" : "Voller Name anzeigen"}
+                title={isLastNameRevealedLocally ? "Nachnamen verbergen" : "Nachnamen enthüllen"}
                 className="hover-scale-mini"
               >
-                {showRealNames ? <EyeOff size={16} /> : <Eye size={16} />}
+                {isLastNameRevealedLocally ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
               {(currentUserRole === 'admin' || currentUserRole === 'secretary') && (
                 <button 

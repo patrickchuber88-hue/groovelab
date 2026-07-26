@@ -402,8 +402,6 @@ export default function CampusDirectMessages({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [typedMessage, setTypedMessage] = useState('');
-  const [showNewChatModal, setShowNewChatModal] = useState(false);
-  const [newChatSearch, setNewChatSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
   const [activeSubTab, setActiveSubTab] = useState<'chat' | 'system'>('chat');
@@ -732,30 +730,6 @@ export default function CampusDirectMessages({
                 {isStudent ? 'Kommunikation mit deinen Lehrern' : 'Kommunikation mit deinen Schülern'}
               </p>
             </div>
-            {(!isStudent || studentToTeacherChat) && (
-              <button 
-                onClick={() => setShowNewChatModal(true)}
-                style={{
-                  background: '#34a853',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '8px 14px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  boxShadow: '0 2px 8px rgba(52, 168, 83, 0.15)'
-                }}
-                className="hover-scale"
-                type="button"
-              >
-                <Plus size={14} />
-                <span>Neu</span>
-              </button>
-            )}
           </div>
           
           <div style={{ position: 'relative' }}>
@@ -1395,35 +1369,9 @@ export default function CampusDirectMessages({
                     Wähle einen Gesprächspartner
                   </h4>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, margin: '4px 0 0 0' }}>
-                    Wähle einen Chat aus der linken Liste oder starte direkt eine neue Unterhaltung.
+                    Wähle einen Chat aus der linken Liste oder klicke unten auf einen Kontakt, um eine Unterhaltung zu beginnen.
                   </p>
                 </div>
-
-                {(!isStudent || studentToTeacherChat) && (
-                  <button
-                    onClick={() => setShowNewChatModal(true)}
-                    style={{
-                      background: '#34a853',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '10px 18px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                      whiteSpace: 'nowrap'
-                    }}
-                    className="hover-scale"
-                    type="button"
-                  >
-                    <Plus size={16} />
-                    <span>Neuen Chat starten</span>
-                  </button>
-                )}
               </div>
 
               {/* Quick Contact Cards */}
@@ -1474,128 +1422,6 @@ export default function CampusDirectMessages({
         )}
       </div>
 
-      {showNewChatModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 4000,
-          background: 'rgba(242, 242, 247, 0.65)',
-          backdropFilter: 'blur(20px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div className="glass-panel animation-slide-up" style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '28px',
-            borderRadius: '24px',
-            maxWidth: '460px',
-            width: '100%',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            position: 'relative',
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}>
-            <button 
-              onClick={() => {
-                setShowNewChatModal(false);
-                setNewChatSearch('');
-              }} 
-              style={{
-                position: 'absolute',
-                top: 20,
-                right: 20,
-                background: 'rgba(0,0,0,0.05)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: '#64748b'
-              }}
-              type="button"
-            >
-              <X size={16} />
-            </button>
-
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0' }}>
-              Neue Nachricht ({chatPartners.length})
-            </h3>
-            
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input 
-                type="text" 
-                placeholder={isStudent ? "Lehrer suchen..." : "Schüler suchen..."}
-                value={newChatSearch}
-                onChange={e => setNewChatSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 38px',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  background: 'white',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '45vh', paddingRight: '4px' }}>
-              {chatPartners
-                .filter(u => `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase().includes(newChatSearch.toLowerCase()))
-                .map(u => {
-                  const avatarSrc = resolveCampusAvatar(u);
-                  return (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        setSelectedRecipient(u);
-                        setShowNewChatModal(false);
-                        setNewChatSearch('');
-                      }}
-                      style={{
-                        padding: '10px 14px',
-                        borderRadius: '14px',
-                        border: '1px solid #f1f5f9',
-                        background: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.2s',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}
-                      className="hover-scale-mini"
-                      type="button"
-                    >
-                      <img 
-                        src={avatarSrc} 
-                        style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
-                      />
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.85rem' }}>{formatStudentDisplayName(u)}</span>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>{u.instrument || (u.role === 'teacher' ? 'Lehrer' : 'Schüler')}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
