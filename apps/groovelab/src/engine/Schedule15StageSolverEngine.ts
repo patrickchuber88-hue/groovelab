@@ -580,7 +580,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
   // STUFE 10: 5000-ITERATION MONTE-CARLO FUZZING & OPTIMIZATION LOOP
   const PASS_1_LIMIT = Math.floor(RUN_ITERATIONS * 0.5); // 2500 Iterationen (50% von 5000)
   for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
-    if (onProgress && iteration % 50 === 0) {
+    if (onProgress && iteration % 150 === 0) {
       const pct = Math.min(90, Math.round(15 + (iteration / RUN_ITERATIONS) * 75));
       const phaseText = iteration < PASS_1_LIMIT
         ? `Pass 1: Max-Wunschzeiten Erkundung (${iteration}/${PASS_1_LIMIT})`
@@ -884,16 +884,19 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
         iterationScore -= 15000000 * (dayGapCount - 1);
       }
 
-      // Start-Lücken Strafe: Bevorzuge, dass der 1. Schüler direkt zu Arbeitsbeginn anfängt!
+      // 15-Minuten Start-Verzögerungs-Strafe: Jede 15 Minuten Verspätung ab Schichtbeginn wird streng bestraft!
       if (boardStudents.length > 0) {
         const firstS = boardStudents[0];
         const [fsh, fsm] = parseTime(firstS.assignedTime!);
         const firstStartMin = fsh * 60 + fsm;
-        const [bh, bm] = parseTime(b.startAnchor || '13:00');
+        const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
+        const teacherStartAnchorStr = (typeof dayConfig === 'string' ? dayConfig : (dayConfig?.start || dayConfig?.start_time)) || b.startAnchor || '13:00';
+        const [bh, bm] = parseTime(teacherStartAnchorStr);
         const boardStartMin = bh * 60 + bm;
         if (firstStartMin > boardStartMin) {
           const startGapMin = firstStartMin - boardStartMin;
-          iterationScore -= startGapMin * 50000; // Moderate penalty for start gaps!
+          const units15Min = Math.ceil(startGapMin / 15);
+          iterationScore -= units15Min * 250000; // 250.000 Strafe pro 15 Minuten Verspätung!
         }
       }
     }
@@ -959,6 +962,15 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       bestStudentsWithWunsch = wunschStudents.length;
       bestGapCount = totalGapCount;
       bestTotalGapsMin = totalInternalGapMinutes;
+    }
+
+    // PERFECT SCORE EARLY CONVERGENCE (Perf-Triad Optimization):
+    // If 100% Wunschzeiten and 0 Min Gaps are achieved, exit early!
+    if (wunschHits >= theoreticalMaxWunschHits && totalInternalGapMinutes === 0 && iteration >= 50) {
+      if (onProgress) {
+        onProgress(90, `⚡ Gold-Standard (100% Wunschzeiten & 0 Min Lücken) in Iteration ${iteration} in Rekordzeit erreicht!`);
+      }
+      break;
     }
   }
 
@@ -1551,6 +1563,160 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
 
   // STUFE 15: ALLERLETZTER GRANDMASTER FINAL CHECK (Exhaustive Final Swap Audit right before returning!)
   performDeepCrossSwapRescue(bestBoardsState, bestNewlyAssigned);
+
+  // STUFE 16: GRANDMASTER FEIERABEND OPTIMIZER PASS (Früherer Start & früheres Feierabend-Ende)
+  // Shift day blocks earlier towards teacherAvailabilityStart if it reduces end time without losing Wunschzeiten or creating gaps!
+  bestBoardsState = bestBoardsState.map(board => {
+    if (!board.students || board.students.length === 0) return board;
+
+    const assignedStuds = board.students.filter(st => st.assignedTime && !st.isBreak);
+    if (assignedStuds.length === 0) return board;
+
+    const [firstH, firstM] = parseTime(assignedStuds[0].assignedTime!);
+    const currentStartMin = firstH * 60 + firstM;
+    const [lastH, lastM] = parseTime(assignedStuds[assignedStuds.length - 1].assignedTime!);
+    const currentEndMin = lastH * 60 + lastM + assignedStuds[assignedStuds.length - 1].duration;
+
+    const dayConfig = (teacherAvailability as any)[board.dayOfWeek];
+    const teacherStartAnchorStr = (typeof dayConfig === 'string' ? dayConfig : (dayConfig?.start || dayConfig?.start_time)) || board.startAnchor || '13:00';
+    const [tH, tM] = parseTime(teacherStartAnchorStr);
+    const earliestTeacherMin = tH * 60 + tM;
+
+    if (currentStartMin <= earliestTeacherMin) return board;
+
+    let bestBoardCandidate = board;
+    let bestCandidateEndMin = currentEndMin;
+
+    for (let testStartMin = currentStartMin - 15; testStartMin >= earliestTeacherMin; testStartMin -= 15) {
+      const testStartStr = `${String(Math.floor(testStartMin / 60)).padStart(2, '0')}:${String(testStartMin % 60).padStart(2, '0')}`;
+
+      const shiftedBoard = recalculateBoardTimesFn({ ...board, startAnchor: testStartStr });
+      const shiftedAssigned = shiftedBoard.students.filter(st => st.assignedTime && !st.isBreak);
+      if (shiftedAssigned.length === 0) break;
+
+      let allWunschPreserved = true;
+      let hasSperrViolation = false;
+
+      for (const st of shiftedAssigned) {
+        const [sh, sm] = parseTime(st.assignedTime!);
+        const stStart = sh * 60 + sm;
+        const stEnd = stStart + st.duration;
+
+        if (isSlotBlockedForStudent(st.id, board.dayOfWeek, stStart, stEnd)) {
+          hasSperrViolation = true;
+          break;
+        }
+
+        const origSt = assignedStuds.find(orig => orig.id === st.id);
+        if (origSt) {
+          const [osh, osm] = parseTime(origSt.assignedTime!);
+          const oStart = osh * 60 + osm;
+          const oEnd = oStart + origSt.duration;
+          const origWunsch = calculateWunschBonus(origSt.id, board.dayOfWeek, oStart, oEnd);
+          const newWunsch = calculateWunschBonus(st.id, board.dayOfWeek, stStart, stEnd);
+          if (origWunsch > 0 && newWunsch <= 0) {
+            allWunschPreserved = false;
+            break;
+          }
+        }
+      }
+
+      if (!hasSperrViolation && allWunschPreserved) {
+        const [candLastH, candLastM] = parseTime(shiftedAssigned[shiftedAssigned.length - 1].assignedTime!);
+        const candEndMin = candLastH * 60 + candLastM + shiftedAssigned[shiftedAssigned.length - 1].duration;
+
+        if (candEndMin < bestCandidateEndMin) {
+          bestCandidateEndMin = candEndMin;
+          bestBoardCandidate = shiftedBoard;
+        }
+      } else {
+        break;
+      }
+    }
+
+    return bestBoardCandidate;
+  });
+
+  // STUFE 17: GRANDMASTER START-ANCHOR OPTIMIZATION PASS (15-Minuten Strafen-Minimierer)
+  // Evaluates student placements at index 0 and selects the combination that minimizes
+  // the 15-minute start delay units from teacherAvailabilityStart!
+  bestBoardsState = bestBoardsState.map(board => {
+    if (!board.students || board.students.length === 0) return board;
+
+    const assignedStuds = board.students.filter(st => st.assignedTime && !st.isBreak);
+    if (assignedStuds.length === 0) return board;
+
+    const dayConfig = (teacherAvailability as any)[board.dayOfWeek];
+    const teacherStartAnchorStr = (typeof dayConfig === 'string' ? dayConfig : (dayConfig?.start || dayConfig?.start_time)) || board.startAnchor || '13:00';
+    const [tH, tM] = parseTime(teacherStartAnchorStr);
+    const teacherStartMin = tH * 60 + tM;
+
+    const [firstH, firstM] = parseTime(assignedStuds[0].assignedTime!);
+    const currentStartMin = firstH * 60 + firstM;
+
+    if (currentStartMin <= teacherStartMin) return board;
+
+    let bestBoardCandidate = board;
+    let minDelay15Units = Math.ceil((currentStartMin - teacherStartMin) / 15);
+
+    for (let idx = 0; idx < board.students.length; idx++) {
+      const candStudent = board.students[idx];
+      if (candStudent.isBreak) continue;
+
+      if (isSlotBlockedForStudent(candStudent.id, board.dayOfWeek, teacherStartMin, teacherStartMin + candStudent.duration)) {
+        continue;
+      }
+
+      const reorderedStudents = [
+        { ...candStudent, customStartTime: teacherStartAnchorStr },
+        ...board.students.filter(st => st.id !== candStudent.id)
+      ];
+
+      const testBoard = recalculateBoardTimesFn({ ...board, startAnchor: teacherStartAnchorStr, students: reorderedStudents });
+      const testAssigned = testBoard.students.filter(st => st.assignedTime && !st.isBreak);
+      if (testAssigned.length === 0) continue;
+
+      let allWunschPreserved = true;
+      let hasSperrViolation = false;
+
+      for (const st of testAssigned) {
+        const [sh, sm] = parseTime(st.assignedTime!);
+        const stStart = sh * 60 + sm;
+        const stEnd = stStart + st.duration;
+
+        if (isSlotBlockedForStudent(st.id, board.dayOfWeek, stStart, stEnd)) {
+          hasSperrViolation = true;
+          break;
+        }
+
+        const origSt = assignedStuds.find(orig => orig.id === st.id);
+        if (origSt) {
+          const [osh, osm] = parseTime(origSt.assignedTime!);
+          const oStart = osh * 60 + osm;
+          const oEnd = oStart + origSt.duration;
+          const origWunsch = calculateWunschBonus(origSt.id, board.dayOfWeek, oStart, oEnd);
+          const newWunsch = calculateWunschBonus(st.id, board.dayOfWeek, stStart, stEnd);
+          if (origWunsch > 0 && newWunsch <= 0) {
+            allWunschPreserved = false;
+            break;
+          }
+        }
+      }
+
+      if (!hasSperrViolation && allWunschPreserved) {
+        const [candFirstH, candFirstM] = parseTime(testAssigned[0].assignedTime!);
+        const candFirstMin = candFirstH * 60 + candFirstM;
+        const candDelay15Units = Math.max(0, Math.ceil((candFirstMin - teacherStartMin) / 15));
+
+        if (candDelay15Units < minDelay15Units) {
+          minDelay15Units = candDelay15Units;
+          bestBoardCandidate = testBoard;
+        }
+      }
+    }
+
+    return bestBoardCandidate;
+  });
 
   // Re-evaluate final gap & wunschzeit metrics
   let finalGaps = 0;

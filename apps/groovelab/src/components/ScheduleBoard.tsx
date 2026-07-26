@@ -440,6 +440,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   // Focus Day Zoom state
   const [focusedDayOfWeek, setFocusedDayOfWeek] = useState<number | null>(null);
+  const autoSaveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Dynamic Theme calculations
   const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
@@ -2112,6 +2113,166 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
     return { totalGapsMin, gapCount, totalAssigned, wunschHits, studentsWithWunsch };
   };
 
+  const persistScheduleToSupabase = async (boardsToSave: DayBoard[], showToastNotification = false) => {
+    if (!selectedTeacherId) return;
+    try {
+      const validBoards = boardsToSave.filter(b => b.students.length > 0);
+
+      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+      const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
+
+      const boardDefinitions = validBoards.map(b => ({
+        id: b.id,
+        dayOfWeek: b.dayOfWeek,
+        startAnchor: b.startAnchor,
+        roomId: b.roomId,
+        students: b.students.map(s => ({
+          id: s.id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          instrument: s.instrument,
+          duration: s.duration,
+          assignedDay: s.assignedDay,
+          assignedTime: s.assignedTime,
+          isBreak: s.isBreak,
+          customStartTime: s.customStartTime,
+          isGroup: s.isGroup,
+          groupStudents: s.groupStudents
+        }))
+      }));
+
+      const updatedDrafts = drafts.map(d => {
+        if (d.id === activeDraftId) {
+          return { ...d, boards: boardDefinitions };
+        }
+        return d;
+      });
+
+      const draftStateToSave = {
+        activeDraftId,
+        submittedDraftId: activeDraftId,
+        submittedAt: new Date().toISOString(),
+        drafts: updatedDrafts
+      };
+
+      await supabase
+        .from('users')
+        .update({
+          planned_boards: draftStateToSave,
+          [columnName]: draftStateToSave
+        })
+        .eq('id', selectedTeacherId);
+
+      await supabase
+        .from('schedules')
+        .delete()
+        .eq('teacher_id', selectedTeacherId);
+
+      const inserts = [];
+      for (const board of validBoards) {
+        for (const s of board.students) {
+          if (s.isGroup && s.groupStudents) {
+            for (const gs of s.groupStudents) {
+              inserts.push({
+                school_id: schoolId,
+                teacher_id: selectedTeacherId,
+                student_id: gs.id,
+                day_of_week: board.dayOfWeek,
+                time_slot: s.assignedTime,
+                room_id: board.roomId || null,
+                duration: s.duration,
+                status: 'ready_for_admin_review',
+                instrument: gs.instrument || 'Musiker'
+              });
+            }
+          } else {
+            inserts.push({
+              school_id: schoolId,
+              teacher_id: selectedTeacherId,
+              student_id: s.isBreak ? null : s.id,
+              day_of_week: board.dayOfWeek,
+              time_slot: s.assignedTime,
+              room_id: board.roomId || null,
+              duration: s.duration,
+              status: s.isBreak ? 'approved' : 'ready_for_admin_review',
+              instrument: s.isBreak ? null : (s.instrument || 'Musiker')
+            });
+          }
+        }
+      }
+
+      if (inserts.length > 0) {
+        const { data: insertedSchedules } = await supabase
+          .from('schedules')
+          .insert(inserts)
+          .select();
+
+        const occurrences: any[] = [];
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+
+        (insertedSchedules || []).forEach((sch: any) => {
+          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration } = sch;
+          if (!student_id || !day_of_week || !time_slot) return;
+
+          for (let i = 0; i < 4; i++) {
+            const targetDate = new Date();
+            const currentDay = today.getDay() || 7;
+            const diff = day_of_week - currentDay + (i * 7);
+            targetDate.setDate(today.getDate() + diff);
+
+            const ty = targetDate.getFullYear();
+            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const td = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${ty}-${tm}-${td}`;
+            if (dateStr < todayStr) continue;
+
+            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
+            occurrences.push({
+              schedule_id: scheduleId,
+              student_id,
+              teacher_id,
+              date: dateStr,
+              start_time: startTime,
+              duration: duration || 45,
+              status: 'scheduled'
+            });
+          }
+        });
+
+        await supabase
+          .from('schedule_occurrences')
+          .delete()
+          .eq('teacher_id', selectedTeacherId)
+          .gte('date', todayStr);
+
+        if (occurrences.length > 0) {
+          await supabase
+            .from('schedule_occurrences')
+            .insert(occurrences);
+        }
+      }
+
+      if (showToastNotification) {
+        setToast({ message: 'Automatisch in Supabase gespeichert! ⚡', type: 'success' });
+      }
+    } catch (err) {
+      console.error('Error auto-saving schedule to Supabase:', err);
+    }
+  };
+
+  const triggerDebouncedAutoSave = (updatedBoards: DayBoard[]) => {
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
+    autoSaveDebounceTimerRef.current = setTimeout(() => {
+      persistScheduleToSupabase(updatedBoards, false);
+    }, 500);
+  };
+
   const handleAutoAssign = async () => {
     const unassignedStudents = students.filter(s => !s.isBreak);
     if (unassignedStudents.length === 0) {
@@ -2190,6 +2351,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
       // Update state with default Plan A (Max Wunschzeiten)
       setBoards(activePlan.boardsState || bestBoardsState);
+      persistScheduleToSupabase(activePlan.boardsState || bestBoardsState, true);
       setStudents(currentStudents => currentStudents.map(s => {
         if (s.isBreak) return s;
         if (activePlan.newlyAssignedMap && activePlan.newlyAssignedMap[s.id]) {
@@ -3034,7 +3196,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           return s;
         }));
 
-        return cleaned.map(b => b.id === targetBoardId ? updatedTarget : b);
+        const finalBoards = cleaned.map(b => b.id === targetBoardId ? updatedTarget : b);
+        triggerDebouncedAutoSave(finalBoards);
+        return finalBoards;
       }
 
       return prev;
@@ -3099,7 +3263,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         return s;
       }));
 
-      return prev.map(b => b.id === boardId ? updatedBoard : b);
+      const nextBoards = prev.map(b => b.id === boardId ? updatedBoard : b);
+      triggerDebouncedAutoSave(nextBoards);
+      return nextBoards;
     });
   };
 
@@ -3561,194 +3727,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
     try {
       setSubmitting(true);
-
       const validBoards = boards.filter(b => b.students.length > 0);
+      await persistScheduleToSupabase(validBoards, true);
 
-      // 1. Delete all previous schedules for this teacher
-      await supabase
-        .from('schedules')
-        .delete()
-        .eq('teacher_id', selectedTeacherId);
-
-      // Save the planned boards definitions to the teacher's profile in users table
-      const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-      const columnName = activePlatform === 'campus' ? 'campus_räume' : 'groovelab_räume';
-
-      const boardDefinitions = validBoards.map(b => ({
-        id: b.id,
-        dayOfWeek: b.dayOfWeek,
-        startAnchor: b.startAnchor,
-        roomId: b.roomId,
-        students: b.students.map(s => ({
-          id: s.id,
-          first_name: s.first_name,
-          last_name: s.last_name,
-          instrument: s.instrument,
-          duration: s.duration,
-          assignedDay: s.assignedDay,
-          assignedTime: s.assignedTime,
-          isBreak: s.isBreak,
-          customStartTime: s.customStartTime,
-          isGroup: s.isGroup,
-          groupStudents: s.groupStudents
-        }))
-      }));
-
-      const updatedDrafts = drafts.map(d => {
-        if (d.id === activeDraftId) {
-          return { ...d, boards: boardDefinitions };
-        }
-        return d;
-      });
-
-      const draftStateToSave = {
-        activeDraftId,
-        submittedDraftId: activeDraftId,
-        submittedAt: new Date().toISOString(),
-        drafts: updatedDrafts
-      };
-
-      await supabase
-        .from('users')
-        .update({
-          planned_boards: draftStateToSave,
-          [columnName]: draftStateToSave
-        })
-        .eq('id', selectedTeacherId);
-
-      setSubmittedDraftId(activeDraftId);
-      setDrafts(updatedDrafts);
-
-      // 2. Insert all new schedule slots from the day boards
-      const inserts = [];
-      for (const board of validBoards) {
-        for (const s of board.students) {
-          if (s.isGroup && s.groupStudents) {
-            for (const gs of s.groupStudents) {
-              inserts.push({
-                school_id: schoolId,
-                teacher_id: selectedTeacherId,
-                student_id: gs.id,
-                day_of_week: board.dayOfWeek,
-                time_slot: s.assignedTime,
-                room_id: board.roomId || null,
-                duration: s.duration,
-                status: 'ready_for_admin_review',
-                instrument: gs.instrument || 'Musiker'
-              });
-            }
-          } else {
-            inserts.push({
-              school_id: schoolId,
-              teacher_id: selectedTeacherId,
-              student_id: s.isBreak ? null : s.id,
-              day_of_week: board.dayOfWeek,
-              time_slot: s.assignedTime,
-              room_id: board.roomId || null,
-              duration: s.duration,
-              status: s.isBreak ? 'approved' : 'ready_for_admin_review', // A break/pause is auto-approved
-              instrument: s.isBreak ? null : (s.instrument || 'Musiker')
-            });
-          }
-        }
-      }
-
-      if (inserts.length > 0) {
-        // Before inserting, validate that no other approved schedule exists for this student_id with the same instrument column value.
-        const studentIds = inserts.map(i => i.student_id).filter(Boolean);
-        if (studentIds.length > 0) {
-          const { data: existingSchedules, error: checkError } = await supabase
-            .from('schedules')
-            .select('student_id, instrument, student:users!schedules_student_id_fkey(id, first_name, last_name)')
-            .eq('status', 'approved')
-            .neq('teacher_id', selectedTeacherId)
-            .in('student_id', studentIds);
-            
-          if (checkError) {
-            console.error("Error checking existing schedules:", checkError);
-          } else if (existingSchedules && existingSchedules.length > 0) {
-            for (const insert of inserts) {
-              if (!insert.student_id) continue;
-              const conflict = (existingSchedules as any[]).find((es: any) => es.student_id === insert.student_id && es.instrument === insert.instrument);
-              if (conflict) {
-                const studentObj = conflict.student;
-                const studentName = studentObj ? `${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : 'Schüler';
-                alert(`Fehler: Für ${studentName} existiert bereits ein genehmigter Stundenplan für das Instrument "${insert.instrument}".`);
-                setSubmitting(false);
-                return;
-              }
-            }
-          }
-        }
-
-        const { data: insertedSchedules, error: insertErr } = await supabase
-          .from('schedules')
-          .insert(inserts)
-          .select();
-        if (insertErr) throw insertErr;
-
-        // Generate schedule_occurrences for the next 4 weeks!
-        const occurrences: any[] = [];
-        const today = new Date();
-        const y = today.getFullYear();
-        const m = String(today.getMonth() + 1).padStart(2, '0');
-        const d = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${y}-${m}-${d}`;
-
-        (insertedSchedules || []).forEach((sch: any) => {
-          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration } = sch;
-          if (!student_id || !day_of_week || !time_slot) return;
-
-          for (let i = 0; i < 4; i++) {
-            const targetDate = new Date();
-            const currentDay = today.getDay() || 7;
-            const diff = day_of_week - currentDay + (i * 7);
-            targetDate.setDate(today.getDate() + diff);
-
-            const ty = targetDate.getFullYear();
-            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const td = String(targetDate.getDate()).padStart(2, '0');
-            const dateStr = `${ty}-${tm}-${td}`;
-            if (dateStr < todayStr) continue;
-
-            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
-            occurrences.push({
-              schedule_id: scheduleId,
-              student_id,
-              teacher_id,
-              date: dateStr,
-              start_time: startTime,
-              duration: duration || 45,
-              status: 'scheduled'
-            });
-          }
-        });
-
-        // Delete future occurrences for this teacher first to prevent duplicates
-        await supabase
-          .from('schedule_occurrences')
-          .delete()
-          .eq('teacher_id', selectedTeacherId)
-          .gte('date', todayStr);
-
-        if (occurrences.length > 0) {
-          const { error: occErr } = await supabase
-            .from('schedule_occurrences')
-            .insert(occurrences);
-          if (occErr) {
-            console.error('Error inserting schedule_occurrences:', occErr);
-          }
-        }
-      }
-
-      // 3. Trigger alert notification for Secretariat
+      // Trigger alert notification for Secretariat
       const { data: teacherProfile } = await supabase
         .from('users')
         .select('first_name, last_name')
         .eq('id', selectedTeacherId)
         .single();
-      
-      const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'Patrick';
+
+      const teacherName = teacherProfile ? `${teacherProfile.first_name} ${teacherProfile.last_name}` : 'Lehrkraft';
 
       await supabase.from('system_alerts').insert({
         school_id: schoolId,
@@ -3757,10 +3746,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         message: `🗓️ Stundenplan-Review: Lehrkraft ${teacherName} hat den neuen Stundenplan erstellt und zur Freigabe an die Verwaltung gesendet.`
       });
 
-      // 4. Generate PDF Backup
+      // Generate PDF Backup & Celebration
       await generatePDFBackup(validBoards, students);
-
-      // 5. Show success animation
       setShowCelebration(true);
       setHasSubmittedSchedule(true);
       setScheduleStatus('pending');
