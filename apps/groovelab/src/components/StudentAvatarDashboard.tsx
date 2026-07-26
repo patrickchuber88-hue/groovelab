@@ -4217,17 +4217,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const getGroupedLogs = () => {
     const groups: Record<string, { date: string, focusSeconds: number, extraSeconds: number, flameLevel: string, isPlaceholder?: boolean }> = {};
     
-    // Initialize placeholders for the last 7 days starting from user creation date
+    // Initialize placeholders for the last 7 days starting from user activation date
     const now = new Date();
-    const creationDate = studentUser?.created_at ? new Date(studentUser.created_at) : null;
-    const startOfCreation = creationDate ? new Date(creationDate.getFullYear(), creationDate.getMonth(), creationDate.getDate()) : null;
+    const actDateStr = studentUser?.activated_at || (studentUser?.is_pin_activated ? studentUser?.created_at : null);
+    // Rule: Der Start des Übe-Streaks startet erst mit der PIN-Aktivierung des Schülers! Davor werden keine Streaks/Fehltage erfasst.
+    const activationDate = actDateStr ? new Date(actDateStr) : new Date();
+    const startOfActivation = new Date(activationDate.getFullYear(), activationDate.getMonth(), activationDate.getDate());
 
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(now.getDate() - i);
       const startOfD = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-      if (startOfCreation && startOfD < startOfCreation) {
+      if (startOfActivation && startOfD < startOfActivation) {
         continue;
       }
 
@@ -5206,8 +5208,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
       }
 
-      if (!lastSecuredDate && studentUser?.created_at) {
-        lastSecuredDate = toLocalYYYYMMDD(new Date(studentUser.created_at));
+      if (!lastSecuredDate) {
+        const actDateStr = studentUser?.activated_at || (studentUser?.is_pin_activated ? studentUser?.created_at : null);
+        if (actDateStr) {
+          lastSecuredDate = toLocalYYYYMMDD(new Date(actDateStr));
+        }
       }
 
       // Check if this session completed the target or if target was already completed today
@@ -5748,8 +5753,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           lastSecuredDateStr = jokerDateStr;
         }
       }
-      if (!lastSecuredDateStr && user?.created_at) {
-        lastSecuredDateStr = toLocalYYYYMMDD(new Date(user.created_at));
+      if (!lastSecuredDateStr) {
+        const actDateStr = user?.activated_at || (user?.is_pin_activated ? user?.created_at : null);
+        if (actDateStr) {
+          lastSecuredDateStr = toLocalYYYYMMDD(new Date(actDateStr));
+        }
       }
 
       if (lastSecuredDateStr && activeStreak > 0) {

@@ -5435,8 +5435,8 @@ export function TeacherDashboard({
       is_trial: newStudent.is_trial || false,
       trial_ends_at: newStudent.is_trial && newStudent.trial_ends_at ? newStudent.trial_ends_at : null,
       contract_ends_at: newStudent.contract_ends_at ? newStudent.contract_ends_at : null,
-      is_campus_active: activePlatform === 'campus',
-      is_groovelab_active: activePlatform === 'groovelab',
+      is_campus_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
+      is_groovelab_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
       teacher_id: userId,
       app_usage_mode: newStudent.app_usage_mode || 'student_only'
     }).select().single();
@@ -5522,6 +5522,7 @@ export function TeacherDashboard({
           return;
         }
       }
+      const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
       const studentId = crypto.randomUUID();
       const qrToken = crypto.randomUUID();
       const lName = inviteLastName.trim();
@@ -5538,8 +5539,8 @@ export function TeacherDashboard({
         instrument: 'Musiker',
         status: 'invited',
         is_trial: true,
-        is_campus_active: activePlatform === 'campus',
-        is_groovelab_active: activePlatform === 'groovelab',
+        is_campus_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
+        is_groovelab_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
         teacher_id: userId
       }).select().single();
       if (error) {

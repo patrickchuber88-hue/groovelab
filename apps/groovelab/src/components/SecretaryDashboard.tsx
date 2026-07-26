@@ -3913,7 +3913,43 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       }
       list = uniqueList;
 
-      const hasOhneZuweisung = list.some(s => s.name.toLowerCase() === 'ohne zuweisung');
+      const DEFAULT_STANDARD_SUBJECTS = [
+        { name: 'Schlagzeug', description: 'Schlagzeug & Percussion', category: 'Allgemein' },
+        { name: 'Piano', description: 'Klavier & Tasteninstrumente', category: 'Allgemein' },
+        { name: 'Gitarre', description: 'Gitarre & Ukulele', category: 'Allgemein' },
+        { name: 'Gesang', description: 'Gesang & Stimmbildung', category: 'Allgemein' },
+        { name: 'Geige', description: 'Geige & Streichinstrumente', category: 'Allgemein' },
+        { name: 'Querflöte', description: 'Querflöte & Holzbläser', category: 'Allgemein' },
+        { name: 'Saxophon', description: 'Saxophon & Blasinstrumente', category: 'Allgemein' },
+        { name: 'Bass', description: 'E-Bass & Kontrabass', category: 'Allgemein' },
+        { name: 'Keyboard', description: 'Keyboard & Synthesizer', category: 'Allgemein' },
+        { name: 'Trompete', description: 'Trompete & Blechbläser', category: 'Allgemein' }
+      ];
+
+      const hasInstrumentSubjects = list.some(s => {
+        const n = (s.name || '').toLowerCase();
+        return n !== 'ohne zuweisung' && n !== 'allgemein' && n !== 'groovelab';
+      });
+
+      if (!hasInstrumentSubjects && schoolId) {
+        try {
+          const toInsert = DEFAULT_STANDARD_SUBJECTS.map(sub => ({
+            school_id: schoolId,
+            name: sub.name,
+            description: sub.description,
+            category: sub.category,
+            is_active: true
+          }));
+          const { data: newSubs } = await supabase.from('subjects').insert(toInsert).select();
+          if (newSubs && newSubs.length > 0) {
+            list.push(...newSubs);
+          }
+        } catch (e) {
+          console.error("Error auto-seeding default subjects:", e);
+        }
+      }
+
+      const hasOhneZuweisung = list.some(s => (s.name || '').toLowerCase() === 'ohne zuweisung');
       if (!hasOhneZuweisung && schoolId) {
         try {
           const { data: newSub, error: insertErr } = await supabase
@@ -3934,9 +3970,9 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       }
 
       const sortedSubjects = list.sort((a, b) => {
-        if (a.name.toLowerCase() === 'ohne zuweisung') return -1;
-        if (b.name.toLowerCase() === 'ohne zuweisung') return 1;
-        return a.name.localeCompare(b.name, 'de');
+        if ((a.name || '').toLowerCase() === 'ohne zuweisung') return -1;
+        if ((b.name || '').toLowerCase() === 'ohne zuweisung') return 1;
+        return (a.name || '').localeCompare(b.name || '', 'de');
       });
       setSubjects(sortedSubjects);
 
@@ -5360,6 +5396,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       setNewStudentDuration(30);
       setNewStudentTeacherId('');
       setShowAddStudentModal(false);
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      window.dispatchEvent(new CustomEvent('campus_students_updated'));
       window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       fetchDashboardData();
     } catch (err: any) {
@@ -5411,6 +5449,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       setNewStudentDuration(30);
       setNewStudentTeacherId('');
       setShowAddGroovelabStudentModal(false);
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      window.dispatchEvent(new CustomEvent('campus_students_updated'));
       window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       fetchDashboardData();
     } catch (err: any) {
@@ -5571,6 +5611,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       setStudentCsvText('');
       setIsStudentCsvExpanded(false);
       setIsAnonymizedImport(true);
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      window.dispatchEvent(new CustomEvent('campus_students_updated'));
       window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       fetchDashboardData();
       return;
@@ -5697,6 +5739,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
     setStudentCsvText('');
     setIsStudentCsvExpanded(false);
+    window.dispatchEvent(new CustomEvent('students_updated'));
+    window.dispatchEvent(new CustomEvent('campus_students_updated'));
     window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
     fetchDashboardData();
   };
@@ -10073,21 +10117,29 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
     }
   };
 
-  // CSP Solver for Room Allocation
-  const runAutoRoomAllocation = () => {
-    // 1. Sort plans: variable ordering (GrooveLab first because it only goes to one room, then drums/schlagzeug)
-    const sortedPlans = [...matrixAllocations].sort((a, b) => {
-      const aIsGroovelab = a.teacherId === 'groovelab';
-      const bIsGroovelab = b.teacherId === 'groovelab';
-      if (aIsGroovelab && !bIsGroovelab) return -1;
-      if (!aIsGroovelab && bIsGroovelab) return 1;
+  // Helper to identify GrooveLab plans & GrooveLab rooms
+  const isGroovelabPlan = (plan: any) => {
+    if (!plan) return false;
+    const tId = plan.teacherId || '';
+    const tName = (plan.teacherName || '').toLowerCase();
+    const instr = (plan.instrument || '').toLowerCase();
+    return tId === 'groovelab' || tName.includes('groove lab') || tName.includes('groovelab') || instr.includes('plattform');
+  };
 
-      const aIsDrums = a.instrument?.toLowerCase().includes('schlagzeug') || a.instrument?.toLowerCase().includes('drums');
-      const bIsDrums = b.instrument?.toLowerCase().includes('schlagzeug') || b.instrument?.toLowerCase().includes('drums');
-      if (aIsDrums && !bIsDrums) return -1;
-      if (!aIsDrums && bIsDrums) return 1;
-      return 0;
-    });
+  const isGroovelabRoom = (room: any) => {
+    if (!room) return false;
+    if (room.is_groovelab_active === true) return true;
+    const name = (room.name || '').toLowerCase();
+    return name.includes('groovelab') || name.includes('groove lab') || name.includes('band');
+  };
+
+  // Multi-Iteration Smart Solver for Room Allocation
+  const runAutoRoomAllocation = () => {
+    const activeRooms = rooms.filter(r => r.is_campus_active !== false);
+    if (activeRooms.length === 0) {
+      alert('Keine aktiven Räume für die Autozuweisung vorhanden!');
+      return;
+    }
 
     const isOverlap = (p1: any, p2: any) => {
       return p1.startTime < p2.endTime && p2.startTime < p1.endTime;
@@ -10104,144 +10156,281 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       return unsuitable.some((inst: string) => inst.toLowerCase() === instrumentName.toLowerCase());
     };
 
-    // Tracks current allocations during solver execution
-    const assigned: Record<string, string> = {};
+    const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
+    const teacherProfileMap = new Map<string, any>();
+    allTeachersList.forEach(t => teacherProfileMap.set(t.id, t));
 
-    // Keep already manually assigned rooms
-    matrixAllocations.forEach(p => {
-      if (p.roomId) {
-        assigned[p.id] = p.roomId;
-      }
-    });
-
-    // Find historical room assignments for teachers to fulfill the soft constraint
-    const teacherHistory: Record<string, string> = {};
-    matrixAllocations.forEach(p => {
-      if (p.roomId) {
-        teacherHistory[p.teacherId] = p.roomId;
-      }
-    });
-
-    const activeRooms = rooms.filter(r => r.is_campus_active !== false);
-
-    for (const plan of sortedPlans) {
-      if (plan.roomId) continue;
-
-      let bestRoomId: string | null = null;
-
-      if (plan.teacherId === 'groovelab') {
-        const groovelabRoom = activeRooms.find(r => r.name.toLowerCase() === 'groovelab');
-        if (groovelabRoom) {
-          const hasConflict = sortedPlans.some(p => {
-            const allocatedRoom = assigned[p.id] || p.roomId;
-            return allocatedRoom === groovelabRoom.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-          });
-          if (!hasConflict) {
-            bestRoomId = groovelabRoom.id;
-          }
+    // 1. Detect plans with time conflicts or unassigned rooms
+    const conflictingPlanIds = new Set<string>();
+    matrixAllocations.forEach(p1 => {
+      if (!p1.roomId) return;
+      matrixAllocations.forEach(p2 => {
+        if (p1.id !== p2.id && p1.roomId === p2.roomId && p1.dayOfWeek === p2.dayOfWeek && isOverlap(p1, p2)) {
+          conflictingPlanIds.add(p1.id);
+          conflictingPlanIds.add(p2.id);
         }
-      } else {
-        let candidates = [...activeRooms];
-        const instr = plan.instrument?.toLowerCase() || '';
+      });
+    });
 
-        // Instrument matching using name and r.equipment
+    const initialAssigned: Record<string, string> = {};
+    matrixAllocations.forEach(p => {
+      if (p.roomId && !conflictingPlanIds.has(p.id)) {
+        initialAssigned[p.id] = p.roomId;
+      }
+    });
+
+    const unassignedPlans = matrixAllocations.filter(p => !p.roomId || conflictingPlanIds.has(p.id));
+    if (unassignedPlans.length === 0) {
+      alert('Alle Einheiten haben bereits einen zugewiesenen Raum ohne Konflikte!');
+      return;
+    }
+
+    // Separate rooms into GrooveLab rooms and Standard rooms
+    const activeGroovelabRooms = activeRooms.filter(r => isGroovelabRoom(r));
+    const activeStandardRooms = activeRooms.filter(r => !isGroovelabRoom(r));
+
+    // Helper to get favorite room IDs for a teacher (from DB profile + Räume Board star selections in localStorage)
+    const getTeacherFavoriteRoomIds = (tId: string) => {
+      const teacherProfile = teacherProfileMap.get(tId);
+      const dbFavs: string[] = teacherProfile?.preferred_room_ids || [];
+      const localFav = localStorage.getItem(`groovelab_favorite_room_id_${tId}`);
+      const combined = new Set<string>([
+        ...dbFavs,
+        ...(localFav ? [localFav] : [])
+      ]);
+      return Array.from(combined);
+    };
+
+    // Pre-calculate candidate room pools per plan:
+    // GrooveLab sessions MUST be assigned to GrooveLab rooms first.
+    // Regular teachers prefer Favorite & Standard rooms first, but unbooked hours in GrooveLab rooms are also available.
+    const candidateRoomsPerPlan = new Map<string, any[]>();
+    unassignedPlans.forEach(plan => {
+      if (isGroovelabPlan(plan)) {
+        const targetGLRooms = activeGroovelabRooms.length > 0 ? activeGroovelabRooms : activeRooms;
+        candidateRoomsPerPlan.set(plan.id, targetGLRooms);
+      } else {
+        const instr = plan.instrument?.toLowerCase() || '';
+        let candidates = activeStandardRooms.length > 0 ? [...activeStandardRooms] : [...activeRooms];
+
         if (instr.includes('schlagzeug') || instr.includes('drums')) {
-          candidates = activeRooms.filter(r => {
+          const drumRooms = candidates.filter(r => {
             const eq = r.equipment;
             const hasEquip = Array.isArray(eq) && (eq.includes('drums') || eq.includes('schlagzeug') || eq.includes('drum'));
             return hasEquip || r.name.toLowerCase().includes('schlagzeug') || r.name.toLowerCase().includes('drums') || r.name.toLowerCase().includes('band') || r.name.toLowerCase().includes('drum');
           });
-          if (candidates.length === 0) candidates = [...activeRooms];
+          if (drumRooms.length > 0) candidates = drumRooms;
         } else if (instr.includes('klavier') || instr.includes('piano')) {
-          candidates = activeRooms.filter(r => {
+          const pianoRooms = candidates.filter(r => {
             const eq = r.equipment;
             const hasEquip = Array.isArray(eq) && (eq.includes('piano') || eq.includes('klavier') || eq.includes('keys'));
             return hasEquip || r.name.toLowerCase().includes('klavier') || r.name.toLowerCase().includes('piano') || r.name.toLowerCase().includes('flügel');
           });
-          if (candidates.length === 0) candidates = [...activeRooms];
+          if (pianoRooms.length > 0) candidates = pianoRooms;
         }
 
-        // Prioritize Teacher's favorite rooms (Lieblingsräume)
-        const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
-        const teacherProfile = allTeachersList.find(t => t.id === plan.teacherId);
-        const preferredRooms = teacherProfile?.preferred_room_ids || [];
-        if (preferredRooms.length > 0) {
-          for (const prId of preferredRooms) {
-            const prRoom = activeRooms.find(r => r.id === prId);
-            if (prRoom && !isRoomUnsuitable(prRoom, plan.instrument)) {
-              const hasConflict = sortedPlans.some(p => {
-                const allocatedRoom = assigned[p.id] || p.roomId;
-                return allocatedRoom === prId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-              });
-              if (!hasConflict) {
-                bestRoomId = prId;
-                break;
-              }
-            }
+        // Suitable standard candidate rooms
+        let suitableCandidates = candidates.filter(r => !isRoomUnsuitable(r, plan.instrument));
+
+        // Unbooked times in GrooveLab rooms are available for regular teachers after GrooveLab sessions are placed
+        if (activeGroovelabRooms.length > 0) {
+          const suitableGLRooms = activeGroovelabRooms.filter(r => !isRoomUnsuitable(r, plan.instrument));
+          suitableCandidates = [...suitableCandidates, ...suitableGLRooms];
+        }
+
+        // Prioritize teacher's favorite rooms at the top of candidate list
+        const favRoomIds = getTeacherFavoriteRoomIds(plan.teacherId);
+        if (favRoomIds.length > 0) {
+          const favCandidates = suitableCandidates.filter(r => favRoomIds.includes(r.id));
+          const nonFavCandidates = suitableCandidates.filter(r => !favRoomIds.includes(r.id));
+          suitableCandidates = [...favCandidates, ...nonFavCandidates];
+        }
+
+        candidateRoomsPerPlan.set(plan.id, suitableCandidates.length > 0 ? suitableCandidates : activeRooms.filter(r => !isRoomUnsuitable(r, plan.instrument)));
+      }
+    });
+
+    // 2. MONTE-CARLO SOLVER (100 Iterations)
+    const RUN_ITERATIONS = 100;
+    let bestGlobalScore = -Infinity;
+    let bestAssigned: Record<string, string> = { ...initialAssigned };
+
+    for (let iter = 0; iter < RUN_ITERATIONS; iter++) {
+      const currentAssigned: Record<string, string> = { ...initialAssigned };
+
+      // Sort plans: GrooveLab sessions MUST always be placed FIRST (Phase 1), followed by drums/schlagzeug, then others
+      const iterPlans = [...unassignedPlans].sort((a, b) => {
+        const aIsGL = isGroovelabPlan(a);
+        const bIsGL = isGroovelabPlan(b);
+        if (aIsGL && !bIsGL) return -1;
+        if (!aIsGL && bIsGL) return 1;
+
+        const aIsDrums = a.instrument?.toLowerCase().includes('schlagzeug') || a.instrument?.toLowerCase().includes('drums');
+        const bIsDrums = b.instrument?.toLowerCase().includes('schlagzeug') || b.instrument?.toLowerCase().includes('drums');
+        if (aIsDrums && !bIsDrums) return -1;
+        if (!aIsDrums && bIsDrums) return 1;
+
+        if (iter > 0) {
+          return (Math.random() - 0.5);
+        }
+        return 0;
+      });
+
+      for (const plan of iterPlans) {
+        const candidateRooms = candidateRoomsPerPlan.get(plan.id) || activeRooms;
+        let bestRoomIdForPlan: string | null = null;
+        let highestRoomScore = -Infinity;
+
+        // Evaluate candidate rooms
+        for (const room of candidateRooms) {
+          // Check hard conflict with already assigned rooms (manual + solver assigned so far in this iter)
+          const hasConflict = matrixAllocations.some(otherPlan => {
+            if (otherPlan.id === plan.id) return false;
+            const allocatedRoom = currentAssigned[otherPlan.id];
+            return allocatedRoom === room.id && otherPlan.dayOfWeek === plan.dayOfWeek && isOverlap(otherPlan, plan);
+          });
+
+          if (hasConflict) continue;
+
+          // Tiered Scoring Matrix
+          let roomScore = 0;
+
+          // GrooveLab Priority Score
+          if (isGroovelabPlan(plan) && isGroovelabRoom(room)) {
+            roomScore += 50000;
+          }
+
+          // Tier 2 (30.000 pts): Favorite Room Hit (Räume-Board Starred + DB Profile Favorite Rooms)
+          const favRoomIds = getTeacherFavoriteRoomIds(plan.teacherId);
+          if (favRoomIds.includes(room.id)) {
+            roomScore += 30000;
+          }
+
+          // Tier 2b (20.000 pts): Day Continuity - Teacher already has an assigned slot in this exact room on this day!
+          const teacherSameDaySlots = matrixAllocations.filter(p => p.teacherId === plan.teacherId && p.dayOfWeek === plan.dayOfWeek && p.id !== plan.id);
+          const sameDayRoomUsageCount = teacherSameDaySlots.filter(p => currentAssigned[p.id] === room.id).length;
+          if (sameDayRoomUsageCount > 0) {
+            roomScore += 20000 * sameDayRoomUsageCount;
+          }
+
+          // Tier 3 (8.000 pts): Teacher Anchor - Room matches a manually assigned room for this teacher on this day
+          const anchorRoom = teacherSameDaySlots.find(p => initialAssigned[p.id])?.roomId;
+          if (anchorRoom && anchorRoom === room.id) {
+            roomScore += 8000;
+          }
+
+          // Tier 4 (4.000 pts): Preferred Room Hit
+          const teacherProfile = teacherProfileMap.get(plan.teacherId);
+          const prefRooms: string[] = teacherProfile?.preferred_room_ids || [];
+          if (prefRooms.includes(room.id)) {
+            roomScore += 4000;
+          }
+
+          // Tier 5 (1.000 pts): Room Compaction / Docking Bonus (docking directly adjacent to another class in this room)
+          const isAdjacent = matrixAllocations.some(otherPlan => {
+            if (otherPlan.id === plan.id) return false;
+            const allocatedRoom = currentAssigned[otherPlan.id];
+            if (allocatedRoom !== room.id || otherPlan.dayOfWeek !== plan.dayOfWeek) return false;
+            return (otherPlan.endTime === plan.startTime || otherPlan.startTime === plan.endTime);
+          });
+          if (isAdjacent) {
+            roomScore += 1000;
+          }
+
+          // Base points
+          roomScore += 100;
+
+          if (roomScore > highestRoomScore) {
+            highestRoomScore = roomScore;
+            bestRoomIdForPlan = room.id;
           }
         }
 
-        // Soft Constraint check: prioritize historically assigned rooms for this teacher (must be suitable)
-        if (!bestRoomId) {
-          const historicalRoomId = teacherHistory[plan.teacherId];
-          if (historicalRoomId) {
-            const histRoom = activeRooms.find(r => r.id === historicalRoomId);
-            if (histRoom && !isRoomUnsuitable(histRoom, plan.instrument)) {
-              const hasConflict = sortedPlans.some(p => {
-                const allocatedRoom = assigned[p.id] || p.roomId;
-                return allocatedRoom === historicalRoomId && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-              });
-              if (!hasConflict) {
-                bestRoomId = historicalRoomId;
-              }
-            }
-          }
-        }
-
-        // If no historical match, search candidate rooms first
-        if (!bestRoomId) {
-          for (const room of candidates) {
-            if (isRoomUnsuitable(room, plan.instrument)) continue;
-
-            const hasConflict = sortedPlans.some(p => {
-              const allocatedRoom = assigned[p.id] || p.roomId;
-              return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-            });
-
-            if (!hasConflict) {
-              bestRoomId = room.id;
-              break;
-            }
-          }
-        }
-
-        // Fallback: search all rooms if candidate rooms are exhausted or full
-        if (!bestRoomId) {
-          for (const room of activeRooms) {
-            if (isRoomUnsuitable(room, plan.instrument)) continue;
-
-            const hasConflict = sortedPlans.some(p => {
-              const allocatedRoom = assigned[p.id] || p.roomId;
-              return allocatedRoom === room.id && p.dayOfWeek === plan.dayOfWeek && isOverlap(p, plan);
-            });
-
-            if (!hasConflict) {
-              bestRoomId = room.id;
-              break;
-            }
-          }
+        if (bestRoomIdForPlan) {
+          currentAssigned[plan.id] = bestRoomIdForPlan;
         }
       }
 
-      if (bestRoomId) {
-        assigned[plan.id] = bestRoomId;
+      // Calculate global score of iteration
+      let iterationGlobalScore = 0;
+      let totalAssignedInIter = 0;
+      let preferredHitsInIter = 0;
+
+      unassignedPlans.forEach(plan => {
+        const assignedRoomId = currentAssigned[plan.id];
+        if (assignedRoomId) {
+          totalAssignedInIter++;
+          iterationGlobalScore += 100000; // Tier 1: Assignment priority
+
+          // Preferred room hit bonus
+          const teacherProfile = teacherProfileMap.get(plan.teacherId);
+          if (teacherProfile?.preferred_room_ids?.includes(assignedRoomId)) {
+            preferredHitsInIter++;
+            iterationGlobalScore += 4000;
+          }
+        }
+      });
+
+      // Continuity score bonus across all teachers per day
+      const teacherDays = new Set<string>();
+      matrixAllocations.forEach(p => teacherDays.add(`${p.teacherId}_${p.dayOfWeek}`));
+
+      let zeroSwitchTeacherDays = 0;
+      teacherDays.forEach(tdKey => {
+        const [tId, dayStr] = tdKey.split('_');
+        const dayNum = Number(dayStr);
+        const slotsForTeacherDay = matrixAllocations.filter(p => p.teacherId === tId && p.dayOfWeek === dayNum);
+        const assignedRooms = new Set(slotsForTeacherDay.map(p => currentAssigned[p.id]).filter(Boolean));
+        if (assignedRooms.size === 1) {
+          zeroSwitchTeacherDays++;
+          iterationGlobalScore += 20000;
+        }
+      });
+
+      if (iterationGlobalScore > bestGlobalScore) {
+        bestGlobalScore = iterationGlobalScore;
+        bestAssigned = { ...currentAssigned };
       }
     }
 
+    // Apply best solver result to state
     setMatrixAllocations(prev => prev.map(p => ({
       ...p,
-      roomId: assigned[p.id] || p.roomId
+      roomId: bestAssigned[p.id] || p.roomId
     })));
+
+    // Calculate quality metrics for notification feedback
+    const newlyAssignedCount = unassignedPlans.filter(p => bestAssigned[p.id]).length;
+    const unassignedRemainingCount = unassignedPlans.length - newlyAssignedCount;
+
+    // Zero room switch metrics
+    const teacherDays = new Set<string>();
+    matrixAllocations.forEach(p => teacherDays.add(`${p.teacherId}_${p.dayOfWeek}`));
+    let zeroSwitchCount = 0;
+    let totalTeacherDaysCount = 0;
+
+    teacherDays.forEach(tdKey => {
+      const [tId, dayStr] = tdKey.split('_');
+      const dayNum = Number(dayStr);
+      const slots = matrixAllocations.filter(p => p.teacherId === tId && p.dayOfWeek === dayNum);
+      const roomsUsed = new Set(slots.map(p => bestAssigned[p.id] || p.roomId).filter(Boolean));
+      if (roomsUsed.size === 1 && slots.length > 1) {
+        zeroSwitchCount++;
+      }
+      if (slots.length > 1) {
+        totalTeacherDaysCount++;
+      }
+    });
+
+    const continuityPercentage = totalTeacherDaysCount > 0 ? Math.round((zeroSwitchCount / totalTeacherDaysCount) * 100) : 100;
+
+    alert(
+      `⚡ Smart Auto-Zuweisung abgeschlossen!\n\n` +
+      `• Erreichter Gesamt-Score: ${bestGlobalScore.toLocaleString()}\n` +
+      `• Zugewiesene Einheiten: ${newlyAssignedCount} von ${unassignedPlans.length}\n` +
+      `• Raumtreue (0 Raumwechsel am Tag): ${continuityPercentage}% der Lehrkräfte\n` +
+      (unassignedRemainingCount > 0 ? `⚠️ ${unassignedRemainingCount} Einheiten konnten wegen Raumkonflikten nicht platziert werden.` : `✅ Alle Einheiten optimal verteilt.`)
+    );
   };
 
   // Bulk save and approve to database
@@ -10264,6 +10453,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       }
 
       await Promise.all(promises);
+
+      // Synchronize assigned room IDs into each teacher's planned_boards / campus_räume / groovelab_räume
+      const teacherRoomMap: Record<string, Record<number, string | null>> = {};
+      matrixAllocations.forEach((p: any) => {
+        if (p.teacherId && p.teacherId !== 'groovelab') {
+          if (!teacherRoomMap[p.teacherId]) teacherRoomMap[p.teacherId] = {};
+          teacherRoomMap[p.teacherId][p.dayOfWeek] = p.roomId || null;
+        }
+      });
+
+      const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
+      for (const [tId, roomMap] of Object.entries(teacherRoomMap)) {
+        const teacherUser = allTeachersList.find((u: any) => u.id === tId);
+        const rawPlanned = teacherUser?.planned_boards;
+        if (rawPlanned && typeof rawPlanned === 'object' && (rawPlanned as any).drafts) {
+          const updatedDrafts = (rawPlanned as any).drafts.map((d: any) => ({
+            ...d,
+            boards: (d.boards || []).map((b: any) => ({
+              ...b,
+              roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : b.roomId
+            }))
+          }));
+          const updatedPlanned = {
+            ...(rawPlanned as any),
+            drafts: updatedDrafts
+          };
+          await supabase
+            .from('users')
+            .update({
+              planned_boards: updatedPlanned,
+              campus_räume: updatedPlanned,
+              groovelab_räume: updatedPlanned
+            })
+            .eq('id', tId);
+        }
+      }
 
       // Also save the virtual groovelab room assignments inside the school's opening_hours JSON
       const groovelabRoomsMap: Record<number, string | null> = {};
@@ -17906,6 +18131,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
                                     const isCellHovered = dragOverCell.roomId === room.id && dragOverCell.day === dayNum;
                                     const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
+                                    const isGLPlan = isGroovelabPlan(draggedPlan);
+                                    const isGLRoom = isGroovelabRoom(room);
 
                                     let hasDragOverlap = false;
                                     if (draggedPlan && cellPlans.length > 0) {

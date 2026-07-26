@@ -99,6 +99,10 @@ export function ScheduleCalendarView({
 }: ScheduleCalendarViewProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default grid snap to 15 mins
+  const [viewMode, setViewMode] = useState<'week' | 'day' | 'month'>('week');
+  const [showMiniDatePicker, setShowMiniDatePicker] = useState(false);
+  const [quickCreateState, setQuickCreateState] = useState<{ isOpen: boolean; date: string; start_time: string } | null>(null);
+  const [eventPopoverState, setEventPopoverState] = useState<{ isOpen: boolean; occ: ScheduleOccurrence; anchorRect?: DOMRect } | null>(null);
 
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
@@ -1414,6 +1418,15 @@ export function ScheduleCalendarView({
     }
 
     if (changesToPersist.length > 0) {
+      // Optimistic instant React state update (0 ms latency)
+      setBaseOccurrences(prev => prev.map(occ => {
+        const match = changesToPersist.find(c => c.id === occ.id);
+        if (match) {
+          return { ...occ, ...match };
+        }
+        return occ;
+      }));
+
       await persistChangesDirectly(changesToPersist);
       
       setPendingChanges(prev => {
@@ -1648,8 +1661,8 @@ export function ScheduleCalendarView({
           mainOccsResult
         ] = await Promise.all([
           supabase.from('room_bookings').select('room_id, date, start_time, room:rooms(name)').eq('booked_by', userId).gte('date', startDateStr).lte('date', endDateStr),
-          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, teacher:users(first_name, last_name)').eq('school_id', schoolId).not('room_id', 'is', null),
-          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week').eq('teacher_id', userId).eq('school_id', schoolId),
+          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument), teacher:users!schedules_teacher_id_fkey(first_name, last_name)').eq('school_id', schoolId).not('room_id', 'is', null),
+          supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument)').eq('teacher_id', userId).eq('school_id', schoolId),
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
           supabase.from('schedule_occurrences').select('id, date, start_time, duration, status, teacher_id, student_id, schedule_id, schedules!schedule_occurrences_schedule_id_fkey(room_id)').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
@@ -1906,6 +1919,51 @@ export function ScheduleCalendarView({
           });
         });
       }
+
+      // Fallback projection from database recurring schedules table (`schedules`) if no occurrence or board exists yet
+      const schedList = (cachedWeekSchedules || []).filter((s: any) => s.teacher_id === userId);
+      if (schedList.length > 0) {
+        schedList.forEach((slot: any) => {
+          if (!slot.day_of_week) return;
+          const offset = slot.day_of_week - 1;
+          const dayDate = new Date(weekStart);
+          dayDate.setDate(dayDate.getDate() + offset);
+          const dateStr = toLocalYYYYMMDD(dayDate);
+
+          if (dayDate.getMonth() === 7) return; // Skip August
+
+          const formattedTime = slot.time_slot ? (slot.time_slot.includes(':') && slot.time_slot.split(':').length === 2 ? `${slot.time_slot}:00` : slot.time_slot) : '00:00:00';
+          const alreadyExists = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5)) ||
+                                projectedData.some(p => p.date === dateStr && (p.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5));
+
+          if (!alreadyExists) {
+            const studentObj = slot.student;
+            const roomObj = (rooms || []).find((r: any) => r.id === slot.room_id);
+
+            projectedData.push({
+              id: `sched-proj-${slot.id || crypto.randomUUID()}-${dateStr}`,
+              student_id: slot.student_id || '',
+              teacher_id: slot.teacher_id || userId,
+              date: dateStr,
+              start_time: formattedTime,
+              duration: slot.duration || 30,
+              status: slot.status === 'approved' ? 'scheduled' : (slot.status || 'scheduled'),
+              student: {
+                first_name: studentObj ? studentObj.first_name : (slot.student_id ? 'Schüler' : '☕️ Pause'),
+                last_name: studentObj ? (studentObj.last_name || '') : '',
+                instrument: studentObj ? (studentObj.instrument || '') : (slot.instrument || '')
+              },
+              schedules: {
+                room_id: slot.room_id || null,
+                room: {
+                  name: roomObj ? roomObj.name : ''
+                }
+              }
+            });
+          }
+        });
+      }
+
       fetchedData = [...fetchedData, ...projectedData];
 
       // Filter out regular schedule items if they fall during holidays.
@@ -2393,6 +2451,18 @@ export function ScheduleCalendarView({
     autoScrollContainerRef.current = null;
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && draggedId) {
+        cleanupDragGhost();
+        stopAutoScroll();
+        setDraggedId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [draggedId]);
+
   const loadPreferencesForDrag = async (studentId: string) => {
     try {
       let targetStudentIds = [studentId];
@@ -2497,6 +2567,13 @@ export function ScheduleCalendarView({
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+    try {
+      const blankImg = document.createElement('canvas');
+      blankImg.width = 1;
+      blankImg.height = 1;
+      e.dataTransfer.setDragImage(blankImg, 0, 0);
+    } catch (_) {}
     setDraggedId(id);
     const sourceOcc = occurrences.find(o => o.id === id);
     draggedOccRef.current = sourceOcc || null;
@@ -2505,10 +2582,11 @@ export function ScheduleCalendarView({
       loadPreferencesForDrag(sourceOcc.student_id);
     }
     
-    // Save the vertical offset where the card was grabbed.
-    // Standardized to 20px to align perfectly with custom drag image y offset.
-    grabOffsetRef.current = 20;
-    e.dataTransfer.setData('grabOffset', '20');
+    // Save the vertical offset where the card was grabbed relative to top of card
+    const cardRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const grabY = Math.max(0, Math.min(e.clientY - cardRect.top, 35));
+    grabOffsetRef.current = grabY;
+    e.dataTransfer.setData('grabOffset', String(grabY));
 
     // Precalculate teacher schedule limits for performance optimization during dragging
     const limits: Record<number, { min: number; max: number }> = {};
@@ -2571,10 +2649,12 @@ export function ScheduleCalendarView({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDragOverDay = (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     
     const rect = e.currentTarget.getBoundingClientRect();
     const grabOffset = grabOffsetRef.current || 20;
@@ -2630,37 +2710,51 @@ export function ScheduleCalendarView({
       ghost = document.createElement('div');
       ghost.id = 'drag-preview-ghost';
       ghost.style.position = 'absolute';
+      ghost.style.top = '0px';
       ghost.style.left = '8px';
       ghost.style.right = '8px';
       ghost.style.borderRadius = '8px';
       ghost.style.padding = '8px';
       ghost.style.boxSizing = 'border-box';
       ghost.style.pointerEvents = 'none';
-      ghost.style.zIndex = '10';
+      ghost.style.zIndex = '100';
       ghost.style.display = 'flex';
       ghost.style.flexDirection = 'column';
       ghost.style.justifyContent = 'center';
-      ghost.style.opacity = '0.85';
-      ghost.style.transition = 'top 0.12s cubic-bezier(0.16, 1, 0.3, 1), height 0.12s, transform 0.12s';
+      ghost.style.opacity = '0.9';
+      ghost.style.willChange = 'transform';
+      ghost.style.transition = 'none';
     }
     
-    ghost.style.top = `${previewTopPx}px`;
+    ghost.style.transform = `translate3d(0, ${previewTopPx}px, 0) scale(1.02)`;
+    ghost.style.boxShadow = '0 12px 28px rgba(0,0,0,0.12), 0 4px 10px rgba(0,0,0,0.06)';
     ghost.style.height = `${previewHeightPx}px`;
     ghost.style.background = highlightBg;
     ghost.style.border = ghostBorder;
-    ghost.style.transform = 'scale(0.97)';
     
+    const occDuration = sourceOcc.duration || 30;
+    const endMinutes = snappedMinutes + occDuration;
+    const endHours = Math.floor(endMinutes / 60) % 24;
+    const endMins = endMinutes % 60;
+    const endFormatted = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
+    const fullTimeRangeStr = `${timeStr} – ${endFormatted} Uhr (${occDuration}m)`;
+
     const studentName = sourceOcc.student ? `${sourceOcc.student.first_name} ${maskLastName(sourceOcc.student.last_name, showRealNames)}` : 'Pause';
-    const outsideHint = isDropOutsideSchedule 
-      ? `<div style="font-size: 0.60rem; font-weight: 800; color: #7c3aed; background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.2); padding: 1px 5px; border-radius: 3px; display: inline-block; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em;">🔔 Raum buchen</div>`
-      : '';
-    ghost.innerHTML = `
-      <div style="font-size: 0.72rem; font-weight: 800; color: ${highlightColor};">${timeStr} Uhr</div>
-      <div style="font-size: 0.78rem; font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
-        ${studentName}
-      </div>
-      ${outsideHint}
-    `;
+    const cacheKey = `${fullTimeRangeStr}-${studentName}-${isDropOutsideSchedule ? 'out' : 'in'}`;
+
+    if (ghost.dataset.cacheKey !== cacheKey) {
+      ghost.dataset.cacheKey = cacheKey;
+      const outsideHint = isDropOutsideSchedule 
+        ? `<div style="font-size: 0.60rem; font-weight: 800; color: #7c3aed; background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.2); padding: 1px 5px; border-radius: 3px; display: inline-block; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em;">🔔 Raum buchen</div>`
+        : '';
+      ghost.innerHTML = `
+        <div style="font-size: 0.72rem; font-weight: 800; color: ${highlightColor};">${fullTimeRangeStr}</div>
+        <div style="font-size: 0.78rem; font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+          ${studentName}
+        </div>
+        ${outsideHint}
+      `;
+    }
     
     if (ghost.parentNode !== e.currentTarget) {
       e.currentTarget.appendChild(ghost);
@@ -2686,9 +2780,163 @@ export function ScheduleCalendarView({
     }
   };
 
-  const handleDragLeaveDay = () => {
+  const touchStateRef = useRef<{
+    activeId: string | null;
+    targetDateStr: string | null;
+    targetBaselineMin: number;
+    grabY: number;
+  }>({ activeId: null, targetDateStr: null, targetBaselineMin: 0, grabY: 0 });
+
+  const handleTouchStartCard = (e: React.TouchEvent, id: string) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const cardRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const grabY = Math.max(0, Math.min(touch.clientY - cardRect.top, 35));
+    grabOffsetRef.current = grabY;
+    setDraggedId(id);
+    const sourceOcc = occurrences.find(o => o.id === id);
+    draggedOccRef.current = sourceOcc || null;
+
+    touchStateRef.current = {
+      activeId: id,
+      targetDateStr: null,
+      targetBaselineMin: 0,
+      grabY
+    };
+
+    if (sourceOcc && sourceOcc.student_id && sourceOcc.student_id !== 'vacant') {
+      loadPreferencesForDrag(sourceOcc.student_id);
+    }
+  };
+
+  const handleTouchMoveCard = (e: React.TouchEvent) => {
+    if (!touchStateRef.current.activeId) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!elemBelow) return;
+
+    const dayCol = elemBelow.closest('.calendar-day-column') as HTMLElement;
+    if (dayCol && dayCol.dataset.dateStr) {
+      const targetDateStr = dayCol.dataset.dateStr;
+      const dayBaselineMinutes = parseFloat(dayCol.dataset.baselineMin || '0');
+      
+      touchStateRef.current.targetDateStr = targetDateStr;
+      touchStateRef.current.targetBaselineMin = dayBaselineMinutes;
+
+      const fakeDragEvent = {
+        preventDefault: () => {},
+        clientY: touch.clientY,
+        currentTarget: dayCol,
+        dataTransfer: {
+          getData: (key: string) => key === 'grabOffset' ? String(touchStateRef.current.grabY) : touchStateRef.current.activeId
+        }
+      } as any;
+
+      handleDragOverDay(fakeDragEvent, targetDateStr, dayBaselineMinutes);
+    }
+  };
+
+  const handleTouchEndCard = async () => {
+    const { activeId, targetDateStr } = touchStateRef.current;
     cleanupDragGhost();
     stopAutoScroll();
+
+    if (activeId && targetDateStr) {
+      const ghost = document.getElementById('drag-preview-ghost');
+      let snappedMinutes = 0;
+      if (ghost && ghost.dataset.snappedMin) {
+        snappedMinutes = parseInt(ghost.dataset.snappedMin, 10);
+      }
+      if (snappedMinutes > 0) {
+        await executeRippleDownShift(activeId, targetDateStr, snappedMinutes);
+      }
+    }
+
+    touchStateRef.current = { activeId: null, targetDateStr: null, targetBaselineMin: 0, grabY: 0 };
+    setDraggedId(null);
+  };
+
+  const handleDragLeaveDay = (e: React.DragEvent) => {
+    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    cleanupDragGhost();
+    stopAutoScroll();
+  };
+
+  const executeRippleDownShift = async (sourceId: string, targetDateStr: string, snappedMin: number) => {
+    const sourceOcc = occurrences.find(o => o.id === sourceId);
+    if (!sourceOcc) return;
+
+    const duration = sourceOcc.duration || 30;
+    const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+    const formattedStartTime = `${String(Math.floor(snappedMin / 60) % 24).padStart(2, '0')}:${String(snappedMin % 60).padStart(2, '0')}:00`;
+
+    // 1. Find all members of the dragged appointment/group
+    const groupOccs = sourceOcc.student_id ? occurrences.filter(o => 
+      o.student_id && 
+      o.student_id !== 'vacant' &&
+      o.date === sourceOcc.date && 
+      o.start_time === sourceOcc.start_time && 
+      (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
+    ) : [sourceOcc];
+
+    const sourceGroupIds = new Set(groupOccs.map(o => o.id));
+
+    groupOccs.forEach(go => {
+      updatesMap[go.id] = {
+        date: targetDateStr,
+        start_time: formattedStartTime,
+        status: 'pending_reschedule'
+      };
+    });
+
+    // 2. Group all other active occurrences on targetDateStr by start_time to preserve group lessons
+    const activeOccs = occurrences.filter(o => 
+      !sourceGroupIds.has(o.id) &&
+      o.date === targetDateStr &&
+      o.student_id &&
+      o.student_id !== 'vacant' &&
+      !['cancelled', 'canceled_by_student'].includes(o.status)
+    );
+
+    const occurrencesByStartTime = new Map<string, ScheduleOccurrence[]>();
+    activeOccs.forEach(o => {
+      const list = occurrencesByStartTime.get(o.start_time) || [];
+      list.push(o);
+      occurrencesByStartTime.set(o.start_time, list);
+    });
+
+    const sortedStartTimes = Array.from(occurrencesByStartTime.keys()).sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+
+    let nextAvailableMin = snappedMin + duration;
+
+    sortedStartTimes.forEach(timeStr => {
+      const occsInSlot = occurrencesByStartTime.get(timeStr)!;
+      const occStartMin = timeToMinutes(timeStr);
+      const slotDuration = Math.max(...occsInSlot.map(o => o.duration || 30));
+      const occEndMin = occStartMin + slotDuration;
+
+      if (occEndMin <= snappedMin) return;
+
+      if (occStartMin < nextAvailableMin) {
+        const shiftedTime = `${String(Math.floor(nextAvailableMin / 60) % 24).padStart(2, '0')}:${String(nextAvailableMin % 60).padStart(2, '0')}:00`;
+        occsInSlot.forEach(o => {
+          updatesMap[o.id] = {
+            start_time: shiftedTime,
+            status: 'pending_reschedule'
+          };
+        });
+        nextAvailableMin += slotDuration;
+      } else {
+        nextAvailableMin = occEndMin;
+      }
+    });
+
+    await persistMultipleOccurrencesDirectly(updatesMap);
   };
 
   const handleDropOnDay = async (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
@@ -2699,7 +2947,7 @@ export function ScheduleCalendarView({
       await showAlert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
       return;
     }
-    const sourceId = e.dataTransfer.getData('text/plain');
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedId || (draggedOccRef.current ? draggedOccRef.current.id : '');
     if (!sourceId) return;
 
     const grabOffset = grabOffsetRef.current || 0;
@@ -2711,50 +2959,23 @@ export function ScheduleCalendarView({
     const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
     const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes));
-    const hours = Math.floor(snappedMinutes / 60) % 24;
-    const mins = snappedMinutes % 60;
-    const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
 
-    if (sourceOcc) {
-      const roomId = sourceOcc.schedules?.room_id || null;
-      const existingStudentOcc = occurrences.find(o => 
-        o.id !== sourceId && 
-        o.student_id && 
-        o.student_id !== 'vacant' && 
-        o.date === targetDateStr && 
-        o.start_time.substring(0, 5) === targetStartTime.substring(0, 5) && 
-        (o.schedules?.room_id || null) === roomId &&
-        !['cancelled', 'canceled_by_student'].includes(o.status)
-      );
-
-      if (existingStudentOcc) {
-        setDropDecisionState({ sourceId, targetId: existingStudentOcc.id });
-        setDraggedId(null);
-        return;
-      }
-
-      const conflict = getRoomConflict(sourceId, targetDateStr, targetStartTime, sourceOcc.duration, roomId);
-      if (conflict) {
-        const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
-        const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetStartTime.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
-        if (!await showConfirm(confirmMsg)) {
-          setDraggedId(null);
-          return;
-        }
-      }
-    }
-
-    moveOccurrenceOrGroup(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
+    await executeRippleDownShift(sourceId, targetDateStr, snappedMinutes);
     setDraggedId(null);
   };
 
   const handleDropOnVacant = async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain');
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedId || (draggedOccRef.current ? draggedOccRef.current.id : '');
     if (!sourceId) return;
 
     const grabOffsetStr = e.dataTransfer.getData('grabOffset');
     const grabOffset = grabOffsetStr ? parseFloat(grabOffsetStr) : 0;
+
+    if ((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) {
+      await showAlert('Dieser Stundenplan ist noch ein Entwurf und wurde noch nicht eingereicht. Zuteilung oder Änderungen sind gesperrt.');
+      return;
+    }
 
     const sourceOcc = occurrences.find(o => o.id === sourceId);
     if (!sourceOcc) return;
@@ -2762,7 +2983,8 @@ export function ScheduleCalendarView({
     const rect = e.currentTarget.getBoundingClientRect();
     const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = 0 + (relativeY / 2.5);
-    const snappedMinutes = Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes;
+    const snappedMinutes = Math.round(droppedMinutes / (gridSnapMinutes || 15)) * (gridSnapMinutes || 15);
+    if (isNaN(snappedMinutes)) return;
     const hours = Math.floor(snappedMinutes / 60) % 24;
     const mins = snappedMinutes % 60;
     const targetStartTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
@@ -2778,8 +3000,8 @@ export function ScheduleCalendarView({
       !['cancelled', 'canceled_by_student'].includes(o.status)
     );
 
-    if (existingStudentOcc) {
-      setDropDecisionState({ sourceId, targetId: existingStudentOcc.id });
+    if (existingStudentOcc && e.altKey) {
+      executeOccurrenceSwap(sourceId, existingStudentOcc.id);
       setDraggedId(null);
       return;
     }
@@ -2916,7 +3138,7 @@ export function ScheduleCalendarView({
       await showAlert('Raumzuteilungen oder Verschiebungen sind gesperrt, da dieser Stundenplan noch nicht eingereicht wurde.');
       return;
     }
-    const sourceId = e.dataTransfer.getData('text/plain');
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedId || (draggedOccRef.current ? draggedOccRef.current.id : '');
     if (!sourceId || sourceId === targetId) return;
 
     const sourceOcc = occurrences.find(o => o.id === sourceId);
@@ -3359,13 +3581,97 @@ export function ScheduleCalendarView({
     return merged;
   };
 
-  const nonCancelledOccurrences = occurrences.filter(o => o.status !== 'cancelled');
-  const weekMinMinutes = nonCancelledOccurrences.length > 0
-    ? nonCancelledOccurrences.reduce((min, o) => {
-        const mins = timeToMinutes(o.start_time);
-        return mins < min ? mins : min;
-      }, 24 * 60)
-    : 13 * 60;
+  // Master Synchronized Time Grid Vector (Google Calendar Standard)
+  // Calculates global minStartMinutes across all active day columns so all columns align 100% horizontally.
+  const globalMinStartMinutes = useMemo(() => {
+    let minMin = 8 * 60; // Default 08:00
+    occurrences.forEach(occ => {
+      if (occ.status !== 'cancelled' && occ.start_time) {
+        const m = timeToMinutes(occ.start_time);
+        if (m < minMin) minMin = Math.floor(m / 60) * 60; // floor to whole hour
+      }
+    });
+    return Math.max(6 * 60, minMin); // Bound between 06:00 and 08:00
+  }, [occurrences]);
+
+  const globalMaxEndMinutes = useMemo(() => {
+    let maxMin = 20 * 60; // Default 20:00
+    occurrences.forEach(occ => {
+      if (occ.status !== 'cancelled' && occ.start_time) {
+        const m = timeToMinutes(occ.start_time) + (occ.duration || 30);
+        if (m > maxMin) maxMin = Math.ceil(m / 60) * 60; // ceil to whole hour
+      }
+    });
+    return Math.min(23 * 60, Math.max(20 * 60, maxMin));
+  }, [occurrences]);
+
+  // Google Calendar Overlap Splitting Layout Calculation
+  const calculateOverlapColumns = (dayOccs: ScheduleOccurrence[]) => {
+    const sorted = [...dayOccs].sort((a, b) => {
+      const sa = timeToMinutes(a.start_time);
+      const sb = timeToMinutes(b.start_time);
+      if (sa !== sb) return sa - sb;
+      return (b.duration || 30) - (a.duration || 30);
+    });
+
+    const clusters: ScheduleOccurrence[][] = [];
+    let currentCluster: ScheduleOccurrence[] = [];
+    let clusterEnd = -1;
+
+    sorted.forEach(occ => {
+      const start = timeToMinutes(occ.start_time);
+      const end = start + (occ.duration || 30);
+
+      if (currentCluster.length === 0) {
+        currentCluster.push(occ);
+        clusterEnd = end;
+      } else if (start < clusterEnd) {
+        currentCluster.push(occ);
+        if (end > clusterEnd) clusterEnd = end;
+      } else {
+        clusters.push(currentCluster);
+        currentCluster = [occ];
+        clusterEnd = end;
+      }
+    });
+    if (currentCluster.length > 0) clusters.push(currentCluster);
+
+    const layoutMap = new Map<string, { colIndex: number; totalCols: number }>();
+
+    clusters.forEach(cluster => {
+      const colEnds: number[] = [];
+
+      cluster.forEach(occ => {
+        const start = timeToMinutes(occ.start_time);
+        const end = start + (occ.duration || 30);
+
+        let placedCol = -1;
+        for (let i = 0; i < colEnds.length; i++) {
+          if (colEnds[i] <= start) {
+            placedCol = i;
+            colEnds[i] = end;
+            break;
+          }
+        }
+        if (placedCol === -1) {
+          placedCol = colEnds.length;
+          colEnds.push(end);
+        }
+
+        layoutMap.set(occ.id, { colIndex: placedCol, totalCols: 1 });
+      });
+
+      const totalColsInCluster = colEnds.length;
+      cluster.forEach(occ => {
+        const existing = layoutMap.get(occ.id);
+        if (existing) {
+          existing.totalCols = totalColsInCluster;
+        }
+      });
+    });
+
+    return layoutMap;
+  };
 
   const isLockedForTeacher = currentUserRole === 'teacher' && (!hasSubmittedSchedule || scheduleStatus !== 'approved');
 
@@ -3746,6 +4052,43 @@ export function ScheduleCalendarView({
               </button>
             )}
 
+            {/* Google Calendar View Mode Switcher */}
+            <div className="apple-btn-group">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('day');
+                  if (focusedDayOffset === null) setFocusedDayOffset(0);
+                }}
+                className={`apple-btn ${viewMode === 'day' ? 'active' : ''}`}
+                style={viewMode === 'day' ? { color: textAccentColor } : {}}
+              >
+                Tag
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('week');
+                  setFocusedDayOffset(null);
+                }}
+                className={`apple-btn ${viewMode === 'week' ? 'active' : ''}`}
+                style={viewMode === 'week' ? { color: textAccentColor } : {}}
+              >
+                Woche
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('month');
+                  setFocusedDayOffset(null);
+                }}
+                className={`apple-btn ${viewMode === 'month' ? 'active' : ''}`}
+                style={viewMode === 'month' ? { color: textAccentColor } : {}}
+              >
+                Monat
+              </button>
+            </div>
+
             {/* Group C: Navigation & Datum */}
             <div className="apple-btn-group">
               <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
@@ -3949,51 +4292,7 @@ export function ScheduleCalendarView({
             return o.original_date && o.original_date !== dateStr;
           });
 
-          let dayBaselineMinutes = 13 * 60;
-          if (nativeOccs.length > 0) {
-            dayBaselineMinutes = timeToMinutes(nativeOccs[0].start_time);
-          } else if (movedInOccs.length > 0) {
-            const origStarts = movedInOccs.map(occ => {
-              const origDate = occ.original_date;
-              if (origDate) {
-                const parts = origDate.split('-');
-                const y = parseInt(parts[0], 10);
-                const m = parseInt(parts[1], 10) - 1;
-                const d = parseInt(parts[2], 10);
-                const origDateObj = new Date(y, m, d);
-                const origDayOfWeek = origDateObj.getDay() || 7;
-                
-                const board = boards.find(b => b.dayOfWeek === origDayOfWeek);
-                if (board && board.students && board.students.length > 0) {
-                  const times = board.students
-                    .map((s: any) => s.assignedTime)
-                    .filter(Boolean);
-                  if (times.length > 0) {
-                    times.sort();
-                    return timeToMinutes(times[0]);
-                  }
-                }
-
-                // Fallback to occurrences list
-                const origDayOccs = occurrences.filter(o => o.date === origDate && (!o.original_date || o.original_date === origDate));
-                const firstOrig = origDayOccs.sort((a, b) => a.start_time.localeCompare(b.start_time))[0];
-                if (firstOrig) {
-                  return timeToMinutes(firstOrig.start_time);
-                }
-              }
-              return timeToMinutes(occ.start_time);
-            });
-            dayBaselineMinutes = Math.min(...origStarts);
-          }
-
-          // Ensure baseline is not after the earliest actual occurrence start time of the day
-          const actualStarts = dayOccurrences.map(o => timeToMinutes(o.start_time));
-          if (actualStarts.length > 0) {
-            const minActualStart = Math.min(...actualStarts);
-            if (dayBaselineMinutes > minActualStart) {
-              dayBaselineMinutes = minActualStart;
-            }
-          }
+          const dayBaselineMinutes = globalMinStartMinutes;
           
           const columnHeight = (1440 - dayBaselineMinutes) * 2.5;
           const startHour = Math.ceil(dayBaselineMinutes / 60);
@@ -4118,10 +4417,23 @@ export function ScheduleCalendarView({
               </div>
 
               <div
+                className="calendar-day-column"
+                data-date-str={dateStr}
                 onDragOver={(e) => handleDragOverDay(e, dateStr, dayBaselineMinutes)}
                 onDragLeave={handleDragLeaveDay}
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
+                onClick={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const clickY = e.clientY - rect.top;
+                  const clickedMinutes = dayBaselineMinutes + (clickY / 2.5);
+                  const snappedMinutes = Math.round(clickedMinutes / gridSnapMinutes) * gridSnapMinutes;
+                  const h = Math.floor(snappedMinutes / 60) % 24;
+                  const m = snappedMinutes % 60;
+                  const startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+                  setQuickCreateState({ isOpen: true, date: dateStr, start_time: startTime });
+                }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px`, cursor: 'pointer' }}
               >
                 {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
                 {draggedId && (() => {
@@ -4366,6 +4678,47 @@ export function ScheduleCalendarView({
                     </span>
                   </div>
                 ))}
+
+                {/* Google Calendar Real-Time "Red Jet-Line" Current Time Indicator */}
+                {(() => {
+                  const todayStr = toLocalYYYYMMDD(new Date());
+                  const isToday = dateStr === todayStr;
+                  if (!isToday) return null;
+
+                  const currentMin = currentMinutes;
+                  if (currentMin < dayBaselineMinutes || currentMin > 24 * 60) return null;
+
+                  const redTopPx = (currentMin - dayBaselineMinutes) * 2.5;
+
+                  return (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '-4px',
+                        right: '-4px',
+                        top: `${redTopPx}px`,
+                        height: '2px',
+                        background: '#ea4335',
+                        zIndex: 25,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        boxShadow: '0 0 8px rgba(234, 67, 53, 0.6)'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: '#ea4335',
+                          marginLeft: '-4px',
+                          boxShadow: '0 0 6px rgba(234, 67, 53, 0.8)'
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.75rem' }}>Lade...</div>
               ) : dayOccurrences.length === 0 ? (
@@ -4420,7 +4773,7 @@ export function ScheduleCalendarView({
                 });
 
                 // Layout calculation to avoid visual overlaps between rendered calendar cards
-                const groupLayouts = new Map<string, { left: number, width: number }>();
+                const groupLayouts = new Map<string, { left: number; width: number; colIndex: number; totalCols: number }>();
                 
                 try {
                   // 1. Sort groups by start time
@@ -4490,7 +4843,7 @@ export function ScheduleCalendarView({
                       colGroups.forEach(group => {
                         const left = (colIndex / totalCols) * 100;
                         const width = (1 / totalCols) * 100;
-                        groupLayouts.set(group.key, { left, width });
+                        groupLayouts.set(group.key, { left, width, colIndex, totalCols });
                       });
                     });
                   });
@@ -4654,6 +5007,14 @@ export function ScheduleCalendarView({
                     }
                   }
                   
+                  // Color side-by-side overlapping cards RED (conflict indicator)
+                  const isParallelConflict = layout && (layout.totalCols || 1) > 1 && (layout.colIndex || 0) >= 1;
+                  if (isParallelConflict && !isBreak && !isVacant) {
+                    cardBackground = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+                    finalColors.border = '#ef4444';
+                    finalColors.text = '#b91c1c';
+                  }
+                  
                   const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
                   const isGruppenunterricht = isGroup && occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
                   const isEnsemble = isGroup && !isGruppenunterricht;
@@ -4673,6 +5034,10 @@ export function ScheduleCalendarView({
                         onDragEnd={handleDragEnd}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDropOnOccurrence(e, occ.id)}
+                        onTouchStart={(e) => handleTouchStartCard(e, occ.id)}
+                        onTouchMove={handleTouchMoveCard}
+                        onTouchEnd={handleTouchEndCard}
+                        onTouchCancel={handleTouchEndCard}
                         onMouseEnter={(e) => {
                           const text = isGroup 
                             ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join('\n')
@@ -4761,7 +5126,7 @@ export function ScheduleCalendarView({
                           padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
                           cursor: (isSick || isCancelled) ? 'pointer' : (isVacant || isBreak) ? 'pointer' : 'grab',
                           opacity: draggedId 
-                             ? (draggedId === occ.id ? 1 : 0.6) 
+                             ? (draggedId === occ.id ? 0.25 : 0.6) 
                              : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
                           filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
                           position: 'absolute',
@@ -4771,8 +5136,12 @@ export function ScheduleCalendarView({
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
                             ? `0 0 10px ${brandColor}55`
                             : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
-                          transition: 'all 0.2s',
+                          transition: draggedId ? 'none' : 'all 0.2s',
+                          willChange: 'transform, top, left',
                           userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          WebkitTouchCallout: 'none',
+                          touchAction: 'manipulation',
                           visibility: isVacant ? (isGap ? 'visible' : 'hidden') : 'visible',
                           height: `${(occ.duration || 30) * 2.5 - 8}px`,
                           flexShrink: 0,
@@ -4803,9 +5172,39 @@ export function ScheduleCalendarView({
                                     background: 'rgba(0,0,0,0.04)', 
                                     padding: '1px 3px', 
                                     borderRadius: '3px',
-                                    whiteSpace: 'nowrap'
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '2px'
                                   }}>
-                                    {occ.start_time.substring(0, 5)}
+                                    <input
+                                      type="time"
+                                      value={occ.start_time.substring(0, 5)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={async (e) => {
+                                        e.stopPropagation();
+                                        const newTime = e.target.value;
+                                        if (!newTime) return;
+                                        const formattedTime = newTime.length === 5 ? `${newTime}:00` : newTime;
+                                        const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
+                                          [occ.id]: { start_time: formattedTime }
+                                        };
+                                        await persistMultipleOccurrencesDirectly(updatesMap);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 800,
+                                        color: finalColors.text,
+                                        outline: 'none',
+                                        padding: 0,
+                                        cursor: 'pointer',
+                                        fontFamily: 'inherit',
+                                        width: '42px'
+                                      }}
+                                      title="Startzeit manuell anpassen"
+                                    />
                                     {(() => {
                                       const roomId = occ.schedules?.room_id;
                                       const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
@@ -4932,9 +5331,37 @@ export function ScheduleCalendarView({
                                       padding: '2px 4px', 
                                       borderRadius: '4px',
                                       display: 'inline-flex',
-                                      alignItems: 'center'
+                                      alignItems: 'center',
+                                      gap: '2px'
                                     }}>
-                                      {occ.start_time.substring(0, 5)}
+                                      <input
+                                        type="time"
+                                        value={occ.start_time.substring(0, 5)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={async (e) => {
+                                          e.stopPropagation();
+                                          const newTime = e.target.value;
+                                          if (!newTime) return;
+                                          const formattedTime = newTime.length === 5 ? `${newTime}:00` : newTime;
+                                          const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
+                                            [occ.id]: { start_time: formattedTime }
+                                          };
+                                          await persistMultipleOccurrencesDirectly(updatesMap);
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          fontSize: '0.7rem',
+                                          fontWeight: 800,
+                                          color: finalColors.text,
+                                          outline: 'none',
+                                          padding: 0,
+                                          cursor: 'pointer',
+                                          fontFamily: 'inherit',
+                                          width: '46px'
+                                        }}
+                                        title="Startzeit manuell anpassen"
+                                      />
                                       {(() => {
                                         const roomId = occ.schedules?.room_id;
                                         const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
@@ -5092,7 +5519,7 @@ export function ScheduleCalendarView({
                               </div>
                             );
                           }
-                          return (
+return (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '6px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -5104,9 +5531,37 @@ export function ScheduleCalendarView({
                                     padding: '2px 6px', 
                                     borderRadius: '5px',
                                     display: 'inline-flex',
-                                    alignItems: 'center'
+                                    alignItems: 'center',
+                                    gap: '2px'
                                   }}>
-                                    {occ.start_time.substring(0, 5)}
+                                    <input
+                                      type="time"
+                                      value={occ.start_time.substring(0, 5)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={async (e) => {
+                                        e.stopPropagation();
+                                        const newTime = e.target.value;
+                                        if (!newTime) return;
+                                        const formattedTime = newTime.length === 5 ? `${newTime}:00` : newTime;
+                                        const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
+                                          [occ.id]: { start_time: formattedTime }
+                                        };
+                                        await persistMultipleOccurrencesDirectly(updatesMap);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 800,
+                                        color: finalColors.text,
+                                        outline: 'none',
+                                        padding: 0,
+                                        cursor: 'pointer',
+                                        fontFamily: 'inherit',
+                                        width: '50px'
+                                      }}
+                                      title="Startzeit manuell anpassen"
+                                    />
                                     {(() => {
                                       const roomId = occ.schedules?.room_id;
                                       const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
@@ -5292,11 +5747,58 @@ export function ScheduleCalendarView({
                                       🔔 Raumbuchung ausstehend
                                     </span>
                                   )}
+                                  {isParallelConflict && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
+                                      ⚠️ Doppelbelegung
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
                           );
                         })()}
+
+                        {/* Bottom-Edge Resize Handle for Google Calendar Duration Adjustment */}
+                        {!isBreak && !isVacant && !((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) && (
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const startY = e.clientY;
+                              const initialDuration = occ.duration || 30;
+
+                              const handleMouseMove = (moveEvent: MouseEvent) => {
+                                const deltaY = moveEvent.clientY - startY;
+                                const deltaMins = Math.round((deltaY / 2.5) / gridSnapMinutes) * gridSnapMinutes;
+                                const newDuration = Math.max(15, initialDuration + deltaMins);
+                                updateOccurrence(occ.id, { duration: newDuration });
+                              };
+
+                              const handleMouseUp = () => {
+                                window.removeEventListener('mousemove', handleMouseMove);
+                                window.removeEventListener('mouseup', handleMouseUp);
+                              };
+
+                              window.addEventListener('mousemove', handleMouseMove);
+                              window.addEventListener('mouseup', handleMouseUp);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: '8px',
+                              cursor: 'ns-resize',
+                              zIndex: 10,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            title="Ziehen, um die Dauer anzupassen"
+                          >
+                            <div style={{ width: '20px', height: '2.5px', borderRadius: '1.5px', background: 'rgba(0,0,0,0.18)' }} />
+                          </div>
+                        )}
                       </div>
                     </React.Fragment>
                   );
@@ -6919,6 +7421,85 @@ export function ScheduleCalendarView({
         </div>
       );
     })()}
+
+    {/* Google Calendar Quick-Click Creation Modal */}
+    {quickCreateState && quickCreateState.isOpen && (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999
+        }}
+        onClick={() => setQuickCreateState(null)}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            padding: '24px 28px',
+            maxWidth: '420px',
+            width: '90%',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CalendarIcon size={18} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f' }}>Termin erstellen</h3>
+            </div>
+            <button onClick={() => setQuickCreateState(null)} className="apple-btn" style={{ padding: '4px' }}><X size={16} /></button>
+          </div>
+
+          <div style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 600 }}>
+            {new Date(quickCreateState.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • {quickCreateState.start_time.substring(0, 5)} Uhr
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const date = quickCreateState.date;
+                const startTime = quickCreateState.start_time;
+                setQuickCreateState(null);
+                setEditOccState({
+                  id: `new-${Date.now()}`,
+                  date,
+                  start_time: startTime,
+                  room_id: null,
+                  duration: 45
+                });
+              }}
+              className="apple-btn active"
+              style={{
+                background: brandColor,
+                color: '#ffffff',
+                fontWeight: 700,
+                padding: '10px 16px',
+                borderRadius: '10px',
+                justifyContent: 'center',
+                fontSize: '0.9rem'
+              }}
+            >
+              <span>Unterrichtstermin anlegen</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     </div>
   );

@@ -143,8 +143,9 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
       ref={cardRef}
       onClick={onClick}
       style={{
-        width: '280px',
+        width: '300px',
         maxWidth: '100%',
+        margin: '0 auto',
         background: '#ffffff',
         borderRadius: '24px',
         display: 'flex',

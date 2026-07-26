@@ -3240,6 +3240,8 @@ export function AdminDashboard({
     const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
     const finalBirthDate = hasCampus ? (newStudent.birthDate ? newStudent.birthDate : null) : null;
 
+    const isSchoolAutoActivateAll = schoolObj?.student_billing_option === 'option3_3' || schoolObj?.student_billing_option === 'all_inclusive';
+
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
       role: 'student', 
@@ -3251,8 +3253,8 @@ export function AdminDashboard({
       qr_token: qrToken,
       is_external_vocalist: newStudent.isExternalVocalist,
       instrument: studentInstrument,
-      is_campus_active: activePlatform === 'campus',
-      is_groovelab_active: activePlatform === 'groovelab',
+      is_campus_active: isSchoolAutoActivateAll,
+      is_groovelab_active: isSchoolAutoActivateAll,
       app_usage_mode: newStudent.app_usage_mode || 'student_only'
     }).select().single();
     
@@ -3272,6 +3274,8 @@ export function AdminDashboard({
       setStudents([...students, data]); 
       setShowAddStudent(false); 
       setNewStudent({ firstName: '', lastName: '', birthDate: '', photoUrl: '/avatar_ghost.jpg', isExternalVocalist: false, instrument: 'Gitarre', app_usage_mode: 'student_only' }); 
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      window.dispatchEvent(new CustomEvent('campus_students_updated'));
       window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
     }
   };
@@ -3306,6 +3310,7 @@ export function AdminDashboard({
     // Check limits - BYPASSED (Limits strictly removed)
 
     const hasCampus = schoolObj?.has_campus_subscription !== false;
+    const isSchoolAutoActivateAll = schoolObj?.student_billing_option === 'option3_3' || schoolObj?.student_billing_option === 'all_inclusive';
     const studentsToInsert = parsedStudents.map(student => {
       const qrToken = crypto.randomUUID();
       const isVocalist = student.instrument === 'Gesang';
@@ -3324,8 +3329,8 @@ export function AdminDashboard({
         qr_token: qrToken,
         is_external_vocalist: isVocalist,
         instrument: studentInstrument,
-        is_campus_active: activePlatform === 'campus',
-        is_groovelab_active: activePlatform === 'groovelab',
+        is_campus_active: isSchoolAutoActivateAll,
+        is_groovelab_active: isSchoolAutoActivateAll,
         app_usage_mode: 'student_only'
       };
     });
@@ -3356,6 +3361,8 @@ export function AdminDashboard({
         setShowBulkAddStudents(false);
         setBulkInput('');
         setParsedStudents([]);
+        window.dispatchEvent(new CustomEvent('students_updated'));
+        window.dispatchEvent(new CustomEvent('campus_students_updated'));
         window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
       }
     } catch (err: any) {
@@ -3404,6 +3411,9 @@ export function AdminDashboard({
         avatar_url: studentAvatarUrl
       } : s));
       setEditingStudent(null);
+      window.dispatchEvent(new CustomEvent('students_updated'));
+      window.dispatchEvent(new CustomEvent('campus_students_updated'));
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
     }
   };
 
@@ -3640,7 +3650,9 @@ export function AdminDashboard({
       name: newRoomName,
       latitude: newRoomLocation?.lat,
       longitude: newRoomLocation?.lng,
-      sort_order: rooms.length
+      sort_order: rooms.length,
+      is_campus_active: true,
+      is_groovelab_active: true
     }).select().single();
     
     if (roomError) {
@@ -5633,6 +5645,38 @@ export function AdminDashboard({
                         </button>
                       </>
                     )}
+                    {/* Hausaufgabenheft / Schüler-Protokoll Button (Harmonisierte Soft-Glass Einheit) */}
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setSelectedStudentForTageskompass(s);
+                        setShowTageskompassModal(true); 
+                      }} 
+                      style={{ 
+                        background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', 
+                        border: activePlatform === 'campus' ? '1px solid #a7f3d0' : '1px solid #fef08a', 
+                        padding: "10px", 
+                        borderRadius: "12px", 
+                        cursor: "pointer", 
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }} 
+                      className="hover-scale-mini"
+                      title="Hausaufgabenheft & Schüler-Protokoll öffnen"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={`url(#bookHeaderGrad-${s.id})`} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <defs>
+                          <linearGradient id={`bookHeaderGrad-${s.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor={activePlatform === 'campus' ? '#34a853' : '#f59e0b'} />
+                            <stop offset="100%" stopColor={activePlatform === 'campus' ? '#4f46e5' : '#d97706'} />
+                          </linearGradient>
+                        </defs>
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                      </svg>
+                    </button>
                     {/* Stundenplan-Onboarding Status Icon */}
                     <button 
                       onClick={(e) => { 
@@ -13373,14 +13417,30 @@ export function AdminDashboard({
     const brandColor = activePlatform === 'groovelab' ? '#f59e0b' : '#34a853';
 
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setSelectedQRUser(null)}>
-        <div style={{ width: '100%', maxWidth: activePlatform === 'groovelab' ? '290px' : '400px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }} onClick={() => setSelectedQRUser(null)}>
+        <div style={{ width: '100%', maxWidth: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }} onClick={e => e.stopPropagation()}>
           {/* Close Button */}
           <button 
             onClick={() => setSelectedQRUser(null)} 
-            style={{ position: 'absolute', top: '-60px', right: '0', background: 'rgba(255,255,255,0.1)', border: 'none', width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
+            style={{ 
+              position: 'absolute', 
+              top: '-56px', 
+              right: '0', 
+              background: 'rgba(255,255,255,0.15)', 
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.2)', 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '50%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              cursor: 'pointer', 
+              color: 'white',
+              transition: 'all 0.2s'
+            }}
           >
-            <X size={24} />
+            <X size={20} />
           </button>
 
           {/* ID Card Design */}
@@ -13400,40 +13460,40 @@ export function AdminDashboard({
                 : brandColor, 
               color: activePlatform === 'groovelab' ? '#1e293b' : 'white', 
               border: 'none', 
-              padding: '20px', 
-              borderRadius: '24px', 
+              padding: '16px', 
+              borderRadius: '20px', 
               fontWeight: 900, 
-              fontSize: '1rem', 
+              fontSize: '0.92rem', 
               cursor: 'pointer', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
               gap: '10px', 
-              marginTop: '24px', 
+              marginTop: '16px', 
               boxShadow: `0 15px 35px ${(activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) ? (isQRAdminOrSecretary ? '#b91c1c' : '#34a853') : brandColor}50`, 
               transition: 'all 0.2s' 
             }} 
           >
-            <Download size={24} /> Ausweis als JPEG speichern
+            <Download size={20} /> Ausweis als JPEG speichern
           </button>
 
           {/* Wallet integration options */}
-          <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
             <button 
               onClick={downloadWalletPass}
               style={{
                 flex: 1,
-                padding: '16px',
-                borderRadius: '20px',
+                padding: '14px',
+                borderRadius: '16px',
                 border: '1.5px solid #e2e8f0',
                 background: '#ffffff',
                 color: '#0f172a',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: '6px',
                 fontWeight: 800,
-                fontSize: '0.85rem',
+                fontSize: '0.82rem',
                 cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 transition: 'all 0.2s'
@@ -13454,17 +13514,17 @@ export function AdminDashboard({
               onClick={downloadGoogleWalletPass}
               style={{
                 flex: 1,
-                padding: '16px',
-                borderRadius: '20px',
+                padding: '14px',
+                borderRadius: '16px',
                 border: '1.5px solid #e2e8f0',
                 background: '#ffffff',
                 color: '#0f172a',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: '6px',
                 fontWeight: 800,
-                fontSize: '0.85rem',
+                fontSize: '0.82rem',
                 cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 transition: 'all 0.2s'
@@ -13488,19 +13548,19 @@ export function AdminDashboard({
             className="google-btn-secondary"
             style={{
               width: '100%',
-              padding: '20px',
-              borderRadius: '24px',
+              padding: '14px',
+              borderRadius: '20px',
               border: '1.5px solid #fecdd3',
               background: '#fff1f2',
               color: '#e11d48',
               fontWeight: 900,
-              fontSize: '1rem',
+              fontSize: '0.85rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '12px',
-              marginTop: '16px',
+              gap: '8px',
+              marginTop: '10px',
               boxShadow: '0 15px 35px rgba(225, 29, 72, 0.05)',
               transition: 'all 0.2s'
             }}

@@ -279,14 +279,14 @@ export const formatStudentNoteDisplay = (note: string): { isStudentNote: boolean
 };
 
 const SKILL_TAGS = [
-  { key: 'tempo', label: 'Tempo', icon: '⏱' },
-  { key: 'rhythmus', label: 'Rhythmus', icon: '🥁' },
-  { key: 'intonation', label: 'Töne / Intonation', icon: '🎵' },
-  { key: 'fingersatz', label: 'Fingersatz', icon: '🖖' },
-  { key: 'ausdruck', label: 'Ausdruck', icon: '🎭' },
-  { key: 'auswendig', label: 'Auswendig', icon: '📖' },
-  { key: 'kontinuitaet', label: 'Kontinuität', icon: '🔄' },
-  { key: 'selbststaendigkeit', label: 'Selbst geübt', icon: '💪' },
+  { key: 'tempo', label: 'Tempo', icon: '⏱', category: 'technical' },
+  { key: 'rhythmus', label: 'Rhythmus', icon: '🥁', category: 'technical' },
+  { key: 'intonation', label: 'Töne / Intonation', icon: '🎵', category: 'technical' },
+  { key: 'fingersatz', label: 'Fingersatz', icon: '🖖', category: 'technical' },
+  { key: 'ausdruck', label: 'Ausdruck', icon: '🎭', category: 'technical' },
+  { key: 'auswendig', label: 'Auswendig', icon: '📖', category: 'technical' },
+  { key: 'kontinuitaet', label: 'Übe-Regelmäßigkeit', icon: '🔄', category: 'practice' },
+  { key: 'selbststaendigkeit', label: 'Selbstständiges Arbeiten', icon: '🧩', category: 'practice' },
 ];
 
 export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationModalProps> = ({ student, onClose, teacherId, initialLehrwerkId, initialViewMode, initialModalTab, onProfileClick, readOnly = false, isEmbed = false, isTeacherTools = false }) => {
@@ -305,6 +305,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Skill-Radar & Feedback-Tagging
   const [showSkillRadar, setShowSkillRadar] = useState(false);
   const [pendingFeedbackTags, setPendingFeedbackTags] = useState<string[]>([]);
+  const [pendingTargetFocusTags, setPendingTargetFocusTags] = useState<string[]>([]);
   const [pendingFeedbackStatus, setPendingFeedbackStatus] = useState<'beherrscht' | 'in_entwicklung' | 'wiederholen' | null>(null);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const activePlat = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
@@ -623,11 +624,67 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [studentXP, setStudentXP] = useState<number>(0);
   const [studentStreak, setStudentStreak] = useState<number>(0);
   const [studentPracticeMinutes, setStudentPracticeMinutes] = useState<number>(0);
+  const [weeklyPracticeDays, setWeeklyPracticeDays] = useState<number>(0);
 
   // Developer simulation states
   const [simulatedSongsCount, setSimulatedSongsCount] = useState<number | null>(null);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [selectedSimSticker, setSelectedSimSticker] = useState<string>('fleiss-pionier');
+
+  // Teacher Skill Level Overrides for Interactive Skill-Radar Cockpit
+  const [skillOverrides, setSkillOverrides] = useState<{ [tagKey: string]: number }>(() => {
+    try {
+      const saved = localStorage.getItem(`groovelab_skill_overrides_${student?.id || 'default'}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleImproveSkill = (tagKey: string) => {
+    setSkillOverrides(prev => {
+      const currentOffset = prev[tagKey] ?? 0;
+      const updated = { ...prev, [tagKey]: currentOffset - 1 };
+      try {
+        localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  // Helper for 2-Tier Auto-Detection of Custom Textbausteine to Skill-Radar Tags
+  const detectSkillTagFromText = (label: string, text: string, category?: string): string => {
+    const combined = ((label || '') + ' ' + (text || '')).toLowerCase();
+
+    if (combined.includes('metronom') || combined.includes('bpm') || combined.includes('tempo') || combined.includes('entschleunig') || combined.includes('schnecke')) {
+      return 'tempo';
+    }
+    if (combined.includes('rhythmus') || combined.includes('takt') || combined.includes('puls') || combined.includes('groove') || combined.includes('timing') || combined.includes('einzählen')) {
+      return 'rhythmus';
+    }
+    if (combined.includes('klang') || combined.includes('ton') || combined.includes('intonation') || combined.includes('sauber') || combined.includes('artikulation') || combined.includes('staccato') || combined.includes('legato')) {
+      return 'intonation';
+    }
+    if (combined.includes('finger') || combined.includes('hand') || combined.includes('griff') || combined.includes('haltung') || combined.includes('lockerheit')) {
+      return 'fingersatz';
+    }
+    if (combined.includes('ausdruck') || combined.includes('dynamik') || combined.includes('gefühl') || combined.includes('lautstärke') || combined.includes('phrasierung') || combined.includes('blind-flug')) {
+      return 'ausdruck';
+    }
+    if (combined.includes('auswendig') || combined.includes('blatt') || combined.includes('gedächtnis') || combined.includes('ohne noten')) {
+      return 'auswendig';
+    }
+    if (combined.includes('täglich') || combined.includes('routine') || combined.includes('ausdauer') || combined.includes('dreierspiel') || combined.includes('regelmäßig') || combined.includes('wiederhol')) {
+      return 'kontinuitaet';
+    }
+    if (combined.includes('selbst') || combined.includes('pionier') || combined.includes('detektiv') || combined.includes('puzzle') || combined.includes('eigen')) {
+      return 'selbststaendigkeit';
+    }
+
+    if (category === 'rhythm') return 'rhythmus';
+    if (category === 'technique') return 'fingersatz';
+    return 'rhythmus';
+  };
   const [simStickerContext, setSimStickerContext] = useState<string>('Simulation');
   const [selectedPreviewSticker, setSelectedPreviewSticker] = useState<any | null>(null);
   const [selectedStickerDetailIdx, setSelectedStickerDetailIdx] = useState<number | null>(null);
@@ -637,7 +694,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [shareCardLayout, setShareCardLayout] = useState<'dark' | 'light'>('dark');
   const [sessionLogs, setSessionLogs] = useState<string[]>([]);
   const [lessonDay, setLessonDay] = useState<number>(1);
-  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum'>(initialModalTab || 'document');
+  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar'>(initialModalTab || 'document');
 
   useEffect(() => {
     if (initialModalTab) {
@@ -1409,15 +1466,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             setStudentStreak(avatarData.streak_flame || 0);
           }
 
-          // Fetch fokus_logs and sum up all minutes
+          // Fetch fokus_logs and calculate total minutes & distinct practice days for the current week
           const { data: focusData, error: focusError } = await supabase
             .from('fokus_logs')
-            .select('duration_seconds')
+            .select('created_at, duration_seconds')
             .eq('user_id', student.id);
 
           if (!focusError && focusData) {
             const totalSeconds = focusData.reduce((sum, item) => sum + (item.duration_seconds || 0), 0);
             setStudentPracticeMinutes(Math.floor(totalSeconds / 60));
+
+            const currentWeek = getISOWeek();
+            const currentWeekDays = new Set(
+              focusData
+                .filter(item => item.created_at && getISOWeek(item.created_at) === currentWeek)
+                .map(item => new Date(item.created_at).toISOString().split('T')[0])
+            );
+            setWeeklyPracticeDays(currentWeekDays.size);
           }
         } catch (e) {
           console.error('Error loading student profile in modal:', e);
@@ -2932,17 +2997,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         setStudentNotesSavedToast(true);
         setTimeout(() => setStudentNotesSavedToast(false), 2500);
 
-        if (!keepOpen) {
-          if (activeSubView === 'hub') {
-            onClose();
-          } else {
-            setActiveItem(null);
-            setActiveSubView('hub');
-            setActiveLehrwerkId(null);
-            setActivePageNumber(null);
-          }
-        }
+        setHomeworkNotesList(finalNotesList);
+        setHomeworkNotes('');
         setHasChanges(false);
+        setSaving(false);
         return;
       }
 
@@ -3007,16 +3065,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       notifyHomeworkChange();
       setStudentNotesSavedToast(true);
       setTimeout(() => setStudentNotesSavedToast(false), 2500);
-      if (!keepOpen) {
-        if (activeSubView === 'hub') {
-          onClose();
-        } else {
-          setActiveItem(null);
-          setActiveSubView('hub');
-          setActiveLehrwerkId(null);
-          setActivePageNumber(null);
-        }
-      }
+
+      setHomeworkNotesList(finalNotesList);
+      setHomeworkNotes('');
       setHasChanges(false);
     } catch (err: any) {
       console.error('Error saving progress:', err);
@@ -3314,6 +3365,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           if (isHistoryActive) {
             setActiveSubView('hub');
           } else {
+            setActiveModalTab('document');
             setActiveViewMode('document');
             setActiveSubView('history');
             const existingWeeks = progressItems
@@ -3365,10 +3417,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return (
       <button
         type="button"
-        onClick={() => setShowSkillRadar(true)}
+        onClick={() => { setActiveModalTab('skillradar'); setActiveSubView('hub'); }}
         title="Skill-Radar"
         style={{
-          background: 'rgba(255,255,255,0.15)',
+          background: activeModalTab === 'skillradar' ? '#34a853' : 'rgba(255,255,255,0.15)',
           border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.08)',
           borderRadius: '20px',
           height: isMobile ? 'auto' : '30px',
@@ -3390,6 +3442,558 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         <Activity size={isMobile ? 12 : 13} />
         <span>Skill-Radar</span>
       </button>
+    );
+  };
+
+  const renderSkillRadarTabContent = () => {
+    const feedbackEntries = (homeworkNotesList || []).slice(0, 12);
+
+    const currentWeekStr = getISOWeek();
+    const allActiveNotesText = [
+      homeworkNotes || '',
+      ...(homeworkNotesList || []),
+      ...((progressItems || [])
+        .filter((item: any) => item.is_current_homework && (item.updated_at ? getISOWeek(item.updated_at) === currentWeekStr : true))
+        .map((item: any) => item.homework_notes || ''))
+    ].join(' ');
+
+    const activeWeeklyTargetTags = SKILL_TAGS.filter(tag => {
+      if (pendingTargetFocusTags.includes(tag.key)) return true;
+      const lowerText = allActiveNotesText.toLowerCase();
+      return lowerText.includes(tag.label.toLowerCase()) || 
+             lowerText.includes(tag.key) ||
+             detectSkillTagFromText('', allActiveNotesText, '') === tag.key;
+    }).map(t => t.key);
+
+    const counts = SKILL_TAGS.map(tag => {
+      let baseInterventions = feedbackEntries.filter((fb: any) => fb.tags?.includes(tag.key)).length;
+      
+      // 3-Stufen-Modell für Übe-Regelmäßigkeit basierend auf Wochen-Übetagen & Streaks (sofern vom Lehrer unmarkiert)
+      if (tag.key === 'kontinuitaet') {
+        if (baseInterventions === 0) {
+          const effectiveDays = Math.max(weeklyPracticeDays, studentStreak);
+          if (effectiveDays >= 4 || studentPracticeMinutes >= 60) {
+            baseInterventions = 0; // Stufe 1: 100% Souverän Superkraft 🌟
+          } else if (effectiveDays >= 2 || studentPracticeMinutes >= 20) {
+            baseInterventions = 0.3; // Stufe 2: Solide / In Entwicklung 🌤️
+          } else {
+            baseInterventions = 1.0; // Stufe 3: Entwicklungs-Hebel 💎
+          }
+        }
+      }
+
+      const offset = skillOverrides[tag.key] ?? 0;
+      const effectiveInterventions = Math.max(0, baseInterventions + offset);
+      return {
+        ...tag,
+        baseInterventions,
+        interventions: effectiveInterventions,
+        count: effectiveInterventions
+      };
+    });
+
+    const maxInterventions = Math.max(...counts.map(c => c.interventions), 1);
+    const tagCounts = counts.map(t => ({
+      ...t,
+      pct: Math.max(0.18, (maxInterventions - t.interventions) / maxInterventions)
+    }));
+
+    const topStrength = tagCounts.find(t => t.interventions === 0) || tagCounts[0];
+    const currentFocus = tagCounts.reduce((prev, curr) => curr.interventions > prev.interventions ? curr : prev, tagCounts[0]);
+
+    const customTagCounts: { key: string; count: number }[] = [];
+    feedbackEntries.forEach((fb: any) => {
+      if (Array.isArray(fb.tags)) {
+        fb.tags.forEach((t: string) => {
+          if (!SKILL_TAGS.some(st => st.key === t)) {
+            const existing = customTagCounts.find(c => c.key === t);
+            if (existing) {
+              existing.count++;
+            } else {
+              customTagCounts.push({ key: t, count: 1 });
+            }
+          }
+        });
+      }
+    });
+
+    let superkraftDesc = 'Exzellente musikalische Entwicklung in deinen Unterrichtsstunden!';
+    if (topStrength) {
+      switch (topStrength.key) {
+        case 'tempo': superkraftDesc = 'Dein inneres Metronom läuft hervorragend! Du hältst das Pulsgefühl stabil und sicher.'; break;
+        case 'rhythmus': superkraftDesc = 'Groove & Timing pur! Du triffst den Schlag genau auf den Punkt und gibst dem Stück echten Fluss.'; break;
+        case 'intonation': superkraftDesc = 'Schöne Tonkultur! Dein Klang ist sauber, klar und bewusst geformt.'; break;
+        case 'fingersatz': superkraftDesc = 'Mühelose Fingerfertigkeit! Dein durchdachter Fingersatz lässt anspruchsvolle Stellen leicht klingen.'; break;
+        case 'ausdruck': superkraftDesc = 'Voller Gefühl & Dynamik! Du nimmst die Zuhörer mit und gestaltest Phrasen lebendig.'; break;
+        case 'auswendig': superkraftDesc = 'Starkes Gedächtnis! Du verinnerlichst Musikstücke mit Leichtigkeit und spielst frei.'; break;
+        case 'kontinuitaet': superkraftDesc = 'Ausdauer-Talent! Deine Ausdauer und dein regelmäßiges Üben tragen Früchte.'; break;
+        case 'selbststaendigkeit': superkraftDesc = 'Echter Musik-Pionier! Du erarbeitest dir Stücke selbstständig und mit Freude.'; break;
+      }
+    }
+
+    const N = SKILL_TAGS.length;
+    const cx = 220, cy = 220, rMax = 145;
+    const getPoint = (index: number, val: number) => {
+      const angle = (Math.PI * 2 / N) * index - Math.PI / 2;
+      return {
+        x: cx + rMax * val * Math.cos(angle),
+        y: cy + rMax * val * Math.sin(angle),
+        angle
+      };
+    };
+
+    const dataPoints = tagCounts.map((t, i) => getPoint(i, Math.max(t.pct, 0.05)));
+    const dataPath = dataPoints.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
+    const gridLevels = [0.25, 0.5, 0.75, 1.0];
+    const gridPaths = gridLevels.map(lvl => {
+      const pts = SKILL_TAGS.map((_, i) => getPoint(i, lvl));
+      return pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
+    });
+
+    return (
+      <div style={{ flex: 1, width: '100%', display: 'flex', overflow: 'hidden', background: useNotebookLayout ? '#fcfaf7' : '#ffffff' }} className="modal-content-container">
+        {/* LINKE BUCHSEITE: SKILL-RADAR */}
+        <div style={{
+          flex: '1 1 0%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderRight: '1px solid #e8e8ed',
+          padding: '24px 28px',
+          position: 'relative',
+          background: 'radial-gradient(circle at 50% 50%, rgba(52, 168, 83, 0.07) 0%, rgba(59, 130, 246, 0.03) 50%, transparent 80%)'
+        }}>
+          {/* Glassmorphic Legend Pill */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.88)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            borderRadius: '24px',
+            padding: '8px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+            zIndex: 5
+          }}>
+            <span style={{ color: '#15803d', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+              <strong>Außen</strong> = Superkraft 🌟
+            </span>
+            <span style={{ color: '#94a3b8' }}>•</span>
+            <span style={{ color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+              <strong>Mitte</strong> = Hebel 💎
+            </span>
+          </div>
+
+          {/* SVG Radar Center Container */}
+          <div style={{
+            margin: 'auto 0',
+            width: '100%',
+            maxHeight: '440px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative'
+          }}>
+            <svg
+              width="100%"
+              height="100%"
+              viewBox="0 0 440 440"
+              style={{
+                maxWidth: '420px',
+                maxHeight: '420px',
+                display: 'block',
+                overflow: 'visible'
+              }}
+            >
+              <defs>
+                <radialGradient id="skillRadarGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="#34a853" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.12" />
+                </radialGradient>
+                <filter id="radarShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#22c55e" floodOpacity="0.25" />
+                </filter>
+              </defs>
+
+              {/* Grid Web Background */}
+              {gridPaths.map((d, i) => (
+                <path
+                  key={i}
+                  d={d}
+                  fill="none"
+                  stroke={i === 3 ? "#cbd5e1" : "#e2e8f0"}
+                  strokeWidth={i === 3 ? "1.8" : "1.2"}
+                  strokeDasharray={i < 3 ? "3 3" : "none"}
+                />
+              ))}
+
+              {/* Axis Spokes */}
+              {SKILL_TAGS.map((_, i) => {
+                const pt = getPoint(i, 1);
+                return (
+                  <line
+                    key={i}
+                    x1={cx}
+                    y1={cy}
+                    x2={pt.x}
+                    y2={pt.y}
+                    stroke="#e2e8f0"
+                    strokeWidth="1.2"
+                  />
+                );
+              })}
+
+              {/* Radar Polygon Fill & Border */}
+              <path
+                d={dataPath}
+                fill="url(#skillRadarGlow)"
+                stroke="#22c55e"
+                strokeWidth="3.2"
+                strokeLinejoin="round"
+                filter="url(#radarShadow)"
+              />
+
+              {/* Data Nodes (Points) */}
+              {tagCounts.map((tag, i) => {
+                const p = getPoint(i, Math.max(tag.pct, 0.05));
+                const isSuperkraft = tag.interventions === 0;
+                return (
+                  <g key={i}>
+                    {isSuperkraft && (
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r="11"
+                        fill="rgba(34, 197, 94, 0.18)"
+                      />
+                    )}
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={isSuperkraft ? 6.5 : 5.5}
+                      fill={isSuperkraft ? '#22c55e' : '#3b82f6'}
+                      stroke="#ffffff"
+                      strokeWidth="2.5"
+                      style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+                    />
+                  </g>
+                );
+              })}
+
+              {/* Skill Labels around the radar */}
+              {tagCounts.map((tag, i) => {
+                const p = getPoint(i, 1.25);
+                const isSuperkraft = tag.interventions === 0;
+                const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
+                
+                let textAnchor: "middle" | "start" | "end" = "middle";
+                if (p.x > cx + 20) textAnchor = "start";
+                else if (p.x < cx - 20) textAnchor = "end";
+
+                return (
+                  <text
+                    key={i}
+                    x={p.x}
+                    y={p.y}
+                    textAnchor={textAnchor}
+                    dominantBaseline="middle"
+                    fontSize="11"
+                    fontWeight="800"
+                    fill={isTargetFocus ? '#d97706' : (isSuperkraft ? '#15803d' : '#1d4ed8')}
+                    style={{ letterSpacing: '0.02em', filter: 'drop-shadow(0 1px 2px rgba(255,255,255,0.9))' }}
+                  >
+                    {tag.icon} {tag.label} {isTargetFocus ? '🎯' : (isSuperkraft ? '🌟' : '💎')}
+                  </text>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* LEHRER INTERAKTIONS-COCKPIT (NUR FÜR LEHRER / ADMIN) */}
+          {(!readOnly || isTeacherTools || !!teacherId) && (
+            <div style={{
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              border: '1px solid rgba(226, 232, 240, 0.9)',
+              borderRadius: '18px',
+              padding: '10px 14px',
+              marginTop: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+              zIndex: 5
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  ⚡ Lehrer-Cockpit: Hebel-Steuerung
+                </span>
+                <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>1-Klick Freigabe</span>
+              </div>
+
+              {tagCounts.filter(t => t.interventions > 0).length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {tagCounts.filter(t => t.interventions > 0).map(t => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => handleImproveSkill(t.key)}
+                      style={{
+                        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                        border: 'none',
+                        color: '#ffffff',
+                        borderRadius: '12px',
+                        padding: '4px 10px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        boxShadow: '0 2px 6px rgba(34, 197, 94, 0.25)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <span>✨ {t.label} ({t.interventions}×): +1 Stufe nach außen</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🏆 Alle Bereiche stehen auf 100% Souverän! Keine aktiven Hebel.</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* RECHTE BUCHSEITE: PÄDAGOGISCHES FEEDBACK */}
+        <div style={{
+          flex: '1 1 0%',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          padding: '24px',
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Active Weekly Practice Goal Card (Golden Focus Banner) */}
+            {activeWeeklyTargetTags.length > 0 && (
+              <div style={{
+                background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                border: '1.5px solid #f59e0b',
+                borderRadius: '20px',
+                padding: '16px',
+                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: 900, fontSize: '0.84rem' }}>
+                  <span>🎯</span>
+                  <span>AKTIVES ÜBE-LERNZIEL DIESER WOCHE</span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.76rem', color: '#92400e', fontWeight: 600, lineHeight: '1.4' }}>
+                  Dein Lehrer hat dir für diese Woche folgende Schwerpunkte im Hausaufgabenheft gesetzt. Achte beim Üben besonders darauf:
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                  {activeWeeklyTargetTags.map(tagKey => {
+                    const tagObj = SKILL_TAGS.find(t => t.key === tagKey);
+                    if (!tagObj) return null;
+                    return (
+                      <span key={tagKey} style={{
+                        background: '#ffffff',
+                        border: '1.5px solid #f59e0b',
+                        color: '#b45309',
+                        padding: '5px 12px',
+                        borderRadius: '20px',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(245, 158, 11, 0.1)'
+                      }}>
+                        {tagObj.icon} {tagObj.label} 🎯
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Säule 1: Musikalische Superkräfte */}
+            {(() => {
+              const superkraftList = tagCounts.filter(t => t.interventions === 0);
+              const count = superkraftList.length;
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '20px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  boxShadow: '0 4px 14px rgba(34, 197, 94, 0.08)'
+                }}>
+                  <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>🌟</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {count > 1 ? `Deine Musikalischen Superkräfte (${count}× Souverän)` : 'Deine Musikalische Superkraft'}
+                    </span>
+                    
+                    {count > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '2px 0 4px' }}>
+                        {superkraftList.map(s => (
+                          <span key={s.key} style={{
+                            background: '#ffffff',
+                            border: '1px solid #86efac',
+                            color: '#15803d',
+                            borderRadius: '12px',
+                            padding: '3px 9px',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            {s.icon} {s.label} 🌟
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#14532d' }}>
+                        {topStrength.icon} {topStrength.label}
+                      </h4>
+                    )}
+
+                    <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#166534', lineHeight: 1.38, fontWeight: 600 }}>
+                      {count > 1 
+                        ? `Eindrucksvolles musikalisches Fundament! In diesen ${count} Säulen zeigst du maximale Sicherheit und meisterst deine Stücke mit großer Souveränität.`
+                        : superkraftDesc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Säule 2: Dein Größter Fortschritts-Hebel ODER Meisterstufe */}
+            {(() => {
+              const growthHebelList = tagCounts.filter(t => t.interventions > 0);
+              const weakestLink = growthHebelList.length > 0
+                ? growthHebelList.reduce((prev, curr) => curr.interventions > prev.interventions ? curr : prev, growthHebelList[0])
+                : null;
+
+              if (!weakestLink) {
+                // Alle Bereiche auf 100% Souverän -> Meisterstufe Erreicht
+                return (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+                    border: '1.5px solid #fde047',
+                    borderRadius: '20px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    boxShadow: '0 4px 14px rgba(234, 179, 8, 0.12)'
+                  }}>
+                    <div style={{ fontSize: '1.4rem', lineHeight: 1 }}>🏆</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Pädagogische Meisterstufe Erreicht
+                      </span>
+                      <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#854d0e' }}>
+                        100% Souveränität auf allen Säulen!
+                      </h4>
+                      <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: '#713f12', lineHeight: 1.38, fontWeight: 600 }}>
+                        Du beherrschst alle aktuell dokumentierten Bausteine perfekt! Es gibt aktuell keinen Schwachpunkt. Dein Lehrer wird dir bald neue Meisterwerke und Herausforderungen eröffnen.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Mindestens ein Bereich liegt im Inneren -> Schwächstes Glied als größter Hebel
+              return (
+                <div style={{
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  border: '1.5px solid #93c5fd',
+                  borderRadius: '20px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.08)'
+                }}>
+                  <div style={{ fontSize: '1.3rem', lineHeight: 1 }}>💎</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Dein Größter Fortschritts-Hebel
+                    </span>
+                    <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900, color: '#1e40af' }}>
+                      {weakestLink.icon} {weakestLink.label} ({weakestLink.interventions}× gezielt geübt)
+                    </h4>
+                    <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: '#1e3a8a', lineHeight: 1.38, fontWeight: 600 }}>
+                      Man ist so stark wie das Kettenglied, das man als Nächstes stärkt! Wenn du in deinen nächsten Übe-Sessions gezielt an <strong>{weakestLink.label}</strong> arbeitest, machst du den spürbarsten Quantensprung.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Fußzeile: Ermutigender Entwicklungs-Impuls */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>💬</span>
+            <p style={{ margin: 0, fontSize: '0.72rem', color: '#475569', lineHeight: 1.35, fontWeight: 600 }}>
+              <em>Pädagogische Weisheit: Wer an seinen Herausforderungen arbeitet, feiert die größten Durchbrüche. Jede Überwindung verwandelt ein Hindernis in deine neue Stärke!</em>
+            </p>
+          </div>
+
+          {/* Custom tag pills */}
+          {customTagCounts.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Weitere dokumentierte Trainings-Schwerpunkte
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {customTagCounts.sort((a, b) => b.count - a.count).map(tag => (
+                  <span key={tag.key} style={{
+                    background: '#f8fafc',
+                    color: '#475569',
+                    border: '1px solid #e2e8f0',
+                    padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
+                  }}>
+                    ✏️ {tag.key} · {tag.count}×
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -3637,7 +4241,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   {/* Teacher tools order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('loopstation')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
                     style={{
                       background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
                       border: 'none',
@@ -3659,7 +4263,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('practice')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
                     style={{
                       background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
                       border: 'none',
@@ -3681,7 +4285,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('recordings')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
                     style={{
                       background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                       border: 'none',
@@ -3707,9 +4311,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   {/* Student order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('document')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('document'); setActiveSubView('hub'); }}
                     style={{
-                      background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
+                      background: (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView !== 'history') ? '#34a853' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       color: '#ffffff',
                       padding: '6px 14px',
@@ -3729,9 +4333,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('loopstation')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
                     style={{
-                      background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                      background: (activeModalTab === 'document' && activeViewMode === 'loopstation') ? '#dc2626' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       color: '#ffffff',
                       padding: '6px 14px',
@@ -3751,9 +4355,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('practice')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
                     style={{
-                      background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
+                      background: (activeModalTab === 'document' && activeViewMode === 'practice') ? '#eab308' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       color: '#ffffff',
                       padding: '6px 14px',
@@ -3773,9 +4377,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveViewMode('recordings')}
+                    onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
                     style={{
-                      background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                      background: (activeModalTab === 'document' && activeViewMode === 'recordings') ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                       border: 'none',
                       color: '#ffffff',
                       padding: '6px 14px',
@@ -3824,7 +4428,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {/* Teacher mobile order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('loopstation')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
                   style={{
                     background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
                     border: 'none',
@@ -3844,7 +4448,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('practice')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
                   style={{
                     background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
                     border: 'none',
@@ -3864,7 +4468,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('recordings')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
                   style={{
                     background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                     border: 'none',
@@ -3888,9 +4492,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 {/* Student mobile order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('document')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('document'); setActiveSubView('hub'); }}
                   style={{
-                    background: activeViewMode === 'document' ? '#34a853' : 'rgba(255,255,255,0.15)',
+                    background: (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView !== 'history') ? '#34a853' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 12px',
@@ -3908,9 +4512,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('loopstation')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
                   style={{
-                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
+                    background: (activeModalTab === 'document' && activeViewMode === 'loopstation') ? '#dc2626' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 12px',
@@ -3928,9 +4532,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('practice')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
                   style={{
-                    background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
+                    background: (activeModalTab === 'document' && activeViewMode === 'practice') ? '#eab308' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 12px',
@@ -3948,9 +4552,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveViewMode('recordings')}
+                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
                   style={{
-                    background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
+                    background: (activeModalTab === 'document' && activeViewMode === 'recordings') ? '#4f46e5' : 'rgba(255,255,255,0.15)',
                     border: 'none',
                     color: '#ffffff',
                     padding: '6px 12px',
@@ -3987,7 +4591,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           padding: '0',
           position: 'relative'
         }} className="modal-content-container">
-          {activeViewMode === 'loopstation' ? (
+          {activeModalTab === 'skillradar' ? (
+            renderSkillRadarTabContent()
+          ) : activeViewMode === 'loopstation' ? (
             <GrooveLoopstation
               student={student}
               homeworkNotesList={homeworkNotesList}
@@ -4711,66 +5317,102 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                 </div>
                               </div>
 
-                              {/* Tags */}
+                              {/* Tags & Skill Categories */}
                               <div>
                                 <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Schwierigkeiten
+                                  Übe-Schwerpunkte & Förderbereiche
                                 </span>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
-                                  {SKILL_TAGS.map(tag => {
-                                    const active = pendingFeedbackTags.includes(tag.key);
-                                    const limitReached = !active && pendingFeedbackTags.length >= 2;
-                                    return (
-                                      <button
-                                        key={tag.key}
-                                        type="button"
-                                        onClick={() => setPendingFeedbackTags(prev => {
-                                          if (prev.includes(tag.key)) {
-                                            return prev.filter(t => t !== tag.key);
-                                          }
-                                          if (prev.length >= 2) return prev;
-                                          return [...prev, tag.key];
-                                        })}
-                                        style={{
-                                          padding: '4px 9px',
-                                          background: active ? '#fef2f2' : '#f8fafc',
-                                          border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
-                                          borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
-                                          color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
-                                          opacity: limitReached ? 0.45 : 1
-                                        }}
-                                      >{tag.icon} {tag.label}</button>
-                                    );
-                                  })}
-                                  {customTags.map(tag => {
-                                    const active = pendingFeedbackTags.includes(tag);
-                                    const limitReached = !active && pendingFeedbackTags.length >= 2;
-                                    return (
-                                      <button
-                                        key={tag}
-                                        type="button"
-                                        onClick={() => setPendingFeedbackTags(prev => {
-                                          if (prev.includes(tag)) {
-                                            return prev.filter(t => t !== tag);
-                                          }
-                                          if (prev.length >= 2) return prev;
-                                          return [...prev, tag];
-                                        })}
-                                        style={{
-                                          padding: '4px 9px',
-                                          background: active ? '#fef2f2' : '#f8fafc',
-                                          border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
-                                          borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
-                                          color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
-                                          opacity: limitReached ? 0.45 : 1
-                                        }}
-                                      >✏️ {tag}</button>
-                                    );
-                                  })}
+
+                                {/* Category 1: Musikalisch-Technische Fertigkeiten */}
+                                <div style={{ marginTop: '6px' }}>
+                                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                    Musikalisch-Technische Fertigkeiten
+                                  </span>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                    {SKILL_TAGS.filter(t => t.category === 'technical').map(tag => {
+                                      const active = pendingFeedbackTags.includes(tag.key);
+                                      const limitReached = !active && pendingFeedbackTags.length >= 2;
+                                      return (
+                                        <button
+                                          key={tag.key}
+                                          type="button"
+                                          onClick={() => setPendingFeedbackTags(prev => {
+                                            if (prev.includes(tag.key)) return prev.filter(t => t !== tag.key);
+                                            if (prev.length >= 2) return prev;
+                                            return [...prev, tag.key];
+                                          })}
+                                          style={{
+                                            padding: '4px 9px',
+                                            background: active ? '#fef2f2' : '#f8fafc',
+                                            border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
+                                            borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
+                                            color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
+                                            opacity: limitReached ? 0.45 : 1
+                                          }}
+                                        >{tag.icon} {tag.label}</button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                                <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '6px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
+
+                                {/* Category 2: Übe-Praxis & Selbstständigkeit */}
+                                <div style={{ marginTop: '8px' }}>
+                                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                    Übe-Praxis & Selbstständigkeit
+                                  </span>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                    {SKILL_TAGS.filter(t => t.category === 'practice').map(tag => {
+                                      const active = pendingFeedbackTags.includes(tag.key);
+                                      const limitReached = !active && pendingFeedbackTags.length >= 2;
+                                      return (
+                                        <button
+                                          key={tag.key}
+                                          type="button"
+                                          onClick={() => setPendingFeedbackTags(prev => {
+                                            if (prev.includes(tag.key)) return prev.filter(t => t !== tag.key);
+                                            if (prev.length >= 2) return prev;
+                                            return [...prev, tag.key];
+                                          })}
+                                          style={{
+                                            padding: '4px 9px',
+                                            background: active ? '#fef2f2' : '#f8fafc',
+                                            border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
+                                            borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
+                                            color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
+                                            opacity: limitReached ? 0.45 : 1
+                                          }}
+                                        >{tag.icon} {tag.label}</button>
+                                      );
+                                    })}
+                                    {customTags.map(tag => {
+                                      const active = pendingFeedbackTags.includes(tag);
+                                      const limitReached = !active && pendingFeedbackTags.length >= 2;
+                                      return (
+                                        <button
+                                          key={tag}
+                                          type="button"
+                                          onClick={() => setPendingFeedbackTags(prev => {
+                                            if (prev.includes(tag)) return prev.filter(t => t !== tag);
+                                            if (prev.length >= 2) return prev;
+                                            return [...prev, tag];
+                                          })}
+                                          style={{
+                                            padding: '4px 9px',
+                                            background: active ? '#fef2f2' : '#f8fafc',
+                                            border: `1.5px solid ${active ? '#fca5a5' : '#e2e8f0'}`,
+                                            borderRadius: '20px', cursor: 'pointer', fontSize: '0.66rem', fontWeight: 800,
+                                            color: active ? '#dc2626' : '#64748b', transition: 'all 0.15s ease',
+                                            opacity: limitReached ? 0.45 : 1
+                                          }}
+                                        >✏️ {tag}</button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '8px', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <span>💡</span>
-                                  <span style={{ fontWeight: 600 }}>Wähle maximal 2 Hauptschwierigkeiten aus, um den Schüler gezielt zu fördern.</span>
+                                  <span style={{ fontWeight: 600 }}>Wähle maximal 2 Schwerpunkte aus, um den Schüler gezielt zu fördern.</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px' }}>
                                   <input
@@ -6486,7 +7128,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveModalTab('stickeralbum')}
+                    onClick={() => { setActiveModalTab('stickeralbum'); setActiveSubView('hub'); }}
                     style={{
                       flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
                       background: '#d97706', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
@@ -8142,28 +8784,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                             {!readOnly && isNotesExpanded && (
                               <button
                                 type="button"
-                                onClick={handleAddNote}
-                                disabled={saving || !homeworkNotes.trim()}
-                                style={{
-                                  background: homeworkNotes.trim() ? '#34a853' : '#cbd5e1',
-                                  color: homeworkNotes.trim() ? 'white' : '#94a3b8',
-                                  border: 'none',
-                                  padding: '5px 10px',
-                                  borderRadius: '8px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  cursor: homeworkNotes.trim() ? 'pointer' : 'not-allowed',
-                                  boxShadow: homeworkNotes.trim() ? '0 2px 6px rgba(19, 115, 51, 0.15)' : 'none',
-                                  transition: 'all 0.15s'
-                                }}
-                                className="hover-scale save-note-btn"
-                              >
-                                {saving ? 'Speichert...' : 'Bemerkung speichern'}
-                              </button>
-                            )}
-                            {!readOnly && isNotesExpanded && (
-                              <button
-                                type="button"
                                 onClick={() => {
                                   if (homeworkNotes.trim()) {
                                     setHomeworkNotes('');
@@ -8299,7 +8919,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                     return currentNotes.includes(itemText);
                                   };
 
-                                  const togglePreset = (itemText: string, isBpm = false) => {
+                                  const togglePreset = (itemText: string, isBpm = false, tagKey?: string) => {
                                     let currentNotes = homeworkNotes || '';
                                     const active = isPresetActive(itemText, isBpm);
 
@@ -8314,6 +8934,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       }
                                       currentNotes = currentNotes.replace(/\n{3,}/g, '\n\n').trim();
                                       setHomeworkNotes(currentNotes);
+
+                                      if (tagKey) {
+                                        setPendingTargetFocusTags(prev => prev.filter(t => t !== tagKey));
+                                      }
                                     } else {
                                       // Add the text
                                       let textToAdd = itemText;
@@ -8325,6 +8949,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       currentNotes = currentNotes ? `${currentNotes.trim()}\n\n${textToAdd}` : textToAdd;
                                       setHomeworkNotes(currentNotes);
                                       setIsCurrentHomework(true);
+
+                                      if (tagKey) {
+                                        setPendingTargetFocusTags(prev => prev.includes(tagKey) ? prev : [...prev, tagKey]);
+                                      }
                                     }
                                     setHasChanges(true);
                                   };
@@ -8334,29 +8962,65 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       label: '⏱️ Tempo halten',
                                       desc: 'Metronom BPM',
                                       text: '',
+                                      tagKey: 'tempo',
                                       isBpm: true,
-                                      onClick: () => togglePreset('', true)
+                                      onClick: () => togglePreset('', true, 'tempo')
                                     },
                                     {
                                       label: '✨ Sauber spielen',
-                                      desc: 'Klarer Klang',
+                                      desc: 'Töne & Intonation',
                                       text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.',
+                                      tagKey: 'intonation',
                                       isBpm: false,
-                                      onClick: () => togglePreset('Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.', false)
+                                      onClick: () => togglePreset('Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.', false, 'intonation')
                                     },
                                     {
                                       label: '🥁 Rhythmus-Metronom',
                                       desc: 'Timing & Takt',
                                       text: 'Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.',
+                                      tagKey: 'rhythmus',
                                       isBpm: false,
-                                      onClick: () => togglePreset('Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.', false)
+                                      onClick: () => togglePreset('Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.', false, 'rhythmus')
                                     },
                                     {
                                       label: '🖖 Fingersatz üben',
                                       desc: 'Fingersatz einhalten',
                                       text: 'Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.',
+                                      tagKey: 'fingersatz',
                                       isBpm: false,
-                                      onClick: () => togglePreset('Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.', false)
+                                      onClick: () => togglePreset('Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.', false, 'fingersatz')
+                                    },
+                                    {
+                                      label: '🎭 Ausdruck & Dynamik',
+                                      desc: 'Musikalität',
+                                      text: 'Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.',
+                                      tagKey: 'ausdruck',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.', false, 'ausdruck')
+                                    },
+                                    {
+                                      label: '📖 Auswendig lernen',
+                                      desc: 'Spiel ohne Blatt',
+                                      text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.',
+                                      tagKey: 'auswendig',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.', false, 'auswendig')
+                                    },
+                                    {
+                                      label: '🔄 Kontinuität üben',
+                                      desc: 'Tägliche Routine',
+                                      text: 'Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.',
+                                      tagKey: 'kontinuitaet',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.', false, 'kontinuitaet')
+                                    },
+                                    {
+                                      label: '💪 Selbstständig üben',
+                                      desc: 'Pionier-Üben',
+                                      text: 'Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.',
+                                      tagKey: 'selbststaendigkeit',
+                                      isBpm: false,
+                                      onClick: () => togglePreset('Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.', false, 'selbststaendigkeit')
                                     },
                                     ...textbausteine
                                       .filter((tb: any) => tb.active)
@@ -8364,6 +9028,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         label: `📝 ${tpl.label}`,
                                         desc: 'Textbaustein',
                                         text: tpl.text,
+                                        tagKey: undefined,
                                         isBpm: false,
                                         onClick: () => togglePreset(tpl.text, false)
                                       }))
@@ -8597,13 +9262,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       disabled={saving}
                       style={{
                         flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
-                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer',
-                        boxShadow: '0 4px 10px rgba(19, 115, 51, 0.2)',
-                        transition: 'all 0.15s ease'
+                        background: saving
+                          ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
+                          : (hasChanges
+                              ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                              : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'),
+                        color: 'white',
+                        fontWeight: 900,
+                        fontSize: '0.84rem',
+                        cursor: saving ? 'wait' : 'pointer',
+                        boxShadow: hasChanges
+                          ? '0 4px 16px rgba(239, 68, 68, 0.4)'
+                          : '0 4px 10px rgba(34, 197, 94, 0.25)',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
                       }}
                       className="hover-scale"
                     >
-                      {saving ? 'Speichert...' : 'Eintrag speichern'}
+                      {saving ? (
+                        <span>⏳ Speichert Eintrag...</span>
+                      ) : hasChanges ? (
+                        <span>⚠️ Ungespeicherte Änderungen — Eintrag jetzt speichern!</span>
+                      ) : (
+                        <span>✓ Eintrag gespeichert</span>
+                      )}
                     </button>
                   </div>
                 </form>
@@ -10423,6 +11108,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
         );
       })()}
+      </div>
 
         {/* Premium Schritt-für-Schritt Onboarding Modal Overlay */}
         {showProtokollOnboarding && (
@@ -10679,7 +11365,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
           </div>
         )}
-      </div>
       </div>
     );
 
