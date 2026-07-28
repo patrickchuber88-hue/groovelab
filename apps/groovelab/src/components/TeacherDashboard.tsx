@@ -4518,7 +4518,14 @@ export function TeacherDashboard({
           return Array.from(studentMap.values());
         };
 
+        const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
+
         let filteredStudData = (studData || []).filter((student: any) => {
+          if (activePlat === 'groovelab') {
+            const isActivatedBySchool = student.is_groovelab_active === true || student.isGroovelabActive === true;
+            const isAddedByTeacher = (student.created_by_teacher_id === userId || student.teacher_id === userId) && student.added_in_groovelab === true;
+            return isActivatedBySchool || isAddedByTeacher;
+          }
           return true;
         });
 
