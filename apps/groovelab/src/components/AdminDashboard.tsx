@@ -2108,54 +2108,56 @@ export function AdminDashboard({
       }
     }
 
-    // 2. Fetch pending onboarding students from pending_students_decrypted view
+    // 2. Fetch pending onboarding students from pending_students_decrypted view (Campus only)
     let mappedPending: any[] = [];
-    try {
-      const { data: pendingData } = await supabase
-        .from('pending_students_decrypted')
-        .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
-        .eq('school_id', schoolId);
+    if (platform === 'campus') {
+      try {
+        const { data: pendingData } = await supabase
+          .from('pending_students_decrypted')
+          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+          .eq('school_id', schoolId);
 
-      if (pendingData && pendingData.length > 0) {
-        const registeredIds = new Set(registeredStudents.map((s: any) => s.id));
-        const registeredNameKeys = new Set(
-          registeredStudents.map((s: any) => `${(s.first_name || '').trim().toLowerCase()}_${(s.last_name || '').trim().toLowerCase()}`)
-        );
-        const seenPendingNames = new Set<string>();
+        if (pendingData && pendingData.length > 0) {
+          const registeredIds = new Set(registeredStudents.map((s: any) => s.id));
+          const registeredNameKeys = new Set(
+            registeredStudents.map((s: any) => `${(s.first_name || '').trim().toLowerCase()}_${(s.last_name || '').trim().toLowerCase()}`)
+          );
+          const seenPendingNames = new Set<string>();
 
-        mappedPending = pendingData
-          .filter((ps: any) => {
-            if (!ps) return false;
-            if (registeredIds.has(ps.id)) return false;
-            const nameKey = `${(ps.first_name || '').trim().toLowerCase()}_${(ps.last_name || '').trim().toLowerCase()}`;
-            if (nameKey !== '_' && registeredNameKeys.has(nameKey)) return false;
-            if (nameKey !== '_') {
-              if (seenPendingNames.has(nameKey)) return false;
-              seenPendingNames.add(nameKey);
-            }
-            return ps.teacher_id === teacherId || assignedStudentIds.includes(ps.id);
-          })
-          .map((ps: any) => ({
-            id: ps.id,
-            school_id: ps.school_id,
-            teacher_id: ps.teacher_id,
-            role: 'student',
-            first_name: ps.first_name || 'Ausstehender Schüler',
-            last_name: ps.last_name || '',
-            email: '',
-            instrument: ps.instrument || 'Gitarre',
-            is_active: false,
-            is_campus_active: false,
-            is_groovelab_active: false,
-            status: 'inactive',
-            isPendingOnboarding: true,
-            day_of_birth: ps.day_of_birth || null,
-            ausweis_nummer: 'Ausstehend (Onboarding)',
-            created_at: ps.created_at || new Date().toISOString()
-          }));
+          mappedPending = pendingData
+            .filter((ps: any) => {
+              if (!ps) return false;
+              if (registeredIds.has(ps.id)) return false;
+              const nameKey = `${(ps.first_name || '').trim().toLowerCase()}_${(ps.last_name || '').trim().toLowerCase()}`;
+              if (nameKey !== '_' && registeredNameKeys.has(nameKey)) return false;
+              if (nameKey !== '_') {
+                if (seenPendingNames.has(nameKey)) return false;
+                seenPendingNames.add(nameKey);
+              }
+              return ps.teacher_id === teacherId || assignedStudentIds.includes(ps.id);
+            })
+            .map((ps: any) => ({
+              id: ps.id,
+              school_id: ps.school_id,
+              teacher_id: ps.teacher_id,
+              role: 'student',
+              first_name: ps.first_name || 'Ausstehender Schüler',
+              last_name: ps.last_name || '',
+              email: '',
+              instrument: ps.instrument || 'Gitarre',
+              is_active: false,
+              is_campus_active: false,
+              is_groovelab_active: false,
+              status: 'inactive',
+              isPendingOnboarding: true,
+              day_of_birth: ps.day_of_birth || null,
+              ausweis_nummer: 'Ausstehend (Onboarding)',
+              created_at: ps.created_at || new Date().toISOString()
+            }));
+        }
+      } catch (err) {
+        console.warn('[Teacher Board] Pending students fetch warning:', err);
       }
-    } catch (err) {
-      console.warn('[Teacher Board] Pending students fetch warning:', err);
     }
 
     // Combine registered + pending onboarding students
