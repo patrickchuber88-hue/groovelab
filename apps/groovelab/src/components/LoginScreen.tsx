@@ -1454,12 +1454,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
 
         if (inviteSchoolId) {
+          const inviteToken = urlParams.get('token');
+          if (inviteToken) {
+            sessionStorage.setItem('groovelab_qr_token', inviteToken);
+            localStorage.setItem('groovelab_kiosk_token', inviteToken);
+          }
           const { data, error } = await supabase.from('schools').select('*').eq('id', inviteSchoolId).maybeSingle();
           if (!error && data) {
             setSchoolName(data.name);
             setSchoolData(data);
             localStorage.setItem('groovelab_last_school_id', data.id);
             if (data.subdomain) localStorage.setItem('groovelab_last_subdomain', data.subdomain);
+            const validToken = data.secretary_onboarding_token || data.groovelab_kiosk_token || data.campus_login_token || inviteToken;
+            if (validToken) {
+              sessionStorage.setItem('groovelab_qr_token', validToken);
+              localStorage.setItem('groovelab_kiosk_token', validToken);
+            }
             return;
           }
         }
@@ -2016,10 +2026,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     fetchKioskData();
   }, [schoolData, isGroovelabKiosk]);
 
-  // Pre-emptively request geolocation when GrooveLab Kiosk mode is active
-  // This ensures browser permission is already granted when a student scans their QR code
+  // Pre-emptively request geolocation when GrooveLab Kiosk mode is active (ONLY on Login screen, NEVER during registration)
   useEffect(() => {
-    if (isGroovelabKiosk && navigator.geolocation) {
+    if (!inviteSchoolId && isGroovelabKiosk && navigator.geolocation) {
       console.log('[Geofence] Pre-emptively fetching location to acquire permission...');
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -2033,7 +2042,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
       );
     }
-  }, [isGroovelabKiosk]);
+  }, [isGroovelabKiosk, inviteSchoolId]);
 
 
   const handleKeypadPress = (val: string, type: 'setup' | 'verify') => {
@@ -3564,6 +3573,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
               }
 
+              // Ensure school onboarding token is injected into fetch headers for Supabase RLS compliance
+              const urlParams = new URLSearchParams(window.location.search);
+              const activeOnboardingToken = urlParams.get('token') || schoolData?.secretary_onboarding_token || schoolData?.groovelab_kiosk_token || schoolData?.campus_login_token;
+              if (activeOnboardingToken) {
+                sessionStorage.setItem('groovelab_qr_token', activeOnboardingToken);
+                localStorage.setItem('groovelab_kiosk_token', activeOnboardingToken);
+              }
+
               const newQrToken = crypto.randomUUID();
               const newUserId = crypto.randomUUID();
               
@@ -3591,10 +3608,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   role: finalRole,
                   roles: [finalRole],
                   is_active: true,
+                  is_campus_active: true,
+                  is_groovelab_active: true,
                   first_name: firstName.trim(),
                   last_name: lastName.trim(),
                   qr_token: newQrToken,
-                  photo_url: isSecretary ? '/campus_login_hero.png' : null
+                  photo_url: isSecretary ? '/campus_login_hero.png' : null,
+                  avatar_url: isSecretary ? '/campus_login_hero.png' : null
                 })
                 .select()
                 .single();
@@ -6075,260 +6095,306 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
-      {/* Admin Bypass for Localhost - Strict Tenant Isolation */}
+      {/* Admin & Teacher Bypass Buttons for Localhost / Dev */}
       {import.meta.env.DEV && schoolData?.id && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Patrick Huber Bypass (Teacher) */}
-          {(import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || true) && (
-            <button
-              onClick={async () => {
-                try {
-                  const token = import.meta.env.VITE_BYPASS_PATRICK_HUBER_TOKEN || '11079eae-664a-49a4-8692-771d83a3193c';
-                  console.log('[Bypass] Attempting Patrick Huber login with token for school:', schoolData.id);
-                  sessionStorage.setItem('groovelab_qr_token', token);
-                  
-                  const { data: user, error } = await supabase
+          <button
+            onClick={async () => {
+              try {
+                console.log('[Bypass] Attempting Patrick Huber (Lehrer) login for school:', schoolData.name, '(', schoolData.id, ')');
+                sessionStorage.removeItem('groovelab_is_master_admin');
+
+                if (schoolData?.groovelab_kiosk_token) {
+                  localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                }
+
+                let { data: user } = await supabase
+                  .from('users')
+                  .select('id, role, school_id, first_name, last_name, qr_token')
+                  .eq('school_id', schoolData.id)
+                  .ilike('first_name', '%Patrick%')
+                  .or('last_name.ilike.%H%,last_name.ilike.%Huber%')
+                  .limit(1)
+                  .maybeSingle();
+
+                if (!user) {
+                  const { data: globalPatrick } = await supabase
                     .from('users')
-                    .select('id, role, school_id')
+                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .ilike('first_name', '%Patrick%')
+                    .or('last_name.ilike.%H%,last_name.ilike.%Huber%')
+                    .limit(1)
+                    .maybeSingle();
+                  user = globalPatrick;
+                }
+
+                if (!user) {
+                  const { data: fallbackTeacher } = await supabase
+                    .from('users')
+                    .select('id, role, school_id, first_name, last_name, qr_token')
                     .eq('school_id', schoolData.id)
-                    .or(`qr_token.eq.${token},id.eq.${token},and(first_name.eq.Patrick,last_name.eq.Huber)`)
+                    .eq('role', 'teacher')
+                    .limit(1)
                     .maybeSingle();
-
-                  if (error) {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.error('[Bypass] Supabase Error:', error);
-                    alert('Datenbank-Fehler: ' + error.message);
-                    return;
-                  }
-
-                  if (user) {
-                    console.log('[Bypass] Patrick Huber found, logging in:', user.id);
-                    sessionStorage.setItem('groovelab_user_id', user.id);
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    onLogin(user.id, true);
-                  } else {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Patrick Huber token for this school:', schoolData.name);
-                    alert(`Patrick Huber ist für die Schule "${schoolData.name}" nicht registriert.`);
-                  }
-                } catch (err: any) {
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  console.error('[Bypass] Runtime Error:', err);
-                  alert('Ein Fehler ist aufgetreten: ' + err.message);
+                  user = fallbackTeacher;
                 }
-              }}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: 'rgba(52, 168, 83, 0.08)',
-                border: '2px solid rgba(52, 168, 83, 0.25)',
-                borderRadius: '24px',
-                color: '#e6f4ea',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(52,168,83,0.1)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.02em',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
-            >
-              🔓 BYPASS: PATRICK HUBER (LEHRER - {schoolData.name})
-            </button>
-          )}
 
-          {/* Patrick Test Bypass (Schüler) */}
-          {(import.meta.env.VITE_BYPASS_PATRICK_TEST_TOKEN || import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN || true) && (
-            <button
-              onClick={async () => {
-                try {
-                  const token = import.meta.env.VITE_BYPASS_PATRICK_TEST_TOKEN || import.meta.env.VITE_BYPASS_ELISABETH_ZIMMERMAN_TOKEN || '03fcc965-695e-48d8-a7b0-f6844443d80d';
-                  console.log('[Bypass] Attempting Patrick Test login with token for school:', schoolData.id);
-                  sessionStorage.setItem('groovelab_qr_token', token);
-                  
-                  const { data: user, error } = await supabase
+                if (user) {
+                  await supabase.from('users').update({ role: 'teacher' }).eq('id', user.id);
+                  localStorage.setItem('groovelab_active_workspace', 'teacher');
+                  localStorage.setItem('groovelab_active_platform', 'campus');
+                  localStorage.setItem('campus_active_tab', 'live');
+                  sessionStorage.setItem('groovelab_user_id', user.id);
+                  localStorage.setItem('groovelab_user_id', user.id);
+                  sessionStorage.removeItem('groovelab_qr_token');
+                  onLogin(user.id, true);
+                } else {
+                  alert(`Kein Lehrer-Profil für "${schoolData.name}" gefunden.`);
+                }
+              } catch (err: any) {
+                console.error('[Bypass] Error logging in as Patrick Huber:', err);
+                alert('Bypass Fehler: ' + (err?.message || err));
+              }
+            }}
+            style={{
+              background: '#064e3b',
+              color: '#a7f3d0',
+              border: '1px solid #059669',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            🔓 BYPASS: PATRICK HUBER (LEHRER - {schoolData.name})
+          </button>
+
+          {/* Schüler Bypass (Student) */}
+          <button
+            onClick={async () => {
+              try {
+                console.log('[Bypass] Attempting Schüler login for school:', schoolData.name, '(', schoolData.id, ')');
+                sessionStorage.removeItem('groovelab_is_master_admin');
+
+                if (schoolData?.groovelab_kiosk_token) {
+                  localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                }
+
+                let { data: user } = await supabase
+                  .from('users')
+                  .select('id, role, school_id, first_name, last_name, qr_token')
+                  .eq('school_id', schoolData.id)
+                  .eq('role', 'student')
+                  .limit(1)
+                  .maybeSingle();
+
+                if (!user) {
+                  const { data: globalStudent } = await supabase
                     .from('users')
-                    .select('id, role, school_id')
+                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .eq('role', 'student')
+                    .limit(1)
+                    .maybeSingle();
+                  user = globalStudent;
+                }
+
+                if (user) {
+                  localStorage.setItem('groovelab_active_workspace', 'student');
+                  sessionStorage.setItem('groovelab_user_id', user.id);
+                  localStorage.setItem('groovelab_user_id', user.id);
+                  sessionStorage.removeItem('groovelab_qr_token');
+                  onLogin(user.id, true);
+                } else {
+                  alert(`Kein Schüler-Profil für "${schoolData.name}" gefunden.`);
+                }
+              } catch (err: any) {
+                console.error('[Bypass] Error logging in as Schüler:', err);
+                alert('Bypass Fehler: ' + (err?.message || err));
+              }
+            }}
+            style={{
+              background: '#064e3b',
+              color: '#a7f3d0',
+              border: '1px solid #059669',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            🔓 BYPASS: SCHÜLER-LOGIN ({schoolData.name})
+          </button>
+
+          {/* Manuel Wagner Bypass (Verwaltung) */}
+          <button
+            onClick={async () => {
+              try {
+                console.log('[Bypass] Attempting Manuel Wagner (Verwaltung) login for school:', schoolData.name, '(', schoolData.id, ')');
+                sessionStorage.removeItem('groovelab_is_master_admin');
+
+                if (schoolData?.groovelab_kiosk_token) {
+                  localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
+                }
+
+                let { data: user } = await supabase
+                  .from('users')
+                  .select('id, role, school_id, first_name, last_name, qr_token')
+                  .eq('school_id', schoolData.id)
+                  .ilike('first_name', '%Manuel%')
+                  .or('last_name.ilike.%W%,last_name.ilike.%Wagner%')
+                  .limit(1)
+                  .maybeSingle();
+
+                if (!user) {
+                  const { data: globalManuel } = await supabase
+                    .from('users')
+                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .ilike('first_name', '%Manuel%')
+                    .or('last_name.ilike.%W%,last_name.ilike.%Wagner%')
+                    .limit(1)
+                    .maybeSingle();
+                  user = globalManuel;
+                }
+
+                if (!user) {
+                  const { data: adminUser } = await supabase
+                    .from('users')
+                    .select('id, role, school_id, first_name, last_name, qr_token')
                     .eq('school_id', schoolData.id)
-                    .or(`qr_token.eq.${token},id.eq.${token},and(first_name.eq.Patrick,role.eq.student)`)
+                    .in('role', ['admin', 'secretary'])
+                    .limit(1)
                     .maybeSingle();
-
-                  if (error) {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.error('[Bypass] Supabase Error:', error);
-                    alert('Datenbank-Fehler: ' + error.message);
-                    return;
-                  }
-
-                  if (user) {
-                    console.log('[Bypass] Patrick Test found, logging in:', user.id);
-                    sessionStorage.setItem('groovelab_user_id', user.id);
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    onLogin(user.id, true);
-                  } else {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No student found with Patrick Test token for this school:', schoolData.name);
-                    alert(`Der Schüler Patrick Test ist für die Schule "${schoolData.name}" nicht registriert.`);
-                  }
-                } catch (err: any) {
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  console.error('[Bypass] Runtime Error:', err);
-                  alert('Ein Fehler ist aufgetreten: ' + err.message);
+                  user = adminUser;
                 }
-              }}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: 'rgba(52, 168, 83, 0.08)',
-                border: '2px solid rgba(52, 168, 83, 0.25)',
-                borderRadius: '24px',
-                color: '#e6f4ea',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(52, 168, 83,0.1)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.02em',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)'; }}
-            >
-              🔓 BYPASS: SCHÜLER-LOGIN ({schoolData.name})
-            </button>
-          )}
 
-          {/* Manuel Wagner Bypass (Admin/Verwaltung) */}
-          {import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN && (
-            <button
-              onClick={async () => {
-                try {
-                  const token = import.meta.env.VITE_BYPASS_MANUEL_WAGNER_TOKEN;
-                  console.log('[Bypass] Attempting Manuel Wagner login with token for school:', schoolData.id);
-                  sessionStorage.setItem('groovelab_qr_token', token);
-                  
-                  const { data: user, error } = await supabase
+                if (user) {
+                  await supabase.from('users').update({ role: 'admin' }).eq('id', user.id);
+                  localStorage.setItem('groovelab_active_workspace', 'secretary');
+                  localStorage.setItem('groovelab_active_platform', 'campus');
+                  localStorage.setItem('campus_active_tab', 'briefing');
+                  sessionStorage.setItem('groovelab_user_id', user.id);
+                  localStorage.setItem('groovelab_user_id', user.id);
+                  sessionStorage.removeItem('groovelab_qr_token');
+                  onLogin(user.id, true);
+                } else {
+                  alert(`Kein Admin/Verwaltungs-Profil für "${schoolData.name}" gefunden.`);
+                }
+              } catch (err: any) {
+                console.error('[Bypass] Error logging in as Manuel Wagner:', err);
+                alert('Bypass Fehler: ' + (err?.message || err));
+              }
+            }}
+            style={{
+              background: '#451a03',
+              color: '#fde68a',
+              border: '1px solid #b45309',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            🔓 BYPASS: MANUEL WAGNER (VERWALTUNG - {schoolData.name})
+          </button>
+
+          {/* Master Admin / Master Dashboard Bypass */}
+          <button
+            onClick={async () => {
+              try {
+                const token = import.meta.env.VITE_BYPASS_ADMIN_TOKEN || 'admin-bypass-token';
+                console.log('[Bypass] Attempting Master Admin login for school:', schoolData.name);
+                sessionStorage.removeItem('groovelab_is_master_admin');
+
+                // 1. Search for dedicated Master Admin user
+                let { data: user } = await supabase
+                  .from('users')
+                  .select('id, role, is_master_admin, school_id, first_name, last_name')
+                  .eq('is_master_admin', true)
+                  .limit(1)
+                  .maybeSingle();
+
+                if (!user) {
+                  // 2. Auto-provision dedicated Master Admin if missing
+                  console.log('[Bypass] Auto-creating Master Admin profile...');
+                  const masterId = '99999999-9999-9999-9999-999999999999';
+                  const { data: createdMaster, error: createErr } = await supabase
                     .from('users')
-                    .select('id, role, school_id')
-                    .eq('school_id', schoolData.id)
-                    .or(`qr_token.eq.${token},id.eq.${token}`)
+                    .insert({
+                      id: masterId,
+                      school_id: schoolData.id,
+                      first_name: 'Master',
+                      last_name: 'Admin',
+                      role: 'admin',
+                      roles: ['admin'],
+                      is_master_admin: true,
+                      photo_url: '/campus_login_hero.png',
+                      avatar_url: '/campus_login_hero.png',
+                      is_campus_active: true,
+                      is_groovelab_active: true,
+                      qr_token: token
+                    })
+                    .select('id, role, is_master_admin, school_id, first_name, last_name')
                     .maybeSingle();
 
-                  if (error) {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.error('[Bypass] Supabase Error:', error);
-                    alert('Datenbank-Fehler: ' + error.message);
-                    return;
+                  if (!createErr && createdMaster) {
+                    user = createdMaster;
                   }
-
-                  if (user) {
-                    console.log('[Bypass] Manuel Wagner found, logging in:', user.id);
-                    sessionStorage.setItem('groovelab_user_id', user.id);
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    onLogin(user.id, true);
-                  } else {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Manuel Wagner token for this school:', schoolData.name);
-                    alert(`Manuel Wagner ist für die Schule "${schoolData.name}" nicht registriert.`);
-                  }
-                } catch (err: any) {
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  console.error('[Bypass] Runtime Error:', err);
-                  alert('Ein Fehler ist aufgetreten: ' + err.message);
                 }
-              }}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '2px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: '24px',
-                color: '#fca5a5',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(239,68,68,0.1)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.02em',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'; }}
-            >
-              🔓 BYPASS: MANUEL WAGNER (VERWALTUNG - {schoolData.name})
-            </button>
-          )}
 
-          {/* Master Admin Bypass */}
-          {import.meta.env.VITE_BYPASS_ADMIN_TOKEN && (
-            <button
-              onClick={async () => {
-                try {
-                  const token = import.meta.env.VITE_BYPASS_ADMIN_TOKEN;
-                  console.log('[Bypass] Attempting Admin login with token:', token);
-                  // Set the token temporarily in sessionStorage so customFetch injects the x-qr-token header
-                  sessionStorage.setItem('groovelab_qr_token', token);
-
-                  const { data: user, error } = await supabase
-                    .from('users')
-                    .select('id, role')
-                    .or(`qr_token.eq.${token},id.eq.${token}`)
-                    .maybeSingle();
-
-                  if (error) {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.error('[Bypass] Supabase Error:', error);
-                    alert('Datenbank-Fehler: ' + error.message);
-                    return;
-                  }
-
-                  if (user) {
-                    console.log('[Bypass] Admin found, logging in:', user.id);
-                    sessionStorage.setItem('groovelab_user_id', user.id);
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    onLogin(user.id, true);
-                  } else {
-                    sessionStorage.removeItem('groovelab_qr_token');
-                    console.warn('[Bypass] No user found with Admin token.');
-                    alert('Admin wurde in der Datenbank nicht gefunden.');
-                  }
-                } catch (err: any) {
+                if (user) {
+                  console.log('[Bypass] Master Admin logged in:', user.id);
+                  sessionStorage.setItem('groovelab_user_id', user.id);
+                  localStorage.setItem('groovelab_user_id', user.id);
                   sessionStorage.removeItem('groovelab_qr_token');
-                  console.error('[Bypass] Runtime Error:', err);
-                  alert('Ein Fehler ist aufgetreten: ' + err.message);
+                  onLogin(user.id, true);
+                } else {
+                  alert('Kein Master-Admin-Benutzer in der Datenbank gefunden.');
                 }
-              }}
-              style={{
-                width: '100%',
-                padding: '16px',
-                background: 'rgba(254, 249, 195, 0.08)',
-                border: '2px solid rgba(253, 224, 71, 0.25)',
-                borderRadius: '24px',
-                color: '#fef9c3',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(234,179,8,0.1)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.02em',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.08)'; }}
-            >
-              🔓 BYPASS: ADMIN (MASTER ADMIN)
-            </button>
-          )}
+              } catch (err: any) {
+                sessionStorage.removeItem('groovelab_qr_token');
+                sessionStorage.removeItem('groovelab_is_master_admin');
+                console.error('[Bypass] Runtime Error:', err);
+                alert('Ein Fehler ist aufgetreten: ' + err.message);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '16px',
+              background: 'rgba(254, 249, 195, 0.08)',
+              border: '2px solid rgba(253, 224, 71, 0.25)',
+              borderRadius: '24px',
+              color: '#fef9c3',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(234,179,8,0.1)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(254, 249, 195, 0.15)'; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(244, 249, 195, 0.08)'; }}
+          >
+            🔓 BYPASS: ADMIN (MASTER ADMIN)
+          </button>
         </div>
       )}
 

@@ -108,11 +108,11 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
 
   const userRolesList = user.roles || (user.role ? [user.role] : []);
   const hasVerwaltung = userRolesList.includes('admin') || userRolesList.includes('secretary') || user.role === 'admin' || user.role === 'secretary';
-  const isTeacher = user.role === 'teacher' || userRolesList.includes('teacher');
   
-  // Teachers and Admins have modules enabled by default. Students rely strictly on active flags.
-  const hasCampus = hasVerwaltung || isTeacher || user.is_campus_active === true;
-  const hasGrooveLab = hasVerwaltung || isTeacher || user.is_groovelab_active === true;
+  // Modules depend on actual profile activation flags (is_campus_active, is_groovelab_active).
+  // Default to true for is_groovelab_active if unspecified, but respect explicit false for is_campus_active.
+  const hasCampus = user.is_campus_active === true;
+  const hasGrooveLab = user.is_groovelab_active !== false;
 
   // Real-Time Multi-Color Spectrum Stripe & Dashed Border Logic
   let spectrumGradient = 'repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 16px)'; // Gestrichelter grüner Balken bei 0 Modulen

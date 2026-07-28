@@ -2654,6 +2654,7 @@ export function AdminDashboard({
           const { data: occursData } = await supabase
             .from('schedule_occurrences')
             .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+            .eq('school_id', adminData.school_id)
             .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
 
           // Fetch room_bookings from database for the selected week
@@ -3448,11 +3449,11 @@ export function AdminDashboard({
         return;
       }
     }
-    
+
     const qrToken = crypto.randomUUID();
     const studentInstrument = newStudent.isExternalVocalist ? 'Vocals' : (newStudent.instrument || 'Gitarre');
     const studentAvatarUrl = getInstrumentAvatarUrl(studentInstrument);
-    
+
     const hasCampus = schoolObj?.has_campus_subscription !== false;
     const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
     const finalBirthDate = hasCampus ? (newStudent.birthDate ? newStudent.birthDate : null) : null;
@@ -3461,7 +3462,8 @@ export function AdminDashboard({
 
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
-      role: 'student', 
+      role: 'student',
+      roles: ['student'],
       first_name: newStudent.firstName, 
       last_name: finalLastName, 
       birth_date: finalBirthDate,
@@ -3538,6 +3540,7 @@ export function AdminDashboard({
       return {
         school_id: admin.school_id, 
         role: 'student', 
+        roles: ['student'],
         first_name: student.firstName, 
         last_name: finalLastName, 
         birth_date: null,
@@ -3726,7 +3729,7 @@ export function AdminDashboard({
              });
           }
        } else {
-         console.error("Fehler beim Verknüpfen des Songs:", bsErr);
+          console.error("Fehler beim Verknüpfen des Songs:", bsErr);
        }
     }
 
@@ -3738,14 +3741,7 @@ export function AdminDashboard({
       role: 'coach',
       instrument: 'Coach'
     };
-    const { error: coachErr } = await supabase.from('band_members').insert(coachInsertData);
-    if (coachErr && coachErr.message.includes('role')) {
-       const fallbackCoach = { ...coachInsertData };
-       delete fallbackCoach.role;
-       await supabase.from('band_members').insert(fallbackCoach);
-    } else if (coachErr) {
-       console.error("Fehler beim Hinzufügen des Coachs:", coachErr);
-    }
+    await supabase.from('band_members').insert(coachInsertData);
     
     for (const m of selectedMembers) {
        const memberInsertData: any = {
@@ -3754,14 +3750,7 @@ export function AdminDashboard({
          role: 'member',
          instrument: m.instrument
        };
-       const { error: memErr } = await supabase.from('band_members').insert(memberInsertData);
-       if (memErr && memErr.message.includes('role')) {
-          const fallbackMember = { ...memberInsertData };
-          delete fallbackMember.role;
-          await supabase.from('band_members').insert(fallbackMember);
-       } else if (memErr) {
-          console.error("Fehler beim Hinzufügen des Mitglieds:", memErr);
-       }
+       await supabase.from('band_members').insert(memberInsertData);
     }
 
     setShowAddBand(false);
@@ -3783,9 +3772,11 @@ export function AdminDashboard({
     }
 
     const isAdmOrSec = newTeacher.isAdmin;
+    const targetRole = newTeacher.isAdmin ? 'admin' : 'teacher';
     const { data, error } = await supabase.from('users').insert({
       school_id: admin.school_id, 
-      role: newTeacher.isAdmin ? 'admin' : 'teacher', 
+      role: targetRole, 
+      roles: [targetRole],
       first_name: newTeacher.firstName, 
       last_name: newTeacher.lastName, 
       instrument: newTeacher.instrument || '',
@@ -6762,7 +6753,7 @@ export function AdminDashboard({
       const targetDay = DAYS_MAP[dayIdx];
       const targetDayInt = dayIdx + 1; // 1 = Monday, 7 = Sunday
 
-      // 1. Manual bookings
+      // 1. Manual room bookings
       const manualForSlot = campusBookings.filter((b: any) => {
         if (b.roomId !== selectedRoom.id) return false;
         const bDate = parseLocalDate(b.date);
@@ -6785,42 +6776,10 @@ export function AdminDashboard({
         const em = parseInt(emStr) || 0;
         const bEndMin = eh * 60 + em;
         
-        const matchesSlot = bStartMin < slotEndMin && bEndMin > slotStartMin;
-        if (!matchesSlot) return false;
-
-        // Exclude if it falls completely within the teacher's own regular weekly schedules in this room on this day
-        const teacherSchedules = (schedules || []).filter((s: any) => {
-          const matchesTeacher = s.teacher_id === b.teacherId;
-          const matchesRoom = s.room_id === selectedRoom.id;
-          const matchesDay = s.day_of_week === targetDay || 
-                             s.day_of_week === targetDayInt || 
-                             String(s.day_of_week) === String(targetDayInt);
-          return matchesTeacher && matchesRoom && matchesDay;
-        });
-
-        let regMin = Infinity;
-        let regMax = -Infinity;
-        teacherSchedules.forEach((s: any) => {
-          const startTimeStr = s.time_slot || s.start_time;
-          if (!startTimeStr) return;
-          const [sshStr, ssmStr] = startTimeStr.split(':');
-          const ssh = parseInt(sshStr) || 0;
-          const ssm = parseInt(ssmStr) || 0;
-          const startMin = ssh * 60 + ssm;
-          const durationMin = s.duration || s.duration_minutes || 45;
-          const endMin = startMin + durationMin;
-          if (startMin < regMin) regMin = startMin;
-          if (endMin > regMax) regMax = endMin;
-        });
-
-        if (regMin !== Infinity && bStartMin >= regMin && bEndMin <= regMax) {
-          return false;
-        }
-
-        return true;
+        return bStartMin < slotEndMin && bEndMin > slotStartMin;
       });
 
-      // 1b. Database manual bookings
+      // 1b. Database manual room bookings
       const dbManualForSlot = dbRoomBookings.filter((b: any) => {
         if (b.roomId !== selectedRoom.id) return false;
         const bDate = parseLocalDate(b.date);
@@ -6843,49 +6802,7 @@ export function AdminDashboard({
         const em = parseInt(emStr) || 0;
         const bEndMin = eh * 60 + em;
         
-        const matchesSlot = bStartMin < slotEndMin && bEndMin > slotStartMin;
-        if (!matchesSlot) return false;
-
-        // Exclude manual DB room bookings that correspond to a rescheduled occurrence to avoid duplicates
-        // and let the occurrence render with proper rescheduled styling and details.
-        const hasRescheduledOcc = scheduleOccurrences.some((occ: any) => 
-          occ.date === b.date &&
-          occ.start_time.substring(0, 5) === b.startTime.substring(0, 5) &&
-          occ.teacher_id === b.teacherId &&
-          (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed')
-        );
-        if (hasRescheduledOcc) return false;
-
-        // Exclude if it falls completely within the teacher's own regular weekly schedules in this room on this day
-        const teacherSchedules = (schedules || []).filter((s: any) => {
-          const matchesTeacher = s.teacher_id === b.teacherId;
-          const matchesRoom = s.room_id === selectedRoom.id;
-          const matchesDay = s.day_of_week === targetDay || 
-                             s.day_of_week === targetDayInt || 
-                             String(s.day_of_week) === String(targetDayInt);
-          return matchesTeacher && matchesRoom && matchesDay;
-        });
-
-        let regMin = Infinity;
-        let regMax = -Infinity;
-        teacherSchedules.forEach((s: any) => {
-          const startTimeStr = s.time_slot || s.start_time;
-          if (!startTimeStr) return;
-          const [sshStr, ssmStr] = startTimeStr.split(':');
-          const ssh = parseInt(sshStr) || 0;
-          const ssm = parseInt(ssmStr) || 0;
-          const startMin = ssh * 60 + ssm;
-          const durationMin = s.duration || s.duration_minutes || 45;
-          const endMin = startMin + durationMin;
-          if (startMin < regMin) regMin = startMin;
-          if (endMin > regMax) regMax = endMin;
-        });
-
-        if (regMin !== Infinity && bStartMin >= regMin && bEndMin <= regMax) {
-          return false;
-        }
-
-        return true;
+        return bStartMin < slotEndMin && bEndMin > slotStartMin;
       });
 
       // Combine local and DB manual bookings, de-duplicating by date + room + start_time
@@ -6901,93 +6818,151 @@ export function AdminDashboard({
         }
       });
 
-      // 2. Weekly recurring schedules
-      const schedulesForSlot = mergedSchedules.filter((s: any) => {
+      // 2. Build merged Teaching Blocks ("Regulärer Unterricht") for active lessons on this day in this room
+      interface LessonSlot {
+        teacherId: string;
+        teacherName: string;
+        startMin: number;
+        endMin: number;
+      }
+      const activeLessons: LessonSlot[] = [];
+
+      // A. Regular weekly recurring schedules
+      const daySchedules = (mergedSchedules || []).filter((s: any) => {
         if (s.room_id !== selectedRoom.id) return false;
-        
-        const startTimeStr = s.time_slot || s.start_time;
-        if (!startTimeStr) return false;
-        
         const matchesDay = s.day_of_week === targetDay || 
                            s.day_of_week === targetDayInt || 
                            String(s.day_of_week) === String(targetDayInt);
-        if (!matchesDay) return false;
-
-        if (s.start_date && s.interval_weeks && s.interval_weeks > 1) {
-          const sDateParts = s.start_date.split('-');
-          const sDate = sDateParts.length === 3 
-            ? new Date(parseInt(sDateParts[0]), parseInt(sDateParts[1]) - 1, parseInt(sDateParts[2]))
-            : new Date(s.start_date);
-          sDate.setHours(0, 0, 0, 0);
-          
-          const sDayOfWeek = sDate.getDay();
-          const sDiffToMon = sDate.getDate() - (sDayOfWeek === 0 ? 6 : sDayOfWeek - 1);
-          const sMonday = new Date(sDate.setDate(sDiffToMon));
-          sMonday.setHours(0, 0, 0, 0);
-
-          const cMonday = new Date(mondayOfSelectedWeek);
-          cMonday.setHours(0, 0, 0, 0);
-
-          const msDiff = cMonday.getTime() - sMonday.getTime();
-          if (msDiff < 0) return false;
-
-          const weekDiff = Math.round(msDiff / (7 * 24 * 60 * 60 * 1000));
-          if (weekDiff % s.interval_weeks !== 0) return false;
-        }
-
-        const durationMin = s.duration || s.duration_minutes || 45;
-        
-        const slotHour = parseInt(hourStr.split(':')[0]);
-        const slotStartMin = slotHour * 60;
-        const slotEndMin = (slotHour + 1) * 60;
-
-        const [shStr, smStr] = startTimeStr.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const schedStartMin = sh * 60 + sm;
-        const schedEndMin = schedStartMin + durationMin;
-        
-        return schedStartMin < slotEndMin && schedEndMin > slotStartMin;
+        return matchesDay;
       });
 
-      // Convert schedules to booking format
-      const mappedSchedules = schedulesForSlot.map((s: any) => {
-        const isApproved = s.status === 'approved' || s.is_approved === true;
-        const startTimeStr = s.time_slot || s.start_time || '';
+      daySchedules.forEach((s: any) => {
+        const startTimeStr = s.time_slot || s.start_time;
+        if (!startTimeStr) return;
         const durationMin = s.duration || s.duration_minutes || 45;
-        
-        // Calculate end_time string
-        let endTimeStr = s.end_time || '';
-        if (startTimeStr && !endTimeStr) {
-          const [shStr, smStr] = startTimeStr.split(':');
-          const sh = parseInt(shStr) || 0;
-          const sm = parseInt(smStr) || 0;
-          const totalMin = sh * 60 + sm + durationMin;
-          const eh = Math.floor(totalMin / 60) % 24;
-          const em = totalMin % 60;
-          endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+        const [shStr, smStr] = startTimeStr.split(':');
+        const startMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
+        const endMin = startMin + durationMin;
+
+        // Check if cancelled or rescheduled away on targetDateStr
+        const occ = (scheduleOccurrences || []).find((o: any) => 
+          o.schedule_id === s.id && 
+          (o.original_date === targetDateStr || o.date === targetDateStr)
+        );
+
+        if (occ) {
+          if (['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)) {
+            return; // Cancelled lesson
+          }
+          if (occ.date !== targetDateStr) {
+            return; // Rescheduled away
+          }
         }
 
         const teacherName = s.teacher 
-          ? `${s.teacher.first_name} ${s.teacher.last_name}` 
+          ? `${s.teacher.first_name || ''} ${s.teacher.last_name || ''}`.trim()
           : (s.teacher_name || 'Lehrer');
 
-        return {
-          id: s.id,
-          roomId: s.room_id,
-          roomName: selectedRoom.name,
-          date: '', // Weekly recurring
-          startTime: startTimeStr,
-          endTime: endTimeStr,
-          purpose: s.purpose || (s.subject_name ? `Unterricht: ${s.subject_name}` : 'Unterricht'),
-          teacherId: s.teacher_id,
-          teacherName: teacherName,
-          isSchedule: true,
-          isApproved
-        };
+        activeLessons.push({
+          teacherId: s.teacher_id || 'unknown',
+          teacherName: teacherName || 'Lehrer',
+          startMin,
+          endMin
+        });
       });
 
-      // 2b. Weekly recurring blocked slots (Sperrzeiten)
+      // B. Rescheduled occurrences moved TO targetDateStr in selectedRoom
+      (scheduleOccurrences || []).forEach((occ: any) => {
+        const roomId = occ.schedules?.room_id || occ.room_id;
+        if (roomId !== selectedRoom.id) return;
+        if (occ.date !== targetDateStr) return;
+        if (['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)) return;
+
+        const startTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '';
+        if (!startTimeStr) return;
+        const [shStr, smStr] = startTimeStr.split(':');
+        const startMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
+        const durationMin = occ.duration || 45;
+        const endMin = startMin + durationMin;
+
+        const teacherName = occ.teacher 
+          ? `${occ.teacher.first_name || ''} ${occ.teacher.last_name || ''}`.trim()
+          : 'Lehrer';
+
+        activeLessons.push({
+          teacherId: occ.teacher_id || 'unknown',
+          teacherName: teacherName || 'Lehrer',
+          startMin,
+          endMin
+        });
+      });
+
+      // Group by teacher and merge contiguous/overlapping intervals
+      const teacherMap: Record<string, LessonSlot[]> = {};
+      activeLessons.forEach((item) => {
+        const key = item.teacherId !== 'unknown' ? item.teacherId : item.teacherName;
+        if (!teacherMap[key]) {
+          teacherMap[key] = [];
+        }
+        teacherMap[key].push(item);
+      });
+
+      const mergedBlocks: LessonSlot[] = [];
+      Object.keys(teacherMap).forEach((tKey) => {
+        const list = teacherMap[tKey];
+        list.sort((a, b) => a.startMin - b.startMin);
+
+        let current: LessonSlot | null = null;
+        list.forEach((item) => {
+          if (!current) {
+            current = { ...item };
+          } else {
+            if (item.startMin <= current.endMin + 5) {
+              current.endMin = Math.max(current.endMin, item.endMin);
+            } else {
+              mergedBlocks.push(current);
+              current = { ...item };
+            }
+          }
+        });
+        if (current) {
+          mergedBlocks.push(current);
+        }
+      });
+
+      // Filter merged teaching blocks that intersect with hourStr slot
+      const slotHour = parseInt(hourStr.split(':')[0]);
+      const slotStartMin = slotHour * 60;
+      const slotEndMin = (slotHour + 1) * 60;
+
+      const mappedSchedules = mergedBlocks
+        .filter(b => b.startMin < slotEndMin && b.endMin > slotStartMin)
+        .map((b, idx) => {
+          const sh = Math.floor(b.startMin / 60) % 24;
+          const sm = b.startMin % 60;
+          const eh = Math.floor(b.endMin / 60) % 24;
+          const em = b.endMin % 60;
+
+          const startTime = `${String(sh).padStart(2, '0')}:${String(sm).padStart(2, '0')}`;
+          const endTime = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+
+          return {
+            id: `teaching_block_${b.teacherId}_${dayIdx}_${b.startMin}_${idx}`,
+            roomId: selectedRoom.id,
+            roomName: selectedRoom.name,
+            date: targetDateStr,
+            startTime,
+            endTime,
+            purpose: 'Regulärer Unterricht',
+            teacherId: b.teacherId,
+            teacherName: b.teacherName,
+            isSchedule: true,
+            isScheduleBlock: true,
+            isApproved: true
+          };
+        });
+
+      // 3. Weekly recurring blocked slots (Sperrzeiten)
       const blockedSlotsForSlot = roomBlockedSlots.filter((s: any) => {
         if (s.room_id !== selectedRoom.id) return false;
         if (s.day_of_week !== targetDayInt) return false;
@@ -6996,19 +6971,11 @@ export function AdminDashboard({
         const endTimeStr = s.end_time ? s.end_time.substring(0, 5) : '';
         if (!startTimeStr || !endTimeStr) return false;
 
-        const slotHour = parseInt(hourStr.split(':')[0]);
-        const slotStartMin = slotHour * 60;
-        const slotEndMin = (slotHour + 1) * 60;
-
         const [shStr, smStr] = startTimeStr.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const bStartMin = sh * 60 + sm;
+        const bStartMin = (parseInt(shStr) || 0) * 60 + (parseInt(smStr) || 0);
 
         const [ehStr, emStr] = endTimeStr.split(':');
-        const eh = parseInt(ehStr) || 0;
-        const em = parseInt(emStr) || 0;
-        const bEndMin = eh * 60 + em;
+        const bEndMin = (parseInt(ehStr) || 0) * 60 + (parseInt(emStr) || 0);
 
         return bStartMin < slotEndMin && bEndMin > slotStartMin;
       });
@@ -7021,7 +6988,7 @@ export function AdminDashboard({
           id: s.id,
           roomId: s.room_id,
           roomName: selectedRoom.name,
-          date: '', // Weekly recurring
+          date: targetDateStr,
           startTime: startTimeStr,
           endTime: endTimeStr,
           purpose: s.reason || 'Sperrung',
@@ -7030,125 +6997,6 @@ export function AdminDashboard({
           isBlockedSlot: true,
           isSchedule: true,
           isApproved: true
-        };
-      });
-
-      // 3. Dynamic rescheduled occurrences
-      const dynamicForSlot = scheduleOccurrences.filter((occ: any) => {
-        const roomId = occ.schedules?.room_id || null;
-        if (roomId !== selectedRoom.id) return false;
-        if (occ.date !== targetDateStr) return false;
-
-        if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
-          return false;
-        }
-
-        // Exclude if there's already a manual DB room booking for this teacher's lesson at this slot to avoid duplicates
-        // But NOT if it's a reschedule, since we want to prioritize the rescheduled occurrence block.
-        const hasDbBooking = dbRoomBookings.some((b: any) => 
-          b.date === occ.date && 
-          b.startTime.substring(0, 5) === occ.start_time.substring(0, 5) &&
-          b.teacherId === occ.teacher_id
-        );
-        if (hasDbBooking && !(occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed')) return false;
-
-        const templateTime = occ.schedules?.time_slot || '';
-        const templateDay = occ.schedules?.day_of_week || 0;
-
-        const occDate = parseLocalDate(occ.date);
-        const rawDay = occDate.getUTCDay();
-        const actualDayOfWeek = rawDay === 0 ? 7 : rawDay;
-
-        const hasTimeMoved = templateTime && occ.start_time.substring(0, 5) !== templateTime.substring(0, 5);
-        const hasDayMoved = templateDay && actualDayOfWeek !== templateDay;
-        
-        const hasFallbackDateMoved = occ.original_date && occ.date !== occ.original_date;
-        const hasFallbackTimeMoved = occ.original_start_time && occ.start_time.substring(0, 5) !== occ.original_start_time.substring(0, 5);
-
-        const hasMoved = (occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed') || (
-          (occ.schedules && occ.schedules.time_slot)
-            ? (hasTimeMoved || hasDayMoved)
-            : (hasFallbackDateMoved || hasFallbackTimeMoved)
-        );
-
-        if (!hasMoved) return false;
-
-        const durationMin = occ.duration || 45;
-        const slotHour = parseInt(hourStr.split(':')[0]);
-        const slotStartMin = slotHour * 60;
-        const slotEndMin = (slotHour + 1) * 60;
-
-        const [shStr, smStr] = occ.start_time.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const occStartMin = sh * 60 + sm;
-        const occEndMin = occStartMin + durationMin;
-
-        const matchesSlot = occStartMin < slotEndMin && occEndMin > slotStartMin;
-        if (!matchesSlot) return false;
-
-        // Exclude if it falls completely within the teacher's own regular weekly schedules in this room on this day
-        const teacherSchedules = (schedules || []).filter((s: any) => {
-          const matchesTeacher = s.teacher_id === occ.teacher_id;
-          const matchesRoom = s.room_id === selectedRoom.id;
-          const matchesDay = s.day_of_week === targetDay || 
-                             s.day_of_week === targetDayInt || 
-                             String(s.day_of_week) === String(targetDayInt);
-          return matchesTeacher && matchesRoom && matchesDay;
-        });
-
-        let regMin = Infinity;
-        let regMax = -Infinity;
-        teacherSchedules.forEach((s: any) => {
-          const startTimeStr = s.time_slot || s.start_time;
-          if (!startTimeStr) return;
-          const [sshStr, ssmStr] = startTimeStr.split(':');
-          const ssh = parseInt(sshStr) || 0;
-          const ssm = parseInt(ssmStr) || 0;
-          const startMin = ssh * 60 + ssm;
-          const sDurationMin = s.duration || s.duration_minutes || 45;
-          const endMin = startMin + sDurationMin;
-          if (startMin < regMin) regMin = startMin;
-          if (endMin > regMax) regMax = endMin;
-        });
-
-        if (regMin !== Infinity && occStartMin >= regMin && occEndMin <= regMax) {
-          return false;
-        }
-
-        return true;
-      });
-
-      const mappedDynamics = dynamicForSlot.map((occ: any) => {
-        const startTimeStr = occ.start_time.substring(0, 5);
-        const durationMin = occ.duration || 45;
-
-        const [shStr, smStr] = startTimeStr.split(':');
-        const sh = parseInt(shStr) || 0;
-        const sm = parseInt(smStr) || 0;
-        const totalMin = sh * 60 + sm + durationMin;
-        const eh = Math.floor(totalMin / 60) % 24;
-        const em = totalMin % 60;
-        const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-
-        const teacherName = occ.teacher 
-          ? `${occ.teacher.first_name} ${occ.teacher.last_name}` 
-          : 'Lehrer';
-
-        return {
-          id: occ.id,
-          roomId: occ.schedules?.room_id,
-          roomName: selectedRoom.name,
-          date: occ.date,
-          startTime: startTimeStr,
-          endTime: endTimeStr,
-          purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}` : 'Unterricht',
-          teacherId: occ.teacher_id,
-          teacherName: teacherName,
-          isSchedule: true,
-          isApproved: occ.status === 'rescheduled_confirmed',
-          status: occ.status,
-          original_date: occ.original_date
         };
       });
 
@@ -7163,7 +7011,6 @@ export function AdminDashboard({
         if (previewDate >= mondayOfSelectedWeek && previewDate <= sundayOfSelectedWeek) {
           const previewDayIdx = getWeekdayIndex(bookingDate);
           if (previewDayIdx === dayIdx) {
-            const slotHour = parseInt(hourStr.split(':')[0]);
             const startHour = parseInt(bookingStartTime.split(':')[0]);
             const endHour = parseInt(bookingEndTime.split(':')[0]);
             if (slotHour >= startHour && slotHour < endHour) {
@@ -7199,45 +7046,18 @@ export function AdminDashboard({
       }
 
       if (activeHoliday) {
-        // Only keep dynamic reschedules (Nachholtermine) from outside the holidays
-        const allowedDynamics = mappedDynamics.filter((occ: any) => {
-          return occ.original_date && 
-                 occ.original_date !== occ.date && 
-                 !holidays.some((h: any) => occ.original_date >= h.start && occ.original_date <= h.end);
-        });
-        // We DO return manual room bookings (filtered for own-schedule coverage) during holidays!
-        return [...combinedManuals.filter((manual: any) => {
-          const toM = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
-          return !mappedSchedules.some((sched: any) =>
-            sched.roomId === manual.roomId &&
-            sched.teacherId === manual.teacherId &&
-            toM(manual.startTime) >= toM(sched.startTime) &&
-            toM(manual.endTime) <= toM(sched.endTime)
-          );
-        }), ...allowedDynamics, ...mappedBlockedSlots, ...draftPreviewBooking];
+        // Show schedule blocks during holidays too (dimmed) so admins/teachers can see the planned schedule
+        const holidaySchedules = mappedSchedules.map((s: any) => ({ ...s, isDuringHoliday: true }));
+        return [...combinedManuals, ...holidaySchedules, ...mappedBlockedSlots, ...draftPreviewBooking];
       }
 
-      if (dayIdx === 4 && hourStr.startsWith('16:00')) {
-        console.log("Friday 16:00 getBookingsForSlot debug:", {
-          selectedRoomId: selectedRoom.id,
-          dbRoomBookingsCount: dbRoomBookings.length,
-          dbRoomBookings: dbRoomBookings,
-          combinedManuals,
-          mappedSchedules,
-          mappedDynamics,
-        });
-      }
-
-      // Filter out manual bookings that are fully covered by the same teacher's own schedule block.
-      // If a teacher's schedule already "owns" the room for e.g. 14:00–18:45, a manual booking
-      // for 17:15–18:00 by the same teacher is redundant and must not be rendered as a separate card.
-      const toMinLocal = (t: string) => { const [h, m] = t.split(':'); return parseInt(h||'0')*60+parseInt(m||'0'); };
+      // Filter out manual bookings that are fully covered by a teacher's own schedule block
+      const toMinLocal = (t: string) => { const [h, m] = t.split(':'); return (parseInt(h||'0'))*60+(parseInt(m||'0')); };
 
       const filteredManuals = combinedManuals.filter((manual: any) => {
         const manualStart = toMinLocal(manual.startTime);
         const manualEnd   = toMinLocal(manual.endTime);
 
-        // Check if this manual booking is fully covered by any of the teacher's own schedule slots
         const coveredByOwnSchedule = mappedSchedules.some((sched: any) => {
           if (sched.roomId !== manual.roomId) return false;
           const isOwnTeacher = sched.teacherId === manual.teacherId;
@@ -7250,7 +7070,7 @@ export function AdminDashboard({
         return !coveredByOwnSchedule;
       });
 
-      return [...filteredManuals, ...mappedSchedules, ...mappedBlockedSlots, ...mappedDynamics, ...draftPreviewBooking];
+      return [...filteredManuals, ...mappedSchedules, ...mappedBlockedSlots, ...draftPreviewBooking];
     };
 
     // Check if room is occupied during selected time slot
@@ -8905,43 +8725,22 @@ export function AdminDashboard({
                                   const colWidth = 100;
                                   const colLeft = 0;
                                   const isSchedule = b.isSchedule;
-                                  const isOwnSchedule = isSchedule && isOwnBooking;
-                                  const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
-                                  const hasConflict = isRescheduled && slotBookings.length > 1;
-                                  const isPending = b.status === 'pending';
-                                  const isUnapprovedSchedule = isSchedule && !b.isApproved;
-                                  
+
                                   // Apple Calendar Color Schemes
-                                  let bg = 'rgba(142, 142, 147, 0.12)';
-                                  let textColor = '#48484a';
-                                  let leftAccentColor = '#8e8e93';
+                                  let bg = 'rgba(175, 82, 222, 0.08)';
+                                  let textColor = '#6d28d9';
+                                  let leftAccentColor = '#af52de';
 
                                   if (b.isPreview) {
                                     bg = 'rgba(0, 122, 255, 0.04)';
                                     textColor = '#007aff';
                                     leftAccentColor = '#007aff';
-                                  } else if (isRescheduled) {
-                                    if (isOwnBooking) {
-                                      bg = 'rgba(175, 82, 222, 0.12)';
-                                      textColor = '#6d28d9';
-                                      leftAccentColor = '#af52de';
-                                    } else {
-                                      bg = 'rgba(255, 149, 0, 0.12)';
-                                      textColor = '#b25e00';
-                                      leftAccentColor = '#ff9500';
-                                    }
                                   } else if (isSchedule) {
-                                    if (b.isApproved) {
-                                      bg = 'rgba(52, 168, 83, 0.12)';
-                                      textColor = '#1e7a44';
-                                      leftAccentColor = '#34c759';
-                                    } else {
-                                      bg = 'rgba(52, 168, 83, 0.12)';
-                                      textColor = '#1e7a44';
-                                      leftAccentColor = '#34c759';
-                                    }
+                                    bg = 'rgba(52, 168, 83, 0.08)';
+                                    textColor = '#1e7a44';
+                                    leftAccentColor = '#34a853';
                                   } else {
-                                    bg = 'rgba(175, 82, 222, 0.12)';
+                                    bg = 'rgba(175, 82, 222, 0.08)';
                                     textColor = '#6d28d9';
                                     leftAccentColor = '#af52de';
                                   }
@@ -8992,61 +8791,52 @@ export function AdminDashboard({
                                       onDragEnd={() => {
                                         setDragOverCell(null);
                                       }}
-                                      title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
+                                      title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : b.isDuringHoliday ? `${b.purpose} (${b.startTime} - ${b.endTime}) – Ferienzeit` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
                                       style={{
                                         background: b.isPreview 
                                           ? '#f0f9ff' 
-                                          : (isExternal
-                                            ? '#fef2f2'
-                                            : (isUnapprovedSchedule
-                                              ? `repeating-linear-gradient(-45deg, rgba(52, 168, 83, 0.18) 0px, rgba(52, 168, 83, 0.18) 8px, #ffffff 8px, #ffffff 16px)`
-                                              : (isPending 
-                                                ? `repeating-linear-gradient(-45deg, rgba(175, 82, 222, 0.14) 0px, rgba(175, 82, 222, 0.14) 8px, #ffffff 8px, #ffffff 16px)`
-                                                : (isOwnSchedule && !b.isPreview ? leftAccentColor : bg)))),
+                                          : b.isDuringHoliday
+                                            ? 'repeating-linear-gradient(45deg, #f0fdf4, #f0fdf4 4px, #dcfce7 4px, #dcfce7 8px)'
+                                            : (isExternal
+                                              ? '#fef2f2'
+                                              : bg),
                                         border: b.isPreview 
                                           ? '2.2px dashed #0284c7' 
-                                          : (isExternal
-                                            ? '1.5px dashed #ef4444'
-                                            : (isUnapprovedSchedule
-                                              ? `1.5px solid ${leftAccentColor}50`
-                                              : (isPending 
-                                                ? `1.5px dashed ${leftAccentColor}` 
-                                                : `1px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? 'rgba(255, 255, 255, 0.15)' : leftAccentColor + '25')}`))),
+                                          : b.isDuringHoliday
+                                            ? '1.5px dashed #34a85370'
+                                            : (isExternal
+                                              ? '1.5px dashed #ef4444'
+                                              : `1px solid ${leftAccentColor}30`),
                                         borderLeft: b.isPreview 
                                           ? '2.2px dashed #0284c7' 
-                                          : (isExternal
-                                            ? '3.5px dashed #ef4444'
-                                            : (isUnapprovedSchedule
-                                              ? `3px solid ${leftAccentColor}`
-                                              : (isPending 
-                                                ? `3.5px dashed ${leftAccentColor}` 
-                                                : `3px solid ${hasConflict ? '#ff9500' : (isOwnSchedule ? brandColor : leftAccentColor)}`))),
-                                        borderRadius: '8px',
-                                        padding: '6px 8px',
-                                        fontSize: '0.70rem',
+                                          : b.isDuringHoliday
+                                            ? '3.5px dashed #34a85370'
+                                            : (isExternal
+                                              ? '3.5px dashed #ef4444'
+                                              : `3.5px solid ${leftAccentColor}`),
+                                        borderRadius: '10px',
+                                        padding: '8px 10px',
+                                        fontSize: '0.72rem',
                                         fontWeight: 800,
-                                        color: b.isPreview 
-                                          ? '#0369a1' 
-                                          : (isExternal
-                                            ? '#b91c1c'
-                                            : (isOwnSchedule && !b.isPreview && !isUnapprovedSchedule ? '#ffffff' : textColor)),
+                                        color: b.isDuringHoliday ? '#34a853aa' : textColor,
+                                        opacity: b.isDuringHoliday ? 0.7 : 1,
                                         position: 'absolute',
-                                        top: `calc(${(sm / 60) * 100}% + 4px)`,
+                                        top: `calc(${(sm / 60) * 100}% + 2px)`,
                                         left: `calc(${colLeft}% + 4px)`,
                                         width: `calc(${colWidth}% - 8px)`,
-                                        height: `calc(${durationHrs * 100}% - 8px)`,
+                                        height: `calc(${durationHrs * 100}% - 4px)`,
                                         zIndex: 5,
                                         display: 'flex',
                                         flexDirection: 'column',
                                         justifyContent: 'flex-start',
-                                        boxShadow: b.isPreview ? 'none' : '0 1px 3px rgba(0,0,0,0.02)',
+                                        boxShadow: (b.isPreview || b.isDuringHoliday) ? 'none' : '0 2px 8px rgba(0,0,0,0.03)',
                                         overflow: 'hidden',
                                         cursor: b.isPreview ? 'default' : (isOwnBooking ? 'grab' : 'pointer')
                                       }}
                                     >
                                       
                                       {/* Delete Button for Own Bookings */}
-                                      {canDelete && !b.isPreview && (
+                                      {canDelete && !b.isPreview && !isSchedule && (
                                         <button
                                           onClick={async (e) => {
                                             e.stopPropagation();
@@ -9056,11 +8846,11 @@ export function AdminDashboard({
                                             position: 'absolute',
                                             top: '4px',
                                             right: '4px',
-                                            width: '16px',
-                                            height: '16px',
+                                            width: '18px',
+                                            height: '18px',
                                             borderRadius: '6px',
-                                            background: isOwnSchedule && !b.isPreview ? 'rgba(255,255,255,0.2)' : 'rgba(255, 59, 48, 0.1)',
-                                            color: isOwnSchedule && !b.isPreview ? '#ffffff' : '#ff3b30',
+                                            background: 'rgba(255, 59, 48, 0.1)',
+                                            color: '#ff3b30',
                                             border: 'none',
                                             display: 'flex',
                                             alignItems: 'center',
@@ -9075,12 +8865,12 @@ export function AdminDashboard({
                                             e.currentTarget.style.color = '#ffffff';
                                           }}
                                           onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = isOwnSchedule && !b.isPreview ? 'rgba(255,255,255,0.2)' : 'rgba(255, 59, 48, 0.1)';
-                                            e.currentTarget.style.color = isOwnSchedule && !b.isPreview ? '#ffffff' : '#ff3b30';
+                                            e.currentTarget.style.background = 'rgba(255, 59, 48, 0.1)';
+                                            e.currentTarget.style.color = '#ff3b30';
                                           }}
                                           title="Buchung stornieren/löschen"
                                         >
-                                          <X size={10} strokeWidth={3} />
+                                          <X size={12} strokeWidth={3} />
                                         </button>
                                       )}
 
@@ -9095,8 +8885,8 @@ export function AdminDashboard({
                                             position: 'absolute',
                                             top: '4px',
                                             right: '4px',
-                                            width: '16px',
-                                            height: '16px',
+                                            width: '18px',
+                                            height: '18px',
                                             borderRadius: '6px',
                                             background: 'rgba(2, 132, 199, 0.12)',
                                             color: '#0284c7',
@@ -9119,7 +8909,7 @@ export function AdminDashboard({
                                           }}
                                           title="Vorschau schließen"
                                         >
-                                          <X size={10} strokeWidth={3} />
+                                          <X size={12} strokeWidth={3} />
                                         </button>
                                       )}
 
@@ -9159,40 +8949,6 @@ export function AdminDashboard({
                                         </>
                                       )}
 
-                                      {isRescheduled && !isOwnBooking && (
-                                        <div style={{
-                                          position: 'absolute',
-                                          right: '8px',
-                                          top: '50%',
-                                          transform: 'translateY(-50%)',
-                                          fontSize: '1.3rem',
-                                          fontWeight: 950,
-                                          opacity: 0.25,
-                                          userSelect: 'none',
-                                          pointerEvents: 'none',
-                                          fontFamily: 'Urbanist, sans-serif'
-                                        }}>
-                                          R
-                                        </div>
-                                      )}
-
-                                      {isSchedule && !isRescheduled && (
-                                        <div style={{
-                                          position: 'absolute',
-                                          bottom: '4px',
-                                          left: '50%',
-                                          transform: 'translateX(-50%)',
-                                          opacity: 0.35,
-                                          pointerEvents: 'none',
-                                          userSelect: 'none',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center'
-                                        }}>
-                                          <Lock size={11} />
-                                        </div>
-                                      )}
-
                                       {isExternal ? (
                                         <>
                                           {/* Time range with School icon */}
@@ -9212,101 +8968,34 @@ export function AdminDashboard({
                                           <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 900, fontSize: '0.72rem' }}>
                                             {b.purpose ? b.purpose.replace(/^\[EXTERN\]\s*/, '') : (b.reason || 'Sperrzeit')}
                                           </div>
-                                          
-                                          {/* Recurring note or detail */}
-                                          {b.isBlockedSlot && b.reason && (
-                                            <div style={{ fontSize: '0.62rem', opacity: 0.8, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                              {b.reason}
-                                            </div>
-                                          )}
                                         </>
-                                      ) : isOwnSchedule && !b.isPreview ? (
+                                      ) : isSchedule ? (
                                         <>
-                                          <div style={{
-                                            background: '#ffffff',
-                                            color: '#000000',
-                                            padding: '6px 8px',
-                                            margin: '-6px -8px 0 -8px',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '2px'
-                                          }}>
-                                            {/* Time range */}
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', fontWeight: 800 }}>
-                                              <span style={{ display: 'flex', alignItems: 'center' }}>
-                                                <GraduationCap size={10} style={{ marginRight: '3px' }} />
-                                                {b.startTime} - {b.endTime}
-                                              </span>
-                                            </div>
-                                            {/* Teacher Name */}
-                                            {durationHrs >= 0.75 && (
-                                              <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
-                                                {b.teacherName === 'Schule' ? <strong style={{ fontWeight: 900 }}>Schule</strong> : b.teacherName}
-                                              </div>
-                                            )}
+                                          {/* Time range with GraduationCap icon */}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', marginBottom: '3px', fontWeight: 800, color: leftAccentColor }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                              <GraduationCap size={13} strokeWidth={2.2} />
+                                              {b.startTime} - {b.endTime}
+                                            </span>
                                           </div>
-                                          {/* Purpose */}
-                                          {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
-                                            <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                              {b.isPreview ? 'Vorschau' : b.purpose}
-                                            </div>
-                                          )}
+                                          {/* Teacher Name */}
+                                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 900, fontSize: '0.78rem', color: '#1c1c1e', letterSpacing: '-0.01em', marginTop: '1px' }}>
+                                            {b.teacherName}
+                                          </div>
+                                          {/* Subtitle: Regulärer Unterricht or Ferienzeit hint */}
+                                          <div style={{ fontSize: '0.64rem', fontWeight: 700, opacity: 0.85, marginTop: '2px', color: b.isDuringHoliday ? '#34a853' : textColor }}>
+                                            {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
+                                          </div>
                                         </>
                                       ) : (
                                         <>
-                                          {/* Time range */}
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.64rem', marginBottom: '4px', fontWeight: 800 }}>
-                                            <span style={{ display: 'flex', alignItems: 'center' }}>
-                                              {isSchedule && <GraduationCap size={10} style={{ marginRight: '3px' }} />}
+                                          {/* Time range with User icon */}
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', marginBottom: '3px', fontWeight: 800, color: leftAccentColor }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                              <User size={13} strokeWidth={2.2} />
                                               {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
                                             </span>
                                           </div>
-
-                                          {/* Conflict badge */}
-                                          {hasConflict && (
-                                            <div style={{
-                                              fontSize: '0.58rem',
-                                              fontWeight: 900,
-                                              textTransform: 'uppercase',
-                                              color: '#ff9500',
-                                              background: 'rgba(255, 149, 0, 0.12)',
-                                              border: '1px solid rgba(255, 149, 0, 0.25)',
-                                              padding: '1px 3px',
-                                              borderRadius: '3px',
-                                              width: 'fit-content'
-                                            }}>
-                                              ⚠️ Doppelbelegung
-                                            </div>
-                                          )}
-
-                                          {/* Pending/Vorläufig badge */}
-                                          {isPending && (
-                                            <div style={{
-                                              fontSize: '0.58rem',
-                                              fontWeight: 900,
-                                              textTransform: 'uppercase',
-                                              color: '#c2410c',
-                                              background: '#fff7ed',
-                                              border: '1.5px dashed #ea580c',
-                                              padding: '1px 3px',
-                                              borderRadius: '4px',
-                                              width: 'fit-content',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '2px',
-                                              marginTop: '2px',
-                                              marginBottom: '2px'
-                                            }}>
-                                              ⏳ Vorläufig
-                                            </div>
-                                          )}
-
-                                          {/* Teacher Name */}
-                                          {durationHrs >= 0.75 && (
-                                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 700 }}>
-                                              {b.teacherName === 'Schule' ? <strong style={{ fontWeight: 900 }}>Schule</strong> : b.teacherName}
-                                            </div>
-                                          )}
 
                                           {/* Purpose */}
                                           {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
@@ -10280,7 +9969,9 @@ export function AdminDashboard({
         </div>
       </div>
     );
-  };  const renderGroovelabRoomsTab = () => {
+  };
+
+  const renderGroovelabRoomsTab = () => {
     const groovelabBrandColor = '#eab308';
     
     return (

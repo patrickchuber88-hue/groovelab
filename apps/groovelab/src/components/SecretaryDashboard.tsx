@@ -795,6 +795,8 @@ function TeacherCard({
 interface SecretaryDashboardProps {
   schoolId: string;
   userId?: string;
+  userRole?: string;
+  userRoles?: string[];
   onLogout?: () => void;
   onRoleSwitched?: (newRole: string) => void;
   activePlatform?: string;
@@ -1124,7 +1126,7 @@ const parseRoomName = (name: string) => {
   };
 };
 
-export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched, activePlatform }: SecretaryDashboardProps) {
+export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLogout, onRoleSwitched, activePlatform }: SecretaryDashboardProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
   const tourSteps: TourStep[] = useMemo(() => {
@@ -2318,6 +2320,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
   const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ roomId: string | null; day: number | null }>({ roomId: null, day: null });
+  const [isSavingApproval, setIsSavingApproval] = useState<boolean>(false);
+  const [approvalToast, setApprovalToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showUnassignedWarning, setShowUnassignedWarning] = useState<boolean>(false);
+  const approvalDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   // Dynamic centering auto-scroll when dragging schedule blocks (high performance requestAnimationFrame)
   useEffect(() => {
@@ -3169,7 +3176,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           .eq('school_id', schoolId),
         supabase
           .from('pending_students_decrypted')
-          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth'),
+          .select('id, school_id, teacher_id, instrument, status, created_at, first_name, last_name, day_of_birth')
+          .eq('school_id', schoolId),
         supabase
           .from('activation_days')
           .select('student_id, day_of_birth'),
@@ -3332,7 +3340,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         setPendingUserQuota(schoolData.pending_user_quota);
       }
 
-      const { data: allUsers, error: usersErr } = usersResult;
+      const allUsers: any[] = usersResult.data || [];
+      const usersErr = usersResult.error;
       if (usersErr) throw usersErr;
 
       // Fetch contract statuses for all students
@@ -3722,9 +3731,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       // Group schedules by teacher_id and day_of_week to build matrixAllocations
       const teacherDays: Record<string, any[]> = {};
       const unsubmittedTeachersMap: Record<string, boolean> = {};
+
+      (allSchedulesData || []).forEach(s => {
+        if (s.status === 'rejected') return;
+        const key = `${s.teacher_id}_${s.day_of_week}`;
+        if (!teacherDays[key]) teacherDays[key] = [];
+        teacherDays[key].push(s);
+      });
+
+      // Dual-Source Failsafe: Fallback to u.planned_boards / campus_räume / groovelab_räume if schedules table has no entries for teacher
       (allUsers || []).forEach(u => {
-        if (u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary') {
-          const rawPlanned = u.planned_boards;
+        if (u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary' || (u.roles && u.roles.some((r: string) => ['teacher', 'admin', 'secretary'].includes(r)))) {
+          const rawPlanned = u.planned_boards || (u as any).campus_räume || (u as any).groovelab_räume;
           let loadedDrafts: any[] = [];
           let loadedSubmittedDraftId = '';
           if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
@@ -3732,24 +3750,46 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
             loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
           } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
             loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: rawPlanned }];
+          } else if (rawPlanned && typeof rawPlanned === 'object' && Array.isArray((rawPlanned as any).boards)) {
+            loadedDrafts = [{ id: 'default', name: 'Standard-Entwurf', boards: (rawPlanned as any).boards }];
           }
           
-          const hasSchedulesInDb = (allSchedulesData || []).some(s => s.teacher_id === u.id && (s.status === 'approved' || s.status === 'ready_for_admin_review'));
-          const isSubmitted = loadedSubmittedDraftId !== '' || hasSchedulesInDb;
+          const hasSchedulesInDb = (allSchedulesData || []).some(s => s.teacher_id === u.id && s.status !== 'rejected');
+          const isSubmitted = loadedSubmittedDraftId !== '' || hasSchedulesInDb || (loadedDrafts.length > 0);
           
           if (!isSubmitted) {
             unsubmittedTeachersMap[u.id] = true;
           }
+
+          // Extract boards from planned_boards if DB schedules are missing for this teacher
+          if (loadedDrafts.length > 0) {
+            const targetDraft = (loadedSubmittedDraftId && loadedDrafts.find(d => d.id === loadedSubmittedDraftId)) || loadedDrafts[0];
+            if (targetDraft && Array.isArray(targetDraft.boards)) {
+              targetDraft.boards.forEach((b: any) => {
+                if (b.dayOfWeek && b.students && b.students.length > 0) {
+                  const key = `${u.id}_${b.dayOfWeek}`;
+                  if (!teacherDays[key] || teacherDays[key].length === 0) {
+                    teacherDays[key] = b.students.map((st: any) => ({
+                      id: `fallback_${u.id}_${st.id}`,
+                      school_id: schoolId,
+                      teacher_id: u.id,
+                      student_id: st.isBreak ? null : st.id,
+                      day_of_week: b.dayOfWeek,
+                      time_slot: st.assignedTime || b.startAnchor || '14:00',
+                      room_id: b.roomId || null,
+                      duration: st.duration || 30,
+                      status: 'ready_for_admin_review',
+                      instrument: st.instrument || 'Musiker',
+                      student_name: st.isBreak ? 'Pause' : `${st.first_name || ''} ${st.last_name || ''}`.trim() || 'Schüler'
+                    }));
+                  }
+                }
+              });
+            }
+          }
         }
       });
       setUnsubmittedTeachers(unsubmittedTeachersMap);
-
-      (allSchedulesData || []).forEach(s => {
-        if (s.status !== 'approved' && s.status !== 'ready_for_admin_review') return;
-        const key = `${s.teacher_id}_${s.day_of_week}`;
-        if (!teacherDays[key]) teacherDays[key] = [];
-        teacherDays[key].push(s);
-      });
 
       const draftMap = (() => {
         try {
@@ -3758,58 +3798,54 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       })();
 
       const initialAllocations = Object.entries(teacherDays)
-        .filter(([key]) => {
-          const [teacherId] = key.split('_');
-          return !unsubmittedTeachersMap[teacherId];
-        })
         .map(([key, slots]) => {
           const [teacherId, dayOfWeekStr] = key.split('_');
-        const dayOfWeek = parseInt(dayOfWeekStr);
+          const dayOfWeek = parseInt(dayOfWeekStr);
 
-        const sortedSlots = [...slots]
-          .map(s => ({
-            ...s,
-            student_name: s.student_id ? map[s.student_id] || 'Unbekannter Schüler' : 'Pause',
-            student_instrument: s.student_id ? userInstrumentMap[s.student_id] || '' : ''
-          }))
-          .sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
-        const startTime = sortedSlots[0]?.time_slot || '14:00';
-        
-        const addMins = (t: string, m: number) => {
-          const [hStr, mStr] = t.split(':');
-          let h = parseInt(hStr) || 0;
-          let mVal = parseInt(mStr) || 0;
-          mVal += m;
-          h += Math.floor(mVal / 60);
-          mVal = mVal % 60;
-          h = h % 24;
-          return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
-        };
+          const sortedSlots = [...slots]
+            .map(s => ({
+              ...s,
+              student_name: s.student_name || (s.student_id ? map[s.student_id] || 'Unbekannter Schüler' : 'Pause'),
+              student_instrument: s.student_id ? userInstrumentMap[s.student_id] || s.instrument || '' : ''
+            }))
+            .sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
+          const startTime = sortedSlots[0]?.time_slot || '14:00';
+          
+          const addMins = (t: string, m: number) => {
+            const [hStr, mStr] = t.split(':');
+            let h = parseInt(hStr) || 0;
+            let mVal = parseInt(mStr) || 0;
+            mVal += m;
+            h += Math.floor(mVal / 60);
+            mVal = mVal % 60;
+            h = h % 24;
+            return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
+          };
 
-        const lastSlot = sortedSlots[sortedSlots.length - 1];
-        const endTime = lastSlot ? addMins(lastSlot.time_slot, lastSlot.duration || 45) : '15:00';
+          const lastSlot = sortedSlots[sortedSlots.length - 1];
+          const endTime = lastSlot ? addMins(lastSlot.time_slot, lastSlot.duration || 45) : '15:00';
 
-        const isPending = sortedSlots.some(s => s.status === 'ready_for_admin_review');
-        const dbRoomId = sortedSlots.find(s => s.room_id)?.room_id || null;
-        const roomId = draftMap[key] !== undefined ? draftMap[key] : dbRoomId;
+          const isPending = sortedSlots.some(s => s.status === 'ready_for_admin_review');
+          const dbRoomId = sortedSlots.find(s => s.room_id)?.room_id || null;
+          const roomId = draftMap[key] !== undefined ? draftMap[key] : dbRoomId;
 
-        const teacherProfile = campusTeachersList.find(t => t.id === teacherId);
-        const teacherName = map[teacherId] || 'Unbekannte Lehrkraft';
-        const instrument = userInstrumentMap[teacherId] || teacherProfile?.instrument || 'Gitarre';
+          const teacherProfile = campusTeachersList.find(t => t.id === teacherId);
+          const teacherName = map[teacherId] || (teacherProfile ? `${teacherProfile.firstName} ${teacherProfile.lastName}` : 'Unbekannte Lehrkraft');
+          const instrument = userInstrumentMap[teacherId] || teacherProfile?.instrument || 'Gitarre';
 
-        return {
-          id: key,
-          teacherId,
-          teacherName,
-          instrument,
-          dayOfWeek,
-          startTime,
-          endTime,
-          roomId,
-          status: isPending ? 'pending' : 'approved',
-          slots: sortedSlots
-        };
-      });
+          return {
+            id: key,
+            teacherId,
+            teacherName,
+            instrument,
+            dayOfWeek,
+            startTime,
+            endTime,
+            roomId: roomId || null,
+            status: isPending ? 'pending' : 'approved',
+            slots: sortedSlots
+          };
+        });
 
       // Generate GrooveLab opening hours blocks as virtual plans for the groovelab teacher
       const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -4433,6 +4469,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       const { data: schedules, error: schedError } = await supabase
         .from('schedules')
         .select('*')
+        .eq('school_id', schoolId)
         .eq('teacher_id', teacherId);
 
       if (schedError) throw schedError;
@@ -4441,6 +4478,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       const { data: occurrences } = await supabase
         .from('schedule_occurrences')
         .select('*')
+        .eq('school_id', schoolId)
         .eq('teacher_id', teacherId);
 
       const now = new Date();
@@ -5092,6 +5130,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         .insert({
           school_id: schoolId,
           role: 'teacher',
+          roles: ['teacher'],
           first_name: newTeacherFirstName.trim(),
           last_name: newTeacherLastName.trim(),
           email: newTeacherEmail.trim() || null,
@@ -5099,10 +5138,10 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           max_students: newTeacherLimit,
           ausweis_nummer: pin,
           teacher_qr_token: qrToken,
-          is_active: false,
-          is_app_user: false,
-          is_campus_active: false,
-          is_groovelab_active: false,
+          is_active: true,
+          is_app_user: true,
+          is_campus_active: true,
+          is_groovelab_active: true,
           contract_ends_at: newTeacherContractEndsAt || null
         });
 
@@ -5134,6 +5173,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         .insert({
           school_id: schoolId,
           role: 'teacher',
+          roles: ['teacher'],
           first_name: newTeacherFirstName.trim(),
           last_name: newTeacherLastName.trim(),
           email: newTeacherEmail.trim() || null,
@@ -5176,6 +5216,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         .insert({
           school_id: schoolId,
           role: coachRole,
+          roles: [coachRole],
           first_name: coachFirstName,
           last_name: coachLastName,
           email: coachEmail,
@@ -5215,10 +5256,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
         .insert({
           school_id: schoolId,
           role: selectedRole,
+          roles: [selectedRole],
           first_name: employeeFirstName,
           last_name: employeeLastName,
           nickname: null,
           email: null,
+          photo_url: '/campus_login_hero.png',
           is_active: true,
           is_app_user: true,
           ausweis_nummer: pin,
@@ -5272,10 +5315,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
           .insert({
             school_id: schoolId,
             role: role,
+            roles: [role],
             first_name: firstName,
             last_name: lastName,
             email: email,
             nickname: nickname,
+            photo_url: '/campus_login_hero.png',
             ausweis_nummer: pin,
             teacher_qr_token: qrToken,
             is_active: true,
@@ -5442,8 +5487,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
   const handleCreateStudentGroovelab = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudentFirstName || !newStudentLastName || (hasCampusSub && !newStudentBirthDate)) {
-      alert(hasCampusSub ? 'Bitte Vorname, Nachname und Geburtsdatum ausfüllen.' : 'Bitte Vorname und Nachname ausfüllen.');
+    if (!newStudentFirstName || !newStudentLastName) {
+      alert('Bitte Vorname und Nachname ausfüllen.');
       return;
     }
 
@@ -5465,10 +5510,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
       if (insertError) throw insertError;
 
-      // 2. Set is_groovelab_active = true and is_campus_active = false for the newly created student profile
+      // 2. Set is_groovelab_active = true for the newly created student profile
+      // Note: is_groovelab_active / is_campus_active are on users_raw (via users view), not on students
       if (newStudentId) {
         await supabase
-          .from('students')
+          .from('users')
           .update({ is_groovelab_active: true, is_campus_active: false })
           .eq('id', newStudentId);
       }
@@ -10469,100 +10515,255 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
   };
 
   // Bulk save and approve to database
-  const handleSaveAndApproveAll = async () => {
+  const handleSaveAndApproveAll = async (skipUnassignedWarning = false) => {
+    // Check for unassigned plans and show warning modal if needed
+    const unassignedPlans = matrixAllocations.filter(p => !p.roomId);
+    if (!skipUnassignedWarning && unassignedPlans.length > 0) {
+      setShowUnassignedWarning(true);
+      return;
+    }
+
+    setIsSavingApproval(true);
     try {
-      const promises = [];
-      for (const plan of matrixAllocations) {
-        const slotIds = plan.slots.map((s: any) => s.id);
-        if (slotIds.length === 0) continue;
+      const isUUID = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const dayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
-        const promise = supabase
-          .from('schedules')
-          .update({
-            room_id: plan.roomId || null,
-            status: 'approved'
-          })
-          .in('id', slotIds);
+      // Only process plans that have a room assigned
+      const assignedPlans = matrixAllocations.filter(p => p.roomId);
 
-        promises.push(promise);
-      }
-
-      await Promise.all(promises);
-
-      // Synchronize assigned room IDs into each teacher's planned_boards / campus_räume / groovelab_räume
-      const teacherRoomMap: Record<string, Record<number, string | null>> = {};
-      matrixAllocations.forEach((p: any) => {
-        if (p.teacherId && p.teacherId !== 'groovelab') {
-          if (!teacherRoomMap[p.teacherId]) teacherRoomMap[p.teacherId] = {};
-          teacherRoomMap[p.teacherId][p.dayOfWeek] = p.roomId || null;
-        }
+      // Map to store assigned roomId for each teacher_day key (includes all for localStorage)
+      const approvedDraftMap: Record<string, string | null> = {};
+      matrixAllocations.forEach(p => {
+        if (p) approvedDraftMap[`${p.teacherId}_${p.dayOfWeek}`] = p.roomId || null;
       });
 
-      const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
-      for (const [tId, roomMap] of Object.entries(teacherRoomMap)) {
-        const teacherUser = allTeachersList.find((u: any) => u.id === tId);
-        const rawPlanned = teacherUser?.planned_boards;
-        if (rawPlanned && typeof rawPlanned === 'object' && (rawPlanned as any).drafts) {
-          const updatedDrafts = (rawPlanned as any).drafts.map((d: any) => ({
-            ...d,
-            boards: (d.boards || []).map((b: any) => ({
-              ...b,
-              roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : b.roomId
-            }))
-          }));
-          const updatedPlanned = {
-            ...(rawPlanned as any),
-            drafts: updatedDrafts
-          };
-          await supabase
-            .from('users')
-            .update({
-              planned_boards: updatedPlanned,
-              campus_räume: updatedPlanned,
-              groovelab_räume: updatedPlanned
-            })
-            .eq('id', tId);
+      // ─── Prepare all DB writes ─────────────────────────────────────────────
+
+      const scheduleUpdatePromises: any[] = [];
+      const slotsToInsert: any[] = [];
+      const teacherRoomMap: Record<string, Record<number, string | null>> = {};
+
+      for (const plan of assignedPlans) {
+        if (!plan) continue;
+        const targetRoomId = plan.roomId;
+
+        if (plan.teacherId && plan.teacherId !== 'groovelab') {
+          // Batch: update existing schedules
+          scheduleUpdatePromises.push(
+            supabase
+              .from('schedules')
+              .update({ room_id: targetRoomId, status: 'approved' })
+              .eq('school_id', schoolId)
+              .eq('teacher_id', plan.teacherId)
+              .eq('day_of_week', plan.dayOfWeek)
+          );
+
+          // Collect synthetic/missing slots for single bulk insert
+          if (plan.slots && plan.slots.length > 0) {
+            for (const slot of plan.slots) {
+              if (!isUUID(slot.id)) {
+                slotsToInsert.push({
+                  school_id: schoolId,
+                  teacher_id: plan.teacherId,
+                  student_id: slot.student_id || null,
+                  day_of_week: plan.dayOfWeek,
+                  time_slot: slot.time_slot || slot.startTime || '14:00',
+                  room_id: targetRoomId,
+                  duration: slot.duration || 30,
+                  status: 'approved',
+                  instrument: slot.instrument || plan.instrument || 'Musiker'
+                });
+              }
+            }
+          }
+
+          // Build teacherRoomMap for user.planned_boards update
+          if (!teacherRoomMap[plan.teacherId]) teacherRoomMap[plan.teacherId] = {};
+          teacherRoomMap[plan.teacherId][plan.dayOfWeek] = plan.roomId || null;
         }
       }
 
-      // Also save the virtual groovelab room assignments inside the school's opening_hours JSON
+      // ─── WAVE 1: Core DB writes (fully parallel) ───────────────────────────
+      // Run schedule updates, slot insert, teacher users fetch all at once
+
       const groovelabRoomsMap: Record<number, string | null> = {};
-      matrixAllocations.forEach((p: any) => {
-        if (p.teacherId === 'groovelab') {
-          groovelabRoomsMap[p.dayOfWeek] = p.roomId;
-        }
+      assignedPlans.forEach((p: any) => {
+        if (p.teacherId === 'groovelab') groovelabRoomsMap[p.dayOfWeek] = p.roomId || null;
       });
 
       const updatedOpHours = { ...openingHours };
       const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-      let changed = false;
+      let opHoursChanged = false;
       for (let d = 1; d <= 7; d++) {
         const dayKey = dayKeys[d];
         if (updatedOpHours[dayKey] && groovelabRoomsMap[d] !== undefined) {
-          updatedOpHours[dayKey] = {
-            ...updatedOpHours[dayKey],
-            roomId: groovelabRoomsMap[d]
-          };
-          changed = true;
+          updatedOpHours[dayKey] = { ...updatedOpHours[dayKey], roomId: groovelabRoomsMap[d] };
+          opHoursChanged = true;
         }
       }
 
-      if (changed) {
-        const { error: opHoursError } = await supabase
-          .from('schools')
-          .update({ opening_hours: updatedOpHours })
-          .eq('id', schoolId);
-        if (opHoursError) throw opHoursError;
+      const [, , teacherUsersResult] = await Promise.all([
+        // 1. All schedule status/room updates
+        Promise.all(scheduleUpdatePromises),
+        // 2. Single bulk insert for synthetic slots
+        slotsToInsert.length > 0
+          ? supabase.from('schedules').insert(slotsToInsert).then(({ error }) => {
+              if (error) console.error('[SecretaryDashboard] Error inserting missing schedules:', error);
+            })
+          : Promise.resolve(),
+        // 3. Fetch teacher users (needed for planned_boards update)
+        supabase.from('users').select('*').eq('school_id', schoolId),
+        // 4. Opening hours update for GrooveLab rooms (fire alongside others)
+        opHoursChanged
+          ? supabase.from('schools').update({ opening_hours: updatedOpHours }).eq('id', schoolId)
+          : Promise.resolve()
+      ]);
+
+      const teacherUsers = (teacherUsersResult as any)?.data || [];
+
+      // ─── WAVE 2: User planned_boards updates + fetch approved schedules (parallel) ─
+
+      // Build user update promises (all at once, no sequential loop)
+      const userUpdatePromises: any[] = [];
+      for (const tu of teacherUsers) {
+        const roomMap = teacherRoomMap[tu.id];
+        if (!roomMap) continue;
+        const rawPlanned = tu.planned_boards || (tu as any).campus_räume || (tu as any).groovelab_räume;
+        if (rawPlanned && typeof rawPlanned === 'object') {
+          let updatedPlanned = { ...rawPlanned, status: 'approved' };
+          if (Array.isArray((rawPlanned as any).drafts)) {
+            updatedPlanned.drafts = (rawPlanned as any).drafts.map((d: any) => ({
+              ...d,
+              status: 'approved',
+              boards: (d.boards || []).map((b: any) => ({
+                ...b,
+                roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
+              }))
+            }));
+          } else if (Array.isArray((rawPlanned as any).boards)) {
+            updatedPlanned.boards = (rawPlanned as any).boards.map((b: any) => ({
+              ...b,
+              roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
+            }));
+          }
+          userUpdatePromises.push(
+            supabase.from('users').update({
+              planned_boards: updatedPlanned,
+              campus_räume: updatedPlanned,
+              groovelab_räume: updatedPlanned
+            }).eq('id', tu.id)
+          );
+        }
       }
 
-      localStorage.removeItem(`groovelab_matrix_allocations_draft_${schoolId}`);
-      alert('Raumzuteilung erfolgreich gespeichert und alle Stundenpläne freigegeben!');
+      const [, allApprovedSchedulesResult] = await Promise.all([
+        // All user.planned_boards updates in parallel
+        Promise.all(userUpdatePromises),
+        // Fetch all approved schedules for occurrence sync
+        supabase.from('schedules').select('*').eq('school_id', schoolId).eq('status', 'approved')
+      ]);
+
+      const allApprovedSchedules = (allApprovedSchedulesResult as any)?.data || [];
+
+      // ─── WAVE 3: schedule_occurrences sync ─────────────────────────────────
+
+      if (allApprovedSchedules.length > 0) {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+
+        const occurrences: any[] = [];
+        allApprovedSchedules.forEach((sch: any) => {
+          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration } = sch;
+          if (!student_id || !day_of_week || !time_slot) return;
+          for (let i = 0; i < 4; i++) {
+            const targetDate = new Date();
+            const currentDay = today.getDay() || 7;
+            const diff = day_of_week - currentDay + (i * 7);
+            targetDate.setDate(today.getDate() + diff);
+            const ty = targetDate.getFullYear();
+            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const td = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${ty}-${tm}-${td}`;
+            if (dateStr < todayStr) continue;
+            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
+            occurrences.push({ schedule_id: scheduleId, student_id, teacher_id, date: dateStr, start_time: startTime, duration: duration || 45, status: 'scheduled' });
+          }
+        });
+
+        const teacherIds = Array.from(new Set(allApprovedSchedules.map((s: any) => s.teacher_id).filter(Boolean))) as string[];
+
+        await Promise.all([
+          // Single DELETE with .in() instead of sequential loop per teacher
+          teacherIds.length > 0
+            ? supabase.from('schedule_occurrences').delete().in('teacher_id', teacherIds).gte('date', todayStr)
+            : Promise.resolve()
+        ]);
+
+        if (occurrences.length > 0) {
+          await supabase.from('schedule_occurrences').insert(occurrences);
+        }
+      }
+
+      // ─── LocalStorage + UI feedback (sync, instant) ────────────────────────
+      localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(approvedDraftMap));
+      setApprovalToast({ message: `✅ Raumplan freigegeben! ${assignedPlans.length} Einheiten wurden gespeichert.`, type: 'success' });
+      setTimeout(() => setApprovalToast(null), 4000);
+
+      // Refresh dashboard data immediately — don't wait for notifications
       fetchDashboardData();
+
+      // ─── Notifications: fire-and-forget (don't block UI) ───────────────────
+      const teacherUsersData = teacherUsers;
+      const notificationPromises: any[] = [];
+      for (const plan of assignedPlans) {
+        if (!plan || plan.teacherId === 'groovelab' || !plan.teacherId) continue;
+        const rName = (rooms.find((r: any) => r.id === plan.roomId)?.name) || plan.roomId || 'dem zugewiesenen Raum';
+        const dayName = dayNames[plan.dayOfWeek] || '';
+
+        const teacherTitle = '✅ Stundenplan freigegeben';
+        const teacherMsg = `Dein Stundenplan für ${dayName} wurde freigegeben! Ab sofort unterrichtest du in ${rName}.`;
+        notificationPromises.push(
+          Promise.resolve(
+            supabase.from('notifications').insert({ user_id: plan.teacherId, title: teacherTitle, message: teacherMsg, metadata: { type: 'schedule_approved', day_of_week: plan.dayOfWeek, room_id: plan.roomId } }).select('id').single()
+          ).then(async ({ data: notif }: any) => {
+            if (notif?.id) await supabase.functions.invoke('send-push', { body: { userId: plan.teacherId, title: teacherTitle, body: teacherMsg, url: '/', notificationId: notif.id } });
+          }).catch(() => {})
+        );
+
+        if (plan.slots) {
+          const teacherUser = teacherUsersData.find((u: any) => u.id === plan.teacherId);
+          const tName = teacherUser ? `${teacherUser.first_name || ''} ${(teacherUser.last_name || '')[0] || ''}.`.trim() : 'deiner Lehrkraft';
+          for (const slot of plan.slots) {
+            const studentId = slot.student_id;
+            if (!studentId || slot.isBreak) continue;
+            const slotTime = (slot.time_slot || '').substring(0, 5);
+            const studentTitle = '✅ Unterricht bestätigt';
+            const studentMsg = `Dein Unterricht am ${dayName} um ${slotTime} Uhr in ${rName} bei ${tName} wurde bestätigt!`;
+            notificationPromises.push(
+              Promise.resolve(
+                supabase.from('notifications').insert({ user_id: studentId, title: studentTitle, message: studentMsg, metadata: { type: 'schedule_approved', day_of_week: plan.dayOfWeek, room_id: plan.roomId } }).select('id').single()
+              ).then(async ({ data: notif }: any) => {
+                if (notif?.id) await supabase.functions.invoke('send-push', { body: { userId: studentId, title: studentTitle, body: studentMsg, url: '/', notificationId: notif.id } });
+              }).catch(() => {})
+            );
+          }
+        }
+      }
+      // Fire notifications without awaiting — they don't affect the user-visible result
+      Promise.allSettled(notificationPromises);
+
     } catch (err: any) {
       console.error('Error saving allocations:', err);
-      alert('Fehler: ' + err.message);
+      setApprovalToast({ message: `❌ Fehler: ${err.message}`, type: 'error' });
+      setTimeout(() => setApprovalToast(null), 5000);
+    } finally {
+      setIsSavingApproval(false);
     }
   };
+
 
   // Reject an entire teacher's day plan back to draft
   const handleRejectTeacherDayPlan = async (plan: any) => {
@@ -10841,12 +11042,42 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
       }
     }
 
-    setMatrixAllocations(prev => prev.map(p => {
-      if (p.id === activePlanId) {
-        return { ...p, roomId: targetRoomId };
+    setMatrixAllocations(prev => {
+      const updated = prev.map(p => {
+        if (p.id === activePlanId) {
+          return { ...p, roomId: targetRoomId };
+        }
+        return p;
+      });
+
+      // Immediately persist draftMap in localStorage
+      if (schoolId) {
+        const draftMap: Record<string, string | null> = {};
+        updated.forEach(p => {
+          draftMap[p.id] = p.roomId;
+          if (p.teacherId && p.dayOfWeek) {
+            draftMap[`${p.teacherId}_${p.dayOfWeek}`] = p.roomId;
+          }
+        });
+        localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(draftMap));
       }
-      return p;
-    }));
+
+      return updated;
+    });
+
+    // Auto-sync room assignment to database schedules so teacher dashboard receives realtime update
+    if (plan && plan.teacherId && plan.teacherId !== 'groovelab' && schoolId) {
+      supabase
+        .from('schedules')
+        .update({ room_id: targetRoomId })
+        .eq('school_id', schoolId)
+        .eq('teacher_id', plan.teacherId)
+        .eq('day_of_week', targetDay)
+        .then(({ error }) => {
+          if (error) console.error('Error auto-syncing room_id to schedules:', error);
+        });
+    }
+
     setDraggedPlanId(null);
     setDraggedPlanDay(null);
   };
@@ -13071,38 +13302,38 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                     {currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung'}
                   </span>
                 </span>
-                {currentUserProfile?.roles?.includes('teacher') && (
-                  <button
-                    onClick={() => {
-                      if (onRoleSwitched) {
-                        onRoleSwitched('teacher');
-                      }
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '4px',
-                      color: '#ea4335',
-                      borderRadius: '50%',
-                      marginLeft: '6px',
-                      transition: 'background 0.2s, transform 0.2s',
-                    }}
-                    title="Zum Lehrer-Dashboard wechseln"
-                    className="hover-scale"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(234, 67, 53, 0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (onRoleSwitched) {
+                      onRoleSwitched('teacher');
+                    }
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px',
+                    color: '#ea4335',
+                    borderRadius: '50%',
+                    marginLeft: '4px',
+                    transition: 'background 0.2s, transform 0.2s',
+                  }}
+                  title="Zum Lehrer-Dashboard wechseln"
+                  className="hover-scale"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(234, 67, 53, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <RefreshCw size={14} color="#ea4335" />
+                </button>
               </div>
             </div>
           </div>
@@ -13992,15 +14223,27 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                       ) : (
                         (() => {
                           // Group pending schedules by teacher
-                          const groupedPending: Record<string, { teacherName: string, instrument: string, days: number[], slotsCount: number }> = {};
+                          const groupedPending: Record<string, { teacherName: string, instrument: string, days: number[], slotsCount: number, submittedAtLabel: string }> = {};
+                          const allTeacherList = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])];
                           pendingSchedules.forEach(sched => {
                             const tId = sched.teacher_id;
                             if (!groupedPending[tId]) {
+                              const tObj = allTeacherList.find((u: any) => u.id === tId);
+                              const rawP = tObj?.planned_boards || (tObj as any)?.campus_räume || (tObj as any)?.groovelab_räume;
+                              const subAtStr = (rawP as any)?.submittedAt || (sched as any).created_at || '';
+                              let formattedSubAt = '';
+                              if (subAtStr) {
+                                const d = new Date(subAtStr);
+                                if (!isNaN(d.getTime())) {
+                                  formattedSubAt = `am ${d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} um ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+                                }
+                              }
                               groupedPending[tId] = {
                                 teacherName: sched.teacher_name || 'Unbekannte Lehrkraft',
                                 instrument: '',
                                 days: [],
-                                slotsCount: 0
+                                slotsCount: 0,
+                                submittedAtLabel: formattedSubAt
                               };
                             }
                             groupedPending[tId].days.push(sched.day_of_week);
@@ -14044,6 +14287,11 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                   <span style={{ fontSize: '0.72rem', color: '#8e8e93', fontWeight: 500 }}>
                                     📅 {daysLabel} ({data.slotsCount} {data.slotsCount === 1 ? 'Termin' : 'Termine'})
                                   </span>
+                                  {data.submittedAtLabel && (
+                                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                                      ⏰ Eingereicht: {data.submittedAtLabel}
+                                    </span>
+                                  )}
                                 </div>
                                 <button
                                   onClick={() => {
@@ -17685,11 +17933,18 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                           </button>
                           <button
                             type="button"
-                            onClick={handleSaveAndApproveAll}
-                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', boxShadow: '0 2px 6px rgba(52,168,83,0.15)', whiteSpace: 'nowrap' }}
+                            onClick={() => handleSaveAndApproveAll(false)}
+                            disabled={isSavingApproval}
+                            style={{ flex: 1.5, background: isSavingApproval ? '#6b9e7a' : 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: isSavingApproval ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(52,168,83,0.15)', whiteSpace: 'nowrap', opacity: isSavingApproval ? 0.8 : 1, transition: 'all 0.2s' }}
                           >
-                            Speichern & Freigeben
+                            {isSavingApproval ? (
+                              <>
+                                <svg style={{ width: 14, height: 14, animation: 'spin 0.8s linear infinite' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                                Wird freigegeben...
+                              </>
+                            ) : 'Speichern & Freigeben'}
                           </button>
+
                         </>
                       )}
                     </div>
@@ -18071,39 +18326,48 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                       </div>
                                     ) : (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-                                        {unassigned.map(plan => (
-                                          <div
-                                            key={plan.id}
-                                            draggable
-                                            onDragStart={(e) => handleDragStartMatrix(e, plan.id)}
-                                            onDragEnd={() => {
-                                              setDraggedPlanId(null);
-                                              setDraggedPlanDay(null);
-                                            }}
-                                            onClick={(e) => {
-                                              setSelectedDayPlan(plan);
-                                              e.stopPropagation();
-                                            }}
-                                            title={`${getPlanDisplayName(plan)} (${plan.instrument})`}
-                                            style={{
-                                              position: 'relative',
-                                              background: '#fffbeb',
-                                              border: '1px solid #fde68a',
-                                              borderLeft: '4px solid #f59e0b',
-                                              borderRadius: '10px',
-                                              padding: '7px 9px',
-                                              cursor: 'grab',
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              gap: '2px',
-                                              boxShadow: '0 4px 8px rgba(245, 158, 11, 0.06)',
-                                              userSelect: 'none',
-                                              WebkitUserSelect: 'none'
-                                            }}
-                                          >
-                                            <span style={{ fontSize: '0.73rem', fontWeight: 800, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(plan)}</span>
-                                            <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#b45309' }}>{plan.instrument}</span>
-                                            <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: '#d97706' }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                        {unassigned.map(plan => {
+                                          const isGL = plan.teacherId === 'groovelab';
+                                          const cardBg = isGL ? '#fffbeb' : '#e6f4ea';
+                                          const cardBorder = isGL ? '1px solid #fde68a' : '1px solid #a7f3d0';
+                                          const cardBorderLeft = isGL ? '4px solid #f59e0b' : '4px solid #34a853';
+                                          const titleColor = isGL ? '#92400e' : '#0f172a';
+                                          const instColor = isGL ? '#b45309' : '#64748b';
+                                          const timeColor = isGL ? '#d97706' : '#34a853';
+
+                                          return (
+                                            <div
+                                              key={plan.id}
+                                              draggable
+                                              onDragStart={(e) => handleDragStartMatrix(e, plan.id)}
+                                              onDragEnd={() => {
+                                                setDraggedPlanId(null);
+                                                setDraggedPlanDay(null);
+                                              }}
+                                              onClick={(e) => {
+                                                setSelectedDayPlan(plan);
+                                                e.stopPropagation();
+                                              }}
+                                              title={`${getPlanDisplayName(plan)} (${plan.instrument})`}
+                                              style={{
+                                                position: 'relative',
+                                                background: cardBg,
+                                                border: cardBorder,
+                                                borderLeft: cardBorderLeft,
+                                                borderRadius: '10px',
+                                                padding: '7px 9px',
+                                                cursor: 'grab',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '2px',
+                                                boxShadow: isGL ? '0 4px 8px rgba(245, 158, 11, 0.06)' : '0 4px 8px rgba(52, 168, 83, 0.06)',
+                                                userSelect: 'none',
+                                                WebkitUserSelect: 'none'
+                                              }}
+                                            >
+                                              <span style={{ fontSize: '0.73rem', fontWeight: 800, color: titleColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(plan)}</span>
+                                              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: instColor }}>{plan.instrument}</span>
+                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: timeColor }}>⏱ {plan.startTime}–{plan.endTime}</span>
                                             {(() => {
                                               // Only validate for GrooveLab slots
                                               const isGroovelabPlan = plan.teacherId === 'groovelab';
@@ -18119,7 +18383,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                               return null;
                                             })()}
                                           </div>
-                                        ))}
+                                        );
+                                      })}
                                       </div>
                                     )}
                                   </td>
@@ -19826,7 +20091,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         gap: '6px'
                       }}
                     >
-                      <ClipboardList size={13} style={{ color: schedulesSidebarTab === 'submissions' ? '#007aff' : '#8e8e93' }} />
+                      <ClipboardList size={13} style={{ color: schedulesSidebarTab === 'submissions' ? '#34a853' : '#8e8e93' }} />
                       Einreichungen
                     </button>
                     <button
@@ -19850,7 +20115,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                         gap: '6px'
                       }}
                     >
-                      <BarChart2 size={13} style={{ color: schedulesSidebarTab === 'stats' ? '#007aff' : '#8e8e93' }} />
+                      <BarChart2 size={13} style={{ color: schedulesSidebarTab === 'stats' ? '#34a853' : '#8e8e93' }} />
                       Wochenauslastung
                     </button>
                   </div>
@@ -19966,7 +20231,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                 padding: '8px 12px',
                                 borderRadius: '8px',
                                 border: 'none',
-                                background: selectedFilterTeacherId === null ? '#007aff' : 'rgba(120, 120, 128, 0.08)',
+                                background: selectedFilterTeacherId === null ? '#34a853' : 'rgba(120, 120, 128, 0.08)',
                                 color: selectedFilterTeacherId === null ? '#ffffff' : '#1c1c1e',
                                 fontSize: '0.74rem',
                                 fontWeight: 600,
@@ -19976,7 +20241,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 transition: 'all 0.15s ease',
-                                boxShadow: selectedFilterTeacherId === null ? '0 1px 3px rgba(0, 122, 255, 0.2)' : 'none'
+                                boxShadow: selectedFilterTeacherId === null ? '0 1px 3px rgba(52, 168, 83, 0.2)' : 'none'
                               }}
                             >
                               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -20004,16 +20269,16 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                   style={{ 
                                     background: '#ffffff', 
                                     border: isSelected 
-                                      ? '1px solid rgba(0, 122, 255, 0.3)' 
+                                      ? '1px solid rgba(52, 168, 83, 0.3)' 
                                       : data.isUnsubmitted 
                                         ? '1px solid rgba(245, 158, 11, 0.3)' 
                                         : '1px solid rgba(0, 0, 0, 0.06)', 
                                     borderRadius: '10px', 
                                     overflow: 'hidden',
                                     transition: 'all 0.15s ease',
-                                    boxShadow: isSelected ? '0 2px 8px rgba(0, 122, 255, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)',
+                                    boxShadow: isSelected ? '0 2px 8px rgba(52, 168, 83, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)',
                                     borderLeft: isSelected 
-                                      ? '3px solid #007aff' 
+                                      ? '3px solid #34a853' 
                                       : data.isUnsubmitted 
                                         ? '3px solid #f59e0b' 
                                         : '1px solid rgba(0, 0, 0, 0.06)'
@@ -20032,7 +20297,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
                                       background: isSelected 
-                                        ? 'rgba(0, 122, 255, 0.03)' 
+                                        ? 'rgba(52, 168, 83, 0.04)' 
                                         : data.isUnsubmitted 
                                           ? 'rgba(245, 158, 11, 0.02)' 
                                           : '#ffffff',
@@ -20045,7 +20310,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                         transition: 'transform 0.15s ease-out', 
                                         marginRight: '6px', 
                                         color: isSelected 
-                                          ? '#007aff' 
+                                          ? '#34a853' 
                                           : data.isUnsubmitted 
                                             ? '#d97706' 
                                             : '#8e8e93' 
@@ -20055,7 +20320,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                           fontSize: '0.74rem', 
                                           fontWeight: 600, 
                                           color: isSelected 
-                                            ? '#007aff' 
+                                            ? '#34a853' 
                                             : data.isUnsubmitted 
                                               ? '#d97706' 
                                               : '#1c1c1e' 
@@ -20077,8 +20342,8 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                     ) : (
                                       <span style={{ 
                                         fontSize: '0.66rem', 
-                                        background: isSelected ? 'rgba(0,122,255,0.1)' : 'rgba(120, 120, 128, 0.08)', 
-                                        color: isSelected ? '#007aff' : '#8e8e93', 
+                                        background: isSelected ? 'rgba(52, 168, 83, 0.12)' : 'rgba(120, 120, 128, 0.08)', 
+                                        color: isSelected ? '#34a853' : '#8e8e93', 
                                         fontWeight: 700, 
                                         padding: '1px 5px', 
                                         borderRadius: '6px' 
@@ -21530,10 +21795,12 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
 
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '180px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
                                 {(() => {
-                                  // Find school students not in GrooveLab
-                                  const nonActiveStudents = students.filter(s => 
+                                  // Find school students not in GrooveLab — strictly filtered by this school's ID
+                                  const nonActiveStudents = students.filter(s =>
+                                    s.school_id === schoolId &&
                                     !(s.is_groovelab_active || s.isGroovelabActive) &&
                                     (
+                                      !groovelabStudentModalSearchQuery.trim() ||
                                       (s.first_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
                                       (s.last_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
                                       (s.nickname || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim())
@@ -21642,56 +21909,6 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                   </div>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Spitzname</label>
-                                    <input
-                                      type="text"
-                                      value={newStudentNickname}
-                                      onChange={(e) => setNewStudentNickname(e.target.value)}
-                                      placeholder="z.B. Wolferl"
-                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                                    />
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Geburtsdatum *</label>
-                                    <input
-                                      type="date"
-                                      required
-                                      value={newStudentBirthDate}
-                                      onChange={(e) => setNewStudentBirthDate(e.target.value)}
-                                      style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' }}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrument / Fach</label>
-                                  <AppleStyleTokenField
-                                    label=""
-                                    selectedString={newStudentInstrument}
-                                    onChange={setNewStudentInstrument}
-                                    suggestions={activeSubjectsList}
-                                    placeholder="Unterrichtsfach auswählen..."
-                                  />
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Lehrkraft zuweisen</label>
-                                  <select
-                                    value={newStudentTeacherId}
-                                    onChange={(e) => setNewStudentTeacherId(e.target.value)}
-                                    style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: '#ffffff' }}
-                                  >
-                                    <option value="">Keine Lehrkraft zugewiesen</option>
-                                    {allUniqueTeachers.map((t: any) => (
-                                      <option key={t.id} value={t.id}>
-                                        {t.firstName || t.first_name} {t.lastName || t.last_name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
                                   <button
                                     type="button"
@@ -21705,7 +21922,7 @@ export function SecretaryDashboard({ schoolId, userId, onLogout, onRoleSwitched,
                                     className="google-btn-primary"
                                     style={{ background: '#fbbc05', color: '#0f172a', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.82rem', fontWeight: 800 }}
                                   >
-                                    Schüler erstellen &amp; freischalten
+                                    Schüler erstellen & freischalten
                                   </button>
                                 </div>
                               </div>
@@ -30343,8 +30560,44 @@ status: status,
           onShowAgb={() => setShowAgb(true)}
         />
       )}
+
+      {/* ─── Unassigned-Warning Modal ─── */}
+      {showUnassignedWarning && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', borderRadius: '20px', padding: '28px 28px 22px', maxWidth: 380, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.4rem', marginBottom: 10 }}>⚠️</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>Nicht alle Räume zugewiesen</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
+              Es gibt noch {matrixAllocations.filter(p => !p.roomId).length} Lehrkraft-Tag-Kombination(en) ohne Raumzuweisung. Diese werden <strong>nicht freigegeben</strong>.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowUnassignedWarning(false)}
+                style={{ flex: 1, padding: '10px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', color: '#64748b' }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => { setShowUnassignedWarning(false); handleSaveAndApproveAll(true); }}
+                style={{ flex: 1.2, padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #34a853, #22c55e)', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,168,83,0.3)' }}
+              >
+                Trotzdem freigeben
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Approval Toast Notification ─── */}
+      {approvalToast && (
+        <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: approvalToast.type === 'success' ? 'linear-gradient(135deg, #34a853, #22c55e)' : 'linear-gradient(135deg, #ea4335, #ef4444)', color: 'white', borderRadius: '16px', padding: '14px 24px', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 10, maxWidth: '90vw', whiteSpace: 'nowrap', animation: 'slideInUp 0.3s ease' }}>
+          {approvalToast.message}
+        </div>
+      )}
+
       <TourComponent />
     </div>
+
   </div>
   );
 }

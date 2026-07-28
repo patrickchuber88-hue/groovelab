@@ -67,10 +67,6 @@
 ## Loopstation Rules
 - **Looping Pause**: Es wird eine zwingende 4-Takte-Pause zwischen den Aufnahme-Spuren verwendet (Variante 1), um eine 100% sample-genaue Synchronität (kein Swallowed Attack) sicherzustellen.
 
-## User & Data Protection Shield Rules
-- **Absolute User Data Protection**: Echte Benutzerdaten, Schülerprofile, Namen und bestehende Datenbankeinträge dürfen NIEMALS über Codeänderungen, Skripte oder direkte Datenbankbefehle verändert, überschrieben, gefälscht oder gelöscht werden.
-- **Data Protection Auditor Subagent**: Vor jeder Änderung am Datenmodell oder an der Benutzerverarbeitung muss der Subagent `user_data_protection_auditor` zur Prüfung herangezogen werden, um sicherzustellen, dass keine echten Userdaten beeinträchtigt werden.
-
 ## Datenschutz & Kindersicherheits-Audit Rules
 - **Datenschutz-Standard**: Bei jeder Code-Änderung oder Funktions-Implementierung muss geprüft werden, ob der absolute Datenschutzstandard für Schulsoftware (Minimierung von personenbezogenen Daten von Minderjährigen nach DSGVO/COPPA) gewährleistet wird.
 - **Datenminimierung**: Da wir auf absolute Datenkomprimierung bei Usern setzen, um den Datenschutz bestmöglich zu erfüllen, werden keine SEPA-, Zahlungs-, Vertragsdaten und auch keine E-Mail-Adressen von Schülern gespeichert.
@@ -90,6 +86,5 @@
 - **No Automatic Commits and Deploys**: Do NOT automatically perform git commits, git pushes, or run `./deploy.sh` (or any other deployment script) after making modifications. Changes must only be committed and deployed when explicitly requested by the user, or left for the user to handle manually.
 - **Sandboxed Deployments Bypass**: When compiling the production bundle and running `./deploy.sh` (upon explicit user request), run it with `BypassSandbox: true` so the files are successfully copied to the remote Hetzner Server (`178.105.10.2`).
 - **Kiosk Map Coupling Token Integrity**: Device coupling directly from the interactive map in `LoginScreen.tsx` must always fetch or create a kiosk record in the `kiosks` table and save its unique `secret_token` in `localStorage`, never the school's general onboarding token. To bypass Row-Level Security (RLS) policies on `kiosks` during this unauthenticated insert/select operation, temporarily set `groovelab_kiosk_token` in `localStorage` to the school's general onboarding token (`schoolData.groovelab_kiosk_token`) right before executing the Supabase query, and overwrite it with the kiosk's unique `secret_token` upon success.
-## Gold Standard Solver & Stundenplan-Designer Lock
-- **Absoluter Gold-Standard Code-Freeze**: Der Code des Stundenplan-Designers (in `ScheduleBoard.tsx` und `Schedule15StageSolverEngine.ts`) hat den 100/100 Gold-Standard Status erreicht. Jegliche zukünftigen Änderungen an der Zuteilungs-Logik, am 17-Stufen-Solver oder an der UI des Stundenplan-Designer Tabs sind STRENG VERBOTEN und dürfen NUR nach expliziter Freigabe durch den User durchgeführt werden.
+
 

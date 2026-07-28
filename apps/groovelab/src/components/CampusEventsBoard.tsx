@@ -2573,7 +2573,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           *,
           teacher:teacher_id(first_name, last_name),
           student:student_id(first_name, last_name)
-        `);
+        `)
+        .eq('school_id', schoolId)
+        .in('status', ['opened', 'approved', 'published']);
 
       if (role === 'student') {
         scheduleQuery = scheduleQuery.eq('student_id', userId);
@@ -2592,7 +2594,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           teacher:teacher_id(first_name, last_name),
           student:student_id(first_name, last_name),
           schedule:schedule_id(status)
-        `);
+        `)
+        .eq('school_id', schoolId);
 
       if (role === 'student') {
         occurrenceQuery = occurrenceQuery.eq('student_id', userId);
@@ -2620,14 +2623,89 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       }
 
 
+      // 3. Load teacher planned_boards for designer slots if DB schedules array is empty
+      let teacherPlannedBoards: any[] = [];
+      try {
+        const { data: tUser } = await supabase
+          .from('users')
+          .select('planned_boards')
+          .eq('id', userId)
+          .single();
+      if (tUser && tUser.planned_boards) {
+          const pb = typeof tUser.planned_boards === 'string' ? JSON.parse(tUser.planned_boards) : tUser.planned_boards;
+          // New ScheduleBoard format: { activeDraftId, submittedDraftId, drafts: [{id, boards:[...]}] }
+          if (pb && typeof pb === 'object' && !Array.isArray(pb) && Array.isArray(pb.drafts)) {
+            const targetDraftId = pb.submittedDraftId || pb.activeDraftId;
+            const targetDraft = pb.drafts.find((d: any) => d.id === targetDraftId) || pb.drafts[0];
+            if (targetDraft && Array.isArray(targetDraft.boards)) {
+              teacherPlannedBoards = targetDraft.boards;
+            }
+          } else if (Array.isArray(pb)) {
+            teacherPlannedBoards = pb;
+          } else if (pb && typeof pb === 'object') {
+            // Legacy: object whose values are boards
+            teacherPlannedBoards = Object.values(pb);
+          }
+        }
+      } catch (e) {}
+
+      // Combine DB schedules with planned_boards designer slots
+      const combinedSchedules: any[] = [...(schedules || [])];
+      
+      if (teacherPlannedBoards.length > 0) {
+        // Fetch all students to match names/IDs from planned_boards
+        const { data: allStudentsList } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, instrument')
+          .eq('school_id', schoolId);
+
+        teacherPlannedBoards.forEach(board => {
+          if (board.students && Array.isArray(board.students)) {
+            board.students.forEach((s: any) => {
+              if (s.isBreak || !s.first_name) return;
+              const matchedStudent = (allStudentsList || []).find((st: any) => 
+                st.id === s.id || 
+                (st.first_name?.trim().toLowerCase() === s.first_name?.trim().toLowerCase() && 
+                 (st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase())
+              );
+              
+              const studentId = matchedStudent?.id || s.id || s.student_id;
+              if (!studentId) return;
+
+              const alreadyInSched = combinedSchedules.some(sch => 
+                sch.student_id === studentId && 
+                sch.day_of_week === board.dayOfWeek
+              );
+
+              if (!alreadyInSched) {
+                combinedSchedules.push({
+                  id: `board-${board.id}-${s.id}`,
+                  student_id: studentId,
+                  teacher_id: userId,
+                  day_of_week: board.dayOfWeek,
+                  time_slot: s.assignedTime ? (s.assignedTime.includes(':') && s.assignedTime.split(':').length === 2 ? `${s.assignedTime}:00` : s.assignedTime) : '14:00:00',
+                  duration: s.duration || 30,
+                  status: 'approved',
+                  student: matchedStudent || {
+                    first_name: s.first_name,
+                    last_name: s.last_name || '',
+                    instrument: s.instrument || ''
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+
       // Generate visual list of occurrences for the school year
       const schoolYearStart = new Date(startYear);
       const schoolYearEnd = new Date(endYear);
       const allMergedOccurrences: LessonOccurrence[] = [];
       const usedActualIds = new Set<string>();
 
-      if (schedules) {
-        schedules.forEach((sch: any) => {
+      if (combinedSchedules.length > 0) {
+        combinedSchedules.forEach((sch: any) => {
           if (!sch.student_id) return; // Skip unassigned slots/breaks
           const current = new Date(schoolYearStart);
           while (current <= schoolYearEnd) {
@@ -2636,8 +2714,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             const targetDate = new Date(current);
             targetDate.setDate(current.getDate() + diff);
 
-            // Skip dates in August (month index 7) — outside school year
-            if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd && targetDate.getMonth() !== 7) {
+            // Generate dates for the school year
+            if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd) {
               const dateStr = targetDate.toLocaleDateString('sv-SE');
 
               // Check if override exists
@@ -3247,19 +3325,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     const todayStr = new Date().toLocaleDateString('sv-SE');
     const nowTimeStr = new Date().toTimeString().substring(0, 8);
 
-    // Filter out holiday lessons
-    const holidayRanges = subscribedEvents.filter(ev => ev.category === 'Ferien');
-
+    // Show ALL regular lessons (upcoming + past) regardless of holiday periods
     return lessons.filter(occ => {
-      const isHoliday = holidayRanges.some(h => {
-        const start = h.event_date;
-        const end = h.event_end_date || h.event_date;
-        return occ.date >= start && occ.date <= end;
-      });
-      if (isHoliday) return false;
-
-
-
       const isPast = occ.date < todayStr || (occ.date === todayStr && occ.start_time < nowTimeStr);
       return lessonTab === 'upcoming' ? !isPast : isPast;
     });

@@ -64,7 +64,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
       kioskToken = deviceMatch[1];
     }
   }
-  if (kioskToken && !qrToken) {
+  if (kioskToken) {
     clientInfo += `;kiosk_token=${kioskToken}`;
   }
   

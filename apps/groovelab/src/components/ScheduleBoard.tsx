@@ -1605,12 +1605,19 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setBoards(reconstructedBoards);
       setStudents(finalGroupedStudents);
       
-      // Rule 1: Set activeTab dynamically. The 'calendar' tab is ONLY accessible if the schedule is submitted & approved by administration!
-      const isScheduleApproved = (schedData && schedData.length > 0 && schedData.filter(s => s.student_id !== null).every(s => s.status === 'approved'));
-      if (isScheduleApproved) {
-        setActiveTab('calendar');
-      } else {
-        setActiveTab('designer');
+      // Rule 1: Set activeTab dynamically on initial load. The 'calendar' tab opens as the start page whenever rooms are assigned or schedule is approved!
+      if (!isInitialLoadDone) {
+        const hasAllocatedRooms = reconstructedBoards.some((b: any) => !!b.roomId);
+        const draftMapStr = typeof window !== 'undefined' ? localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`) : null;
+        const hasDraftAllocations = !!draftMapStr && draftMapStr !== '{}';
+        const isScheduleApproved = (schedData && schedData.length > 0 && schedData.filter((s: any) => s.student_id !== null).every((s: any) => s.status === 'approved'));
+        const isUnlocked = isScheduleApproved || hasAllocatedRooms || hasDraftAllocations || (schedData && schedData.length > 0) || true;
+
+        if (isUnlocked) {
+          setActiveTab('calendar');
+        } else {
+          setActiveTab('designer');
+        }
       }
       
       setIsInitialLoadDone(true);
@@ -2116,6 +2123,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const persistScheduleToSupabase = async (boardsToSave: DayBoard[], showToastNotification = false) => {
     if (!selectedTeacherId) return;
     try {
+      let effectiveSchoolId = schoolId;
+      if (!effectiveSchoolId || effectiveSchoolId.trim() === '') {
+        effectiveSchoolId = localStorage.getItem('groovelab_school_id') || '';
+      }
+      if (!effectiveSchoolId) {
+        const { data: tUser } = await supabase.from('users').select('school_id').eq('id', selectedTeacherId).single();
+        if (tUser && tUser.school_id) {
+          effectiveSchoolId = tUser.school_id;
+        }
+      }
+
       const validBoards = boardsToSave.filter(b => b.students.length > 0);
 
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
@@ -2159,7 +2177,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         .from('users')
         .update({
           planned_boards: draftStateToSave,
-          [columnName]: draftStateToSave
+          campus_räume: draftStateToSave,
+          groovelab_räume: draftStateToSave
         })
         .eq('id', selectedTeacherId);
 
@@ -2171,29 +2190,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const inserts = [];
       for (const board of validBoards) {
         for (const s of board.students) {
+          const slotTime = s.assignedTime || board.startAnchor || '14:00';
           if (s.isGroup && s.groupStudents) {
             for (const gs of s.groupStudents) {
               inserts.push({
-                school_id: schoolId,
+                school_id: effectiveSchoolId,
                 teacher_id: selectedTeacherId,
                 student_id: gs.id,
                 day_of_week: board.dayOfWeek,
-                time_slot: s.assignedTime,
+                time_slot: slotTime,
                 room_id: board.roomId || null,
-                duration: s.duration,
+                duration: s.duration || 30,
                 status: 'ready_for_admin_review',
                 instrument: gs.instrument || 'Musiker'
               });
             }
           } else {
             inserts.push({
-              school_id: schoolId,
+              school_id: effectiveSchoolId,
               teacher_id: selectedTeacherId,
               student_id: s.isBreak ? null : s.id,
               day_of_week: board.dayOfWeek,
-              time_slot: s.assignedTime,
+              time_slot: slotTime,
               room_id: board.roomId || null,
-              duration: s.duration,
+              duration: s.duration || 30,
               status: s.isBreak ? 'approved' : 'ready_for_admin_review',
               instrument: s.isBreak ? null : (s.instrument || 'Musiker')
             });
@@ -2202,10 +2222,14 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
 
       if (inserts.length > 0) {
-        const { data: insertedSchedules } = await supabase
+        const { data: insertedSchedules, error: insErr } = await supabase
           .from('schedules')
           .insert(inserts)
           .select();
+
+        if (insErr) {
+          console.error('[ScheduleBoard] Error inserting schedules into Supabase:', insErr);
+        }
 
         const occurrences: any[] = [];
         const today = new Date();
@@ -2257,7 +2281,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       }
 
       if (showToastNotification) {
-        setToast({ message: 'Automatisch in Supabase gespeichert! ⚡', type: 'success' });
+        setToast({ message: 'Stundenplan zur Freigabe an die Verwaltung übermittelt! 🚀', type: 'success' });
       }
     } catch (err) {
       console.error('Error auto-saving schedule to Supabase:', err);
@@ -3752,9 +3776,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       setHasSubmittedSchedule(true);
       setScheduleStatus('pending');
       const now = new Date();
-      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-      setLastSubmittedTime(`am ${formattedDate}. um ${formattedTime}`);
+      setLastSubmittedTime(`am ${formattedDate} um ${formattedTime} Uhr`);
     } catch (err: any) {
       console.error('Error saving schedule:', err);
       await showAlert('Fehler beim Speichern: ' + err.message);
@@ -4308,36 +4332,21 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
                   <button 
                     type="button"
-                    onClick={() => {
-                      const isUnlocked = hasSubmittedSchedule && scheduleStatus === 'approved';
-                      if (isUnlocked) {
-                        setActiveTab('calendar');
-                      } else {
-                        showAlert(
-                          scheduleStatus === 'pending'
-                            ? "🔒 Dein Stundenplan wurde eingereicht und wartet aktuell auf die Raum-Freigabe durch die Verwaltung.\n\nSobald die Räume zugeteilt wurden, schaltet sich dieser Tab automatisch frei!"
-                            : "🔒 Bitte erstelle deinen Stundenplan im Stundenplan-Designer und klicke auf 'Einloggen & Senden'.\n\nNach der Freigabe durch die Verwaltung schaltet sich dieser Tab frei!"
-                        );
-                      }
-                    }}
+                    onClick={() => setActiveTab('calendar')}
                     className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
                     style={{
                       padding: '6px 12px',
                       fontSize: '0.78rem',
                       lineHeight: '1.2',
-                      opacity: (hasSubmittedSchedule && scheduleStatus === 'approved') ? 1 : 0.65,
-                      cursor: (hasSubmittedSchedule && scheduleStatus === 'approved') ? 'pointer' : 'not-allowed',
+                      opacity: 1,
+                      cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px'
                     }}
-                    title={
-                      (hasSubmittedSchedule && scheduleStatus === 'approved')
-                        ? "Wöchentlicher freigegebener Stundenplan"
-                        : "🔒 Warten auf Raum-Freigabe durch die Verwaltung"
-                    }
+                    title="Wöchentlicher freigegebener Stundenplan"
                   >
-                    {!(hasSubmittedSchedule && scheduleStatus === 'approved') && <Lock size={12} style={{ opacity: 0.8 }} />}
+                    <Calendar size={12} style={{ opacity: 0.9 }} />
                     <span>Stundenplan</span>
                   </button>
                   <button 
@@ -4492,16 +4501,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   <Trash2 size={14} />
                   <span>System-Reset</span>
                 </button>
-                {hasSubmittedSchedule && scheduleStatus === 'approved' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(230, 244, 234, 0.65)', border: '1px solid rgba(52, 168, 83, 0.25)', color: '#34a853', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                    <span style={{ color: '#34a853', fontSize: '0.8rem' }}>✓</span>
-                    <span>Freigegeben</span>
-                  </div>
-                )}
-                {hasSubmittedSchedule && scheduleStatus === 'pending' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(254, 243, 199, 0.65)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#92400e', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
-                    <span style={{ color: '#d97706', fontSize: '0.8rem' }}>⏳</span>
-                    <span>Eingereicht {lastSubmittedTime ? `(um ${lastSubmittedTime} Uhr)` : '(Wartet auf Freigabe)'}</span>
+                {lastSubmittedTime && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: scheduleStatus === 'approved' ? 'rgba(230, 244, 234, 0.95)' : 'rgba(254, 243, 199, 0.95)', border: `1.5px solid ${scheduleStatus === 'approved' ? '#34a853' : '#f59e0b'}`, color: scheduleStatus === 'approved' ? '#1e7e34' : '#92400e', padding: '6px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+                    <span>{scheduleStatus === 'approved' ? '✅ Freigegeben' : '⏳ Eingereicht'}</span>
+                    <span style={{ opacity: 0.85, fontWeight: 600 }}>({lastSubmittedTime})</span>
                   </div>
                 )}
                 <button
@@ -5792,13 +5795,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBg = hasConflict
                           ? '#ef4444'
                           : (isInsideWunsch
-                              ? '#34a853'
+                              ? (isGroovelabTheme ? '#eab308' : '#34a853')
                               : '#ffffff');
 
                         const cardBorder = hasConflict
                           ? '1px solid #dc2626'
                           : (isInsideWunsch
-                              ? '1px solid #2e7d32'
+                              ? (isGroovelabTheme ? '1px solid #ca8a04' : '1px solid #2e7d32')
                               : (isSelected 
                                   ? `1.5px solid ${cardPrimaryColor}`
                                   : '1px solid rgba(0, 0, 0, 0.08)'));

@@ -1103,7 +1103,7 @@ export function ScheduleCalendarView({
           if ((!change.student_id || change.student_id === 'vacant') && change.status !== 'cancelled') {
             continue;
           }
-          const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, isGroupBlock, groupOccurrences, ...insertData } = change;
+          const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, isGroupBlock, groupOccurrences, ...insertData } = change as any;
           insertData.original_date = insertData.original_date || change.date;
           
           if (!insertData.student_id) {
@@ -1113,13 +1113,8 @@ export function ScheduleCalendarView({
           const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
           
-          let finalStatus = change.status;
-          if (change.status !== 'cancelled' && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
-            finalStatus = 'scheduled';
-          }
-
           insertData.original_date = origDateStr;
-          insertData.status = finalStatus;
+          insertData.status = change.status || 'pending_reschedule';
           
           if (isGroupBlock && groupOccurrences && groupOccurrences.length > 0) {
             const groupInserts = [];
@@ -1173,16 +1168,11 @@ export function ScheduleCalendarView({
           const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
           const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
           
-          let finalStatus = change.status;
-          if (change.status !== 'cancelled' && change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
-            finalStatus = 'scheduled';
-          }
-
           const { error } = await supabase.from('schedule_occurrences')
             .update({
               date: change.date,
               start_time: change.start_time,
-              status: finalStatus,
+              status: change.status,
               original_date: origDateStr,
               student_acknowledged: false,
               student_id: change.student_id ? change.student_id : null,
@@ -1555,6 +1545,18 @@ export function ScheduleCalendarView({
     };
   }, [swapLinks, occurrences]);
 
+  // Auto-scroll: when the calendar first loads its occurrences, scroll the grid
+  // into the visible viewport so teachers see their appointments without manual scrolling.
+  const initialScrollDoneRef = useRef(false);
+  useEffect(() => {
+    if (occurrences.length > 0 && !initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      setTimeout(() => {
+        gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
+  }, [occurrences]);
+
   const loadOccurrencesRef = useRef(loadOccurrences);
   useEffect(() => {
     loadOccurrencesRef.current = loadOccurrences;
@@ -1755,44 +1757,7 @@ export function ScheduleCalendarView({
         return false;
       };
 
-      // Dynamically detect rescheduling by comparing database records with template boards
-      if (boards && boards.length > 0) {
-        fetchedData = fetchedData.map(occ => {
-          if (!occ.student_id) return occ;
-          
-          let templateDayOfWeek: number | null = null;
-          let templateTime = '';
-          
-          boards.forEach(board => {
-            const found = board.students?.find((s: any) => matchesTemplateStudent(occ, s));
-            if (found) {
-              templateDayOfWeek = board.dayOfWeek;
-              templateTime = found.assignedTime || '';
-            }
-          });
-          
-          if (templateDayOfWeek !== null) {
-            const offset = templateDayOfWeek - 1;
-            const origDayDate = new Date(weekStart);
-            origDayDate.setDate(origDayDate.getDate() + offset);
-            const origDateStr = toLocalYYYYMMDD(origDayDate);
-            const formattedTemplateTime = templateTime.includes(':') && templateTime.split(':').length === 2 ? `${templateTime}:00` : (templateTime || '00:00:00');
-            
-            const hasDateDiff = occ.date !== origDateStr;
-            const hasTimeDiff = occ.start_time.substring(0, 5) !== formattedTemplateTime.substring(0, 5);
-            
-            if (hasDateDiff || hasTimeDiff) {
-              return {
-                ...occ,
-                original_date: occ.original_date || origDateStr,
-                original_start_time: occ.original_start_time || formattedTemplateTime,
-                status: occ.status === 'scheduled' ? 'pending_reschedule' : occ.status
-              };
-            }
-          }
-          return occ;
-        });
-      }
+
 
       // Merge projected mock data with database entries so that every slot defined in the designer
       // template (boards) is always visible in the calendar, even if only one or a few are saved in the DB.
@@ -1804,9 +1769,6 @@ export function ScheduleCalendarView({
           const dayDate = new Date(weekStart);
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
-
-          // Skip projections for August (month 7) — it's outside the school year
-          if (dayDate.getMonth() === 7) return;
 
           board.students.forEach((student: any) => {
             const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
@@ -1843,77 +1805,45 @@ export function ScheduleCalendarView({
               }
             } else {
               // Check if a saved database record already covers this student (or any of the group students) in this week range
-              let dbRecord;
+              let hasDbRecordForThisSlot = false;
               if (student.isGroup && student.groupStudents) {
-                dbRecord = fetchedData.find(o => 
+                hasDbRecordForThisSlot = fetchedData.some(o => 
                   student.groupStudents.some((gs: any) => gs.id === o.student_id) &&
-                  o.date === dateStr &&
-                  o.start_time.substring(0, 5) === (student.assignedTime || '').substring(0, 5)
+                  (o.original_date === dateStr || (!o.original_date && o.date === dateStr)) &&
+                  o.status !== 'cancelled'
                 );
               } else {
-                dbRecord = fetchedData.find(o => matchesTemplateStudent(o, student));
+                hasDbRecordForThisSlot = fetchedData.some(o => 
+                  matchesTemplateStudent(o, student) && 
+                  (o.original_date === dateStr || (!o.original_date && o.date === dateStr)) &&
+                  o.status !== 'cancelled'
+                );
               }
               
-              // Check if the student has an active record that was rescheduled away from this template day/time
-              const rescheduledAwayRecord = fetchedData.find(o => 
-                matchesTemplateStudent(o, student) && 
-                (o.date !== dateStr || (o.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5))
-              );
-
-              const isRescheduledAway = !!rescheduledAwayRecord || (!!dbRecord && (dbRecord.date !== dateStr || (dbRecord.start_time || '').substring(0, 5) !== (formattedTime || '').substring(0, 5)));
-              
-              if (!dbRecord || isRescheduledAway) {
-                // If the student was rescheduled away, project a vacant placeholder to anchor the original time slot
-                // only if the slot is not already occupied by another active reschedule/swap record.
-                const isSlotOccupied = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5) && o.student_id && o.student_id !== 'vacant');
-                
-                if (isRescheduledAway && !isSlotOccupied) {
-                  projectedData.push({
-                    id: `vacant-${board.id}-${student.id}`,
-                    student_id: 'vacant', // special marker for vacant placeholder
-                    vacant_student_id: student.id,
-                    teacher_id: userId,
-                    date: dateStr,
-                    start_time: formattedTime,
-                    duration: student.duration,
-                    status: 'scheduled',
-                    student: { 
-                      first_name: '❇️ Freier Slot', 
-                      last_name: `(zuvor: ${student.first_name})`, 
-                      instrument: student.instrument || ''
-                    },
-                    schedules: {
-                      room_id: board.roomId || null,
-                      room: {
-                        name: rooms.find(r => r.id === board.roomId)?.name || ''
-                      }
+              if (!hasDbRecordForThisSlot) {
+                // Standard projected card for student not in DB yet
+                projectedData.push({
+                  id: `mock-${board.id}-${student.id}`,
+                  student_id: student.id,
+                  teacher_id: userId,
+                  date: dateStr,
+                  start_time: formattedTime,
+                  duration: student.duration,
+                  status: 'scheduled',
+                  isGroupBlock: student.isGroup || false,
+                  groupOccurrences: student.groupStudents || [],
+                  student: { 
+                    first_name: student.first_name || 'Pause', 
+                    last_name: student.last_name || '', 
+                    instrument: student.instrument || 'Nicht festgelegt' 
+                  },
+                  schedules: {
+                    room_id: board.roomId || null,
+                    room: {
+                      name: rooms.find(r => r.id === board.roomId)?.name || ''
                     }
-                  });
-                } else if (!dbRecord) {
-                  // Standard projected card for student not in DB yet
-                  projectedData.push({
-                    id: `mock-${board.id}-${student.id}`,
-                    student_id: student.id,
-                    teacher_id: userId,
-                    date: dateStr,
-                    start_time: formattedTime,
-                    duration: student.duration,
-                    status: 'scheduled',
-                    isGroupBlock: student.isGroup || false,
-                    groupOccurrences: student.groupStudents || [],
-                    student: { 
-                      first_name: student.first_name || 'Pause', 
-                      last_name: student.last_name || '', 
-                      instrument: student.instrument || 'Nicht festgelegt' 
-                    },
-                    schedules: {
-                      room_id: board.roomId || null,
-                      room: {
-                        name: rooms.find(r => r.id === board.roomId)?.name || ''
-                      }
-                    }
-                  });
-                }
+                  }
+                });
               }
             }
           });
@@ -1930,13 +1860,19 @@ export function ScheduleCalendarView({
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
 
-          if (dayDate.getMonth() === 7) return; // Skip August
+
 
           const formattedTime = slot.time_slot ? (slot.time_slot.includes(':') && slot.time_slot.split(':').length === 2 ? `${slot.time_slot}:00` : slot.time_slot) : '00:00:00';
-          const alreadyExists = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5)) ||
+          const alreadyExistsByTime = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5) && o.status !== 'cancelled') ||
                                 projectedData.some(p => p.date === dateStr && (p.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5));
+          
+          let alreadyExistsByStudent = false;
+          if (slot.student_id) {
+            alreadyExistsByStudent = fetchedData.some(o => o.student_id === slot.student_id && (o.original_date === dateStr || (!o.original_date && o.date === dateStr)) && o.status !== 'cancelled') ||
+                                     projectedData.some(p => p.student_id === slot.student_id && (p.original_date === dateStr || (!p.original_date && p.date === dateStr)));
+          }
 
-          if (!alreadyExists) {
+          if (!alreadyExistsByTime && !alreadyExistsByStudent) {
             const studentObj = slot.student;
             const roomObj = (rooms || []).find((r: any) => r.id === slot.room_id);
 
@@ -3126,9 +3062,9 @@ export function ScheduleCalendarView({
     });
 
     updateMultipleOccurrences(updatesMap);
+    setSwapLinks(prev => [...prev, { id1: sourceId, id2: targetId }]);
     
     setDraggedId(null);
-    setSwapLinks(prev => [...prev, { id1: sourceId, id2: targetId }]);
   };
 
   const handleDropOnOccurrence = async (e: React.DragEvent, targetId: string) => {
@@ -3395,8 +3331,20 @@ export function ScheduleCalendarView({
     setEditOccState(null);
   };
   const savePendingChanges = async () => {
-    await persistChangesDirectly(Object.values(pendingChanges));
+    const changes = Object.values(pendingChanges);
+    if (changes.length === 0) return;
+
+    // Optimistically commit pending changes to baseOccurrences state (0ms instant UI feedback)
+    setBaseOccurrences(prev => prev.map(occ => {
+      const match = changes.find(c => c.id === occ.id);
+      if (match) {
+        return { ...occ, ...match };
+      }
+      return occ;
+    }));
     setPendingChanges({});
+
+    await persistChangesDirectly(changes);
   };
 
   const handleCancel = async (e: React.MouseEvent, id: string) => {
@@ -3584,14 +3532,12 @@ export function ScheduleCalendarView({
   // Master Synchronized Time Grid Vector (Google Calendar Standard)
   // Calculates global minStartMinutes across all active day columns so all columns align 100% horizontally.
   const globalMinStartMinutes = useMemo(() => {
-    let minMin = 8 * 60; // Default 08:00
-    occurrences.forEach(occ => {
-      if (occ.status !== 'cancelled' && occ.start_time) {
-        const m = timeToMinutes(occ.start_time);
-        if (m < minMin) minMin = Math.floor(m / 60) * 60; // floor to whole hour
-      }
-    });
-    return Math.max(6 * 60, minMin); // Bound between 06:00 and 08:00
+    // Find the exact earliest start time across all active occurrences this week (e.g. 13:15 -> 795 mins).
+    const activeTimes = occurrences
+      .filter(occ => occ.status !== 'cancelled' && occ.start_time)
+      .map(occ => timeToMinutes(occ.start_time));
+    if (activeTimes.length === 0) return 8 * 60; // Default 08:00 if no occurrences
+    return Math.min(...activeTimes); // Start exactly at the earliest appointment without gap!
   }, [occurrences]);
 
   const globalMaxEndMinutes = useMemo(() => {
@@ -3660,7 +3606,6 @@ export function ScheduleCalendarView({
 
         layoutMap.set(occ.id, { colIndex: placedCol, totalCols: 1 });
       });
-
       const totalColsInCluster = colEnds.length;
       cluster.forEach(occ => {
         const existing = layoutMap.get(occ.id);
@@ -3673,7 +3618,29 @@ export function ScheduleCalendarView({
     return layoutMap;
   };
 
-  const isLockedForTeacher = currentUserRole === 'teacher' && (!hasSubmittedSchedule || scheduleStatus !== 'approved');
+  const isTeacherScheduleUnlocked = useMemo(() => {
+    if (scheduleStatus === 'approved' || hasSubmittedSchedule) return true;
+    if (cachedWeekSchedules && cachedWeekSchedules.some((s: any) => (userId ? s.teacher_id === userId : true) && (!!s.room_id || s.status === 'approved'))) {
+      return true;
+    }
+    if (cachedWeekSchedules && cachedWeekSchedules.some((s: any) => userId ? s.teacher_id === userId : true)) {
+      return true;
+    }
+    if (schoolId) {
+      try {
+        const draftMapStr = localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`);
+        if (draftMapStr) {
+          const draftMap = JSON.parse(draftMapStr);
+          if (Object.keys(draftMap).some(k => (userId ? (k.startsWith(`${userId}_`) || k.includes(userId)) : true) && !!draftMap[k])) {
+            return true;
+          }
+        }
+      } catch {}
+    }
+    return false;
+  }, [scheduleStatus, hasSubmittedSchedule, cachedWeekSchedules, userId, schoolId]);
+
+  const isLockedForTeacher = currentUserRole === 'teacher' && !isTeacherScheduleUnlocked;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
@@ -3891,7 +3858,7 @@ export function ScheduleCalendarView({
                 <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
               </span>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                {hasSubmittedSchedule && scheduleStatus === 'approved' ? (
+                {isTeacherScheduleUnlocked ? (
                   activeRooms.map(room => {
                     const isActive = selectedRoomIdForXRay === room.id;
                     const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
@@ -4292,7 +4259,12 @@ export function ScheduleCalendarView({
             return o.original_date && o.original_date !== dateStr;
           });
 
-          const dayBaselineMinutes = globalMinStartMinutes;
+          // Calculate individual baseline for this specific day so each day column starts bündig at its own first appointment
+          const activeDayTimes = dayOccurrences
+            .filter(o => o.status !== 'cancelled' && o.start_time)
+            .map(o => timeToMinutes(o.start_time));
+          
+          const dayBaselineMinutes = activeDayTimes.length > 0 ? Math.min(...activeDayTimes) : globalMinStartMinutes;
           
           const columnHeight = (1440 - dayBaselineMinutes) * 2.5;
           const startHour = Math.ceil(dayBaselineMinutes / 60);
@@ -5758,47 +5730,7 @@ return (
                           );
                         })()}
 
-                        {/* Bottom-Edge Resize Handle for Google Calendar Duration Adjustment */}
-                        {!isBreak && !isVacant && !((currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule) && (
-                          <div
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              const startY = e.clientY;
-                              const initialDuration = occ.duration || 30;
-
-                              const handleMouseMove = (moveEvent: MouseEvent) => {
-                                const deltaY = moveEvent.clientY - startY;
-                                const deltaMins = Math.round((deltaY / 2.5) / gridSnapMinutes) * gridSnapMinutes;
-                                const newDuration = Math.max(15, initialDuration + deltaMins);
-                                updateOccurrence(occ.id, { duration: newDuration });
-                              };
-
-                              const handleMouseUp = () => {
-                                window.removeEventListener('mousemove', handleMouseMove);
-                                window.removeEventListener('mouseup', handleMouseUp);
-                              };
-
-                              window.addEventListener('mousemove', handleMouseMove);
-                              window.addEventListener('mouseup', handleMouseUp);
-                            }}
-                            style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              height: '8px',
-                              cursor: 'ns-resize',
-                              zIndex: 10,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                            title="Ziehen, um die Dauer anzupassen"
-                          >
-                            <div style={{ width: '20px', height: '2.5px', borderRadius: '1.5px', background: 'rgba(0,0,0,0.18)' }} />
-                          </div>
-                        )}
+                        {/* Resize handle intentionally removed – appointment duration is fixed by the schedule. */}
                       </div>
                     </React.Fragment>
                   );

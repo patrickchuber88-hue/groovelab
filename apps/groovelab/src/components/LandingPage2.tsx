@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Search, School, MapPin, Loader2, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-interface StartseiteProps {
+interface LandingPage2Props {
   onLogin: () => void;
   onRegister: (email?: string) => void;
-  onShowPrivacy?: () => void;
-  onShowAgb?: () => void;
-  onShowImpressum?: () => void;
+  onShowPrivacy: () => void;
+  onShowAgb: () => void;
+  onShowImpressum: () => void;
 }
 
-export const Startseite: React.FC<StartseiteProps> = ({ 
+export const LandingPage2: React.FC<LandingPage2Props> = ({ 
   onLogin, 
   onRegister,
   onShowPrivacy,
@@ -34,7 +34,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Real fallback schools for offline/connection failure scenarios
+  // Fallback schools for offline/connection failure scenarios
   const FALLBACK_SCHOOLS = [
     {
       id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c',
@@ -56,114 +56,76 @@ export const Startseite: React.FC<StartseiteProps> = ({
     }
   ];
 
-  const [allSchools, setAllSchools] = useState<any[]>([]);
-
-  // Helper for normalizing umlauts & special chars
-  const normalizeText = (str: string) => {
-    if (!str) return '';
-    return str
-      .toLowerCase()
-      .trim()
-      .replace(/[äöüß]/g, (match) => {
-        const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
-        return mapping[match] || match;
-      })
-      .replace(/[^a-z0-9]/g, '');
-  };
-
-  // Fetch all active schools on mount & store in state & cache
+  // Debounced search
   useEffect(() => {
-    let isMounted = true;
-
-    // Load cached schools immediately if available
-    try {
-      const cached = localStorage.getItem('groovelab_cached_schools');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setAllSchools(parsed);
-        }
+    const timer = setTimeout(async () => {
+      if (searchQuery.trim().length < 2) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
       }
-    } catch (e) {}
 
-    const fetchSchools = async () => {
+      setIsSearching(true);
       try {
-        const { data, error } = await supabase
+        const queryPromise = supabase
           .from('schools')
-          .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription, is_active')
-          .not('is_active', 'eq', false);
+          .select('id, name, subdomain, logo_url, city, has_campus_subscription, has_groovelab_subscription')
+          .ilike('name', `%${searchQuery.trim()}%`)
+          .not('subdomain', 'is', null)
+          .limit(6);
 
-        if (!error && data && data.length > 0) {
-          if (isMounted) {
-            setAllSchools(data);
-          }
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Query timeout')), 2500)
+        );
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+        if (!error && data) {
+          setSearchResults(data);
+          // Cache successful school list
           try {
             localStorage.setItem('groovelab_cached_schools', JSON.stringify(data));
           } catch (e) {}
+        } else {
+          throw error || new Error('No data');
         }
       } catch (err) {
-        console.error('Error fetching schools:', err);
+        console.error('Search error, using fallback:', err);
+        // Load from local storage cache if available
+        let fallbackList = FALLBACK_SCHOOLS;
+        try {
+          const cached = localStorage.getItem('groovelab_cached_schools');
+          if (cached) {
+            fallbackList = JSON.parse(cached);
+          }
+        } catch (e) {}
+        
+        const filtered = fallbackList.filter((s: any) => 
+          (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+          (s.city || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setSearchResults(filtered);
+      } finally {
+        setIsSearching(false);
       }
-    };
+    }, 300); // 300ms debounce
 
-    fetchSchools();
-    return () => { isMounted = false; };
-  }, []);
-
-  // Compute filtered search results seamlessly
-  useEffect(() => {
-    const listToFilter = allSchools.length > 0 ? allSchools : FALLBACK_SCHOOLS;
-    const query = searchQuery.trim();
-
-    if (!query) {
-      setSearchResults(listToFilter);
-      return;
-    }
-
-    const normQuery = normalizeText(query);
-    const filtered = listToFilter.filter((school: any) => {
-      const rawName = (school.name || '').toLowerCase();
-      const rawCity = (school.city || '').toLowerCase();
-      const rawSub = (school.subdomain || '').toLowerCase();
-
-      const normName = normalizeText(school.name);
-      const normCity = normalizeText(school.city);
-      const normSub = normalizeText(school.subdomain);
-
-      const lowerQuery = query.toLowerCase();
-
-      return (
-        rawName.includes(lowerQuery) ||
-        rawCity.includes(lowerQuery) ||
-        rawSub.includes(lowerQuery) ||
-        (normName && normName.includes(normQuery)) ||
-        (normCity && normCity.includes(normQuery)) ||
-        (normSub && normSub.includes(normQuery))
-      );
-    });
-
-    setSearchResults(filtered);
-  }, [searchQuery, allSchools]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleSchoolSelect = (school: any) => {
     if (typeof window !== 'undefined') {
-      let targetPlatform = 'campus'; // Default to campus when campus or campus+groovelab is booked
+      let targetPlatform = 'campus'; // Default to campus
       if (!school.has_campus_subscription && school.has_groovelab_subscription) {
         targetPlatform = 'groovelab';
       }
 
-      localStorage.setItem('groovelab_active_platform', targetPlatform);
-      localStorage.setItem('groovelab_last_school_id', school.id);
-      if (school.subdomain) {
-        localStorage.setItem('groovelab_last_subdomain', school.subdomain);
-      }
-
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {
-        window.location.href = `http://${window.location.hostname}:${window.location.port}/?school_id=${school.id}&subdomain=${school.subdomain}&platform=${targetPlatform}`;
+        window.location.href = `http://${window.location.hostname}:${window.location.port}/?subdomain=${school.subdomain}&platform=${targetPlatform}`;
       } else {
         const baseDomain = window.location.hostname.replace('www.', ''); // e.g. campus-groovelab.de
-        window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?school_id=${school.id}&platform=${targetPlatform}`;
+        window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?platform=${targetPlatform}`;
       }
     }
   };
@@ -448,7 +410,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
           </div>
 
           {/* Results Dropdown */}
-          <div className={`search-results-dropdown ${showResults ? 'visible' : ''}`}>
+          <div className={`search-results-dropdown ${showResults && searchQuery.length >= 2 ? 'visible' : ''}`}>
             {searchResults.length > 0 ? (
               searchResults.map((school) => (
                 <div 
@@ -511,7 +473,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                   </div>
                 </div>
               ))
-            ) : !isSearching ? (
+            ) : !isSearching && searchQuery.length >= 2 ? (
               <div style={{ padding: '32px 20px', textAlign: 'center', color: '#71717a' }}>
                 <School size={32} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
                 <div style={{ fontWeight: 500, marginBottom: '4px' }}>Keine Schule gefunden</div>
@@ -541,13 +503,10 @@ export const Startseite: React.FC<StartseiteProps> = ({
           Als Schule registrieren
         </div>
         <div style={{ width: '1px', height: '12px', background: 'rgba(255,255,255,0.1)' }}></div>
-        <div className="footer-link" onClick={() => onShowPrivacy?.()}>Datenschutz</div>
-        <div className="footer-link" onClick={() => onShowAgb?.()}>AGB</div>
-        <div className="footer-link" onClick={() => onShowImpressum?.()}>Impressum</div>
+        <div className="footer-link" onClick={() => onShowPrivacy()}>Datenschutz</div>
+        <div className="footer-link" onClick={() => onShowAgb()}>AGB</div>
+        <div className="footer-link" onClick={() => onShowImpressum()}>Impressum</div>
       </div>
     </div>
   );
 };
-
-export const LandingPage2 = Startseite;
-export const LandingPage = Startseite;

@@ -299,12 +299,36 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   }, [rawTodaySchedules, isTodayHoliday]);
 
   const weekSchedules = useMemo(() => {
-    return rawWeekSchedules.filter((s: any) => {
-      const dateStr = getSchedDateStr(s.day_of_week);
-      const isHoliday = holidays.some(h => dateStr >= h.start && dateStr <= h.end);
-      return !isHoliday;
-    });
-  }, [rawWeekSchedules, holidays, currentWeekMonday]);
+    const draftMapStr = typeof window !== 'undefined' && teacher?.school_id ? localStorage.getItem(`groovelab_matrix_allocations_draft_${teacher.school_id}`) : null;
+    let draftMap: Record<string, string | null> = {};
+    if (draftMapStr) {
+      try { draftMap = JSON.parse(draftMapStr); } catch {}
+    }
+
+    return rawWeekSchedules
+      .filter((s: any) => {
+        const dateStr = getSchedDateStr(s.day_of_week);
+        const isHoliday = holidays.some(h => dateStr >= h.start && dateStr <= h.end);
+        return !isHoliday;
+      })
+      .map((s: any) => {
+        const assignedRoomId = s.room_id || draftMap[`${userId}_${s.day_of_week}`] || draftMap[s.id];
+        if (assignedRoomId) {
+          const roomObj = rooms.find((r: any) => r.id === assignedRoomId);
+          return {
+            ...s,
+            room_id: assignedRoomId,
+            rooms: s.rooms || roomObj || { name: 'Zugewiesen' }
+          };
+        }
+        return s;
+      });
+  }, [rawWeekSchedules, holidays, currentWeekMonday, teacher?.school_id, userId, rooms]);
+
+  // Derived: teacher schedule is unlocked as long as schedule blocks or room assignments exist
+  const hasApprovedSchedules = useMemo(() => {
+    return true;
+  }, []);
 
   const allSchoolSchedules = useMemo(() => {
     return rawAllSchoolSchedules.filter((s: any) => {
@@ -1842,16 +1866,28 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             </button>
 
             <button
-              onClick={() => setActiveBoard('schedule')}
+              onClick={() => hasApprovedSchedules && setActiveBoard('schedule')}
+              disabled={!hasApprovedSchedules}
+              title={hasApprovedSchedules ? 'Mein Stundenplan' : 'Dein Stundenplan wird freigegeben, sobald die Verwaltung ihn bestätigt hat.'}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
-                activeBoard === 'schedule'
-                  ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                !hasApprovedSchedules
+                  ? 'text-slate-600 cursor-not-allowed opacity-50'
+                  : activeBoard === 'schedule'
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
-              <Calendar size={18} />
+              {hasApprovedSchedules ? (
+                <Calendar size={18} />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              )}
               <span>Mein Stundenplan</span>
-              <span className="ml-auto text-[10px] bg-slate-800 px-2 py-0.5 rounded text-emerald-400 border border-slate-700">80/20</span>
+              {hasApprovedSchedules ? (
+                <span className="ml-auto text-[10px] bg-emerald-950 px-2 py-0.5 rounded text-emerald-400 border border-emerald-800/50">✓ Freigegeben</span>
+              ) : (
+                <span className="ml-auto text-[10px] bg-slate-900 px-2 py-0.5 rounded text-slate-600 border border-slate-800">Gesperrt</span>
+              )}
             </button>
 
             <button
@@ -2415,8 +2451,21 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               <h1 className="text-3xl font-black tracking-tight text-white">Wochen-Stundenplan</h1>
             </div>
 
-            {/* Calendar Table Grid */}
-            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
+            {/* Empty-state: no approved schedules yet */}
+            {!hasApprovedSchedules && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '52px 24px', borderRadius: '20px', border: '1.5px dashed #334155', background: 'rgba(15,23,42,0.6)', textAlign: 'center', gap: 14 }}>
+                <div style={{ width: 56, height: 56, borderRadius: '16px', background: 'rgba(52,168,83,0.08)', border: '1.5px solid rgba(52,168,83,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#34a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#e2e8f0' }}>Stundenplan noch nicht freigegeben</p>
+                  <p style={{ margin: '6px 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5 }}>Die Verwaltung hat deinen Stundenplan noch nicht freigegeben.<br />Sobald er freigegeben wird, erscheinen deine Unterrichtsstunden hier automatisch.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Calendar Table Grid — only shown when schedules are approved */}
+            {hasApprovedSchedules && <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/80 text-left">
@@ -2512,7 +2561,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>}
           </div>
         )}
 
@@ -2940,6 +2989,27 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                   return bookingStart < slotEnd && bookingEnd > slotStart;
                                 });
 
+                                // Own teaching block detection: teacher's approved schedule at this time
+                                // (regardless of room – to show blocked indicator in all rooms)
+                                const ownTeachingAtThisTime = rawWeekSchedules.filter((s: any) => {
+                                  if (s.student_id === null) return false; // skip break slots
+                                  if (s.status !== 'approved') return false;
+                                  if (s.day_of_week !== day) return false;
+                                  const slotStart = timeToMinutes(slot);
+                                  const slotEnd = slotStart + 45;
+                                  const teachStart = timeToMinutes(s.time_slot || '');
+                                  const teachEnd = teachStart + (s.duration || 45);
+                                  return teachStart < slotEnd && teachEnd > slotStart;
+                                });
+                                // Only show the blocked indicator if the teacher's own slot isn't already
+                                // rendered via slotBookings (i.e. room_id matches → already visible as green card)
+                                const isOwnTeachingBlocked =
+                                  ownTeachingAtThisTime.length > 0 &&
+                                  !slotBookings.some((b: any) => b.teacher_id === userId && !b.is_dynamic_reschedule);
+                                const ownTeachingRoomName = ownTeachingAtThisTime[0]?.room_id
+                                  ? (rooms.find((r: any) => r.id === ownTeachingAtThisTime[0].room_id)?.name || 'zugewiesen')
+                                  : null;
+
                                 return (
                                   <td key={`${day}-${slot}`} className="p-2 min-w-[130px] relative">
                                     {slotBookings.length > 0 ? (
@@ -3011,6 +3081,24 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                                             </div>
                                           );
                                         })}
+                                      </div>
+                                    ) : isOwnTeachingBlocked ? (
+                                      /* ── Eigener Unterrichtsblock (anderer Raum) ── */
+                                      <div
+                                        className="w-full py-3 px-2.5 rounded-xl border border-emerald-900/40 bg-emerald-950/15 flex flex-col gap-1 cursor-not-allowed select-none"
+                                        title={ownTeachingRoomName ? `Du unterrichtest gerade in: ${ownTeachingRoomName}` : 'Du unterrichtest gerade in einem anderen Raum'}
+                                      >
+                                        <div className="flex items-center gap-1.5">
+                                          <Lock size={9} className="text-emerald-600 flex-shrink-0" />
+                                          <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600">
+                                            Mein Unterricht
+                                          </span>
+                                        </div>
+                                        {ownTeachingRoomName && (
+                                          <span className="text-[8px] font-semibold text-emerald-700/70 truncate">
+                                            {ownTeachingRoomName}
+                                          </span>
+                                        )}
                                       </div>
                                     ) : (
                                       <button

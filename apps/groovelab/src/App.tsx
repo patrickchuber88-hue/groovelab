@@ -66,6 +66,27 @@ if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.medi
   }
 }
 
+let _lastReplaceStateTime = 0;
+let _replaceStateCount = 0;
+
+export const safeReplaceState = (data: any, unused: string, url?: string | URL | null) => {
+  if (typeof window === 'undefined' || !window.history) return;
+  try {
+    const now = Date.now();
+    if (now - _lastReplaceStateTime > 10000) {
+      _lastReplaceStateTime = now;
+      _replaceStateCount = 0;
+    }
+    _replaceStateCount++;
+    if (_replaceStateCount > 25) {
+      return;
+    }
+    window.history.replaceState(data, unused, url);
+  } catch (e) {
+    console.warn('[History] safeReplaceState caught error:', e);
+  }
+};
+
 const APP_INSTRUMENT_ICONS: Record<string, any> = { 
   "Gitarre": renderInstrumentIcon("Gitarre"), 
   "Guitar": renderInstrumentIcon("Guitar"), 
@@ -1169,7 +1190,7 @@ if (targetPlatform && (targetPlatform === 'campus' || targetPlatform === 'groove
     const newSearch = params.toString();
     const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
     if (typeof window !== 'undefined' && window.history) {
-      window.history.replaceState({}, '', newUrl);
+      safeReplaceState({}, '', newUrl);
     }
   }
 }
@@ -2241,7 +2262,7 @@ function App() {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
       if (isStandalone) {
         const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
+        safeReplaceState({}, document.title, cleanUrl);
       }
     }
     
@@ -2400,18 +2421,16 @@ function App() {
     }
   });
   const setUser = React.useCallback((val: any) => {
-    React.startTransition(() => {
-      setUserRaw((prev: any) => {
-        const nextVal = typeof val === 'function' ? val(prev) : val;
-        if (typeof window !== 'undefined') {
-          if (nextVal) {
-            localStorage.setItem('groovelab_cached_user', JSON.stringify(nextVal));
-          } else {
-            localStorage.removeItem('groovelab_cached_user');
-          }
+    setUserRaw((prev: any) => {
+      const nextVal = typeof val === 'function' ? val(prev) : val;
+      if (typeof window !== 'undefined') {
+        if (nextVal) {
+          localStorage.setItem('groovelab_cached_user', JSON.stringify(nextVal));
+        } else {
+          localStorage.removeItem('groovelab_cached_user');
         }
-        return nextVal;
-      });
+      }
+      return nextVal;
     });
   }, []);
 
@@ -2515,22 +2534,20 @@ function App() {
     } else if (targetVal === 'groovelab' && !schoolHasGroove) {
       targetVal = 'campus';
     }
-    React.startTransition(() => {
-      setActivePlatformRaw(targetVal);
-      localStorage.setItem('groovelab_active_platform', targetVal);
-      
-      // Auto-switch the active tab to the saved tab of the target platform to load flawlessly
-      if (targetVal === 'campus') {
-        const savedTab = localStorage.getItem('campus_active_tab') || 'briefing';
-        setActiveStudentTabRaw(savedTab);
-      } else if (targetVal === 'ensembles') {
-        const savedTab = localStorage.getItem('ensembles_active_tab') || 'overview';
-        setActiveStudentTabRaw(savedTab);
-      } else {
-        const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
-        setActiveStudentTabRaw(savedTab);
-      }
-    });
+    setActivePlatformRaw(targetVal);
+    localStorage.setItem('groovelab_active_platform', targetVal);
+    
+    // Auto-switch the active tab to the saved tab of the target platform to load flawlessly
+    if (targetVal === 'campus') {
+      const savedTab = localStorage.getItem('campus_active_tab') || 'briefing';
+      setActiveStudentTabRaw(savedTab);
+    } else if (targetVal === 'ensembles') {
+      const savedTab = localStorage.getItem('ensembles_active_tab') || 'overview';
+      setActiveStudentTabRaw(savedTab);
+    } else {
+      const savedTab = localStorage.getItem('groovelab_active_tab') || 'live';
+      setActiveStudentTabRaw(savedTab);
+    }
   }, [locationMode, user?.role, user?.schools]);
 
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
@@ -2544,21 +2561,19 @@ function App() {
     return localStorage.getItem('groovelab_active_tab') || 'live';
   });
   const setActiveStudentTab = React.useCallback((val: any) => {
-    React.startTransition(() => {
-      setActiveStudentTabRaw(val);
-      // Persist the tab to the correct localStorage key based on the current active platform
-      const platform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-      if (platform === 'campus') {
-        localStorage.setItem('campus_active_tab', val);
-      } else if (platform === 'ensembles') {
-        localStorage.setItem('ensembles_active_tab', val);
-      } else {
-        localStorage.setItem('groovelab_active_tab', val);
-        if (val === 'live' && user?.id) {
-          fetchDashboardData(user.id);
-        }
+    setActiveStudentTabRaw(val);
+    // Persist the tab to the correct localStorage key based on the current active platform
+    const platform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    if (platform === 'campus') {
+      localStorage.setItem('campus_active_tab', val);
+    } else if (platform === 'ensembles') {
+      localStorage.setItem('ensembles_active_tab', val);
+    } else {
+      localStorage.setItem('groovelab_active_tab', val);
+      if (val === 'live' && user?.id) {
+        fetchDashboardData(user.id);
       }
-    });
+    }
   }, [user?.id]);
 
   // Auto-refresh bands for staff profile and GrooveLab view
@@ -3226,7 +3241,7 @@ function App() {
   const [customBandName, setCustomBandName] = useState('');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [failedAvatarUrls, setFailedAvatarUrls] = useState<string[]>([]);
-  const [avatarPickerType, setAvatarPickerType] = useState<'band' | 'student'>('band');
+  const [avatarPickerType, setAvatarPickerType] = useState<'band' | 'student' | 'teacher'>('band');
   const [avatarInstrumentFilter, setAvatarInstrumentFilter] = useState<'Alle' | 'E-Gitarre' | 'E-Piano' | 'E-Drum' | 'E-Bass' | 'Gesang'>('Alle');
   const [bandAvatarSizeFilter, setBandAvatarSizeFilter] = useState<'Alle' | '3' | '4' | '5'>('Alle');
 
@@ -3655,12 +3670,14 @@ function App() {
       }
 
       if (userData) {
-        const r = (userData.role || '').toLowerCase();
-        const rolesArr = userData.roles || [];
-        const isAdminOrSec = r === 'admin' || r === 'secretary' || rolesArr.includes('admin') || rolesArr.includes('secretary');
-        if (isAdminOrSec && activePlatform === 'campus') {
-          userData.photo_url = '/campus_login_hero.png';
-          userData.avatar_url = '/campus_login_hero.png';
+        if (!userData.photo_url && !userData.avatar_url) {
+          const r = (userData.role || '').toLowerCase();
+          const rolesArr = userData.roles || [];
+          const isPureAdminOrSec = (r === 'admin' || r === 'secretary') && !rolesArr.includes('teacher') && !rolesArr.includes('student');
+          if (isPureAdminOrSec) {
+            userData.photo_url = '/campus_login_hero.png';
+            userData.avatar_url = '/campus_login_hero.png';
+          }
         }
       }
 
@@ -6551,26 +6568,16 @@ function App() {
       }
     }
 
-    const rolesArray = Array.isArray(userToLogin?.roles) ? userToLogin.roles : [];
-    const hasAdminRole = rolesArray.includes('admin');
-    const hasSecretaryRole = rolesArray.includes('secretary');
-    const isTeacher = userToLogin?.role === 'teacher';
-    
-    if (hasAdminRole || hasSecretaryRole) {
-      const finalAdminRole = hasAdminRole ? 'admin' : 'secretary';
-      if (userToLogin && userToLogin.role !== finalAdminRole) {
-        await supabase
-          .from('users')
-          .update({ role: finalAdminRole })
-          .eq('id', userId);
-      }
+    const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
+    if (currentRole === 'admin' || currentRole === 'secretary') {
       localStorage.setItem('groovelab_active_workspace', 'secretary');
       localStorage.setItem('groovelab_active_platform', 'campus');
       localStorage.setItem('campus_active_tab', 'briefing');
-      if (finalAdminRole === 'secretary') {
+      if (currentRole === 'secretary') {
         localStorage.setItem('groovelab_secretary_subtab', 'briefing');
       }
-    } else if (userToLogin?.role === 'student') {
+    } else if (currentRole === 'student') {
+      localStorage.setItem('groovelab_active_workspace', 'student');
       if (!localIsKioskMode) {
         localStorage.setItem('groovelab_active_platform', 'campus');
         localStorage.setItem('campus_active_tab', 'briefing');
@@ -6578,7 +6585,8 @@ function App() {
         localStorage.setItem('groovelab_active_platform', 'groovelab');
         localStorage.setItem('groovelab_active_tab', 'live');
       }
-    } else if (isTeacher) {
+    } else {
+      localStorage.setItem('groovelab_active_workspace', 'teacher');
       if (!localIsKioskMode) {
         localStorage.setItem('groovelab_active_platform', 'campus');
         localStorage.setItem('campus_active_tab', 'live');
@@ -6589,8 +6597,7 @@ function App() {
     }
 
     // Force checkout from active sessions for Campus logins / Admins / Secretaries to prevent automatic check-in visibility
-    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-    const isCampus = activePlatform === 'campus' || hasAdminRole || hasSecretaryRole;
+    const isCampus = activePlatform === 'campus' || currentRole === 'admin' || currentRole === 'secretary';
     if (isCampus) {
       await supabase
         .from('sessions')
@@ -7078,21 +7085,22 @@ function App() {
 
   // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder fixer QR-Token-Link (Sofort abfangen vor allen States!)
   const urlParams = new URLSearchParams(location.search);
-  const queryQrToken = urlParams.get('token') || urlParams.get('qr_token');
+  const isInviteSchoolLink = urlParams.has('invite_school_id');
+  const queryQrToken = !isInviteSchoolLink ? (urlParams.get('token') || urlParams.get('qr_token')) : null;
 
   const sessionQrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
   const localLastQrToken = typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_qr_token') : null;
 
-  const effectiveQrToken = qrPathMatch 
+  const effectiveQrToken = !isInviteSchoolLink && (qrPathMatch 
     ? qrPathMatch[1] 
-    : (queryQrToken || sessionQrToken || (location.pathname.startsWith('/qr/') ? localLastQrToken : null));
+    : (queryQrToken || sessionQrToken || (location.pathname.startsWith('/qr/') ? localLastQrToken : null)));
 
   if (effectiveQrToken) {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('groovelab_qr_token', effectiveQrToken);
       localStorage.setItem('groovelab_last_qr_token', effectiveQrToken);
       if (!location.pathname.startsWith('/qr/')) {
-        window.history.replaceState(null, '', `/qr/${effectiveQrToken}`);
+        safeReplaceState(null, '', `/qr/${effectiveQrToken}`);
       }
     }
 
@@ -7350,8 +7358,29 @@ function App() {
 
   const handleSwitchActiveRole = async (newRole: string) => {
     try {
-      setUser((prevUser: any) => (prevUser ? { ...prevUser, role: newRole } : prevUser));
+      const userId = user?.id;
+      if (!userId) return;
 
+      // 1. Synchronously update local React state & cached user
+      setUser((prevUser: any) => {
+        if (!prevUser) return prevUser;
+        const updated = { ...prevUser, role: newRole };
+        try {
+          localStorage.setItem('groovelab_cached_user', JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+
+      // 2. Await database role update FIRST before triggering platform/tab refetches
+      const { error } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', userId);
+      if (error) {
+        console.warn('Role update in Supabase notice:', error.message);
+      }
+
+      // 3. Update active workspace and platform tabs
       if (newRole === 'teacher') {
         const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
         const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
@@ -7362,6 +7391,7 @@ function App() {
           targetPlatform = 'groovelab';
         }
 
+        localStorage.setItem('groovelab_active_workspace', 'teacher');
         localStorage.setItem('groovelab_active_platform', targetPlatform);
         setActivePlatform(targetPlatform);
         setActiveStudentTab('live');
@@ -7372,14 +7402,6 @@ function App() {
         localStorage.setItem('campus_active_tab', 'briefing');
         setActivePlatform('campus');
         setActiveStudentTab('briefing');
-      }
-
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', user.id);
-      if (error) {
-        console.warn('Role update in Supabase notice:', error.message);
       }
     } catch (err: any) {
       console.warn('Fehler beim Rollenwechsel:', err);
@@ -7394,6 +7416,8 @@ function App() {
           <SecretaryDashboard 
             schoolId={user.school_id} 
             userId={user.id} 
+            userRole={user.role}
+            userRoles={user.roles}
             onLogout={handleLogout} 
             onRoleSwitched={handleSwitchActiveRole}
             activePlatform={activePlatform}
@@ -9354,10 +9378,10 @@ function App() {
                 </div>
               )}
               {/* Elegant Switch to Admin/Verwaltung Button */}
-              {user?.role === 'teacher' && user.roles && (user.roles.includes('admin') || user.roles.includes('secretary')) && (
+              {user && (user.role === 'teacher' || (user.roles && user.roles.includes('teacher'))) && (
                 <button 
                   onClick={() => {
-                    const targetRole = user.roles.includes('admin') ? 'admin' : 'secretary';
+                    const targetRole = (user.roles && user.roles.includes('admin')) ? 'admin' : (user.role === 'admin' ? 'admin' : 'secretary');
                     handleSwitchActiveRole(targetRole);
                   }}
                   style={{ 
@@ -9366,7 +9390,7 @@ function App() {
                     justifyContent: 'center',
                     gap: '6px', 
                     background: '#fce8e6', 
-                    border: '1px solid #fad2cf', 
+                    border: '1.5px solid #ea4335', 
                     height: windowWidth <= 768 ? '36px' : '40px',
                     padding: windowWidth <= 480 ? '0 10px' : '0 14px', 
                     borderRadius: '12px', 
@@ -9375,14 +9399,14 @@ function App() {
                     fontSize: '0.8rem', 
                     cursor: 'pointer',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: '0 4px 12px rgba(234, 67, 53, 0.08)',
+                    boxShadow: '0 4px 12px rgba(234, 67, 53, 0.12)',
                     flexShrink: 0
                   }}
                   className="hover-scale"
-                  title="Zur Verwaltung wechseln"
+                  title="Zur Schulverwaltung wechseln"
                 >
-                  <School size={14} color="#ea4335" />
-                  {windowWidth > 480 && <span>Verwaltung</span>}
+                  <School size={15} color="#ea4335" />
+                  <span>Verwaltung</span>
                 </button>
               )}
               {/* Elegant Logout Button next to avatar (mobile-only to avoid duplicate on desktop) */}
@@ -9851,13 +9875,7 @@ function App() {
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', transition: 'all 0.3s' }} className="photo-overlay">
                     <button 
                       onClick={() => {
-                        const r = (user?.role || '').toLowerCase();
-                        const isAdminOrSec = r === 'admin' || r === 'secretary';
-                        if (isAdminOrSec) {
-                          alert('Mitarbeiter der Verwaltung und des Sekretariats nutzen das Standard-Profilbild (/campus_login_hero.png).');
-                          return;
-                        }
-                        setAvatarPickerType('student');
+                        setAvatarPickerType('teacher');
                         setShowAvatarPicker(true);
                       }}
                       style={{ 
@@ -15286,10 +15304,10 @@ function App() {
                   let list: any[] = STUDENT_AVATARS;
                   if (activePlatform === 'campus') {
                     if (role !== 'student') list = CAMPUS_AVATARS;
-                  } else if (role === 'teacher' || role === 'admin') {
+                  } else if (role === 'teacher' || role === 'admin' || role === 'secretary' || avatarPickerType === 'teacher') {
                     list = TEACHER_AVATARS;
                   }
-                  if (avatarInstrumentFilter !== 'Alle' && !(role === 'teacher' || role === 'admin')) {
+                  if (avatarInstrumentFilter !== 'Alle' && !(role === 'teacher' || role === 'admin' || role === 'secretary' || avatarPickerType === 'teacher')) {
                     list = list.filter((av: any) => av.category === avatarInstrumentFilter);
                   }
 

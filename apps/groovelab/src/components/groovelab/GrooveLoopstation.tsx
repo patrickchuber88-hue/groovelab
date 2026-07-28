@@ -2162,6 +2162,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           ? masterLoopDuration - ((Date.now() - startTimeRef.current) % masterLoopDuration)
           : 0;
 
+        // Mandatory 4-measure loop pause (4 * masterLoopDuration) to guarantee sample-accurate synchrony (no swallowed attack)
+        const totalDelay = msToNextCycle + (masterLoopDuration ? 4 * masterLoopDuration : 0);
+
         setTimeout(() => {
           recordStartTimesRef.current[trackId] = Date.now();
           mediaRecorder.start();
@@ -2175,7 +2178,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             }
           }, masterLoopDuration || 5000);
 
-        }, msToNextCycle);
+        }, totalDelay);
       }
     } catch (err) {
       console.error('Mic error:', err);
@@ -4175,7 +4178,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           </div>
 
           {/* Analog Tape Machine Bounce Down Bar */}
-          {useHeadphones && (tracks.filter(t => !!t.url).length >= 2 || bounceBackupState !== null) && (
+          {(tracks.filter(t => !!t.url).length >= 2 || bounceBackupState !== null) && (
             <div style={{
               width: '100%',
               background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',

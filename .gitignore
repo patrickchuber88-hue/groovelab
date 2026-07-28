@@ -33,3 +33,4 @@ dist.tar.gz
 *.tar.gz
 backups/
 backup.sh
+scratch/

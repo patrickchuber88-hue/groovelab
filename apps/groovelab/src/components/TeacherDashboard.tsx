@@ -267,7 +267,7 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     const targetUser = user;
     
     const r = (targetUser?.role || '').toLowerCase();
-    if (r === 'admin' || r === 'secretary') {
+    if (activePlat === 'secretary') {
       return '/campus_login_hero.png';
     }
     
@@ -320,12 +320,8 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
         src.includes('bariton_avatar') || 
         src.includes('oboe_avatar')
       );
-      const isTeacherAvatar = src && (
-        src.includes('teacher_') ||
-        src.includes('avatar_teacher')
-      );
       if (r === 'teacher' || r === 'admin' || r === 'secretary') {
-        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
+        return (src && src !== '/campus_login_hero.png') ? src : '/avatar_ghost.jpg';
       }
       if (!src || isInstrument || src === '/avatar_ghost.jpg') {
         return '/avatar_ghost.jpg';
@@ -2944,6 +2940,7 @@ export function TeacherDashboard({
           .select(`
             id,
             date,
+            original_date,
             start_time,
             status,
             schedules (
@@ -2960,7 +2957,7 @@ export function TeacherDashboard({
           .in('status', ['pending_reschedule', 'rescheduled_confirmed', 'cancelled']);
 
         const mappedOccurs = (occurs || []).map((occ: any) => {
-          const startTimeStr = occ.start_time.substring(0, 5);
+          const startTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
           const durationMin = occ.schedules?.duration || 45;
           const [shStr, smStr] = startTimeStr.split(':');
           const sh = parseInt(shStr) || 0;
@@ -2975,6 +2972,7 @@ export function TeacherDashboard({
             roomId: occ.schedules?.rooms?.id,
             roomName: occ.schedules?.rooms?.name || 'Raum',
             date: occ.date,
+            original_date: occ.original_date,
             startTime: startTimeStr,
             endTime: endTimeStr,
             purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Unterricht',
@@ -3010,6 +3008,9 @@ export function TeacherDashboard({
           if (b.teacherId !== userId) return false;
           if (!b.date) return false;
           if (!b.studentName) return false;
+          // Only classify as a real reschedule if original_date differs from date or status is pending_reschedule/cancelled
+          const isRealReschedule = (b.original_date && b.original_date !== b.date) || b.status === 'pending_reschedule' || b.status === 'cancelled';
+          if (!isRealReschedule) return false;
           return b.date >= todayStr && b.date <= twoWeeksLaterStr;
         });
 
@@ -3598,7 +3599,10 @@ export function TeacherDashboard({
           const rawDay = new Date().getDay();
           const todayWeekday = rawDay === 0 ? 7 : rawDay;
 
-           const { data: slots } = await supabase
+           const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
+           const dayNameStr = dayNamesMap[todayWeekday] || 'Monday';
+
+           const { data: allTeacherSlots } = await supabase
             .from('schedules')
             .select(`
               id,
@@ -3619,7 +3623,112 @@ export function TeacherDashboard({
               )
             `)
             .eq('teacher_id', userId)
-            .eq('day_of_week', todayWeekday);
+            .eq('school_id', teacherProfile.school_id)
+            .in('status', ['opened', 'approved', 'published']);
+
+           let slots = (allTeacherSlots || []).filter((s: any) => {
+             return s.day_of_week === todayWeekday || 
+                    s.day_of_week === dayNameStr || 
+                    String(s.day_of_week) === String(todayWeekday) ||
+                    String(s.day_of_week) === dayNameStr;
+           });
+
+           // Fallback to teacher planned_boards if DB schedules are empty
+           if (slots.length === 0) {
+             try {
+               const { data: tUser } = await supabase
+                 .from('users')
+                 .select('planned_boards')
+                 .eq('id', userId)
+                 .single();
+
+               if (tUser && tUser.planned_boards) {
+                 const pb = typeof tUser.planned_boards === 'string' ? JSON.parse(tUser.planned_boards) : tUser.planned_boards;
+                 let boards: any[] = [];
+                 if (pb && typeof pb === 'object' && !Array.isArray(pb) && Array.isArray(pb.drafts)) {
+                   const targetDraftId = pb.submittedDraftId || pb.activeDraftId;
+                   const targetDraft = pb.drafts.find((d: any) => d.id === targetDraftId) || pb.drafts[0];
+                   const isOpened = targetDraft && (targetDraft.status === 'opened' || targetDraft.status === 'approved' || targetDraft.status === 'published' || targetDraft.is_opened === true);
+                   if (isOpened && Array.isArray(targetDraft.boards)) {
+                     boards = targetDraft.boards;
+                   }
+                 } else if (Array.isArray(pb)) {
+                   boards = pb;
+                 } else if (pb && typeof pb === 'object') {
+                   boards = Object.values(pb);
+                 }
+
+                 const todayBoard = boards.find((b: any) => 
+                   b.dayOfWeek === todayWeekday || 
+                   b.dayOfWeek === dayNameStr || 
+                   String(b.dayOfWeek) === String(todayWeekday)
+                 );
+
+                 if (todayBoard && Array.isArray(todayBoard.students)) {
+                   const { data: schoolStudents } = await supabase
+                     .from('users')
+                     .select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)')
+                     .eq('school_id', teacherProfile.school_id);
+
+                   const boardStartStr = todayBoard.startTime || '14:00';
+                   const [bSh, bSm] = boardStartStr.split(':').map(Number);
+                   let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
+
+                   todayBoard.students.forEach((s: any) => {
+                     if (s.isBreak || !s.first_name) {
+                       if (s.isBreak) {
+                         currentCumulativeMin += (s.duration || 15);
+                       }
+                       return;
+                     }
+                     const matchedStudent = (schoolStudents || []).find((st: any) => 
+                       st.id === s.id || 
+                       (st.first_name?.trim().toLowerCase() === s.first_name?.trim().toLowerCase() && 
+                        (st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase())
+                     );
+
+                     let studentTime = s.customStartTime || s.assignedTime || s.startTime;
+                     if (!studentTime) {
+                       const h = Math.floor(currentCumulativeMin / 60) % 24;
+                       const m = currentCumulativeMin % 60;
+                       studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                     }
+                     const studentDuration = s.duration || 45;
+                     currentCumulativeMin += studentDuration;
+
+                     slots.push({
+                       id: `board-${todayBoard.id}-${s.id}`,
+                       time_slot: studentTime,
+                       duration: studentDuration,
+                       status: 'approved',
+                       day_of_week: todayWeekday,
+                       instrument: matchedStudent?.instrument || s.instrument || 'Klavier',
+                       rooms: { id: todayBoard.roomId || null, name: todayBoard.roomName || 'Hauptraum' } as any,
+                       student: (matchedStudent ? {
+                         id: matchedStudent.id,
+                         first_name: matchedStudent.first_name,
+                         last_name: matchedStudent.last_name,
+                         is_app_user: matchedStudent.is_app_user,
+                         instrument: matchedStudent.instrument,
+                         birth_date: matchedStudent.birth_date,
+                         avatars: matchedStudent.avatars
+                       } : {
+                         id: s.id || `temp-${s.first_name}`,
+                         first_name: s.first_name,
+                         last_name: s.last_name || '',
+                         is_app_user: false,
+                         instrument: s.instrument || 'Klavier',
+                         birth_date: null,
+                         avatars: []
+                       }) as any
+                     });
+                   });
+                 }
+               }
+             } catch (e) {
+               console.warn('Failed to parse planned_boards for briefing fallback:', e);
+             }
+           }
 
           const todayStr = new Date().toLocaleDateString('sv-SE');
 
@@ -3651,6 +3760,7 @@ export function TeacherDashboard({
               )
             `)
             .eq('teacher_id', userId)
+            .eq('school_id', teacherProfile.school_id)
             .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
 
           // Format regular schedules
@@ -5964,7 +6074,7 @@ export function TeacherDashboard({
               {activeTab !== 'live' && (
                 <>
                   <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', margin: 0 }}>
-                    {activeTab === 'students' ? `🎓 Schülerverwaltung (${allStudents.length})` : `👥 Bands (${allBands.length})`}
+                    {activeTab === 'students' ? `🎓 Schülerverwaltung (${allStudents.filter(s => activePlatform === 'campus' ? (s.is_campus_active === true || s.isCampusActive === true) : (s.is_groovelab_active === true || s.isGroovelabActive === true)).length})` : `👥 Bands (${allBands.length})`}
                   </h2>
                   <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
                     {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
@@ -12938,6 +13048,15 @@ export function TeacherDashboard({
             {/* Students Grid */}
             {(() => {
               const filtered = allStudents.filter(student => {
+                // Strict Module Activation Filter:
+                // GrooveLab tab MUST ONLY show students who have GrooveLab activated (is_groovelab_active === true)
+                // Campus tab MUST ONLY show students who have Campus activated (is_campus_active === true)
+                const isModuleActive = activePlatform === 'campus'
+                  ? (student.is_campus_active === true || student.isCampusActive === true)
+                  : (student.is_groovelab_active === true || student.isGroovelabActive === true);
+
+                if (!isModuleActive) return false;
+
                 const matchesSearch = (student.first_name || '').toLowerCase().includes(studentSearch.toLowerCase()) || 
                                       (student.last_name || '').toLowerCase().includes(studentSearch.toLowerCase());
                 const matchesLetter = studentLetter ? (student.first_name || '').toUpperCase().startsWith(studentLetter) : true;
@@ -13565,6 +13684,71 @@ export function TeacherDashboard({
                         value="Campus-Lehrkraft" 
                         style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none' }}
                       />
+                    </div>
+                  </div>
+
+                  {/* AVATAR SELECTION SECTION */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      🖼️ Profil-Avatar auswählen
+                    </label>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
+                      Wähle dein bevorzugtes Avatar-Bild für den Live Lab &amp; die Sidebar aus.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: '12px', marginTop: '8px' }}>
+                      {[
+                        { url: '/avatars/gitarre_avatar_new.png', name: 'Gitarre' },
+                        { url: '/avatars/egitarre_avatar.png', name: 'E-Gitarre' },
+                        { url: '/avatars/ebass_avatar.png', name: 'E-Bass' },
+                        { url: '/avatars/schlagzeug_avatar.png', name: 'Drums' },
+                        { url: '/avatars/klavier_avatar_new.png', name: 'Klavier' },
+                        { url: '/avatars/gesang_avatar.png', name: 'Gesang' },
+                        { url: '/avatars/trompete_avatar_new.png', name: 'Trompete' },
+                        { url: '/avatars/saxophon_avatar_new.png', name: 'Saxophon' },
+                        { url: '/avatar_ghost.jpg', name: 'Geist' }
+                      ].map((av) => {
+                        const isSelected = teacher?.photo_url === av.url || teacher?.avatar_url === av.url;
+                        return (
+                          <div
+                            key={av.url}
+                            onClick={async () => {
+                              if (!teacher?.id) return;
+                              try {
+                                const { error } = await supabase
+                                  .from('users')
+                                  .update({ photo_url: av.url, avatar_url: av.url })
+                                  .eq('id', teacher.id);
+                                if (error) throw error;
+                                setTeacher((prev: any) => ({ ...prev, photo_url: av.url, avatar_url: av.url }));
+                              } catch (err: any) {
+                                alert('Fehler beim Aktualisieren: ' + err.message);
+                              }
+                            }}
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px',
+                              borderRadius: '14px',
+                              background: isSelected ? '#e6f4ea' : 'white',
+                              border: isSelected ? '2px solid #34a853' : '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              boxShadow: isSelected ? '0 4px 12px rgba(52,168,83,0.15)' : 'none',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            <img
+                              src={av.url}
+                              alt={av.name}
+                              style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: isSelected ? '#34a853' : '#64748b' }}>
+                              {av.name}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

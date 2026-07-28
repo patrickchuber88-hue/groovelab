@@ -67,128 +67,33 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   let displaySrc = src;
   const targetUser = user;
   const role = (targetUser?.role || '').toLowerCase();
-  const hasTeacherOrStudentRole = 
-    role === 'teacher' || 
-    role === 'student' || 
-    (targetUser?.roles && (targetUser.roles.includes('teacher') || targetUser.roles.includes('student')));
 
-  const isPureAdminOrSecretary = !hasTeacherOrStudentRole && (
-    role === 'admin' || 
-    role === 'secretary' || 
-    (targetUser?.roles && (targetUser.roles.includes('admin') || targetUser.roles.includes('secretary')))
-  );
-  
-  if (isPureAdminOrSecretary) {
-    // Pure administrative users always display the chalkboard image in all modules
+  if (activePlat === 'secretary' || activePlat === 'admin') {
+    // In administration/secretariat module, ALWAYS display the chalkboard image
     displaySrc = '/campus_login_hero.png';
-  } else if (activePlat === 'secretary' || activePlat === 'admin') {
-    // In administration/secretariat module, always display the chalkboard
-    displaySrc = '/campus_login_hero.png';
-  } else if (activePlat === 'campus') {
-    // In Campus module, display the instrument avatar for all roles (student, teacher)
-    // We only show custom non-avatar photos if available, otherwise default to instrument avatar
-    const isMusicianOrInstrumentAvatar = src && (
-      src.includes('student_') ||
-      src.includes('bandstyle_') ||
-      src.includes('teen_') ||
-      src.includes('avatar_boy') ||
-      src.includes('avatar_girl') ||
-      src.includes('avatar.png') || 
-      src.includes('avatar_new') ||
-      src.includes('_avatar') ||
-      src.includes('guitar_avatar') || 
-      src.includes('gitarre_avatar') || 
-      src.includes('ebass_avatar') || 
-      src.includes('egitarre_avatar') || 
-      src.includes('kontrabass_avatar') || 
-      src.includes('bass_avatar') || 
-      src.includes('drums_avatar') || 
-      src.includes('schlagzeug_avatar') || 
-      src.includes('piano_avatar') || 
-      src.includes('klavier_avatar') || 
-      src.includes('vocals_avatar') || 
-      src.includes('gesang_avatar') || 
-      src.includes('trumpet_avatar') || 
-      src.includes('trompete_avatar') || 
-      src.includes('trombone_avatar') || 
-      src.includes('posaune_avatar') || 
-      src.includes('horn_avatar') || 
-      src.includes('cello_avatar') || 
-      src.includes('violin_avatar') || 
-      src.includes('violine_avatar') || 
-      src.includes('clarinet_avatar') || 
-      src.includes('klarinette_avatar') || 
-      src.includes('flute_avatar') || 
-      src.includes('querfloete_avatar') || 
-      src.includes('saxophone_avatar') || 
-      src.includes('saxophon_avatar') || 
-      src.includes('blockfloete_avatar') || 
-      src.includes('bariton_avatar') || 
-      src.includes('oboe_avatar') ||
-      src.includes('teacher_') ||
-      src.includes('avatar_teacher') ||
-      src.includes('avatar_ghost') ||
-      src === '/campus_login_hero.png'
-    );
-    if (!src || isMusicianOrInstrumentAvatar) {
-      displaySrc = getInstrumentAvatarUrl(resolvedInstrument || user?.instrument);
-    }
-  } else {
-    // GrooveLab platform: musician/instrument avatars are allowed for students/teachers
-    const isStudentAvatar = src && (
-      src.includes('student_') ||
-      src.includes('bandstyle_') ||
-      src.includes('teen_') ||
-      src.includes('avatar_boy') ||
-      src.includes('avatar_girl')
-    );
-    const isInstrumentAvatar = !isStudentAvatar && src && (
-      src.includes('avatar.png') || 
-      src.includes('avatar_new') ||
-      src.includes('_avatar') ||
-      src.includes('guitar_avatar') || 
-      src.includes('gitarre_avatar') || 
-      src.includes('ebass_avatar') || 
-      src.includes('egitarre_avatar') || 
-      src.includes('kontrabass_avatar') || 
-      src.includes('bass_avatar') || 
-      src.includes('drums_avatar') || 
-      src.includes('schlagzeug_avatar') || 
-      src.includes('piano_avatar') || 
-      src.includes('klavier_avatar') || 
-      src.includes('vocals_avatar') || 
-      src.includes('gesang_avatar') || 
-      src.includes('trumpet_avatar') || 
-      src.includes('trompete_avatar') || 
-      src.includes('trombone_avatar') || 
-      src.includes('posaune_avatar') || 
-      src.includes('horn_avatar') || 
-      src.includes('cello_avatar') || 
-      src.includes('violin_avatar') || 
-      src.includes('violine_avatar') || 
-      src.includes('clarinet_avatar') || 
-      src.includes('klarinette_avatar') || 
-      src.includes('flute_avatar') || 
-      src.includes('querfloete_avatar') || 
-      src.includes('saxophone_avatar') || 
-      src.includes('saxophon_avatar') || 
-      src.includes('blockfloete_avatar') || 
-      src.includes('bariton_avatar') || 
-      src.includes('oboe_avatar')
-    );
-    const isTeacherAvatar = src && (
-      src.includes('teacher_') ||
-      src.includes('avatar_teacher')
-    );
-    if (role === 'teacher') {
-      displaySrc = isTeacherAvatar ? src : '/avatar_ghost.jpg';
-    } else if (role === 'student') {
-      if (!src || src === '/avatar_ghost.jpg') {
-        displaySrc = '/avatar_ghost.jpg';
-      }
+  } else if (activePlat === 'groovelab') {
+    // IN GROOVELAB MODULE: ONLY MUSICIAN AVATARS ALLOWED! NEVER DISPLAY /campus_login_hero.png!
+    const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
+    const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;
+    const userAvatar = (targetUser?.avatar_url === '/campus_login_hero.png') ? null : targetUser?.avatar_url;
+    
+    const candidate = effectiveSrc || userPhoto || userAvatar;
+    if (candidate) {
+      displaySrc = candidate;
     } else {
-      // Admins/secretaries get ghost or custom avatar
-      displaySrc = !src || src === '/campus_login_hero.png' ? '/avatar_ghost.jpg' : src;
+      if (role === 'teacher' || role === 'admin' || role === 'secretary') {
+        displaySrc = '/avatar_ghost.jpg';
+      } else {
+        displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, role);
+      }
+    }
+  } else if (activePlat === 'campus') {
+    // In Campus module, display instrument avatar if no custom photo or if chalkboard
+    const isChalkboard = !src || src === '/campus_login_hero.png';
+    if (isChalkboard) {
+      displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
+    } else {
+      displaySrc = src;
     }
   }
 
