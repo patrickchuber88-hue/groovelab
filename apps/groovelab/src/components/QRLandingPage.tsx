@@ -1048,28 +1048,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           hasPinCreated = true;
         }
 
-        // 1. Allererstes Öffnen der QR Landingpage 2: Wenn noch KEINE PIN in der DB hinterlegt ist, MUSS sofort zur PIN-Ersterstellung aufgefordert werden!
-        if (userData.role === 'student' && !hasPinCreated) {
-          setParentUnlocked(false);
-          setLessonsUnlocked(false);
-          setPinPurpose('setup_initial_pin');
-          setPageState('pin_required');
-          return;
-        }
-
-        if (wasUnlocked) {
-          setParentUnlocked(true);
-          setLessonsUnlocked(true);
-          sessionStorage.setItem('groovelab_qr_token', token);
-          setPageState('profile');
-        } else {
-          // 2. Wenn der Cache-Speicher geleert wurde / Gerät noch nicht gekoppelt ist -> IMMER sofort PIN vor Öffnen der Landingpage abfragen!
-          setParentUnlocked(false);
-          setLessonsUnlocked(false);
-          setPinPurpose('unlock_preview');
-          setPageState('pin_required');
-          return;
-        }
+        // Direkte Anzeige der QR-Landingpage ohne anfängliche PIN-Abfrage (Netflix-Prinzip für Schnellzugriff auf Hausaufgaben & Stundenplan)
+        setParentUnlocked(wasUnlocked);
+        setLessonsUnlocked(wasUnlocked);
+        sessionStorage.setItem('groovelab_qr_token', token);
+        setPageState('profile');
       } catch (err: any) {
         sessionStorage.removeItem('groovelab_qr_token');
         sessionStorage.removeItem('groovelab_user_id');

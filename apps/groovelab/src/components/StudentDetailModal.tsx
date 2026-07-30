@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -181,6 +181,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
   const [studentStats, setStudentStats] = useState<any>(null);
   const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
   const [isPremiumActive, setIsPremiumActive] = useState<boolean>(false);
+  const [campusHomeworkItems, setCampusHomeworkItems] = useState<any[]>([]);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
   const [appUsageMode, setAppUsageMode] = useState<string>(student.app_usage_mode || 'student_only');
   const [parentPin, setParentPin] = useState<string>(student.parent_pin || '');
@@ -1191,6 +1192,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         .maybeSingle();
       setStudentStats(statsRecord);
 
+      // Fetch campus homework items from progress_matrix
+      const { data: pmData } = await supabase
+        .from('progress_matrix')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('created_at', { ascending: false });
+      setCampusHomeworkItems(pmData || []);
+
       setLoading(false);
     };
     fetchData();
@@ -1836,7 +1845,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     document.body.removeChild(link);
   };
 
-  const [activeModalTab, setActiveModalTab] = useState<'dashboard' | 'settings' | 'access'>('dashboard');
+  const [activeModalTab, setActiveModalTab] = useState<'dashboard' | 'groovelab' | 'settings' | 'access'>('dashboard');
 
   const renderProfileHeader = () => {
     const activeColor = localTab === 'campus' ? '#34a853' : '#eab308';
@@ -2080,6 +2089,30 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <LayoutDashboard size={16} style={{ color: activeModalTab === 'dashboard' ? activeColor : '#64748b' }} />
           <span>Dashboard</span>
         </button>
+
+        {isGroovelabActive && (
+          <button
+            onClick={() => setActiveModalTab('groovelab')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: activeModalTab === 'groovelab' ? '3px solid #eab308' : '3px solid transparent',
+              padding: '8px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              color: activeModalTab === 'groovelab' ? '#1e293b' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <Music size={16} style={{ color: activeModalTab === 'groovelab' ? '#eab308' : '#64748b' }} />
+            <span>GrooveLab</span>
+          </button>
+        )}
+
         <button
           onClick={() => setActiveModalTab('settings')}
           style={{
@@ -2126,243 +2159,214 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const renderModalContent = () => {
     const activeColor = localTab === 'campus' ? '#34a853' : '#eab308';
+
+    // Compute campus homework songs & exercises from assignedLehrwerke and progress_matrix
+    const campusHomeworkList: { id: string; title: string; subtitle: string; status: 'homework' | 'mastered'; notes?: string }[] = [];
+
+    (assignedLehrwerke || []).forEach((assigned: any) => {
+      const book = globalLehrwerke.find((b: any) => b.id === assigned.lehrwerkId);
+      if (!book) return;
+      const states = assigned.pageStates || {};
+      Object.keys(states).forEach((pageNumStr) => {
+        const pageNum = parseInt(pageNumStr, 10);
+        const st = states[pageNumStr];
+        if (st && (st.status === 'homework' || st.status === 'mastered')) {
+          campusHomeworkList.push({
+            id: `${assigned.lehrwerkId}-${pageNum}`,
+            title: `${book.title} - Seite ${pageNum}`,
+            subtitle: st.notes ? `Hinweis: ${st.notes}` : (st.status === 'mastered' ? 'Meisterwerk' : 'Hausaufgabe'),
+            status: st.status,
+            notes: st.notes
+          });
+        }
+      });
+    });
+
+    (campusHomeworkItems || []).forEach((item: any) => {
+      if (!item.topic_name) return;
+      const isMastered = item.status === 'mastered' || item.status === 'completed';
+      if (!campusHomeworkList.some(existing => existing.title === item.topic_name)) {
+        campusHomeworkList.push({
+          id: item.id || item.topic_name,
+          title: item.topic_name,
+          subtitle: item.teacher_notes || item.homework_notes || (isMastered ? 'Meisterwerk' : 'Hausaufgabe'),
+          status: isMastered ? 'mastered' : 'homework',
+          notes: item.teacher_notes || item.homework_notes
+        });
+      }
+    });
     
     if (activeModalTab === 'dashboard') {
       return (
         <div className="student-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start' }}>
-          {/* Left Column: Stats & Progress Details */}
+          {/* Left Column: Campus Stats & Progress Details */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {isPlatformCampus ? (
-              /* ---- CAMPUS Dashboard core contents ---- */
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
-                  {/* Campus Card 1: XP */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #4285f4, #2b6cb0)',
-                    color: 'white',
-                    borderRadius: '16px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    boxShadow: '0 6px 15px rgba(66, 133, 244, 0.15)',
-                    height: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Star size={18} fill="white" color="white" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {currentXP} XP
-                      </div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                        XP GESAMMELT
-                      </div>
-                    </div>
+            {/* ---- CAMPUS Dashboard core contents ---- */}
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
+                {/* Campus Card 1: XP */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #4285f4, #2b6cb0)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(66, 133, 244, 0.15)',
+                  height: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Star size={18} fill="white" color="white" />
                   </div>
-
-                  {/* Campus Card 2: Songs */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #34a853, #22c55e)',
-                    color: 'white',
-                    borderRadius: '16px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    boxShadow: '0 6px 15px rgba(52, 168, 83, 0.15)',
-                    height: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Award size={18} color="white" fill="white" />
+                  <div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {currentXP} XP
                     </div>
-                    <div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {verifiedSongsCount} / {skills.length + vocalsSongIds.size}
-                      </div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                        SONGS GEMEISTERT
-                      </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      XP GESAMMELT
                     </div>
-                  </div>
-
-                  {/* Campus Card 3: Fokus-Übezeit */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #fbbc05, #d97706)',
-                    color: 'white',
-                    borderRadius: '16px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    boxShadow: '0 6px 15px rgba(251, 188, 5, 0.15)',
-                    height: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Clock size={18} color="white" fill="white" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {focusMinutes} Min
-                      </div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                        FOKUS-ÜBEZEIT
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Campus Card 4: Übe-Streak */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #ea4335, #b91c1c)',
-                    color: 'white',
-                    borderRadius: '16px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    boxShadow: '0 6px 15px rgba(234, 67, 53, 0.15)',
-                    height: '100%',
-                    boxSizing: 'border-box',
-                    position: 'relative'
-                  }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span style={{ fontSize: '1.1rem' }}>🔥</span>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {streakDays} Tage
-                      </div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                        SERIE AM LAUFEN
-                      </div>
-                    </div>
-                    {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
-                      <button
-                        onClick={() => {
-                          const val = prompt('Neue Anzahl an Streak-Tagen eingeben:', String(streakDays));
-                          if (val !== null) {
-                            const num = parseInt(val, 10);
-                            if (!isNaN(num) && num >= 0) {
-                              handleUpdateStreak(num);
-                            }
-                          }
-                        }}
-                        style={{
-                          position: 'absolute',
-                          right: '8px',
-                          top: '8px',
-                          background: 'rgba(255,255,255,0.2)',
-                          border: 'none',
-                          color: '#ffffff',
-                          borderRadius: '6px',
-                          padding: '2px 5px',
-                          fontSize: '0.55rem',
-                          fontWeight: 800,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Bearbeiten
-                      </button>
-                    )}
                   </div>
                 </div>
 
-                {/* Songs & Lehrwerke list widget */}
-                <section style={{ 
-                  background: '#f8fafc', 
-                  borderRadius: '24px', 
-                  padding: '20px', 
-                  border: '1.5px solid #e2e8f0',
+                {/* Campus Card 2: Songs */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #34a853, #22c55e)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px'
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(52, 168, 83, 0.15)',
+                  height: '100%',
+                  boxSizing: 'border-box'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                    <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
-                      <BookOpen size={16} /> Songs &amp; Lehrwerke
-                    </h4>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Award size={18} color="white" fill="white" />
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {/* Textbooks Row */}
-                    <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Lehrwerke</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {(assignedLehrwerke || []).map((assigned) => {
-                          const book = globalLehrwerke.find((b: any) => b.id === assigned.lehrwerkId);
-                          if (!book) return null;
-                          const percent = assigned.progressPercent || 0;
-                          const bookColor = getLehrwerkColor(book.title);
-
-                          return (
-                            <div key={assigned.lehrwerkId} style={{ 
-                              background: '#ffffff', 
-                              padding: '8px 12px', 
-                              borderRadius: '12px', 
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              fontSize: '0.82rem'
-                            }}>
-                              <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{
-                                  width: '24px',
-                                  height: '32px',
-                                  background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
-                                  borderRadius: '4px',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                  border: 'none',
-                                  position: 'relative',
-                                  flexShrink: 0,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}>
-                                  <BookOpen size={11} color={bookColor.text} />
-                                  <div style={{
-                                    position: 'absolute',
-                                    left: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    width: '3px',
-                                    background: 'rgba(0,0,0,0.08)',
-                                    borderRight: '1px solid rgba(255,255,255,0.1)'
-                                  }} />
-                                </div>
-                                <span>{book.title}</span>
-                              </span>
-                              <span style={{ 
-                                background: percent > 0 ? '#e6f4ea' : '#f1f5f9', 
-                                color: percent > 0 ? '#34a853' : '#64748b', 
-                                padding: '2px 8px', 
-                                borderRadius: '6px', 
-                                fontWeight: 900,
-                                fontSize: '0.75rem' 
-                              }}>
-                                {percent}% gemeistert
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {(assignedLehrwerke || []).length === 0 && (
-                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine aktiven Lehrwerke zugewiesen.</div>
-                        )}
-                      </div>
+                  <div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {campusHomeworkList.filter(i => i.status === 'mastered').length} / {assignedLehrwerke.length || 1}
                     </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      SONGS GEMEISTERT
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Divider line inside card */}
-                    <div style={{ height: '1px', background: '#e2e8f0' }} />
+                {/* Campus Card 3: Fokus-Übezeit */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #fbbc05, #d97706)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(251, 188, 5, 0.15)',
+                  height: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Clock size={18} color="white" fill="white" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {focusMinutes} Min
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      FOKUS-ÜBEZEIT
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Songs Row */}
-                    <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Songs &amp; Übungen</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {practiceBoard.map((s: any) => (
-                          <div key={s.id + s.level} style={{ 
+                {/* Campus Card 4: Übe-Streak */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #ea4335, #b91c1c)',
+                  color: 'white',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  boxShadow: '0 6px 15px rgba(234, 67, 53, 0.15)',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                  position: 'relative'
+                }}>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: '1.1rem' }}>🔥</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                      {streakDays} Tage
+                    </div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                      SERIE AM LAUFEN
+                    </div>
+                  </div>
+                  {(currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary') && (
+                    <button
+                      onClick={() => {
+                        const val = prompt('Neue Anzahl an Streak-Tagen eingeben:', String(streakDays));
+                        if (val !== null) {
+                          const num = parseInt(val, 10);
+                          if (!isNaN(num) && num >= 0) {
+                            handleUpdateStreak(num);
+                          }
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '8px',
+                        background: 'rgba(255,255,255,0.2)',
+                        border: 'none',
+                        color: '#ffffff',
+                        borderRadius: '6px',
+                        padding: '2px 5px',
+                        fontSize: '0.55rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Bearbeiten
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Songs & Lehrwerke list widget */}
+              <section style={{ 
+                background: '#f8fafc', 
+                borderRadius: '24px', 
+                padding: '20px', 
+                border: '1.5px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                    <BookOpen size={16} /> Songs &amp; Lehrwerke
+                  </h4>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Textbooks Row */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Lehrwerke</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(assignedLehrwerke || []).map((assigned) => {
+                        const book = globalLehrwerke.find((b: any) => b.id === assigned.lehrwerkId);
+                        if (!book) return null;
+                        const percent = assigned.progressPercent || 0;
+                        const bookColor = getLehrwerkColor(book.title);
+
+                        return (
+                          <div key={assigned.lehrwerkId} style={{ 
                             background: '#ffffff', 
                             padding: '8px 12px', 
                             borderRadius: '12px', 
@@ -2372,254 +2376,374 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                             justifyContent: 'space-between',
                             fontSize: '0.82rem'
                           }}>
-                            <span style={{ fontWeight: 800, color: '#1e293b' }}>
-                              🎵 {s.title} <span style={{ fontWeight: 500, color: '#64748b', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                            <span style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '24px',
+                                height: '32px',
+                                background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                borderRadius: '4px',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                border: 'none',
+                                position: 'relative',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                <BookOpen size={11} color={bookColor.text} />
+                                <div style={{
+                                  position: 'absolute',
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: '3px',
+                                  background: 'rgba(0,0,0,0.08)',
+                                  borderRight: '1px solid rgba(255,255,255,0.1)'
+                                }} />
+                              </div>
+                              <span>{book.title}</span>
                             </span>
                             <span style={{ 
-                              background: '#eff6ff', 
-                              color: '#2563eb', 
+                              background: percent > 0 ? '#e6f4ea' : '#f1f5f9', 
+                              color: percent > 0 ? '#34a853' : '#64748b', 
                               padding: '2px 8px', 
                               borderRadius: '6px', 
                               fontWeight: 900,
                               fontSize: '0.75rem' 
                             }}>
-                              Übt gerade ({Math.max(...s.instruments.map((i: any) => i.progress)) || 0}%)
+                              {percent}% gemeistert
                             </span>
                           </div>
-                        ))}
+                        );
+                      })}
+                      {(assignedLehrwerke || []).length === 0 && (
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine aktiven Lehrwerke zugewiesen.</div>
+                      )}
+                    </div>
+                  </div>
 
-                        {repertoire.map((s: any) => (
-                          <div key={s.id + s.level} style={{ 
-                            background: '#e6f4ea', 
-                            padding: '8px 12px', 
-                            borderRadius: '12px', 
-                            border: '1px solid #e6f4ea',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            fontSize: '0.82rem'
+                  {/* Divider line inside card */}
+                  <div style={{ height: '1px', background: '#e2e8f0' }} />
+
+                  {/* Songs Row (Campus Hausaufgabenheft) */}
+                  <div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.04em' }}>Aktive Songs &amp; Übungen (Hausaufgabenheft)</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {campusHomeworkList.map((item) => (
+                        <div key={item.id} style={{ 
+                          background: item.status === 'mastered' ? '#e6f4ea' : '#ffffff', 
+                          padding: '8px 12px', 
+                          borderRadius: '12px', 
+                          border: item.status === 'mastered' ? '1px solid #e6f4ea' : '1px solid #e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          fontSize: '0.82rem'
+                        }}>
+                          <span style={{ fontWeight: 800, color: item.status === 'mastered' ? '#34a853' : '#1e293b' }}>
+                            {item.status === 'mastered' ? '🎉 ' : '🎵 '}{item.title}
+                            {item.subtitle && <span style={{ fontWeight: 500, color: item.status === 'mastered' ? '#34a853' : '#64748b', opacity: 0.8, fontSize: '0.75rem', marginLeft: '6px' }}>({item.subtitle})</span>}
+                          </span>
+                          <span style={{ 
+                            background: item.status === 'mastered' ? '#e6f4ea' : '#eff6ff', 
+                            color: item.status === 'mastered' ? '#34a853' : '#2563eb', 
+                            padding: '2px 8px', 
+                            borderRadius: '6px', 
+                            fontWeight: 900,
+                            fontSize: '0.75rem' 
                           }}>
-                            <span style={{ fontWeight: 800, color: '#34a853' }}>
-                              🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
-                            </span>
-                            <span style={{ 
-                              background: '#e6f4ea', 
-                              color: '#34a853', 
-                              padding: '2px 8px', 
-                              borderRadius: '6px', 
-                              fontWeight: 900,
-                              fontSize: '0.75rem' 
-                            }}>
-                              ✓ Verifiziert
-                            </span>
-                          </div>
-                        ))}
+                            {item.status === 'mastered' ? '✓ Meisterwerk' : 'Hausaufgabe'}
+                          </span>
+                        </div>
+                      ))}
 
-                        {practiceBoard.length === 0 && repertoire.length === 0 && (
-                          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Songs eingetragen.</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </>
-            ) : (
-              /* ---- GROOVELAB Dashboard core contents ---- */
-              <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
-                  {/* GL Card 1: GL XP */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #eab308, #ca8a04)',
-                    color: 'white',
-                    borderRadius: '16px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    boxShadow: '0 6px 15px rgba(234, 179, 8, 0.15)',
-                    height: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Star size={18} fill="white" color="white" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {verifiedSongsCount * 100} XP
-                      </div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                        GROOVELAB XP
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* GL Card 2: Mastered Songs */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: 'white',
-                    borderRadius: '16px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    boxShadow: '0 6px 15px rgba(29, 78, 216, 0.15)',
-                    height: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Music size={18} fill="white" color="white" />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
-                        {verifiedSongsCount}
-                      </div>
-                      <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
-                        SONGS GEMEISTERT
-                      </div>
+                      {campusHomeworkList.length === 0 && (
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Hausaufgaben oder Übungen im Hausaufgabenheft eingetragen.</div>
+                      )}
                     </div>
                   </div>
                 </div>
+              </section>
+            </>
+          </div>
 
-                {/* Active Repertoire Songs Widget */}
-                <section style={{ 
-                  background: '#fefce8', 
-                  borderRadius: '24px', 
-                  padding: '20px', 
-                  border: '1.5px solid #fef08a'
-                }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
-                    <Music size={16} /> Repertoire &amp; Übe-Liste
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {practiceBoard.map((s: any) => (
-                      <div key={s.id + s.level} style={{ 
-                        background: '#ffffff', 
-                        padding: '8px 12px', 
-                        borderRadius: '12px', 
-                        border: '1px solid #fef08a',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.82rem'
-                      }}>
-                        <span style={{ fontWeight: 800, color: '#854d0e' }}>
-                          🎵 {s.title} <span style={{ fontWeight: 500, color: '#a16207', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
-                        </span>
-                        <span style={{ 
-                          background: '#fefce8', 
-                          color: '#eab308', 
-                          padding: '2px 8px', 
-                          borderRadius: '6px', 
-                          fontWeight: 900,
-                          fontSize: '0.75rem' 
-                        }}>
-                          Übt gerade
-                        </span>
-                      </div>
-                    ))}
-                    {repertoire.map((s: any) => (
-                      <div key={s.id + s.level} style={{ 
-                        background: '#e6f4ea', 
-                        padding: '8px 12px', 
-                        borderRadius: '12px', 
-                        border: '1px solid #e6f4ea',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.82rem'
-                      }}>
-                        <span style={{ fontWeight: 800, color: '#34a853' }}>
-                          🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
-                        </span>
-                        <span style={{ 
-                          background: '#e6f4ea', 
-                          color: '#34a853', 
-                          padding: '2px 8px', 
-                          borderRadius: '6px', 
-                          fontWeight: 900,
-                          fontSize: '0.75rem' 
-                        }}>
-                          ✓ Verifiziert
-                        </span>
-                      </div>
-                    ))}
-                    {practiceBoard.length === 0 && repertoire.length === 0 && (
-                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine Songs eingetragen.</div>
-                    )}
-                  </div>
-                </section>
+          {/* Right Column: Sidebar Widgets */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Hero Card: Digitales Hausaufgabenheft */}
+            <section style={{
+              background: 'linear-gradient(135deg, #34a853 0%, #059669 45%, #4f46e5 100%)',
+              borderRadius: '24px',
+              padding: '22px 20px',
+              color: '#ffffff',
+              boxShadow: '0 12px 30px rgba(52, 168, 83, 0.28), 0 4px 12px rgba(79, 70, 229, 0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                  <BookOpen size={24} color="#ffffff" />
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.9 }}>LERNFORTSCHRITT &amp; PROTOKOLL</span>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', margin: '2px 0 0 0', lineHeight: 1.2 }}>Digitales Hausaufgabenheft</h3>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.78rem', opacity: 0.9, margin: '0 0 18px 0', lineHeight: 1.45 }}>
+                Wochenziele, Übungs-Streaks, Audio-Aufnahmen &amp; Meisterwerke des Schülers direkt einsehen.
+              </p>
+              <button 
+                onClick={handleOpenHausaufgabenheft}
+                style={{ 
+                  width: '100%', 
+                  background: '#ffffff', 
+                  color: '#15803d', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  padding: '12px 16px', 
+                  fontWeight: 900, 
+                  fontSize: '0.85rem', 
+                  cursor: 'pointer', 
+                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '8px', 
+                  transition: 'all 0.15s ease' 
+                }}
+              >
+                <BookOpen size={16} /> <span>Hausaufgabenheft öffnen</span>
+              </button>
+            </section>
 
-                {/* Meine Bands */}
-                <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
-                  <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Users size={16} /> Meine Bands
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {bands.map((b: any) => (
-                      <div 
-                        key={b.id} 
-                        onClick={() => {
-                          if (onOpenBandProfile) {
-                            onOpenBandProfile(b);
-                          }
-                        }}
-                        className={onOpenBandProfile ? "clickable-band-item" : ""}
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '12px', 
-                          padding: '12px', 
-                          background: '#fefce8', 
-                          borderRadius: '16px', 
-                          border: '1px solid #fef08a',
-                          cursor: onOpenBandProfile ? 'pointer' : 'default'
-                        }}
-                      >
-                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden' }}>
-                          <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {/* Aktueller Unterricht Widget */}
+            <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={16} /> Aktueller Unterricht
+              </h3>
+              {schedulesList.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {schedulesList.map((sched: any) => (
+                    <div key={sched.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
+                          {sched.day_of_week}s, {sched.time_slot}
                         </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e' }}>{b.name}</div>
-                      </div>
-                    ))}
-                    {bands.length === 0 && !loading && (
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>In keiner Band aktiv.</div>
-                    )}
-                  </div>
-                </section>
-
-                {/* Wochenplan-Zeiten */}
-                {!isPeerStudent && (
-                  <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
-                    <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Calendar size={16} /> Wochenplan-Zeiten
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {weekSessions.map((pres, idx) => (
-                        <div key={idx} style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '10px', 
-                          background: '#fffbeb', 
-                          border: '1px solid #fef3c7', 
-                          padding: '12px 14px', 
-                          borderRadius: '16px', 
-                          fontSize: '0.85rem', 
-                          fontWeight: 700, 
-                          color: '#b45309' 
-                        }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
-                          <div>
-                            {pres.dayStr}. {pres.rangeStr}
-                          </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                          Raum: {sched.rooms?.name || 'Kein Raum'} • Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
                         </div>
-                      ))}
-                      {weekSessions.length === 0 && (
-                        <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
-                      )}
+                      </div>
                     </div>
-                  </section>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>Kein aktiver Stundenplan zugeordnet.</div>
+              )}
+            </section>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeModalTab === 'groovelab' && isGroovelabActive) {
+      return (
+        <div className="student-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start' }}>
+          {/* Left Column: GrooveLab Stats & Band Songs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
+              {/* GL Card 1: GL XP */}
+              <div style={{
+                background: 'linear-gradient(135deg, #eab308, #ca8a04)',
+                color: 'white',
+                borderRadius: '16px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: '0 6px 15px rgba(234, 179, 8, 0.15)',
+                height: '100%',
+                boxSizing: 'border-box'
+              }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Star size={18} fill="white" color="white" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                    {verifiedSongsCount * 100} XP
+                  </div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                    GROOVELAB XP
+                  </div>
+                </div>
+              </div>
+
+              {/* GL Card 2: Mastered Songs */}
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                borderRadius: '16px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: '0 6px 15px rgba(29, 78, 216, 0.15)',
+                height: '100%',
+                boxSizing: 'border-box'
+              }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Music size={18} fill="white" color="white" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                    {verifiedSongsCount}
+                  </div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                    SONGS GEMEISTERT
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Repertoire Songs Widget */}
+            <section style={{ 
+              background: '#fefce8', 
+              borderRadius: '24px', 
+              padding: '20px', 
+              border: '1.5px solid #fef08a'
+            }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                <Music size={16} /> Repertoire &amp; Übe-Liste (GrooveLab)
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {practiceBoard.map((s: any) => (
+                  <div key={s.id + s.level} style={{ 
+                    background: '#ffffff', 
+                    padding: '8px 12px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #fef08a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.82rem'
+                  }}>
+                    <span style={{ fontWeight: 800, color: '#854d0e' }}>
+                      🎵 {s.title} <span style={{ fontWeight: 500, color: '#a16207', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                    </span>
+                    <span style={{ 
+                      background: '#fefce8', 
+                      color: '#eab308', 
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      fontWeight: 900,
+                      fontSize: '0.75rem' 
+                    }}>
+                      Übt gerade ({Math.max(...s.instruments.map((i: any) => i.progress)) || 0}%)
+                    </span>
+                  </div>
+                ))}
+                {repertoire.map((s: any) => (
+                  <div key={s.id + s.level} style={{ 
+                    background: '#e6f4ea', 
+                    padding: '8px 12px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #e6f4ea',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.82rem'
+                  }}>
+                    <span style={{ fontWeight: 800, color: '#34a853' }}>
+                      🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                    </span>
+                    <span style={{ 
+                      background: '#e6f4ea', 
+                      color: '#34a853', 
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      fontWeight: 900,
+                      fontSize: '0.75rem' 
+                    }}>
+                      ✓ Verifiziert
+                    </span>
+                  </div>
+                ))}
+                {practiceBoard.length === 0 && repertoire.length === 0 && (
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine GrooveLab Songs eingetragen.</div>
                 )}
-              </>
+              </div>
+            </section>
+
+            {/* Meine Bands */}
+            <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} /> Meine Bands
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {bands.map((b: any) => (
+                  <div 
+                    key={b.id} 
+                    onClick={() => {
+                      if (onOpenBandProfile) {
+                        onOpenBandProfile(b);
+                      }
+                    }}
+                    className={onOpenBandProfile ? "clickable-band-item" : ""}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '12px', 
+                      padding: '12px', 
+                      background: '#fefce8', 
+                      borderRadius: '16px', 
+                      border: '1px solid #fef08a',
+                      cursor: onOpenBandProfile ? 'pointer' : 'default'
+                    }}
+                  >
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden' }}>
+                      <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e' }}>{b.name}</div>
+                  </div>
+                ))}
+                {bands.length === 0 && !loading && (
+                  <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>In keiner Band aktiv.</div>
+                )}
+              </div>
+            </section>
+
+            {/* Wochenplan-Zeiten */}
+            {!isPeerStudent && (
+              <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+                <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={16} /> Wochenplan-Zeiten
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {weekSessions.map((pres, idx) => (
+                    <div key={idx} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '10px', 
+                      background: '#fffbeb', 
+                      border: '1px solid #fef3c7', 
+                      padding: '12px 14px', 
+                      borderRadius: '16px', 
+                      fontSize: '0.85rem', 
+                      fontWeight: 700, 
+                      color: '#b45309' 
+                    }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                      <div>
+                        {pres.dayStr}. {pres.rangeStr}
+                      </div>
+                    </div>
+                  ))}
+                  {weekSessions.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
+                  )}
+                </div>
+              </section>
             )}
           </div>
 
@@ -2627,224 +2751,312 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Hero Card: Digitales Hausaufgabenheft */}
             <section style={{
-              background: localTab === 'campus' 
-                ? 'linear-gradient(135deg, #34a853 0%, #059669 45%, #4f46e5 100%)' 
-                : 'linear-gradient(135deg, #eab308 0%, #d97706 45%, #ea4335 100%)',
+              background: 'linear-gradient(135deg, #eab308 0%, #d97706 45%, #ea4335 100%)',
               borderRadius: '24px',
               padding: '22px 20px',
               color: '#ffffff',
-              boxShadow: localTab === 'campus' 
-                ? '0 12px 30px rgba(52, 168, 83, 0.28), 0 4px 12px rgba(79, 70, 229, 0.15)' 
-                : '0 12px 30px rgba(234, 179, 8, 0.28), 0 4px 12px rgba(234, 67, 53, 0.15)',
+              boxShadow: '0 12px 30px rgba(234, 179, 8, 0.28), 0 4px 12px rgba(234, 67, 53, 0.15)',
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              gap: '14px',
-              boxSizing: 'border-box'
+              justifyContent: 'space-between'
             }}>
-              {/* Decorative background sheen */}
-              <div style={{
-                position: 'absolute',
-                top: '-30px', right: '-30px',
-                width: '120px', height: '120px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.12)',
-                pointerEvents: 'none'
-              }} />
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1 }}>
-                <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '14px',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(8px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}>
-                  <BookOpen size={22} color="#ffffff" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
+                  <Music size={24} color="#ffffff" />
                 </div>
                 <div>
-                  <div style={{ 
-                    fontSize: '0.68rem', 
-                    fontWeight: 900, 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.12em', 
-                    color: 'rgba(255, 255, 255, 0.85)' 
-                  }}>
-                    LERNFORTSCHRITT &amp; PROTOKOLL
-                  </div>
-                  <h3 style={{ 
-                    margin: 0, 
-                    fontSize: '1.1rem', 
-                    fontWeight: 900, 
-                    fontFamily: "'Outfit', sans-serif", 
-                    color: '#ffffff',
-                    lineHeight: 1.1 
-                  }}>
-                    Digitales Hausaufgabenheft
-                  </h3>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.9 }}>GROOVELAB MODUL</span>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', margin: '2px 0 0 0', lineHeight: 1.2 }}>Band &amp; Songs</h3>
                 </div>
               </div>
-
-              <p style={{ 
-                margin: 0, 
-                fontSize: '0.78rem', 
-                lineHeight: 1.4, 
-                color: 'rgba(255, 255, 255, 0.9)', 
-                fontWeight: 600,
-                zIndex: 1 
-              }}>
-                Wochenziele, Übungs-Streaks, Audio-Aufnahmen &amp; Meisterwerke des Schülers direkt einsehen.
+              <p style={{ fontSize: '0.78rem', opacity: 0.9, margin: '0 0 18px 0', lineHeight: 1.45 }}>
+                Band-Songs, Skill-Radare, Live Lab Sessions &amp; Repertoire des Schülers direkt einsehen.
               </p>
-
-              <button
-                type="button"
+              <button 
                 onClick={handleOpenHausaufgabenheft}
-                style={{
-                  width: '100%',
-                  background: '#ffffff',
-                  color: localTab === 'campus' ? '#047857' : '#92400e',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '12px 16px',
-                  fontSize: '0.85rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
-                  transition: 'all 0.15s ease',
-                  zIndex: 1
+                style={{ 
+                  width: '100%', 
+                  background: '#ffffff', 
+                  color: '#d97706', 
+                  border: 'none', 
+                  borderRadius: '14px', 
+                  padding: '12px 16px', 
+                  fontWeight: 900, 
+                  fontSize: '0.85rem', 
+                  cursor: 'pointer', 
+                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '8px', 
+                  transition: 'all 0.15s ease' 
                 }}
-                className="hover-scale"
               >
-                <BookOpen size={16} />
-                <span>Hausaufgabenheft öffnen</span>
+                <BookOpen size={16} /> <span>Hausaufgabenheft öffnen</span>
               </button>
             </section>
 
-            {isPlatformCampus ? (
-              /* ---- CAMPUS Sidebar: Lesson Card ---- */
-              <section style={{
-                background: '#ffffff',
-                borderRadius: '24px',
-                padding: '20px',
-                border: '1.5px solid #f1f5f9',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
-              }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#34a853', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
-                  <Calendar size={16} /> Aktueller Unterricht
-                </h4>
-                {schedulesList.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {schedulesList
-                      .sort((a, b) => {
-                        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
-                        return (a.time_slot || '').localeCompare(b.time_slot || '');
-                      })
-                      .map((sched) => {
-                        const isApproved = sched.status === 'approved';
-                        const isReview = sched.status === 'ready_for_admin_review';
-                        const statusText = isApproved ? 'Aktiv' : isReview ? 'In Prüfung' : 'Entwurf';
-                        const dayNames = ['Montags', 'Dienstags', 'Mittwochs', 'Donnerstags', 'Freitags', 'Samstags', 'Sonntags'];
-                        const dayName = dayNames[sched.day_of_week - 1] || 'Unbekannter Tag';
-                        const teacherName = sched.teacher_profiles ? `${sched.teacher_profiles.first_name || ''} ${sched.teacher_profiles.last_name ? sched.teacher_profiles.last_name.charAt(0) + '.' : ''}` : 'Lehrer';
+            {/* Aktueller Unterricht Widget */}
+            <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={16} /> Aktueller Unterricht
+              </h3>
+              {schedulesList.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {schedulesList.map((sched: any) => (
+                    <div key={sched.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
+                          {sched.day_of_week}s, {sched.time_slot}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                          Raum: {sched.rooms?.name || 'Kein Raum'} • Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>Kein aktiver Stundenplan zugeordnet.</div>
+              )}
+            </section>
+          </div>
+        </div>
+      );
+    }
 
-                        return (
-                          <div key={sched.id} style={{
-                            background: isApproved ? '#e6f4ea' : '#f1f5f9',
-                            border: isApproved ? '1px solid #d1fae5' : '1px solid #e2e8f0',
-                            borderRadius: '16px',
-                            padding: '12px 14px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '12px'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{
-                                background: isApproved ? '#34a853' : '#64748b',
-                                color: '#ffffff',
-                                borderRadius: '10px',
-                                width: '38px',
-                                height: '38px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '0.62rem',
-                                fontWeight: 800,
-                                lineHeight: 1.2
-                              }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 900 }}>{sched.time_slot ? sched.time_slot.slice(0, 2) : ''}</span>
-                                <span>{sched.time_slot ? sched.time_slot.slice(3) : ''}</span>
-                              </div>
-                              <div>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
-                                  {groupId ? 'Gruppenunterricht' : 'Einzelunterricht'} bei {teacherName}
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  🏢 {sched.rooms ? sched.rooms.name : 'Raum'} • {dayName}
-                                </div>
-                              </div>
-                            </div>
-                            <span style={{
-                              background: isApproved ? '#34a853' : '#cbd5e1',
-                              color: '#ffffff',
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              fontSize: '0.65rem',
-                              fontWeight: 800
-                            }}>
-                              {statusText}
-                            </span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                    Kein aktiver Stundenplan zugeordnet.
-                  </div>
-                )}
-              </section>
-            ) : (
-              /* ---- GROOVELAB Sidebar: Skill Radar Chart ---- */
-              <section style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '20px', 
-                border: '1.5px solid #fef9c3',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+    if (activeModalTab === 'groovelab' && isGroovelabActive) {
+      return (
+        <div className="student-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 360px', gap: '40px', alignItems: 'start' }}>
+          {/* Left Column: GrooveLab Stats & Band Songs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', alignItems: 'stretch' }}>
+              {/* GL Card 1: GL XP */}
+              <div style={{
+                background: 'linear-gradient(135deg, #eab308, #ca8a04)',
+                color: 'white',
+                borderRadius: '16px',
+                padding: '12px 16px',
                 display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: '0 6px 15px rgba(234, 179, 8, 0.15)',
+                height: '100%',
+                boxSizing: 'border-box'
               }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  <Music size={16} style={{ color: '#eab308' }} /> Skill Radar
-                </h4>
-                
-                <div style={{ width: '100%', height: '240px', display: 'flex', justifyContent: 'center' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="65%" data={studentRadarData}>
-                      <PolarGrid stroke="#f1f5f9" />
-                      <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
-                        <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}>
-                          {payload.value}
-                        </text>
-                      )} />
-                      <Radar name="XP" dataKey="xp" stroke="#eab308" fill="#facc15" fillOpacity={0.5} />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Star size={18} fill="white" color="white" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                    {verifiedSongsCount * 100} XP
+                  </div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                    GROOVELAB XP
+                  </div>
+                </div>
+              </div>
+
+              {/* GL Card 2: Mastered Songs */}
+              <div style={{
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                borderRadius: '16px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                boxShadow: '0 6px 15px rgba(29, 78, 216, 0.15)',
+                height: '100%',
+                boxSizing: 'border-box'
+              }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.18)', borderRadius: '10px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Music size={18} fill="white" color="white" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 900, lineHeight: 1.1, fontFamily: "'Outfit', sans-serif" }}>
+                    {verifiedSongsCount}
+                  </div>
+                  <div style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.85, letterSpacing: '0.04em', marginTop: '2px', lineHeight: 1.1 }}>
+                    SONGS GEMEISTERT
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Repertoire Songs Widget */}
+            <section style={{ 
+              background: '#fefce8', 
+              borderRadius: '24px', 
+              padding: '20px', 
+              border: '1.5px solid #fef08a'
+            }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.05em' }}>
+                <Music size={16} /> Repertoire &amp; Übe-Liste (GrooveLab)
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {practiceBoard.map((s: any) => (
+                  <div key={s.id + s.level} style={{ 
+                    background: '#ffffff', 
+                    padding: '8px 12px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #fef08a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.82rem'
+                  }}>
+                    <span style={{ fontWeight: 800, color: '#854d0e' }}>
+                      🎵 {s.title} <span style={{ fontWeight: 500, color: '#a16207', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                    </span>
+                    <span style={{ 
+                      background: '#fefce8', 
+                      color: '#eab308', 
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      fontWeight: 900,
+                      fontSize: '0.75rem' 
+                    }}>
+                      Übt gerade ({Math.max(...s.instruments.map((i: any) => i.progress)) || 0}%)
+                    </span>
+                  </div>
+                ))}
+                {repertoire.map((s: any) => (
+                  <div key={s.id + s.level} style={{ 
+                    background: '#e6f4ea', 
+                    padding: '8px 12px', 
+                    borderRadius: '12px', 
+                    border: '1px solid #e6f4ea',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.82rem'
+                  }}>
+                    <span style={{ fontWeight: 800, color: '#34a853' }}>
+                      🎉 {s.title} <span style={{ fontWeight: 500, color: '#34a853', opacity: 0.8, fontSize: '0.75rem' }}>({s.artist})</span>
+                    </span>
+                    <span style={{ 
+                      background: '#e6f4ea', 
+                      color: '#34a853', 
+                      padding: '2px 8px', 
+                      borderRadius: '6px', 
+                      fontWeight: 900,
+                      fontSize: '0.75rem' 
+                    }}>
+                      ✓ Verifiziert
+                    </span>
+                  </div>
+                ))}
+                {practiceBoard.length === 0 && repertoire.length === 0 && (
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic' }}>Keine GrooveLab Songs eingetragen.</div>
+                )}
+              </div>
+            </section>
+
+            {/* Meine Bands */}
+            <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} /> Meine Bands
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {bands.map((b: any) => (
+                  <div 
+                    key={b.id} 
+                    onClick={() => {
+                      if (onOpenBandProfile) {
+                        onOpenBandProfile(b);
+                      }
+                    }}
+                    className={onOpenBandProfile ? "clickable-band-item" : ""}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '12px', 
+                      padding: '12px', 
+                      background: '#fefce8', 
+                      borderRadius: '16px', 
+                      border: '1px solid #fef08a',
+                      cursor: onOpenBandProfile ? 'pointer' : 'default'
+                    }}
+                  >
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', overflow: 'hidden' }}>
+                      <img src={b.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e' }}>{b.name}</div>
+                  </div>
+                ))}
+                {bands.length === 0 && !loading && (
+                  <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>In keiner Band aktiv.</div>
+                )}
+              </div>
+            </section>
+
+            {/* Wochenplan-Zeiten */}
+            {!isPeerStudent && (
+              <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
+                <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={16} /> Wochenplan-Zeiten
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {weekSessions.map((pres, idx) => (
+                    <div key={idx} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '10px', 
+                      background: '#fffbeb', 
+                      border: '1px solid #fef3c7', 
+                      padding: '12px 14px', 
+                      borderRadius: '16px', 
+                      fontSize: '0.85rem', 
+                      fontWeight: 700, 
+                      color: '#b45309' 
+                    }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }}></div>
+                      <div>
+                        {pres.dayStr}. {pres.rangeStr}
+                      </div>
+                    </div>
+                  ))}
+                  {weekSessions.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>Keine reservierten Zeiten diese Woche.</div>
+                  )}
                 </div>
               </section>
             )}
+          </div>
+
+          {/* Right Column: Skill Radar Chart */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <section style={{ 
+              background: '#ffffff', 
+              borderRadius: '24px', 
+              padding: '20px', 
+              border: '1.5px solid #fef9c3',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 900, color: '#eab308', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Music size={16} style={{ color: '#eab308' }} /> Skill Radar
+              </h4>
+              
+              <div style={{ width: '100%', height: '240px', display: 'flex', justifyContent: 'center' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="65%" data={studentRadarData}>
+                    <PolarGrid stroke="#f1f5f9" />
+                    <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
+                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}>
+                        {payload.value}
+                      </text>
+                    )} />
+                    <Radar name="XP" dataKey="xp" stroke="#eab308" fill="#facc15" fillOpacity={0.5} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
           </div>
         </div>
       );
@@ -4069,6 +4281,42 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 >
                   <Copy size={14} />
                   Onboarding-Link kopieren
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const qrUrl = `${window.location.origin}/qr/${localQrToken || student.qr_token || student.id || ''}`;
+                    window.open(qrUrl, '_blank');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '11px',
+                    borderRadius: '14px',
+                    border: '1.5px dashed #cbd5e1',
+                    background: '#f1f5f9',
+                    color: '#0f172a',
+                    fontWeight: 750,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  className="hover-scale"
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = '#e2e8f0';
+                    e.currentTarget.style.borderColor = '#94a3b8';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = '#f1f5f9';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                >
+                  <ExternalLink size={14} color="#0f172a" />
+                  🛠️ QR-Landingpage testen ↗
                 </button>
                 <button
                   type="button"

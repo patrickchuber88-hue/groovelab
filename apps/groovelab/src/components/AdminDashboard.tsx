@@ -13488,6 +13488,41 @@ export function AdminDashboard({
 
           {/* Action button for managers to regenerate QR Code */}
           <button
+            type="button"
+            onClick={() => {
+              const qrUrl = `${window.location.origin}/qr/${selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || ''}`;
+              window.open(qrUrl, '_blank');
+            }}
+            style={{
+              width: '100%',
+              padding: '14px',
+              borderRadius: '20px',
+              border: '1.5px dashed #cbd5e1',
+              background: '#f1f5f9',
+              color: '#0f172a',
+              fontWeight: 900,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              marginTop: '10px',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#e2e8f0';
+              e.currentTarget.style.borderColor = '#94a3b8';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#f1f5f9';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+            }}
+          >
+            <ExternalLink size={20} color="#0f172a" />
+            🛠️ QR-Landingpage testen ↗
+          </button>
+          <button
             onClick={handleRegenerateToken}
             className="google-btn-secondary"
             style={{
