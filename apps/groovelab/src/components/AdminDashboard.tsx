@@ -3997,7 +3997,10 @@ export function AdminDashboard({
     if (!window.confirm('Raum und alle darin enthaltenen iPads wirklich löschen?')) return;
     const { error } = await supabase.from('rooms').delete().eq('id', roomId);
     if (error) alert(error.message);
-    else fetchData();
+    else {
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+      fetchData();
+    }
   };
 
   const handleRoomDragStart = (e: React.DragEvent, roomId: string) => {
@@ -10054,12 +10057,43 @@ export function AdminDashboard({
                       {index + 1}. {room.name}
                     </h3>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button onClick={() => setCustomizingRoom(room)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <MapPin size={14} color={groovelabBrandColor} /> Layout
                     </button>
                     <button onClick={() => triggerBatchAddStations(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: groovelabBrandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Plus size={14} /> iPad
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteRoom(room.id);
+                      }} 
+                      style={{ 
+                        padding: '8px', 
+                        borderRadius: '10px', 
+                        background: '#f8fafc', 
+                        border: '1px solid #e2e8f0', 
+                        color: '#94a3b8', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = '#ef4444';
+                        e.currentTarget.style.background = '#fef2f2';
+                        e.currentTarget.style.borderColor = '#fecaca';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = '#94a3b8';
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }}
+                      title="Raum löschen"
+                    >
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
