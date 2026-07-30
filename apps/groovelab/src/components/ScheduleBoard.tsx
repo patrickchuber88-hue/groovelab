@@ -28,7 +28,8 @@ import {
   Lock,
   Sliders,
   RotateCcw,
-  Grid3X3
+  Grid3X3,
+  MoreVertical
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
@@ -357,6 +358,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [dragSourceBoardId, setDragSourceBoardId] = useState<string | null>(null);
   const [dragOverBoardId, setDragOverBoardId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [showMoreMenu, setShowMoreMenu] = useState<boolean>(false);
   const [draggedDuration, setDraggedDuration] = useState<number>(30);
   const [draggedStudentName, setDraggedStudentName] = useState<string>('Termin');
   const [dragSnapState, setDragSnapState] = useState<{
@@ -4486,52 +4488,124 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const inviteLink = window.location.origin + "?onboarding=parent";
-                    await navigator.clipboard.writeText(inviteLink);
-                    await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
-                  }}
-                  className="apple-btn" title="Onboarding-Link kopieren"
-                >
-                  <Send size={13} />
-                  <span>Onboarding-Link</span>
-                </button>
+                <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
 
-                <label htmlFor="pdf-upload" className="apple-btn" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} title="Backup aus PDF wiederherstellen">
-                  <Upload size={13} />
-                  <span>Backup</span>
-                </label>
+                {/* Options-Dropdown (Mehr) */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreMenu(prev => !prev)}
+                    className={`apple-btn ${showMoreMenu ? 'active' : ''}`}
+                    title="Weitere Optionen & Aktionen"
+                  >
+                    <MoreVertical size={13} />
+                    <span>Mehr</span>
+                  </button>
+
+                  {showMoreMenu && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      right: 0,
+                      background: 'rgba(255, 255, 255, 0.96)',
+                      backdropFilter: 'blur(20px) saturate(190%)',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      borderRadius: '12px',
+                      padding: '6px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      zIndex: 1000,
+                      minWidth: '220px'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setShowMoreMenu(false);
+                          const inviteLink = window.location.origin + "?onboarding=parent";
+                          await navigator.clipboard.writeText(inviteLink);
+                          await showAlert("Allgemeiner Schüler-Onboarding-Link kopiert! Sende diesen Link an deine Schüler: " + inviteLink);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 12px',
+                          border: 'none',
+                          background: 'transparent',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          color: '#1d1d1f',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Send size={13} />
+                        <span>Onboarding-Link kopieren</span>
+                      </button>
+
+                      <label
+                        htmlFor="pdf-upload"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          color: '#1d1d1f',
+                          cursor: 'pointer',
+                          margin: 0
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                        onClick={() => setShowMoreMenu(false)}
+                      >
+                        <Upload size={13} />
+                        <span>PDF-Backup wiederherstellen</span>
+                      </label>
+
+                      <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', margin: '4px 0' }} />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          handleHardResetSystem();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 12px',
+                          border: 'none',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                      >
+                        <Trash2 size={13} />
+                        <span>System-Reset</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <input id="pdf-upload" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handleRestoreFromPDF} />
               </div>
 
               {/* Right: Status + Senden */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={handleHardResetSystem}
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
-                    border: '1px solid rgba(239, 68, 68, 0.15)',
-                    fontWeight: 600,
-                    padding: '8px 14px',
-                    borderRadius: '12px',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                  title="Stundenplan und Pool komplett auf Null zurücksetzen (Altlasten löschen)"
-                >
-                  <Trash2 size={14} />
-                  <span>System-Reset</span>
-                </button>
                 {lastSubmittedTime && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: scheduleStatus === 'approved' ? 'rgba(230, 244, 234, 0.95)' : 'rgba(254, 243, 199, 0.95)', border: `1.5px solid ${scheduleStatus === 'approved' ? '#34a853' : '#f59e0b'}`, color: scheduleStatus === 'approved' ? '#1e7e34' : '#92400e', padding: '6px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
                     <span>{scheduleStatus === 'approved' ? '✅ Freigegeben' : '⏳ Eingereicht'}</span>

@@ -22,7 +22,9 @@ import {
   EyeOff,
   Info,
   CheckCheck,
-  ShieldCheck
+  ShieldCheck,
+  RotateCcw,
+  MoreVertical
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -251,6 +253,29 @@ export function ScheduleCalendarView({
     y: number;
     visible: boolean;
   } | null>(null);
+
+  // Toast confirmation with undo action state
+  const [actionToast, setActionToast] = useState<{
+    id: string;
+    message: string;
+    undoFn: () => void;
+  } | null>(null);
+  const toastTimeoutRef = useRef<any>(null);
+  const [showMoreHeaderMenu, setShowMoreHeaderMenu] = useState<boolean>(false);
+
+  const showActionToast = (message: string, undoFn: () => void) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setActionToast({
+      id: String(Date.now()),
+      message,
+      undoFn
+    });
+    toastTimeoutRef.current = setTimeout(() => {
+      setActionToast(null);
+    }, 7000);
+  };
 
 
   useEffect(() => {
@@ -974,16 +999,21 @@ export function ScheduleCalendarView({
     return null;
   };
 
-  // Helper für Mutations
-  const updateOccurrence = (id: string, updates: Partial<ScheduleOccurrence>) => {
+  // Helper für Mutations mit Rückgängig-Toast
+  const updateOccurrence = (id: string, updates: Partial<ScheduleOccurrence>, customActionMessage?: string) => {
     if (id.startsWith('vacant-')) return;
+    const baseOcc = baseOccurrences.find(o => o.id === id);
+    const existingInPending = pendingChanges[id];
+    const currentOcc = existingInPending || baseOcc;
+    if (!currentOcc) return;
+
+    const hadPendingBefore = id in pendingChanges;
+
     setPendingChanges(prev => {
-      const baseOcc = baseOccurrences.find(o => o.id === id);
       const existing = prev[id] || baseOcc;
       if (!existing) return prev;
       
       const newOcc = { ...existing, ...updates };
-      // Tracking der Ursprungsdaten – immer auf Basis der originalen DB-Werte (baseOcc)
       if (baseOcc && !newOcc.original_date) {
         newOcc.original_date = baseOcc.date;
       }
@@ -992,9 +1022,35 @@ export function ScheduleCalendarView({
       }
       return { ...prev, [id]: newOcc };
     });
+
+    const rawName = currentOcc.student ? `${currentOcc.student.first_name || ''} ${currentOcc.student.last_name || ''}`.trim() : 'Termin';
+    const displayStudent = showRealNames ? rawName : maskLastName(rawName);
+    const timeDisplay = updates.start_time ? ` (auf ${updates.start_time.substring(0, 5)} Uhr)` : '';
+    const message = customActionMessage || `✨ Termin für ${displayStudent}${timeDisplay} angepasst`;
+
+    showActionToast(message, () => {
+      setPendingChanges(prev => {
+        const next = { ...prev };
+        if (hadPendingBefore && existingInPending) {
+          next[id] = existingInPending;
+        } else {
+          delete next[id];
+        }
+        return next;
+      });
+    });
   };
 
-  const updateMultipleOccurrences = (updatesMap: Record<string, Partial<ScheduleOccurrence>>) => {
+  const updateMultipleOccurrences = (updatesMap: Record<string, Partial<ScheduleOccurrence>>, customActionMessage?: string) => {
+    const previousStateSnapshot: Record<string, ScheduleOccurrence | undefined> = {};
+    const existedInPendingMap: Record<string, boolean> = {};
+
+    Object.keys(updatesMap).forEach(id => {
+      if (id.startsWith('vacant-')) return;
+      existedInPendingMap[id] = id in pendingChanges;
+      previousStateSnapshot[id] = pendingChanges[id];
+    });
+
     setPendingChanges(prev => {
       const next = { ...prev };
       Object.keys(updatesMap).forEach(id => {
@@ -1013,6 +1069,25 @@ export function ScheduleCalendarView({
         next[id] = newOcc;
       });
       return next;
+    });
+
+    const count = Object.keys(updatesMap).length;
+    const message = customActionMessage || `✨ ${count} ${count === 1 ? 'Termin' : 'Termine'} angepasst`;
+
+    showActionToast(message, () => {
+      setPendingChanges(prev => {
+        const next = { ...prev };
+        Object.keys(updatesMap).forEach(id => {
+          if (existedInPendingMap[id]) {
+            if (previousStateSnapshot[id]) {
+              next[id] = previousStateSnapshot[id]!;
+            }
+          } else {
+            delete next[id];
+          }
+        });
+        return next;
+      });
     });
   };
 
@@ -2864,7 +2939,7 @@ export function ScheduleCalendarView({
       }
     });
 
-    await persistMultipleOccurrencesDirectly(updatesMap);
+    updateMultipleOccurrences(updatesMap, 'Termine verschoben');
   };
 
   const handleDropOnDay = async (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
@@ -2944,7 +3019,7 @@ export function ScheduleCalendarView({
       }
     }
 
-    await moveOccurrenceOrGroupDirectly(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
+    moveOccurrenceOrGroup(sourceId, { date: targetDateStr, start_time: targetStartTime, status: 'pending_reschedule' });
     setDraggedId(null);
   };
 
@@ -3172,7 +3247,7 @@ export function ScheduleCalendarView({
             nextTime = addMins(nextTime, occ.duration);
           });
 
-          await persistMultipleOccurrencesDirectly(updatesMap);
+          updateMultipleOccurrences(updatesMap, 'Termine lückenlos verschoben');
           setDraggedId(null);
           return;
         }
@@ -3333,7 +3408,7 @@ export function ScheduleCalendarView({
         };
       });
 
-      await persistMultipleOccurrencesDirectly(updatesMap);
+      updateMultipleOccurrences(updatesMap, 'Terminzeit/Raum geändert');
     }
 
     setEditOccState(null);
@@ -3397,7 +3472,7 @@ export function ScheduleCalendarView({
       });
     }
 
-    await persistMultipleOccurrencesDirectly(updatesMap);
+    updateMultipleOccurrences(updatesMap, 'Pause entfernt');
   };
 
   const getStatusColor = (status: string) => {
@@ -5211,7 +5286,7 @@ export function ScheduleCalendarView({
                                         const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
                                           [occ.id]: { start_time: formattedTime }
                                         };
-                                        await persistMultipleOccurrencesDirectly(updatesMap);
+                                        updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
                                       }}
                                       style={{
                                         background: 'transparent',
@@ -5306,7 +5381,7 @@ export function ScheduleCalendarView({
                                             occurrencesInGroup.forEach(go => {
                                               updatesMap[go.id] = { status: 'cancelled' };
                                             });
-                                            await persistMultipleOccurrencesDirectly(updatesMap);
+                                            updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
                                           }
                                         } else {
                                           handleCancel(e, occ.id);
@@ -5379,7 +5454,7 @@ export function ScheduleCalendarView({
                                           const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
                                             [occ.id]: { start_time: formattedTime }
                                           };
-                                          await persistMultipleOccurrencesDirectly(updatesMap);
+                                          updateMultipleOccurrences(updatesMap, 'Startzeit geändert');
                                         }}
                                         style={{
                                           background: 'transparent',
@@ -5472,7 +5547,7 @@ export function ScheduleCalendarView({
                                               occurrencesInGroup.forEach(go => {
                                                 updatesMap[go.id] = { status: 'cancelled' };
                                               });
-                                              await persistMultipleOccurrencesDirectly(updatesMap);
+                                              updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
                                             }
                                           } else {
                                             handleCancel(e, occ.id);
@@ -5579,7 +5654,7 @@ return (
                                         const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
                                           [occ.id]: { start_time: formattedTime }
                                         };
-                                        await persistMultipleOccurrencesDirectly(updatesMap);
+                                        updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
                                       }}
                                       style={{
                                         background: 'transparent',
@@ -5672,7 +5747,7 @@ return (
                                             occurrencesInGroup.forEach(go => {
                                               updatesMap[go.id] = { status: 'cancelled' };
                                             });
-                                            await persistMultipleOccurrencesDirectly(updatesMap);
+                                            updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
                                           }
                                         } else {
                                           handleCancel(e, occ.id);
@@ -7102,7 +7177,7 @@ return (
                       };
                     });
 
-                    await persistMultipleOccurrencesDirectly(updatesMap);
+                    updateMultipleOccurrences(updatesMap, 'Termine zu Gruppe zusammengeführt');
                     setDropDecisionState(null);
                   }}
                   style={{
@@ -7150,6 +7225,65 @@ return (
         );
       })()}
       
+      {/* Instant Action Confirmation Toast with Undo Button */}
+      {actionToast && (
+        <>
+          <style>{`
+            @keyframes floating-slide-down {
+              0% { transform: translateY(-30px); opacity: 0; }
+              100% { transform: translateY(0); opacity: 1; }
+            }
+          `}</style>
+          <div style={{
+            position: 'fixed',
+            top: '24px',
+            right: '24px',
+            background: 'rgba(29, 29, 31, 0.94)',
+            backdropFilter: 'blur(20px) saturate(190%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+            color: '#ffffff',
+            borderRadius: '16px',
+            padding: '10px 16px',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            zIndex: 9999,
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            animation: 'floating-slide-down 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+          }}>
+            <span>{actionToast.message}</span>
+            <button
+              type="button"
+              onClick={() => {
+                actionToast.undoFn();
+                setActionToast(null);
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.16)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                color: '#ffffff',
+                padding: '6px 12px',
+                borderRadius: '100px',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.28)'}
+              onMouseOut={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'}
+            >
+              <RotateCcw size={12} />
+              <span>Rückgängig</span>
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Floating Save Actions Bar at the bottom of the screen */}
       {Object.keys(pendingChanges).length > 0 && (
         <>
