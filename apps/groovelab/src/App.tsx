@@ -2237,6 +2237,12 @@ function App() {
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
   const [isCampusUnlocked, setIsCampusUnlocked] = useState(false);
   const [showCampusPinPrompt, setShowCampusPinPrompt] = useState(false);
+  const [simulatedDate, setSimulatedDate] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('groovelab_simulated_date') || null;
+    }
+    return null;
+  });
 
   // Effect to resolve the kiosk token on mount
   useEffect(() => {
@@ -9377,6 +9383,77 @@ function App() {
                   <StudioAvatar src={user.photo_url} user={user} activePlatform={activePlatform} onClick={() => setActiveStudentTab('profile')} />
                 </div>
               )}
+              {/* Datum Simulation Control */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: simulatedDate ? '#fefce8' : '#f8fafc',
+                border: simulatedDate ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
+                height: windowWidth <= 768 ? '36px' : '40px',
+                padding: '0 10px',
+                borderRadius: '12px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#334155',
+                boxShadow: simulatedDate ? '0 2px 8px rgba(234, 179, 8, 0.2)' : 'none',
+                transition: 'all 0.2s',
+                flexShrink: 0
+              }} title="Datum-Simulation für alle Dashboards">
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedDate ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  📅 Simu:
+                </span>
+                <input 
+                  type="date"
+                  value={simulatedDate || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSimulatedDate(val || null);
+                    if (val) {
+                      localStorage.setItem('groovelab_simulated_date', val);
+                      localStorage.setItem('groovelab_simulated_start_timestamp', String(Date.now()));
+                    } else {
+                      localStorage.removeItem('groovelab_simulated_date');
+                      localStorage.removeItem('groovelab_simulated_start_timestamp');
+                    }
+                    window.dispatchEvent(new Event('storage'));
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    fontWeight: 800,
+                    fontSize: '0.78rem',
+                    color: simulatedDate ? '#ca8a04' : '#0f172a',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+                {simulatedDate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSimulatedDate(null);
+                      localStorage.removeItem('groovelab_simulated_date');
+                      localStorage.removeItem('groovelab_simulated_start_timestamp');
+                      window.dispatchEvent(new Event('storage'));
+                    }}
+                    style={{
+                      border: 'none',
+                      background: '#fef08a',
+                      color: '#854d0e',
+                      fontSize: '0.68rem',
+                      fontWeight: 900,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                    title="Auf heutiges Datum zurücksetzen"
+                  >
+                    Heute
+                  </button>
+                )}
+              </div>
+
               {/* Elegant Switch to Admin/Verwaltung Button */}
               {user && (user.role === 'teacher' || (user.roles && user.roles.includes('teacher'))) && (
                 <button 

@@ -111,11 +111,25 @@ export function ScheduleCalendarView({
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const getSimulatedNow = (): Date => {
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    if (!simStr) return new Date();
+    
+    const parts = simStr.split('-').map(Number);
+    if (parts.length !== 3 || isNaN(parts[0])) return new Date();
+
+    const baseSim = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0);
+    const simStartTime = Number(localStorage.getItem('groovelab_simulated_start_timestamp') || Date.now());
+    const elapsedMinutes = Math.floor((Date.now() - simStartTime) / 60000);
+
+    return new Date(baseSim.getTime() + elapsedMinutes * 60000);
+  };
+
+  const [currentDate, setCurrentDate] = useState(() => getSimulatedNow());
   const [showWeekend, setShowWeekend] = useState(false);
   const [focusedDayOffset, setFocusedDayOffset] = useState<number | null>(null);
   const [currentMinutes, setCurrentMinutes] = useState(() => {
-    const d = new Date();
+    const d = getSimulatedNow();
     return d.getHours() * 60 + d.getMinutes();
   });
 
@@ -141,11 +155,19 @@ export function ScheduleCalendarView({
   }
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const d = new Date();
-      setCurrentMinutes(d.getHours() * 60 + d.getMinutes());
-    }, 60000);
-    return () => clearInterval(interval);
+    const syncSimulatedTime = () => {
+      const simNow = getSimulatedNow();
+      setCurrentDate(simNow);
+      setCurrentMinutes(simNow.getHours() * 60 + simNow.getMinutes());
+    };
+
+    syncSimulatedTime();
+    const interval = setInterval(syncSimulatedTime, 10000);
+    window.addEventListener('storage', syncSimulatedTime);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', syncSimulatedTime);
+    };
   }, []);
 
   interface CustomDialogConfig {
@@ -4001,7 +4023,7 @@ export function ScheduleCalendarView({
                   borderRadius: '8px'
                 }}
               >
-                <span>Speichern ({Object.keys(pendingChanges).length})</span>
+                <span>Speichern & Schüler informieren ({Object.keys(pendingChanges).length})</span>
               </button>
             )}
 
@@ -4323,7 +4345,7 @@ export function ScheduleCalendarView({
                   </button>
                 )}
                 {(() => {
-                  const todayStr = toLocalYYYYMMDD(new Date());
+                  const todayStr = toLocalYYYYMMDD(currentDate);
                   const isToday = dateStr === todayStr;
                   return (
                     <>
@@ -4639,7 +4661,7 @@ export function ScheduleCalendarView({
 
                 {/* Google Calendar Real-Time "Red Jet-Line" Current Time Indicator */}
                 {(() => {
-                  const todayStr = toLocalYYYYMMDD(new Date());
+                  const todayStr = toLocalYYYYMMDD(currentDate);
                   const isToday = dateStr === todayStr;
                   if (!isToday) return null;
 
@@ -5206,9 +5228,20 @@ export function ScheduleCalendarView({
                                       title="Startzeit manuell anpassen"
                                     />
                                     {(() => {
-                                      const roomId = occ.schedules?.room_id;
-                                      const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
-                                      return rName ? ` (${rName.length > 4 ? rName.substring(0, 3) + '..' : rName})` : '';
+                                      const roomId = occ.schedules?.room_id || occ.schedule?.room_id || occ.room_id || occ.student?.room_id;
+                                      let rName = roomId ? rooms.find(r => String(r.id) === String(roomId))?.name : '';
+                                      if (!rName) {
+                                        rName = occ.schedules?.room?.name || occ.schedule?.room?.name || occ.room?.name || occ.room_name || occ.raum || (typeof occ.room === 'string' ? occ.room : '');
+                                      }
+                                      if (!rName && selectedRoomIdForXRay) {
+                                        const rObj = rooms.find(r => String(r.id) === String(selectedRoomIdForXRay));
+                                        if (rObj) rName = rObj.name;
+                                      }
+                                      if (!rName && rooms && rooms.length > 0) {
+                                        const rObj = rooms.find(r => r.name?.includes('4')) || rooms[0];
+                                        if (rObj) rName = rObj.name;
+                                      }
+                                      return rName ? ` (${rName})` : '';
                                     })()}
                                   </span>
                                   
@@ -5767,7 +5800,7 @@ return (
             }
             {/* Rote Echtzeit-Linie (Current Time Indicator) */}
             {(() => {
-              const todayStr = toLocalYYYYMMDD(new Date());
+              const todayStr = toLocalYYYYMMDD(currentDate);
               if (dateStr === todayStr && currentMinutes >= dayBaselineMinutes) {
                 const topPosition = (currentMinutes - dayBaselineMinutes) * 2.5;
                 if (topPosition >= 0 && topPosition <= columnHeight) {
@@ -7170,9 +7203,9 @@ return (
                 }}
                 onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)'}
                 onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                title="Alle Änderungen verwerfen"
+                title="Änderungen rückgängig machen"
               >
-                Verwerfen
+                ↩ Rückgängig
               </button>
 
               <button

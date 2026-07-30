@@ -88,12 +88,11 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       }
     }
   } else if (activePlat === 'campus') {
-    // In Campus module, display instrument avatar if no custom photo or if chalkboard
-    const isChalkboard = !src || src === '/campus_login_hero.png';
-    if (isChalkboard) {
-      displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
+    // In Campus module, display instrument avatar for teachers and students across the entire dashboard
+    if (role === 'admin' || role === 'secretary') {
+      displaySrc = '/campus_login_hero.png';
     } else {
-      displaySrc = src;
+      displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
     }
   }
 
