@@ -1552,18 +1552,12 @@ export function ScheduleCalendarView({
   const prevWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() - 7);
-    // Skip August entirely: jump back to July 31 if we'd land in August
-    if (d.getMonth() === 7) d.setMonth(6, 31);
-    if (d < schoolYearStart) return; // don't navigate before school year start
     setCurrentDate(d);
   };
 
   const nextWeek = () => {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + 7);
-    // Skip August entirely: jump forward to September 1 if we'd land in August
-    if (d.getMonth() === 7) d.setMonth(8, 1);
-    if (d > schoolYearEnd) return; // don't navigate past school year end
     setCurrentDate(d);
   };
 
@@ -4148,7 +4142,7 @@ export function ScheduleCalendarView({
               </button>
             )}
 
-            {/* Google Calendar View Mode Switcher */}
+            {/* View Mode Switcher */}
             <div className="apple-btn-group">
               <button
                 type="button"
@@ -4171,17 +4165,6 @@ export function ScheduleCalendarView({
                 style={viewMode === 'week' ? { color: textAccentColor } : {}}
               >
                 Woche
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('month');
-                  setFocusedDayOffset(null);
-                }}
-                className={`apple-btn ${viewMode === 'month' ? 'active' : ''}`}
-                style={viewMode === 'month' ? { color: textAccentColor } : {}}
-              >
-                Monat
               </button>
             </div>
 
@@ -4216,10 +4199,6 @@ export function ScheduleCalendarView({
                   <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
                 </button>
               </div>
-
-              <button onClick={jumpToMonthStart} className="apple-btn" title="Zum Monatsanfang springen">
-                <span>Monat</span>
-              </button>
             </div>
           </div>
         </div>
