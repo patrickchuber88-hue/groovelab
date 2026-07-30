@@ -4278,8 +4278,11 @@ export function TeacherDashboard({
             setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
           }
         });
-        // Prepare Student Query: fetch all students in the school
-        const studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
+        // Prepare Student Query: fetch assigned students in the school
+        let studentQuery = supabase.from('users').select('*').eq('school_id', tData.school_id).eq('role', 'student');
+        if (tData.role === 'teacher') {
+          studentQuery = studentQuery.eq('teacher_id', userId);
+        }
 
         // Prepare dynamic matching board songs query
         let wallSongsQuery = supabase.from('songs').select(`
@@ -4535,6 +4538,12 @@ export function TeacherDashboard({
         const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
 
         let filteredStudData = (studData || []).filter((student: any) => {
+          const fn = (student.first_name || '').trim().toLowerCase();
+          const ln = (student.last_name || '').trim().toLowerCase();
+          const email = (student.email || '').trim().toLowerCase();
+          const isTest = fn.startsWith('test') || fn.startsWith('jane') || fn.startsWith('bob') || ln === 't.' || ln === 'test' || email.includes('test');
+          if (isTest) return false;
+
           if (activePlat === 'groovelab') {
             const isActivatedBySchool = student.is_groovelab_active === true || student.isGroovelabActive === true;
             const isAddedByTeacher = (student.created_by_teacher_id === userId || student.teacher_id === userId) && student.added_in_groovelab === true;

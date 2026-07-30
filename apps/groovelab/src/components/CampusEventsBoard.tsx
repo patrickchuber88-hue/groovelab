@@ -2682,17 +2682,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       let { data: schedules } = await scheduleQuery;
 
-      // Fallback: If no schedules found for specific teacher, query all school schedules
-      if ((!schedules || schedules.length === 0) && effectiveSchoolId) {
-        const { data: fallbackSchedules } = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('school_id', effectiveSchoolId);
-        if (fallbackSchedules && fallbackSchedules.length > 0) {
-          schedules = fallbackSchedules;
-        }
-      }
-
       // 2. Load overrides/occurrences with plain select('*') to prevent PostgREST join errors
       let occurrenceQuery = supabase
         .from('schedule_occurrences')
@@ -2710,13 +2699,23 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       let { data: occurrences } = await occurrenceQuery;
 
-      if ((!occurrences || occurrences.length === 0) && effectiveSchoolId) {
-        const { data: fallbackOccs } = await supabase
-          .from('schedule_occurrences')
-          .select('*')
-          .eq('school_id', effectiveSchoolId);
-        if (fallbackOccs && fallbackOccs.length > 0) {
-          occurrences = fallbackOccs;
+      // Enrich occurrences with student details for name matching & display
+      if (occurrences && occurrences.length > 0) {
+        const studentIdsToFetch = Array.from(new Set(occurrences.map((o: any) => o.student_id).filter(Boolean)));
+        if (studentIdsToFetch.length > 0) {
+          const { data: dbStudents } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument')
+            .in('id', studentIdsToFetch);
+          
+          if (dbStudents && dbStudents.length > 0) {
+            const stMap = new Map<string, any>();
+            dbStudents.forEach((st: any) => stMap.set(st.id, st));
+            occurrences = occurrences.map((o: any) => ({
+              ...o,
+              student: o.student || stMap.get(o.student_id) || null
+            }));
+          }
         }
       }
 
@@ -2880,11 +2879,30 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         console.error('Error loading teacher planned boards in CampusEventsBoard:', e);
       }
 
-      // Combine DB schedules with planned_boards designer slots
-      const combinedSchedules: any[] = [...(schedules || [])];
-      
-      if (teacherPlannedBoards.length > 0) {
-        // Fetch all students to match names/IDs from planned_boards
+      // Enrich schedules with student details for display and matching
+      if (schedules && schedules.length > 0) {
+        const schedStudentIds = Array.from(new Set(schedules.map((s: any) => s.student_id).filter(Boolean)));
+        if (schedStudentIds.length > 0) {
+          const { data: dbSchedStudents } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument')
+            .in('id', schedStudentIds);
+          
+          if (dbSchedStudents && dbSchedStudents.length > 0) {
+            const stMap = new Map<string, any>();
+            dbSchedStudents.forEach((st: any) => stMap.set(st.id, st));
+            schedules = schedules.map((s: any) => ({
+              ...s,
+              student: s.student || stMap.get(s.student_id) || null
+            }));
+          }
+        }
+      }
+
+      // Strictly use active DB schedules (Stundenplan Tab). Fallback to teacher's OWN planned_boards only if DB schedules are empty for this teacher.
+      let combinedSchedules: any[] = [...(schedules || [])];
+
+      if (combinedSchedules.length === 0 && teacherPlannedBoards.length > 0) {
         let studentQuery = supabase
           .from('users')
           .select('id, first_name, last_name, instrument');
@@ -2927,6 +2945,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 combinedSchedules.push({
                   id: `board-${board.id}-${s.id || studentId}`,
                   student_id: studentId,
+                  board_student_id: s.id || s.student_id,
                   teacher_id: userId,
                   day_of_week: boardDayNum,
                   time_slot: formattedTimeSlot,
@@ -2968,9 +2987,42 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const dd = String(targetDate.getDate()).padStart(2, '0');
               const dateStr = `${yyyy}-${mm}-${dd}`;
 
+              const matchesTemplateStudent = (occ: any, sch: any) => {
+                if (!occ || !sch) return false;
+                const occStudentId = occ.student_id;
+                const schStudentId = sch.student_id || sch.studentId || sch.board_student_id || sch.id;
+                if (occStudentId && schStudentId) {
+                  if (
+                    occStudentId === schStudentId ||
+                    occStudentId === sch.id ||
+                    occStudentId === sch.student_id ||
+                    occStudentId === sch.board_student_id ||
+                    occStudentId === sch.studentId ||
+                    occStudentId === sch.db_id ||
+                    occStudentId === sch.user_id ||
+                    sch.student_id === occ.student?.id ||
+                    sch.student_id === occ.student?.user_id ||
+                    sch.board_student_id === occ.student?.id
+                  ) return true;
+                }
+
+                const occFirst = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
+                const schFirst = (sch.student?.first_name || sch.first_name || sch.firstName || sch.name || '').trim().toLowerCase();
+                
+                if (occFirst && schFirst && occFirst === schFirst) {
+                  const occLast = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
+                  const schLast = (sch.student?.last_name || sch.last_name || sch.lastName || '').trim().toLowerCase();
+                  if (!occLast || !schLast || occLast === schLast || occLast.startsWith(schLast[0]) || schLast.startsWith(occLast[0])) {
+                    return true;
+                  }
+                }
+
+                return false;
+              };
+
               // Check if override exists
               const actual = occurrences?.find((occ: any) => 
-                (occ.student_id === sch.student_id || (occ.schedule_id && occ.schedule_id === sch.id)) && 
+                (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) && 
                 (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
               );
 
@@ -4494,7 +4546,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               title="Unterrichtstermine abonnieren (iCal)"
               style={{
                 border: 'none',
-                background: '#ef4444',
+                background: brandColor,
                 color: '#ffffff',
                 padding: '8px 14px',
                 borderRadius: '20px',
@@ -4504,7 +4556,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 gap: '6px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
+                boxShadow: `0 4px 12px ${brandColor}55`,
                 fontSize: '0.78rem',
                 fontWeight: 800,
                 flexShrink: 0
@@ -4716,44 +4768,95 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               {/* Week Items List */}
                               {isWeekExpanded && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
-                                  {wGroup.items.map(occ => {
-                                    const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
-                                    const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
-                                    const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-                                    const hasMessages = activeChatOccIds.has(occ.id) ||
-                                       (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
-                                       (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
-                                    
-                                    let rowBg = '#ffffff';
-                                    let rowBorder = '1px solid #e2e8f0';
-                                    let textColor = '#0f172a';
-                                    let subColor = '#64748b';
+                                  {(() => {
+                                    const groupedSlotItems: any[] = [];
+                                    const slotMap = new Map<string, any[]>();
 
-                                    if (isCanceled) {
-                                      rowBg = '#fef2f2';
-                                      rowBorder = '1px solid #fee2e2';
-                                      textColor = '#991b1b';
-                                      subColor = '#ef4444';
-                                    } else if (isRescheduled) {
-                                      rowBg = '#fffbeb';
-                                      rowBorder = '1px solid #fef3c7';
-                                      textColor = '#92400e';
-                                      subColor = '#d97706';
-                                    } else if (isPendingReview) {
-                                      rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                                      rowBorder = '1px dashed #eab308';
-                                      textColor = '#713f12';
-                                      subColor = '#ca8a04';
-                                    }
+                                    wGroup.items.forEach(occ => {
+                                      const slotKey = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+                                      if (!slotMap.has(slotKey)) {
+                                        slotMap.set(slotKey, []);
+                                      }
+                                      slotMap.get(slotKey)!.push(occ);
+                                    });
 
-                                    const opponentName = role === 'student'
-                                      ? (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name || ''}`.trim() : 'Lehrkraft')
-                                      : (() => {
-                                          const fn = occ.student?.first_name || 'Schüler';
-                                          const ln = occ.student?.last_name ? occ.student.last_name.trim() : '';
-                                          const initial = ln ? `${ln[0].toUpperCase()}.` : '';
-                                          return initial ? `${fn} ${initial}` : fn;
-                                        })();
+                                    slotMap.forEach((slotOccs) => {
+                                      if (slotOccs.length > 1) {
+                                        const uniqueStudentIds = new Set(slotOccs.map(o => o.student_id).filter(Boolean));
+                                        if (uniqueStudentIds.size > 1) {
+                                          const primary = slotOccs[0];
+                                          const groupStudents = slotOccs.map(o => o.student).filter(Boolean);
+                                          groupedSlotItems.push({
+                                            ...primary,
+                                            id: `group-slot-${primary.date}-${primary.start_time}`,
+                                            isGroupOcc: true,
+                                            students: groupStudents,
+                                            group_occurrences: slotOccs
+                                          });
+                                        } else {
+                                          const nonCancelled = slotOccs.find(o => !['cancelled', 'canceled_by_student'].includes(o.status)) || slotOccs[0];
+                                          groupedSlotItems.push(nonCancelled);
+                                        }
+                                      } else {
+                                        groupedSlotItems.push(slotOccs[0]);
+                                      }
+                                    });
+
+                                    return groupedSlotItems.map(occ => {
+                                      const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
+                                      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                                      const isRescheduled = occ.status === 'pending_reschedule' || 
+                                        occ.status === 'rescheduled_confirmed' ||
+                                        (occ.original_date && occ.original_date !== occ.date) ||
+                                        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
+                                        occ.is_moved === true ||
+                                        occ.is_rescheduled === true;
+                                        
+                                      const hasMessages = activeChatOccIds.has(occ.id) ||
+                                         (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
+                                         (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
+                                      
+                                      let rowBg = '#ffffff';
+                                      let rowBorder = '1px solid #e2e8f0';
+                                      let textColor = '#0f172a';
+                                      let subColor = '#64748b';
+
+                                      const isGroupOcc = occ.isGroupOcc || (occ.students && occ.students.length > 1) || (occ.group_occurrences && occ.group_occurrences.length > 1) || !!occ.group_id;
+
+                                      if (isCanceled) {
+                                        rowBg = '#fef2f2';
+                                        rowBorder = '2px dashed #ef4444';
+                                        textColor = '#991b1b';
+                                        subColor = '#ef4444';
+                                      } else if (isRescheduled) {
+                                        rowBg = '#fefce8';
+                                        rowBorder = '2px dashed #eab308';
+                                        textColor = '#854d0e';
+                                        subColor = '#d97706';
+                                      } else if (isGroupOcc) {
+                                        rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                                        rowBorder = '2px solid #0284c7';
+                                        textColor = '#0369a1';
+                                        subColor = '#0284c7';
+                                      } else if (isPendingReview) {
+                                        rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                                        rowBorder = '1px dashed #eab308';
+                                        textColor = '#713f12';
+                                        subColor = '#ca8a04';
+                                      }
+
+                                      const groupFirstNames = isGroupOcc && (occ.students || occ.group_occurrences)
+                                        ? (occ.students || occ.group_occurrences).map((s: any) => (s.first_name || s.student?.first_name || '').trim()).filter(Boolean).join(', ')
+                                        : null;
+
+                                      const opponentName = groupFirstNames || (role === 'student'
+                                        ? (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name || ''}`.trim() : 'Lehrkraft')
+                                        : (() => {
+                                            const fn = occ.student?.first_name || 'Schüler';
+                                            const ln = occ.student?.last_name ? occ.student.last_name.trim() : '';
+                                            const initial = ln ? `${ln[0].toUpperCase()}.` : '';
+                                            return initial ? `${fn} ${initial}` : fn;
+                                          })());
 
                                     return (
                                       <div 
@@ -4786,7 +4889,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             padding: '2px',
                                             width: '34px',
                                             height: '34px',
-                                            border: '1px solid rgba(0,0,0,0.03)',
+                                            border: isCanceled ? '1.5px dashed #ef4444' : isRescheduled ? '1.5px dashed #eab308' : '1px solid rgba(0,0,0,0.03)',
                                             flexShrink: 0
                                           }}>
                                             <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
@@ -4800,7 +4903,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                           {/* Details */}
                                           <div style={{ minWidth: 0, flex: 1 }}>
                                             <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                              <span style={{ fontSize: '12px', fontWeight: 800, color: textColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              <span style={{ 
+                                                fontSize: '12px', 
+                                                fontWeight: 800, 
+                                                color: textColor, 
+                                                textDecoration: isCanceled ? 'line-through' : 'none',
+                                                overflow: 'hidden', 
+                                                textOverflow: 'ellipsis', 
+                                                whiteSpace: 'nowrap' 
+                                              }}>
                                                 {opponentName}
                                               </span>
                                               {isPendingReview && (
@@ -4822,12 +4933,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                               )}
                                               {isRescheduled && (
                                                 <span style={{
-                                                  fontSize: '7px',
+                                                  fontSize: '7.5px',
                                                   fontWeight: 800,
                                                   background: '#fef3c7',
-                                                  color: '#d97706',
-                                                  padding: '1px 4px',
-                                                  borderRadius: '4px',
+                                                  color: '#b45309',
+                                                  border: '1.5px dashed #eab308',
+                                                  padding: '1px 5px',
+                                                  borderRadius: '5px',
                                                   textTransform: 'uppercase'
                                                 }}>
                                                   Verschoben
@@ -4835,12 +4947,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                               )}
                                               {isCanceled && (
                                                 <span style={{
-                                                  fontSize: '7px',
+                                                  fontSize: '7.5px',
                                                   fontWeight: 800,
                                                   background: '#fee2e2',
-                                                  color: '#ef4444',
-                                                  padding: '1px 4px',
-                                                  borderRadius: '4px',
+                                                  color: '#dc2626',
+                                                  border: '1.5px dashed #ef4444',
+                                                  padding: '1px 5px',
+                                                  borderRadius: '5px',
                                                   textTransform: 'uppercase'
                                                 }}>
                                                   Abgesagt
@@ -4898,7 +5011,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         </div>
                                       </div>
                                     );
-                                  })}
+                                  });
+                                })()}
                                 </div>
                               )}
                             </div>

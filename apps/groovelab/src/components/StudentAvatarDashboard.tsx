@@ -1165,7 +1165,8 @@ function MobileBriefingView({
                       
                       <div style={{ 
                         flex: 1, 
-                        background: 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)',
+                        background: '#fefce8',
+                        border: '2px dashed #eab308',
                         boxShadow: '0 4px 10px rgba(234, 179, 8, 0.1)',
                         borderRadius: '12px',
                         padding: '10px 14px',
@@ -1174,9 +1175,9 @@ function MobileBriefingView({
                         gap: '12px'
                       }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#78350f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{d.toLocaleDateString('de-DE', {weekday: 'long'})}</span>
-                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#000000', color: '#ffffff', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
+                            <span style={{ fontSize: '0.58rem', fontWeight: 900, background: '#fef3c7', color: '#b45309', border: '1.5px dashed #eab308', padding: '2px 7px', borderRadius: '6px', textTransform: 'uppercase' }}>Verschoben</span>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'rgba(120, 53, 15, 0.95)', fontWeight: 600, marginTop: '2px' }}>
                             {occ.start_time?.substring(0,5)} <span style={{ color: '#b45309' }}>{getOccRoomName(occ)}</span>

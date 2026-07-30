@@ -159,7 +159,6 @@ export function ScheduleCalendarView({
   useEffect(() => {
     const syncSimulatedTime = () => {
       const simNow = getSimulatedNow();
-      setCurrentDate(simNow);
       setCurrentMinutes(simNow.getHours() * 60 + simNow.getMinutes());
     };
 
@@ -1023,8 +1022,11 @@ export function ScheduleCalendarView({
       return { ...prev, [id]: newOcc };
     });
 
-    const rawName = currentOcc.student ? `${currentOcc.student.first_name || ''} ${currentOcc.student.last_name || ''}`.trim() : 'Termin';
-    const displayStudent = showRealNames ? rawName : maskLastName(rawName);
+    const rawFirstName = currentOcc.student?.first_name || '';
+    const rawLastName = currentOcc.student?.last_name || '';
+    const displayStudent = currentOcc.student 
+      ? `${rawFirstName} ${showRealNames ? rawLastName : maskLastName(rawLastName)}`.trim() 
+      : 'Termin';
     const timeDisplay = updates.start_time ? ` (auf ${updates.start_time.substring(0, 5)} Uhr)` : '';
     const message = customActionMessage || `✨ Termin für ${displayStudent}${timeDisplay} angepasst`;
 
@@ -1740,6 +1742,7 @@ export function ScheduleCalendarView({
 
       let fetchedData: any[] = [];
       let roomBookings: any[] = [];
+      const studentTeacherMap = new Map<string, string | null>();
 
       try {
         const [
@@ -1750,7 +1753,8 @@ export function ScheduleCalendarView({
           rbData2Result,
           allOccsResult,
           mainOccsResult,
-          schoolStudentsResult
+          schoolStudentsResult,
+          schoolUsersResult
         ] = await Promise.all([
           supabase.from('room_bookings').select('room_id, date, start_time, room:rooms(name)').eq('booked_by', userId).gte('date', startDateStr).lte('date', endDateStr),
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument), teacher:users!schedules_teacher_id_fkey(first_name, last_name)').eq('school_id', schoolId).not('room_id', 'is', null),
@@ -1759,7 +1763,8 @@ export function ScheduleCalendarView({
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
           supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
           supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time'),
-          supabase.from('students').select('id, teacher_id').eq('school_id', schoolId)
+          supabase.from('students').select('id, user_id, teacher_id').eq('school_id', schoolId),
+          supabase.from('users').select('id, teacher_id, first_name, last_name').eq('school_id', schoolId).eq('role', 'student')
         ]);
 
         if (rbResult.data) roomBookings = rbResult.data;
@@ -1776,20 +1781,33 @@ export function ScheduleCalendarView({
         if (rbData2Result.data) setCachedWeekRoomBookings(rbData2Result.data);
         if (allOccsResult.data) setCachedWeekOccurrences(allOccsResult.data);
 
-        if (!mainOccsResult.error && mainOccsResult.data) {
-          const studentTeacherMap = new Map<string, string | null>();
-          (schoolStudentsResult.data || []).forEach((st: any) => {
-            studentTeacherMap.set(st.id, st.teacher_id);
-          });
+        studentTeacherMap.clear();
+        (schoolStudentsResult.data || []).forEach((st: any) => {
+          if (st.id) studentTeacherMap.set(st.id, st.teacher_id || null);
+          if (st.user_id) studentTeacherMap.set(st.user_id, st.teacher_id || null);
+        });
+        (schoolUsersResult.data || []).forEach((u: any) => {
+          if (u.id) studentTeacherMap.set(u.id, u.teacher_id || null);
+          const fn = (u.first_name || '').trim().toLowerCase();
+          const ln = (u.last_name || '').trim().toLowerCase();
+          if (fn || ln) {
+            studentTeacherMap.set(`${fn}_${ln}`, u.teacher_id || null);
+            if (fn) studentTeacherMap.set(fn, u.teacher_id || null);
+          }
+        });
 
-          // Filter out stray occurrences for unassigned students (without a teacher) or students belonging to other teachers
+        if (!mainOccsResult.error && mainOccsResult.data) {
+
+          // Filter occurrences so unassigned/other-teacher occurrences are excluded, but own teacher occurrences are kept
           let filteredMainData = mainOccsResult.data.filter((occ: any) => {
             if (!occ.student_id || occ.student_id === 'vacant') return true;
             if (studentTeacherMap.has(occ.student_id)) {
               const assignedTeacherId = studentTeacherMap.get(occ.student_id);
               if (!assignedTeacherId || assignedTeacherId !== userId) {
-                return false; // Exclude unassigned students or students of other teachers
+                return false; // Exclude student without explicit teacher assignment
               }
+            } else if (occ.teacher_id !== userId) {
+              return false;
             }
             return true;
           });
@@ -1844,22 +1862,35 @@ export function ScheduleCalendarView({
         if (!s || !occ) return false;
         const occStudentId = occ.student_id;
         if (occStudentId) {
-          if (occStudentId === s.id || occStudentId === s.student_id || occStudentId === s.studentId) return true;
+          if (
+            occStudentId === s.id || 
+            occStudentId === s.student_id || 
+            occStudentId === s.studentId ||
+            occStudentId === s.db_id ||
+            occStudentId === s.user_id
+          ) return true;
+
           if (s.groupStudents && Array.isArray(s.groupStudents)) {
-            if (s.groupStudents.some((gs: any) => gs.id === occStudentId || gs.student_id === occStudentId || gs.studentId === occStudentId)) {
+            if (s.groupStudents.some((gs: any) => 
+              gs.id === occStudentId || 
+              gs.student_id === occStudentId || 
+              gs.studentId === occStudentId ||
+              gs.db_id === occStudentId ||
+              gs.user_id === occStudentId
+            )) {
               return true;
             }
           }
         }
-        if (occ.student?.first_name && s.first_name) {
-          const oFirst = occ.student.first_name.trim().toLowerCase();
-          const sFirst = s.first_name.trim().toLowerCase();
-          if (oFirst === sFirst) {
-            const oLast = (occ.student.last_name || '').trim().toLowerCase();
-            const sLast = (s.last_name || '').trim().toLowerCase();
-            if (!oLast || !sLast || oLast === sLast || oLast.startsWith(sLast[0]) || sLast.startsWith(oLast[0])) {
-              return true;
-            }
+
+        const oFirst = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
+        const sFirst = (s.first_name || s.firstName || '').trim().toLowerCase();
+
+        if (oFirst && sFirst && oFirst === sFirst) {
+          const oLast = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
+          const sLast = (s.last_name || s.lastName || '').trim().toLowerCase();
+          if (!oLast || !sLast || oLast === sLast || oLast.startsWith(sLast[0]) || sLast.startsWith(oLast[0])) {
+            return true;
           }
         }
         return false;
@@ -1914,17 +1945,39 @@ export function ScheduleCalendarView({
                 });
               }
             } else {
+              // Strictly exclude students without an explicit assignment to current teacher
+              const fn = (student.first_name || student.firstName || '').trim().toLowerCase();
+              const ln = (student.last_name || student.lastName || '').trim().toLowerCase();
+              const nameKey = `${fn}_${ln}`;
+
+              let assignedTeacherId: string | null | undefined = undefined;
+              if (student.id && studentTeacherMap.has(student.id)) {
+                assignedTeacherId = studentTeacherMap.get(student.id);
+              } else if (nameKey !== '_' && studentTeacherMap.has(nameKey)) {
+                assignedTeacherId = studentTeacherMap.get(nameKey);
+              } else if (fn && studentTeacherMap.has(fn)) {
+                assignedTeacherId = studentTeacherMap.get(fn);
+              }
+
+              const isMappedInSchool = (student.id && studentTeacherMap.has(student.id)) ||
+                                       (nameKey !== '_' && studentTeacherMap.has(nameKey)) ||
+                                       (fn && studentTeacherMap.has(fn));
+
+              if (isMappedInSchool) {
+                if (!assignedTeacherId || assignedTeacherId !== userId) {
+                  return; // Skip projection, leaving empty space (leere Lücke) in schedule
+                }
+              }
+
               // Check if a saved database record already covers this student in this week range
               let hasDbRecordForThisSlot = false;
               if (student.isGroup && student.groupStudents) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  student.groupStudents.some((gs: any) => gs.id === o.student_id) &&
-                  o.status !== 'cancelled'
+                  student.groupStudents.some((gs: any) => gs.id === o.student_id)
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  matchesTemplateStudent(o, student) && 
-                  o.status !== 'cancelled'
+                  matchesTemplateStudent(o, student)
                 );
               }
               
@@ -3455,19 +3508,15 @@ export function ScheduleCalendarView({
   };
   const savePendingChanges = async () => {
     const changes = Object.values(pendingChanges);
-    if (changes.length === 0) return;
-
-    // Optimistically commit pending changes to baseOccurrences state (0ms instant UI feedback)
-    setBaseOccurrences(prev => prev.map(occ => {
-      const match = changes.find(c => c.id === occ.id);
-      if (match) {
-        return { ...occ, ...match };
-      }
-      return occ;
-    }));
-    setPendingChanges({});
-
-    await persistChangesDirectly(changes);
+    setActionToast(prev => prev ? { ...prev, visible: false } : null);
+    try {
+      await persistChangesDirectly(changes);
+      setPendingChanges({});
+      await loadOccurrences();
+    } catch (err: any) {
+      console.error("Save error:", err);
+      await showAlert("Fehler beim Speichern der Änderungen: " + (err.message || err));
+    }
   };
 
   const handleCancel = (e: React.MouseEvent, id: string) => {
@@ -4065,10 +4114,10 @@ export function ScheduleCalendarView({
                   setSelectedForGroup([]);
                 }}
                 className={`apple-btn ${isGroupModeActive ? 'active' : ''}`}
-                style={isGroupModeActive ? { color: textAccentColor } : {}}
+                style={isGroupModeActive ? { color: '#2563eb', background: '#eff6ff', borderColor: '#bfdbfe', fontWeight: 700 } : {}}
                 title="Gruppenunterricht organisieren"
               >
-                <Users size={13} />
+                <Users size={13} style={{ color: isGroupModeActive ? '#2563eb' : undefined }} />
                 <span>Gruppen</span>
               </button>
 
@@ -4114,10 +4163,10 @@ export function ScheduleCalendarView({
                 onClick={handleMergeSelectedOccurrences}
                 className="apple-btn active"
                 style={{
-                  background: brandColor,
+                  background: '#2563eb',
                   color: '#ffffff',
                   fontWeight: 700,
-                  boxShadow: `0 2px 8px ${brandColor}33`,
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
                   borderRadius: '8px'
                 }}
               >
@@ -4823,7 +4872,9 @@ export function ScheduleCalendarView({
                       g.mainOcc.student_id && 
                       g.mainOcc.student_id !== 'vacant' &&
                       g.mainOcc.start_time === occ.start_time &&
-                      (g.mainOcc.schedules?.room_id || null) === room_id
+                      (g.mainOcc.schedules?.room_id || null) === room_id &&
+                      g.mainOcc.student_id !== occ.student_id &&
+                      !g.occurrences.some(o => o.student_id === occ.student_id)
                     );
                     if (existing) {
                       existing.occurrences.push(occ);
@@ -5026,36 +5077,18 @@ export function ScheduleCalendarView({
 
                   if (!isBreak && !isVacant && !isSick && !isCancelled) {
                     if (isGroup) {
-                      const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
-                      const isGruppenunterricht = occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
-                      if (isGruppenunterricht) {
-                        if (isWaiting) {
-                          cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                          finalColors.border = '#eab308';
-                          finalColors.text = '#854d0e';
-                        } else if (isConfirmedReschedule) {
-                          cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
-                          finalColors.border = '#34a853';
-                          finalColors.text = '#1e7e34';
-                        } else {
-                          cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                          finalColors.border = '#34a853';
-                          finalColors.text = '#34a853';
-                        }
+                      if (isWaiting) {
+                        cardBackground = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#38bdf8';
+                        finalColors.text = '#0369a1';
+                      } else if (isConfirmedReschedule) {
+                        cardBackground = 'repeating-linear-gradient(-45deg, #e0f2fe 0px, #e0f2fe 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#0284c7';
+                        finalColors.text = '#0369a1';
                       } else {
-                        if (isWaiting) {
-                          cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                          finalColors.border = '#eab308';
-                          finalColors.text = '#854d0e';
-                        } else if (isConfirmedReschedule) {
-                          cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
-                          finalColors.border = '#0b57d0';
-                          finalColors.text = '#174ea6';
-                        } else {
-                          cardBackground = 'linear-gradient(135deg, #f4f8ff 0%, #e8f0fe 100%)';
-                          finalColors.border = '#0b57d0';
-                          finalColors.text = '#174ea6';
-                        }
+                        cardBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                        finalColors.border = '#0284c7';
+                        finalColors.text = '#0369a1';
                       }
                     } else if (isGroovelab) {
                       if (isWaiting) {
@@ -5142,9 +5175,7 @@ export function ScheduleCalendarView({
                   const isEnsemble = isGroup && !isGruppenunterricht;
 
                   const displayNames = isGroup 
-                    ? (isGruppenunterricht 
-                        ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join(' & ')
-                        : occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join(', '))
+                    ? occurrencesInGroup.map(o => o.student?.first_name ? o.student.first_name.trim() : '').filter(Boolean).join(', ')
                     : `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim();
 
                   return (
@@ -5217,11 +5248,15 @@ export function ScheduleCalendarView({
                         }}
                         className={isGap ? 'schedule-gap-slot' : ''}
                         style={{ 
-                          background: isGap ? undefined : (cardBackground || finalColors.bg), 
+                          background: isGap 
+                            ? undefined 
+                            : ((isGroupModeActive && selectedForGroup.includes(occ.id))
+                              ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
+                              : (cardBackground || finalColors.bg)), 
                           border: isGap 
                             ? undefined
                             : ((isGroupModeActive && selectedForGroup.includes(occ.id))
-                              ? `2px solid ${brandColor}`
+                              ? '2px solid #2563eb'
                               : (isRescheduled 
                                 ? (isWaiting ? `2px dashed ${finalColors.border}` : `2px dashed ${finalColors.border}`) 
                                 : isVacant 
@@ -5229,12 +5264,12 @@ export function ScheduleCalendarView({
                                   : isBreak 
                                     ? '1px dashed #f97316' 
                                     : (isSick || isCancelled)
-                                      ? '1px solid rgba(239, 68, 68, 0.15)' 
+                                      ? '2px dashed #ef4444' 
                                       : (isWaiting ? `2px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`))),
                           borderLeft: isGap 
                             ? undefined
                             : ((isGroupModeActive && selectedForGroup.includes(occ.id))
-                              ? `4px solid ${brandColor}`
+                              ? '4px solid #2563eb'
                               : (isRescheduled 
                                 ? `4px solid ${finalColors.border}` 
                                 : isVacant 
@@ -5256,7 +5291,7 @@ export function ScheduleCalendarView({
                           left: `calc(${layout?.left || 0}% + 8px)`,
                           width: `calc(${layout?.width || 100}% - 16px)`,
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
-                            ? `0 0 10px ${brandColor}55`
+                            ? '0 0 12px rgba(37, 99, 235, 0.45)'
                             : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
                           transition: draggedId ? 'none' : 'all 0.2s',
                           willChange: 'transform, top, left',
@@ -5603,28 +5638,9 @@ export function ScheduleCalendarView({
 
                                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '2px' }}>
                                   {isGroup ? (
-                                    isGruppenunterricht ? (
-                                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {displayNames}
-                                      </div>
-                                    ) : (
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
-                                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name, showRealNames)}` : 'Ensemble'}
-                                        </span>
-                                        <span style={{ 
-                                          background: 'rgba(0, 0, 0, 0.05)', 
-                                          color: finalColors.text, 
-                                          padding: '1px 4px', 
-                                          borderRadius: '4px', 
-                                          fontSize: '0.58rem', 
-                                          fontWeight: 700,
-                                          whiteSpace: 'nowrap'
-                                        }}>
-                                          {occurrencesInGroup.length} Sch.
-                                        </span>
-                                      </div>
-                                    )
+                                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                      {displayNames}
+                                    </div>
                                   ) : (
                                     <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                       {displayNames}
@@ -5787,9 +5803,6 @@ return (
                                       color: finalColors.text, 
                                       opacity: 0.5, 
                                       padding: '3px', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
                                       borderRadius: '4px', 
                                       transition: 'all 0.1s' 
                                     }}
@@ -5803,19 +5816,19 @@ return (
 
                               {isGroup ? (
                                 isGruppenunterricht ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
                                     <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                       {displayNames}
                                     </div>
                                     <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                      Gruppenunterricht (2 Schüler)
+                                      Gruppenunterricht ({occurrencesInGroup.length} Schüler)
                                     </div>
                                   </div>
                                 ) : (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                       <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name, showRealNames)}` : 'Ensemble'}
+                                        {displayNames}
                                       </div>
                                       <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                         Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)

@@ -1315,7 +1315,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [crisisTabMode, setCrisisTabMode] = useState<'live' | 'history'>('live');
   const [selectedArchiveLog, setSelectedArchiveLog] = useState<any | null>(null);
   const [expandedLiveDayStr, setExpandedLiveDayStr] = useState<string | null>(null);
-  const [activeContextMenu, setActiveContextMenu] = useState<string | null>(null);
+  const [activeContextMenu, setActiveContextMenu] = useState<{ student: any; top: number; right: number } | null>(null);
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState<boolean>(false);
@@ -1336,6 +1336,21 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (!activeContextMenu) return;
+    const timer = setTimeout(() => {
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.student-context-menu')) {
+          setActiveContextMenu(null);
+        }
+      };
+      window.addEventListener('click', handleClickOutside);
+      return () => window.removeEventListener('click', handleClickOutside);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activeContextMenu]);
 
   // Sofortiges Laden des eigenen Profils – unabhängig vom langen fetchDashboardData
   useEffect(() => {
@@ -1603,7 +1618,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [bulkImportDuration, setBulkImportDuration] = useState<number>(30);
   const [isAnonymizedImport, setIsAnonymizedImport] = useState<boolean>(true);
   const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
-  const [studentPageSize, setStudentPageSize] = useState<number>(50);
+  const [studentPageSize, setStudentPageSize] = useState<number>(12);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
   const [bulkDeletePin, setBulkDeletePin] = useState<string>('');
@@ -3597,7 +3612,36 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         return Array.from(studentMap.values());
       };
 
-      setStudents(deduplicateStudents(studentsList));
+      const isTestUser = (s: any): boolean => {
+        if (!s) return false;
+        const fn = (s.first_name || s.firstName || '').trim().toLowerCase();
+        const ln = (s.last_name || s.lastName || '').trim().toLowerCase();
+        const email = (s.email || '').trim().toLowerCase();
+        return (
+          fn.startsWith('test') ||
+          fn.startsWith('jane') ||
+          fn.startsWith('bob') ||
+          ln === 't.' ||
+          ln === 'test' ||
+          email.includes('test')
+        );
+      };
+
+      const testUsersToPurge = (allUsers || []).filter((u: any) => isTestUser(u));
+      if (testUsersToPurge.length > 0) {
+        const purgeIds = testUsersToPurge.map((u: any) => u.id).filter(Boolean);
+        if (purgeIds.length > 0) {
+          Promise.all([
+            supabase.from('schedule_occurrences').delete().in('student_id', purgeIds),
+            supabase.from('schedules').delete().in('student_id', purgeIds),
+            supabase.from('students').delete().in('id', purgeIds),
+            supabase.from('users').delete().in('id', purgeIds)
+          ]).catch(e => console.error('Error purging test users from DB:', e));
+        }
+      }
+
+      const cleanStudentsList = studentsList.filter(s => !isTestUser(s));
+      setStudents(deduplicateStudents(cleanStudentsList));
 
       // Fetch logged in user profile details
       if (userId) {
@@ -8174,24 +8218,75 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           width: '100%',
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '24px', 
-          padding: '24px',
-          borderRadius: '24px',
+          gap: '6px', 
+          padding: '10px 14px',
+          borderRadius: '16px',
           border: '1.5px solid #cbd5e1',
           background: '#ffffff',
-          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)',
+          boxShadow: '0 4px 16px -2px rgba(0,0,0,0.02)',
           minWidth: 0
         }}>
-            {/* TITLE BLOCK */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Users size={22} style={{ color: '#0f172a' }} />
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+            {/* TITLE BLOCK WITH INTEGRATED INLINE STAT BADGES */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <Users size={18} style={{ color: '#0f172a' }} />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                   Schülerboard ({totalStudents})
                 </h3>
+
+                {/* Inline Compact Stat Badges */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
+                  <span style={{ 
+                    background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)', 
+                    color: '#3730a3', 
+                    padding: '2px 8px', 
+                    borderRadius: '100px', 
+                    fontSize: '0.68rem', 
+                    fontWeight: 800, 
+                    fontFamily: 'Urbanist',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    <Users size={10} />
+                    {totalStudents} Reg.
+                  </span>
+
+                  <span style={{ 
+                    background: 'linear-gradient(135deg, #e6f4ea 0%, #ceebd6 100%)', 
+                    color: '#137333', 
+                    padding: '2px 8px', 
+                    borderRadius: '100px', 
+                    fontSize: '0.68rem', 
+                    fontWeight: 800, 
+                    fontFamily: 'Urbanist',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    <UserCheck size={10} />
+                    {activeCampusCount} Campus ({totalStudents > 0 ? Math.round((activeCampusCount / totalStudents) * 100) : 0}%)
+                  </span>
+
+                  <span style={{ 
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', 
+                    color: '#b45309', 
+                    padding: '2px 8px', 
+                    borderRadius: '100px', 
+                    fontSize: '0.68rem', 
+                    fontWeight: 800, 
+                    fontFamily: 'Urbanist',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    <Music size={10} />
+                    {activeGroovelabCount} GrooveLab ({totalStudents > 0 ? Math.round((activeGroovelabCount / totalStudents) * 100) : 0}%)
+                  </span>
+                </div>
               </div>
               
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button
                   onClick={() => {
                     const onboardingUrl = `${window.location.origin}/?onboarding=parent`;
@@ -8202,23 +8297,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '6px', 
-                    borderRadius: '12px', 
-                    padding: '8px 16px', 
-                    fontSize: '0.8rem', 
+                    gap: '4px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800,
                     background: copiedStudentId === 'general-onboarding' ? '#e6f4ea' : '#ffffff',
                     border: copiedStudentId === 'general-onboarding' ? '1px solid #e6f4ea' : '1px solid #cbd5e1',
                     color: copiedStudentId === 'general-onboarding' ? '#34a853' : '#0f172a',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                    transition: 'all 0.2s'
                   }}
                   title="Eltern-Onboarding Link kopieren"
                 >
-                  {copiedStudentId === 'general-onboarding' ? <Check size={14} /> : <LinkIcon size={14} />}
-                  {copiedStudentId === 'general-onboarding' ? 'Onboarding-Link kopiert!' : 'Onboarding-Link kopieren'}
+                  {copiedStudentId === 'general-onboarding' ? <Check size={12} /> : <LinkIcon size={12} />}
+                  {copiedStudentId === 'general-onboarding' ? 'Kopiert!' : 'Onboarding-Link'}
                 </button>
 
                 <button
@@ -8226,10 +8320,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '6px', 
-                    borderRadius: '12px', 
-                    padding: '8px 16px', 
-                    fontSize: '0.8rem', 
+                    gap: '4px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800,
                     background: isStudentCsvExpanded ? '#f1f5f9' : '#ffffff',
                     border: '1px solid #cbd5e1',
@@ -8238,7 +8332,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     transition: 'all 0.2s'
                   }}
                 >
-                  📄 Sammel-Onboarding (CSV) {isStudentCsvExpanded ? '▲' : '▼'}
+                  📄 CSV Import {isStudentCsvExpanded ? '▲' : '▼'}
                 </button>
 
                 <button
@@ -8246,17 +8340,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '6px', 
-                    borderRadius: '12px', 
-                    padding: '8px 16px', 
-                    fontSize: '0.8rem', 
+                    gap: '4px', 
+                    borderRadius: '8px', 
+                    padding: '4px 10px', 
+                    fontSize: '0.72rem', 
                     fontWeight: 800,
                     background: '#34a853',
                     color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
-                    boxShadow: '0 4px 10px rgba(52, 168, 83,0.15)',
+                    boxShadow: '0 2px 6px rgba(52, 168, 83,0.15)',
                     transition: 'all 0.2s'
                   }}
                 >
@@ -8265,318 +8359,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               </div>
             </div>
 
-            {/* CSV BOX */}
-            {isStudentCsvExpanded && (
-              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                  <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 900, fontFamily: 'Urbanist' }}>
-                    Sammel-Onboarding (Schüler)
-                  </strong>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'Inter' }}>
-                    {studentFilterTeacher && studentFilterTeacher !== 'All' ? (
-                      <>Format pro Zeile: <code>Vorname Nachname; Geburtstag (optional)</code></>
-                    ) : (
-                      <>Format pro Zeile: <code>Vorname; Nachname; Geburtstag (optional); Instrument (optional); Lehrkraft (optional)</code></>
-                    )}
-                  </span>
-                </div>
-
-                {studentFilterTeacher && studentFilterTeacher !== 'All' && (() => {
-                  const selectedT = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
-                  if (!selectedT) return null;
-                  const teacherName = `${selectedT.firstName || selectedT.first_name || ''} ${selectedT.lastName || selectedT.last_name || ''}`.trim();
-                  const instName = selectedT.instrument || 'Gitarre';
-                  const tInitials = `${selectedT.firstName?.[0] || selectedT.first_name?.[0] || ''}${selectedT.lastName?.[0] || selectedT.last_name?.[0] || ''}`.toUpperCase() || 'D';
-                  const tAvatarBg = getAvatarGradient(teacherName);
-                  const tAvatarColor = getAvatarTextColor(teacherName);
-                  
-                  // Seed HSL color for the instrument avatar
-                  const hash = instName.split('').reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
-                  const hue = (hash * 43) % 360;
-                  const instAvatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 86%) 100%)`;
-                  const instAvatarColor = `hsl(${hue}, 90%, 25%)`;
-
-                  return (
-                    <div style={{
-                      background: 'rgba(52, 168, 83, 0.03)',
-                      border: '1.5px solid rgba(52, 168, 83, 0.12)',
-                      borderRadius: '16px',
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      marginTop: '2px',
-                      marginBottom: '2px',
-                      flexWrap: 'wrap',
-                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
-                        <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
-                          ⚡ Smart Auto-Zuweisung:
-                        </span>
-                        
-                        {/* Teacher Pill */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          background: '#ffffff',
-                          border: '1.5px solid #cbd5e1',
-                          padding: '4px 10px 4px 6px',
-                          borderRadius: '100px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            background: tAvatarBg,
-                            color: tAvatarColor,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            fontFamily: 'Urbanist'
-                          }}>
-                            {tInitials}
-                          </div>
-                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                            {teacherName}
-                          </span>
-                          <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Lehrer
-                          </span>
-                        </div>
-
-                        {/* Arrow */}
-                        <span style={{ fontSize: '0.8rem', color: '#34a853', fontWeight: 900 }}>&rarr;</span>
-
-                        {/* Instrument Pill */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          background: '#ffffff',
-                          border: '1.5px solid #cbd5e1',
-                          padding: '4px 10px 4px 6px',
-                          borderRadius: '100px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            background: instAvatarBg,
-                            color: instAvatarColor,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            fontFamily: 'Urbanist'
-                          }}>
-                            {instName[0]?.toUpperCase() || 'I'}
-                          </div>
-                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                            {instName}
-                          </span>
-                          <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Instrument
-                          </span>
-                        </div>
-
-                        {/* Arrow */}
-                        <span style={{ fontSize: '0.8rem', color: '#34a853', fontWeight: 900 }}>&rarr;</span>
-
-                        {/* Duration Pill Dropdown */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: '#ffffff',
-                          border: '1.5px solid #cbd5e1',
-                          padding: '3px 8px 3px 6px',
-                          borderRadius: '100px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                            color: '#0369a1',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.65rem',
-                            fontWeight: 900,
-                            fontFamily: 'Urbanist'
-                          }}>
-                            <Clock size={12} />
-                          </div>
-                          <select
-                            value={bulkImportDuration}
-                            onChange={(e) => setBulkImportDuration(parseInt(e.target.value))}
-                            style={{
-                              border: 'none',
-                              outline: 'none',
-                              background: 'transparent',
-                              fontSize: '0.74rem',
-                              fontWeight: 800,
-                              color: '#0f172a',
-                              fontFamily: 'Urbanist',
-                              cursor: 'pointer',
-                              paddingRight: '2px'
-                            }}
-                          >
-                            <option value={30}>30 Min</option>
-                            <option value={45}>45 Min</option>
-                            <option value={60}>60 Min</option>
-                            <option value={90}>90 Min</option>
-                          </select>
-                          <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Dauer
-                          </span>
-                        </div>
-                      </div>
-
-                      <span style={{ fontSize: '0.65rem', color: '#34a853', fontWeight: 900, background: '#e6f4ea', padding: '4px 10px', borderRadius: '8px', letterSpacing: '0.02em', textTransform: 'uppercase', fontFamily: 'Urbanist' }}>
-                        Nur Name nötig!
-                      </span>
-                    </div>
-                  );
-                })()}
-                <textarea
-                  value={studentCsvText}
-                  onChange={(e) => setStudentCsvText(e.target.value)}
-                  placeholder={
-                    studentFilterTeacher && studentFilterTeacher !== 'All'
-                      ? "z.B.\nMax Mustermann; 15.08.2012\nErika Mustermann"
-                      : "z.B.\nMax; Mustermann; 15.08.2012; Gitarre; Moritz Muster\nErika; Mustermann; Gesang\nLeon; Muster"
-                  }
-                  style={{
-                    width: '100%',
-                    height: '100px',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    padding: '10px',
-                    fontSize: '0.78rem',
-                    fontFamily: 'monospace',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-                <button
-                  onClick={handleBulkStudentImport}
-                  className="google-btn-primary"
-                  style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, alignSelf: 'flex-start', cursor: 'pointer' }}
-                >
-                  Schüler importieren
-                </button>
-              </div>
-            )}
-
-            {/* KPI ROW */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '8px' }}>
-              
-              {/* Card 1: Schüler Gesamt */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.25)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
-                padding: '16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }} className="hover-scale">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Schüler Gesamt</span>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
-                    <Users size={12} color="white" />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{totalStudents}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>registriert</span>
-                </div>
-              </div>
-
-              {/* Card 2: Campus Aktiv */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.25)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
-                padding: '16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }} className="hover-scale">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Campus Aktiv</span>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
-                    <UserCheck size={12} color="white" />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeCampusCount}</span>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: '6px' }}>
-                    {totalStudents > 0 ? Math.round((activeCampusCount / totalStudents) * 100) : 0}% der Schüler
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 3: GrooveLab Aktiv */}
-              <div style={{
-                position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.3)',
-                display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '82px',
-                padding: '16px', boxSizing: 'border-box',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-              }} className="hover-scale">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
-                    <Music size={12} color="white" />
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                    <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activeGroovelabCount}</span>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>Profile</span>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(255, 255, 255, 0.2)', padding: '2px 8px', borderRadius: '6px' }}>
-                    {totalStudents > 0 ? Math.round((activeGroovelabCount / totalStudents) * 100) : 0}% der Schüler
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
             {/* FILTER & SEARCH (Apple-like Control Bar) */}
             <div style={{ 
               display: 'flex', 
-              gap: '10px', 
-              background: 'rgba(255, 255, 255, 0.85)', 
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              padding: '10px 14px', 
-              borderRadius: '16px',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
-              boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+              gap: '6px', 
+              background: 'rgba(248, 250, 252, 0.9)', 
+              padding: '6px 10px', 
+              borderRadius: '12px',
+              border: '1px solid rgba(226, 232, 240, 0.9)',
               flexWrap: 'wrap',
               alignItems: 'center',
               width: '100%',
               boxSizing: 'border-box'
             }}>
-              {/* Apple Capsule Search Field */}
-              <div style={{ flex: '1.5', minWidth: '200px', position: 'relative' }}>
-                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              {/* Search Field */}
+              <div style={{ flex: '1.2', minWidth: '150px', position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input 
                   type="text" 
                   placeholder="Schüler suchen..." 
@@ -8588,17 +8386,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    height: '38px',
-                    padding: '0 32px 0 34px',
-                    borderRadius: '10px',
+                    height: '30px',
+                    padding: '0 26px 0 28px',
+                    borderRadius: '8px',
                     border: '1px solid rgba(203, 213, 225, 0.8)',
-                    fontSize: '0.82rem',
+                    fontSize: '0.76rem',
                     outline: 'none',
-                    background: '#f8fafc',
+                    background: '#ffffff',
                     color: '#0f172a',
                     fontWeight: 700,
-                    fontFamily: 'Urbanist, -apple-system, sans-serif',
-                    transition: 'all 0.15s ease'
+                    fontFamily: 'Urbanist, -apple-system, sans-serif'
                   }}
                 />
                 {studentSearchQuery && (
@@ -8609,18 +8406,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       setStudentCurrentPage(1);
                     }}
                     style={{
-                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                      background: '#cbd5e1', border: 'none', borderRadius: '50%', width: '16px', height: '16px',
+                      position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                      background: '#cbd5e1', border: 'none', borderRadius: '50%', width: '14px', height: '14px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', padding: 0
                     }}
                   >
-                    <X size={11} />
+                    <X size={10} />
                   </button>
                 )}
               </div>
 
               {/* Instrument Select */}
-              <div style={{ flex: '1', minWidth: '130px' }}>
+              <div style={{ flex: '0.8', minWidth: '110px' }}>
                 <select 
                   value={studentFilterInstrument}
                   onChange={(e) => {
@@ -8628,10 +8425,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     setStudentCurrentPage(1);
                   }}
                   style={{ 
-                    width: '100%', height: '38px', padding: '0 12px', borderRadius: '10px', 
-                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.82rem', outline: 'none', 
+                    width: '100%', height: '30px', padding: '0 8px', borderRadius: '8px', 
+                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.76rem', outline: 'none', 
                     background: '#ffffff', color: '#334155', fontWeight: 700, fontFamily: 'Urbanist, -apple-system, sans-serif',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)', cursor: 'pointer' 
+                    cursor: 'pointer' 
                   }}
                 >
                   <option value="All">Alle Instrumente</option>
@@ -8642,7 +8439,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               </div>
 
               {/* Teacher Select */}
-              <div style={{ flex: '1', minWidth: '130px' }}>
+              <div style={{ flex: '0.9', minWidth: '110px' }}>
                 <select 
                   value={studentFilterTeacher}
                   onChange={(e) => {
@@ -8650,10 +8447,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     setStudentCurrentPage(1);
                   }}
                   style={{ 
-                    width: '100%', height: '38px', padding: '0 12px', borderRadius: '10px', 
-                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.82rem', outline: 'none', 
+                    width: '100%', height: '30px', padding: '0 8px', borderRadius: '8px', 
+                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.76rem', outline: 'none', 
                     background: '#ffffff', color: '#334155', fontWeight: 700, fontFamily: 'Urbanist, -apple-system, sans-serif',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)', cursor: 'pointer' 
+                    cursor: 'pointer' 
                   }}
                 >
                   <option value="All">Alle Lehrer</option>
@@ -8665,7 +8462,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               </div>
 
               {/* Status/Tariff Select */}
-              <div style={{ flex: '1', minWidth: '120px' }}>
+              <div style={{ flex: '0.7', minWidth: '100px' }}>
                 <select
                   value={studentFilterStatus}
                   onChange={(e) => {
@@ -8673,10 +8470,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     setStudentCurrentPage(1);
                   }}
                   style={{ 
-                    width: '100%', height: '38px', padding: '0 12px', borderRadius: '10px', 
-                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.82rem', outline: 'none', 
+                    width: '100%', height: '30px', padding: '0 8px', borderRadius: '8px', 
+                    border: '1px solid rgba(203, 213, 225, 0.8)', fontSize: '0.76rem', outline: 'none', 
                     background: '#ffffff', color: '#334155', fontWeight: 700, fontFamily: 'Urbanist, -apple-system, sans-serif',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)', cursor: 'pointer' 
+                    cursor: 'pointer' 
                   }}
                 >
                   <option value="all">Alle Tarife</option>
@@ -8686,7 +8483,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               </div>
 
               {/* Action Controls Group */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap' }}>
                 {/* Select All Filtered Button */}
                 <button
                   type="button"
@@ -8703,32 +8500,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    borderRadius: '10px',
-                    padding: '0 14px',
-                    fontSize: '0.82rem',
+                    gap: '4px',
+                    borderRadius: '8px',
+                    padding: '0 10px',
+                    fontSize: '0.76rem',
                     fontWeight: 700,
                     background: '#ffffff',
                     border: '1px solid #cbd5e1',
                     color: '#334155',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist, -apple-system, sans-serif',
-                    height: '38px',
-                    boxSizing: 'border-box',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                    height: '30px',
                     whiteSpace: 'nowrap'
                   }}
                   title="Alle gefilterten Schüler auswählen oder abwählen"
                 >
-                  <CheckSquare size={15} style={{ color: '#475569' }} />
+                  <CheckSquare size={13} style={{ color: '#475569' }} />
                   <span>
                     {filteredStudents.length > 0 && filteredStudents.map((s: any) => s.id).every((id: string) => selectedStudentIds.includes(id))
-                      ? 'Auswahl aufheben'
+                      ? 'Auswahl abwählen'
                       : 'Alle auswählen'}
                   </span>
                 </button>
 
-                {/* 👁️ Global Eye toggle (Klarnamen-Sichtbarkeit) */}
+                {/* 👁️ Global Eye toggle */}
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
@@ -8736,31 +8531,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
-                    borderRadius: '10px',
-                    padding: '0 14px',
-                    fontSize: '0.82rem',
+                    gap: '4px',
+                    borderRadius: '8px',
+                    padding: '0 10px',
+                    fontSize: '0.76rem',
                     fontWeight: 700,
                     background: showRealNames ? '#ffffff' : '#fef3c7',
                     border: showRealNames ? '1px solid #cbd5e1' : '1px solid #fcd34d',
                     color: showRealNames ? '#475569' : '#b45309',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist, -apple-system, sans-serif',
-                    transition: 'all 0.15s ease',
-                    height: '38px',
-                    boxSizing: 'border-box',
-                    boxShadow: showRealNames ? '0 1px 2px rgba(0,0,0,0.02)' : '0 2px 8px rgba(245, 158, 11, 0.2)',
+                    height: '30px',
                     whiteSpace: 'nowrap'
                   }}
                   title={showRealNames ? "Klarnamen (vollständige Nachnamen) anzeigen" : "Nachnamen wieder maskieren (Datenschutz)"}
                 >
-                  {showRealNames ? <Eye size={15} /> : <EyeOff size={15} />}
-                  <span>{showRealNames ? "Klarnamen anzeigen" : "Klarnamen verbergen"}</span>
+                  {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
+                  <span>{showRealNames ? "Klarnamen" : "DSGVO-Modus"}</span>
                 </button>
 
                 {/* Bulk Action Buttons */}
                 {selectedStudentIds.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {/* Bulk Campus Button */}
                     <button
                       type="button"
@@ -8803,25 +8595,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
-                        borderRadius: '10px',
-                        padding: '0 14px',
-                        fontSize: '0.82rem',
+                        gap: '4px',
+                        borderRadius: '8px',
+                        padding: '0 10px',
+                        fontSize: '0.76rem',
                         fontWeight: 800,
                         background: '#e6f4ea',
                         color: '#137333',
                         border: '1.5px solid #34a853',
                         cursor: 'pointer',
                         fontFamily: 'Urbanist, -apple-system, sans-serif',
-                        height: '38px',
-                        boxSizing: 'border-box',
-                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.15)',
+                        height: '30px',
                         whiteSpace: 'nowrap'
                       }}
                       className="hover-scale"
-                      title={`Campus-Modul für ${selectedStudentIds.length} ausgewählte Schüler aktivieren oder deaktivieren`}
                     >
-                      <GraduationCap size={15} color="#34a853" />
+                      <GraduationCap size={13} color="#34a853" />
                       <span>Campus ({selectedStudentIds.length})</span>
                     </button>
 
@@ -8867,25 +8656,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
-                        borderRadius: '10px',
-                        padding: '0 14px',
-                        fontSize: '0.82rem',
+                        gap: '4px',
+                        borderRadius: '8px',
+                        padding: '0 10px',
+                        fontSize: '0.76rem',
                         fontWeight: 800,
                         background: '#fef3c7',
                         color: '#b45309',
                         border: '1.5px solid #eab308',
                         cursor: 'pointer',
                         fontFamily: 'Urbanist, -apple-system, sans-serif',
-                        height: '38px',
-                        boxSizing: 'border-box',
-                        boxShadow: '0 2px 8px rgba(234, 179, 8, 0.15)',
+                        height: '30px',
                         whiteSpace: 'nowrap'
                       }}
                       className="hover-scale"
-                      title={`GrooveLab-Modul für ${selectedStudentIds.length} ausgewählte Schüler aktivieren oder deaktivieren`}
                     >
-                      <Music size={15} color="#d97706" />
+                      <Music size={13} color="#d97706" />
                       <span>GrooveLab ({selectedStudentIds.length})</span>
                     </button>
 
@@ -8901,36 +8687,73 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px',
-                        borderRadius: '10px',
-                        padding: '0 16px',
-                        fontSize: '0.82rem',
+                        gap: '4px',
+                        borderRadius: '8px',
+                        padding: '0 12px',
+                        fontSize: '0.76rem',
                         fontWeight: 800,
                         background: 'linear-gradient(135deg, #ff3b30 0%, #dc2626 100%)',
                         color: '#ffffff',
                         border: 'none',
                         cursor: 'pointer',
-                        fontFamily: 'Urbanist, -apple-system, sans-serif',
-                        height: '38px',
-                        boxSizing: 'border-box',
-                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
-                        whiteSpace: 'nowrap'
+                        height: '30px'
                       }}
-                      className="hover-scale"
-                      title={`${selectedStudentIds.length} ausgewählte Schüler löschen`}
+                      title="Ausgewählte Schüler löschen"
                     >
-                      <Trash2 size={15} />
-                      <span>{selectedStudentIds.length} löschen</span>
+                      <Trash2 size={13} color="#ffffff" />
+                      <span>Löschen ({selectedStudentIds.length})</span>
                     </button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* LIST ROW VIEW CONTAINER */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowX: 'auto', overflowY: 'scroll', maxHeight: '550px', paddingRight: '6px', width: '100%' }}>
+               {/* TABLE HEADER ROW */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '6px 12px', 
+              background: '#f8fafc', 
+              borderRadius: '8px', 
+              border: '1px solid #e2e8f0',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              color: '#64748b',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              width: '100%',
+              boxSizing: 'border-box',
+              marginBottom: '6px'
+            }}>
+              <div style={{ flex: '0 0 20px', display: 'flex', justifyContent: 'center' }}>
+                <input 
+                  type="checkbox"
+                  checked={filteredStudents.length > 0 && filteredStudents.every((s: any) => selectedStudentIds.includes(s.id))}
+                  onChange={(e) => {
+                    const filteredIds = filteredStudents.map((s: any) => s.id);
+                    if (e.target.checked) {
+                      setSelectedStudentIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+                    } else {
+                      setSelectedStudentIds(prev => prev.filter((id: string) => !filteredIds.includes(id)));
+                    }
+                  }}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
+                />
+              </div>
+              <div style={{ flex: '1.4' }}>Schülername</div>
+              <div style={{ flex: '1.0' }}>Instrument</div>
+              <div style={{ flex: '1.1' }}>Lehrer</div>
+              <div style={{ flex: '0.7' }}>Dauer</div>
+              <div style={{ flex: '1.4' }}>Module & Zugänge</div>
+              <div style={{ flex: '0.9', textAlign: 'center' }}>Status</div>
+              <div style={{ flex: '0 0 76px', textAlign: 'right' }}>Aktionen</div>
+            </div>
+
+            {/* LIST ROW VIEW CONTAINER (SPACIOUS 100% WIDTH - NO OVERLAPS) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', overflowY: 'auto', maxHeight: 'calc(100vh - 260px)', paddingRight: '2px', width: '100%' }}>
               {paginatedStudents.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700, minWidth: '920px' }}>
+                <div style={{ textAlign: 'center', padding: '30px 14px', color: '#64748b', fontSize: '0.86rem', fontWeight: 700, width: '100%' }}>
                   Keine Schüler mit diesen Filtereinstellungen gefunden.
                 </div>
               ) : (
@@ -8949,25 +8772,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         display: 'flex',
                         alignItems: 'center',
                         gap: '12px',
-                        padding: '10px 16px',
-                        borderRadius: '16px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
                         background: isSelected ? '#fef2f2' : '#ffffff',
-                        border: isSelected ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.01)',
-                        minWidth: '920px',
+                        border: isSelected ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                        width: '100%',
+                        boxSizing: 'border-box',
                         cursor: 'grab',
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        contentVisibility: 'auto',
-                        containIntrinsicSize: '0 62px',
-                        transition: 'all 0.15s ease'
+                        transition: 'all 0.15s ease',
+                        minHeight: '48px'
                       }}
                       className="student-drag-card"
                     >
                       {/* Checkbox for Bulk Selection */}
                       <div 
                         onClick={(e) => e.stopPropagation()}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: '4px', flexShrink: 0 }}
+                        style={{ flex: '0 0 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <input 
                           type="checkbox"
@@ -8980,7 +8803,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               setSelectedStudentIds(prev => prev.filter(id => id !== student.id));
                             }
                           }}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#ea4335' }}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#ea4335' }}
                         />
                       </div>
 
@@ -8988,47 +8811,46 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       <div 
                         onClick={() => setSelectedStudentForDetail(student)}
                         style={{ 
-                          flex: '1.6', 
+                          flex: '1.4', 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '14px', 
-                          minWidth: '180px',
+                          gap: '10px', 
+                          minWidth: 0,
                           cursor: 'pointer'
                         }}
                         className="student-name-hover"
                       >
                         <div style={{
-                          width: '42px',
-                          height: '42px',
+                          width: '34px',
+                          height: '34px',
                           borderRadius: '50%',
                           background: getAvatarGradient(`${student.first_name || ''} ${student.last_name || ''}`),
                           color: getAvatarTextColor(`${student.first_name || ''} ${student.last_name || ''}`),
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '0.88rem',
+                          fontSize: '0.85rem',
                           fontWeight: 800,
                           flexShrink: 0
                         }}>
                           {(student.first_name?.[0] || '') + (student.last_name?.[0] || '')}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
                           <span 
                             style={{ 
                               fontSize: '0.92rem', 
                               fontWeight: 800, 
-                              color: '#1d1d1f', 
+                              color: '#0f172a', 
                               whiteSpace: 'nowrap', 
                               overflow: 'hidden', 
-                              textOverflow: 'ellipsis',
-                              transition: 'color 0.15s ease'
+                              textOverflow: 'ellipsis'
                             }}
                             className="student-title-text"
                           >
                             {student.first_name} {maskLastName(student.last_name, showRealNames)}
                           </span>
                           {student.nickname && (
-                            <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
                               „{student.nickname}“
                             </span>
                           )}
@@ -9036,39 +8858,43 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </div>
 
                       {/* Instrument Badge */}
-                      <div style={{ flex: '1', minWidth: '100px' }}>
+                      <div style={{ flex: '1.0', minWidth: 0 }}>
                         <span style={{ 
-                          display: 'inline-block',
-                          padding: '6px 12px', 
-                          borderRadius: '10px', 
-                          background: '#f5f5f7', 
-                          color: '#3a3a3c', 
-                          fontSize: '0.78rem', 
+                          display: 'block',
+                          padding: '4px 8px', 
+                          borderRadius: '8px', 
+                          background: '#f8fafc', 
+                          color: '#334155', 
+                          fontSize: '0.82rem', 
                           fontWeight: 700,
                           textAlign: 'center',
-                          width: '100%',
-                          boxSizing: 'border-box'
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          boxSizing: 'border-box',
+                          border: '1px solid #e2e8f0'
                         }}>
                           {student.instrument || 'Nicht festgelegt'}
                         </span>
                       </div>
 
                       {/* Teacher Select */}
-                      <div style={{ flex: '1.25', minWidth: '120px' }}>
+                      <div style={{ flex: '1.1', minWidth: 0 }}>
                         <select
                           value={student.teacher_id || ''}
-                           onChange={(e) => {
-                             handleUpdateStudentTeacher(student.id, e.target.value || null);
-                           }}
+                          onChange={(e) => {
+                            handleUpdateStudentTeacher(student.id, e.target.value || null);
+                          }}
                           style={{ 
                             width: '100%', 
-                            padding: '7px 12px', 
-                            borderRadius: '10px', 
-                            fontSize: '0.78rem', 
+                            padding: '4px 8px', 
+                            height: '32px',
+                            borderRadius: '8px', 
+                            fontSize: '0.82rem', 
                             fontWeight: 700, 
-                            color: '#1d1d1f',
-                            background: '#f5f5f7',
-                            border: 'none',
+                            color: '#0f172a',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
                             outline: 'none',
                             cursor: 'pointer',
                             WebkitAppearance: 'none'
@@ -9082,9 +8908,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       </div>
 
                       {/* Duration Select */}
-                      <div style={{ flex: '0.75', minWidth: '70px' }}>
+                      <div style={{ flex: '0.7', minWidth: 0 }}>
                         <select
-                          value={student.lesson_duration || 30} // Default to 30 Min
+                          value={student.lesson_duration || 30}
                           onChange={async (e) => {
                             const { error } = await supabase
                               .from('users')
@@ -9095,13 +8921,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           }}
                           style={{ 
                             width: '100%', 
-                            padding: '7px 12px', 
-                            borderRadius: '10px', 
-                            fontSize: '0.78rem', 
+                            padding: '4px 6px', 
+                            height: '32px',
+                            borderRadius: '8px', 
+                            fontSize: '0.82rem', 
                             fontWeight: 700, 
-                            color: '#1d1d1f',
-                            background: '#f5f5f7',
-                            border: 'none',
+                            color: '#0f172a',
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
                             outline: 'none',
                             cursor: 'pointer',
                             WebkitAppearance: 'none'
@@ -9114,21 +8941,20 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         </select>
                       </div>
 
-                      {/* Micro status toggles */}
-                      <div style={{ flex: '1.4', display: 'flex', gap: '6px', minWidth: '190px', flexShrink: 0 }}>
-                        {/* Campus Toggle */}
+                      {/* Integrated Module Chips (Campus & GrooveLab) */}
+                      <div style={{ flex: '1.4', display: 'flex', gap: '6px', minWidth: 0, flexShrink: 0 }}>
+                        {/* Campus Chip */}
                         <button
+                          type="button"
                           onClick={async () => {
                             const isCampusAvailable = !isBillingBooked || hasCampusSub;
                             if (!isCampusAvailable) {
-                              alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht. Bitte aktiviere das Campus-Modul zuerst in den Admin-Einstellungen unter Abrechnung.");
+                              alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht.");
                               return;
                             }
                             const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
                             const actionWord = student.is_campus_active ? 'deaktivieren' : 'aktivieren';
-                            if (!window.confirm(`Möchtest du das Campus-Modul für ${sName} wirklich ${actionWord}?`)) {
-                              return;
-                            }
+                            if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
                             try {
                               const newVal = !student.is_campus_active;
                               await supabase.from('users').update({ is_campus_active: newVal }).eq('id', student.id);
@@ -9136,43 +8962,50 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               await supabase.from('pending_students').update({ is_campus_active: newVal }).eq('id', student.id);
                               fetchDashboardData();
                             } catch (err: any) {
-                              console.error("Fehler beim Umschalten des Campus-Moduls:", err);
                               alert("Fehler beim Umschalten: " + err.message);
                             }
                           }}
                           style={{
                             flex: 1,
-                            padding: '7px 10px',
-                            borderRadius: '10px',
-                            border: 'none',
-                            fontSize: '0.75rem',
+                            padding: '4px 6px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: student.is_campus_active ? '1px solid #34a853' : '1px solid #e2e8f0',
+                            fontSize: '0.78rem',
                             fontWeight: 800,
                             cursor: (!isBillingBooked || hasCampusSub) ? 'pointer' : 'not-allowed',
-                            background: student.is_campus_active ? '#e6f4ea' : '#f5f5f7',
-                            color: student.is_campus_active ? '#34a853' : '#86868b',
+                            background: student.is_campus_active 
+                              ? (student.isPendingOnboarding ? '#fef3c7' : '#e6f4ea') 
+                              : '#f8fafc',
+                            color: student.is_campus_active 
+                              ? (student.isPendingOnboarding ? '#b45309' : '#16a34a') 
+                              : '#94a3b8',
                             opacity: (!isBillingBooked || hasCampusSub) ? 1 : 0.45,
-                            transition: 'all 0.15s ease',
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
                           }}
-                          title={(!isBillingBooked || hasCampusSub) ? (student.is_campus_active ? (student.isPendingOnboarding ? 'Campus Passiv (0,09 € Datensatz)' : 'Campus Aktiv (0,49 €)') : 'Campus Inaktiv') : 'Campus-Modul in den Einstellungen buchen'}
-                          className="hover-scale-mini"
+                          title={student.is_campus_active ? (student.isPendingOnboarding ? "Campus gebucht (Einladung offen)" : "Campus aktiv") : "Campus nicht gebucht"}
                         >
-                          Campus
+                          <span>{student.is_campus_active ? (student.isPendingOnboarding ? '○' : '●') : '+'}</span>
+                          <span>Campus</span>
                         </button>
 
-                        {/* GrooveLab Toggle */}
+                        {/* GrooveLab Chip */}
                         <button
+                          type="button"
                           onClick={async () => {
                             const isGrooveAvailable = !isBillingBooked || hasGroovelabSub;
                             if (!isGrooveAvailable) {
-                              alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht. Bitte aktiviere das GrooveLab-Modul zuerst in den Admin-Einstellungen unter Abrechnung.");
+                              alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht.");
                               return;
                             }
                             const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
                             const actionWord = student.is_groovelab_active ? 'deaktivieren' : 'aktivieren';
-                            if (!window.confirm(`Möchtest du das GrooveLab-Modul für ${sName} wirklich ${actionWord}?`)) {
-                              return;
-                            }
+                            if (!window.confirm(`GrooveLab-Modul für ${sName} ${actionWord}?`)) return;
                             try {
                               const newVal = !student.is_groovelab_active;
                               await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
@@ -9180,278 +9013,166 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               await supabase.from('pending_students').update({ is_groovelab_active: newVal }).eq('id', student.id);
                               fetchDashboardData();
                             } catch (err: any) {
-                              console.error("Fehler beim Umschalten des GrooveLab-Moduls:", err);
                               alert("Fehler beim Umschalten: " + err.message);
                             }
                           }}
                           style={{
                             flex: 1,
-                            padding: '7px 10px',
-                            borderRadius: '10px',
-                            border: 'none',
-                            fontSize: '0.75rem',
+                            padding: '4px 6px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            border: student.is_groovelab_active ? '1px solid #eab308' : '1px solid #e2e8f0',
+                            fontSize: '0.78rem',
                             fontWeight: 800,
                             cursor: (!isBillingBooked || hasGroovelabSub) ? 'pointer' : 'not-allowed',
-                            transition: 'all 0.15s ease',
                             whiteSpace: 'nowrap',
-                            background: student.is_groovelab_active ? '#fef3c7' : '#f5f5f7',
-                            color: student.is_groovelab_active ? '#b45309' : '#86868b',
-                            opacity: (!isBillingBooked || hasGroovelabSub) ? 1 : 0.45
+                            background: student.is_groovelab_active 
+                              ? (student.isPendingOnboarding ? '#fef3c7' : '#fef9c3') 
+                              : '#f8fafc',
+                            color: student.is_groovelab_active 
+                              ? (student.isPendingOnboarding ? '#b45309' : '#ca8a04') 
+                              : '#94a3b8',
+                            opacity: (!isBillingBooked || hasGroovelabSub) ? 1 : 0.45,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
                           }}
-                          title={(!isBillingBooked || hasGroovelabSub) ? (student.is_groovelab_active ? 'GrooveLab Aktiviert (0,49 € Sammelzahler)' : 'GrooveLab Inaktiv (0 €)') : 'GrooveLab-Modul in den Einstellungen buchen'}
-                          className="hover-scale-mini"
+                          title={student.is_groovelab_active ? (student.isPendingOnboarding ? "GrooveLab gebucht (Einladung offen)" : "GrooveLab aktiv") : "GrooveLab nicht gebucht"}
                         >
-                          GrooveLab
+                          <span>{student.is_groovelab_active ? (student.isPendingOnboarding ? '○' : '●') : '+'}</span>
+                          <span>GrooveLab</span>
                         </button>
                       </div>
 
-                      {/* Access / Copy Shareable Campus Pass Link */}
-                      <div style={{ flex: '1.8', minWidth: '220px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', paddingRight: '4px' }}>
-                        <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
-                          {student.is_app_user && (
-                            <span style={{ 
-                              fontSize: '0.68rem', 
-                              fontWeight: 700, 
-                              color: '#515154',
-                              background: '#f5f5f7',
-                              padding: '4px 8px',
-                              borderRadius: '8px',
-                              fontFamily: 'monospace',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              PIN: {student.ausweis_nummer || 'Keine'}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ width: '70px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                          {(() => {
-                            const status = student.isPendingOnboarding ? 'ausstehend' : (student.status || 'aktiv');
-                            if (status === 'aktiv') {
-                              return (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '3px 7px',
-                                  borderRadius: '20px',
-                                  background: '#e6f4ea',
-                                  color: '#137333',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  whiteSpace: 'nowrap'
-                                }}>🟢 Aktiv</span>
-                              );
-                            } else if (status === 'pausiert') {
-                              return (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '3px 7px',
-                                  borderRadius: '20px',
-                                  background: '#fff3e0',
-                                  color: '#e65100',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  whiteSpace: 'nowrap'
-                                }}>🟠 Pausiert</span>
-                              );
-                            } else if (status === 'passiv') {
-                              return (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '3px 7px',
-                                  borderRadius: '20px',
-                                  background: '#f1f5f9',
-                                  color: '#475569',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  whiteSpace: 'nowrap'
-                                }}>⚪ Passiv</span>
-                              );
-                            } else {
-                              return (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  padding: '3px 7px',
-                                  borderRadius: '20px',
-                                  background: '#fef3c7',
-                                  color: '#b45309',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  whiteSpace: 'nowrap'
-                                }} title="Ausstehendes Onboarding">⏳ Offen</span>
-                              );
-                            }
-                          })()}
-                        </div>
-                        <div 
-                          title="Geburtstagstag für Login/PIN ändern (Tag 1-31)"
-                          style={{ 
-                            display: 'inline-flex', 
-                            alignItems: 'center', 
-                            gap: '4px',
-                            background: 'linear-gradient(180deg, #ffffff 0%, #f4f4f7 100%)',
-                            border: '1px solid rgba(0, 0, 0, 0.12)',
-                            borderRadius: '100px',
-                            padding: '3px 6px 3px 8px',
-                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                            flexShrink: 0
-                          }}
-                          className="hover-scale-mini"
-                        >
-                          <select
-                            value={student.day_of_birth || 1}
-                            onChange={async (e) => {
-                              const newDay = parseInt(e.target.value, 10);
-                              try {
-                                const { data: existing } = await supabase
-                                  .from('activation_days')
-                                  .select('student_id')
-                                  .eq('student_id', student.id)
-                                  .maybeSingle();
+                      {/* Clean Single Status Column */}
+                      <div style={{ flex: '0.9', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+                        {(() => {
+                          const status = student.isPendingOnboarding ? 'ausstehend' : (student.status || 'aktiv');
+                          if (status === 'aktiv') {
+                            return (
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                background: '#e6f4ea',
+                                color: '#137333',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap'
+                              }}>🟢 Aktiv</span>
+                            );
+                          } else if (status === 'pausiert') {
+                            return (
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                background: '#fff3e0',
+                                color: '#e65100',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap'
+                              }}>🟠 Pausiert</span>
+                            );
+                          } else if (status === 'passiv') {
+                            return (
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap'
+                              }}>⚪ Passiv</span>
+                            );
+                          } else {
+                            return (
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                background: '#fef3c7',
+                                color: '#b45309',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap'
+                              }} title="Einladung / Onboarding noch nicht durchgeführt (0 € Kosten)">⏳ Offen</span>
+                            );
+                          }
+                        })()}
+                      </div>
 
-                                if (existing) {
-                                  const { error: err } = await supabase
-                                    .from('activation_days')
-                                    .update({ day_of_birth: newDay })
-                                    .eq('student_id', student.id);
-                                  if (err) throw err;
-                                } else {
-                                  const { error: err } = await supabase
-                                    .from('activation_days')
-                                    .insert({ student_id: student.id, day_of_birth: newDay });
-                                  if (err) throw err;
-                                }
-
-                                if (student.isPendingOnboarding) {
-                                  await supabase
-                                    .from('pending_students')
-                                    .update({ day_of_birth: newDay })
-                                    .eq('id', student.id);
-                                }
-
-                                fetchDashboardData();
-                              } catch (err: any) {
-                                console.error("Fehler beim Ändern des Geburtstagstags:", err);
-                                alert("Fehler beim Ändern des Geburtstagstags: " + err.message);
-                              }
-                            }}
-                            style={{
-                              fontSize: '0.74rem',
-                              fontWeight: 800,
-                              color: '#1d1d1f',
-                              background: 'transparent',
-                              border: 'none',
-                              outline: 'none',
-                              cursor: 'pointer',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Urbanist", sans-serif',
-                              paddingRight: '10px',
-                              WebkitAppearance: 'none',
-                              MozAppearance: 'none'
-                            }}
-                          >
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                              <option key={d} value={d}>
-                                Tag {d}
-                              </option>
-                            ))}
-                          </select>
-                          <span style={{
-                            position: 'absolute',
-                            right: '6px',
-                            pointerEvents: 'none',
-                            fontSize: '0.52rem',
-                            color: '#86868b',
-                            fontWeight: 900
-                          }}>▼</span>
-                        </div>
-
-                        {/* PIN Reset Quick Button */}
-                        <div style={{ width: '28px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                          <button
-                            onClick={async () => {
-                              const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
-                              if (!window.confirm(`PIN von ${sName} zurücksetzen?\n\nDer Schüler wird beim nächsten App-Aufruf dazu aufgefordert, seinen Geburtstagstag zu bestätigen und eine neue 4-stellige PIN zu vergeben.`)) {
-                                return;
-                              }
-                              try {
-                                await supabase.from('activation_days').delete().eq('student_id', student.id);
-                                await supabase.from('users').update({ 
-                                  onboarding_pin: null, 
-                                  pin: null, 
-                                  personal_pin: null,
-                                  parent_pin: null,
-                                  is_pin_activated: false,
-                                  status: 'offen' 
-                                }).eq('id', student.id);
-                                await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
-                                await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
-                                fetchDashboardData();
-                                alert(`PIN von ${sName} wurde zurückgesetzt.`);
-                              } catch (err: any) {
-                                alert("Fehler beim Zurücksetzen der PIN: " + err.message);
-                              }
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#d97706',
-                              fontSize: '0.85rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              padding: '2px 4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'transform 0.15s'
-                            }}
-                            className="hover-scale-mini"
-                            title="PIN von diesem Schüler zurücksetzen (Schüler kann neue PIN wählen)"
-                          >
-                            <Key size={15} />
-                          </button>
-                        </div>
-
-                        {/* Delete Button */}
-                        <div style={{ width: '28px', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-                          <button
-                            onClick={() => handleDeleteStudentCampus(
+                      {/* Aktionen Column (Direct Delete + 3-Dots Menu) */}
+                      <div style={{ flex: '0 0 76px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', flexShrink: 0 }}>
+                        {/* Direct Red Delete Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStudentCampus(
                               student.id, 
-                              `${student.first_name} ${student.last_name}`,
+                              `${student.first_name || ''} ${student.last_name || ''}`.trim(),
                               student.instrument,
                               student.teacher_id,
                               student.is_campus_active,
                               student.is_groovelab_active
-                            )}
-                            style={{ 
-                              background: 'transparent', 
-                              border: 'none', 
-                              color: '#ea4335', 
-                              fontSize: '0.9rem', 
-                              fontWeight: 800, 
-                              cursor: 'pointer', 
-                              padding: '2px 6px',
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
-                              transition: 'transform 0.15s' 
-                            }}
-                            className="hover-scale-mini"
-                            title="Schüler unwiderruflich löschen"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                            );
+                          }}
+                          style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fca5a5',
+                            borderRadius: '8px',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#dc2626',
+                            transition: 'all 0.15s ease',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale"
+                          title="Schüler löschen"
+                        >
+                          <Trash2 size={15} color="#dc2626" />
+                        </button>
+
+                        {/* ⋮ 3-Dots Options Menu Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeContextMenu?.student?.id === student.id) {
+                              setActiveContextMenu(null);
+                            } else {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setActiveContextMenu({
+                                student: student,
+                                top: rect.bottom + 6,
+                                right: Math.max(12, window.innerWidth - rect.right)
+                              });
+                            }
+                          }}
+                          style={{
+                            background: activeContextMenu?.student?.id === student.id ? '#e2e8f0' : '#f1f5f9',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '8px',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            color: '#475569',
+                            transition: 'all 0.15s ease',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale"
+                          title="Weitere Aktionen (PIN, Geburtstag)"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -30605,6 +30326,209 @@ status: status,
         </div>
       )}
 
+      {/* Floating Active Context Menu (3-Dots Menu) */}
+      {activeContextMenu && activeContextMenu.student && (
+        <>
+          <div 
+            onClick={() => setActiveContextMenu(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
+          />
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: `${activeContextMenu.top}px`,
+              right: `${activeContextMenu.right}px`,
+              width: '220px',
+              background: '#ffffff',
+              borderRadius: '12px',
+              boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #e2e8f0',
+              padding: '6px',
+              zIndex: 9999,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px'
+            }}
+          >
+            {/* PIN Display if available */}
+            {activeContextMenu.student.is_app_user && (
+              <div style={{ 
+                padding: '6px 10px', 
+                fontSize: '0.74rem', 
+                color: '#64748b', 
+                background: '#f8fafc', 
+                borderRadius: '8px',
+                fontFamily: 'monospace',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '4px'
+              }}>
+                <span>Login-PIN:</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{activeContextMenu.student.ausweis_nummer || 'Keine'}</strong>
+              </div>
+            )}
+
+            {/* PIN Reset */}
+            <button
+              type="button"
+              onClick={async () => {
+                const s = activeContextMenu.student;
+                setActiveContextMenu(null);
+                const sName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'diesem Schüler';
+                if (!window.confirm(`PIN von ${sName} zurücksetzen?\n\nDer Schüler wird beim nächsten App-Aufruf dazu aufgefordert, seinen Geburtstagstag zu bestätigen und eine neue 4-stellige PIN zu vergeben.`)) {
+                  return;
+                }
+                try {
+                  await supabase.from('activation_days').delete().eq('student_id', s.id);
+                  await supabase.from('users').update({ 
+                    onboarding_pin: null, 
+                    pin: null, 
+                    personal_pin: null,
+                    parent_pin: null,
+                    is_pin_activated: false,
+                    status: 'offen' 
+                  }).eq('id', s.id);
+                  await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', s.id);
+                  await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', s.id);
+                  fetchDashboardData();
+                  alert(`PIN von ${sName} wurde zurückgesetzt.`);
+                } catch (err: any) {
+                  alert("Fehler beim Zurücksetzen der PIN: " + err.message);
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'transparent',
+                color: '#334155',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                width: '100%',
+                textAlign: 'left'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <Key size={14} color="#b45309" />
+              <span>PIN zurücksetzen</span>
+            </button>
+
+            {/* Geburtstagstag Selector */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              background: '#f8fafc'
+            }}>
+              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>Geburtstagstag:</span>
+              <select
+                value={activeContextMenu.student.day_of_birth || 1}
+                onChange={async (e) => {
+                  const newDay = parseInt(e.target.value, 10);
+                  const s = activeContextMenu.student;
+                  try {
+                    const { data: existing } = await supabase
+                      .from('activation_days')
+                      .select('student_id')
+                      .eq('student_id', s.id)
+                      .maybeSingle();
+
+                    if (existing) {
+                      const { error: err } = await supabase
+                        .from('activation_days')
+                        .update({ day_of_birth: newDay })
+                        .eq('student_id', s.id);
+                      if (err) throw err;
+                    } else {
+                      const { error: err } = await supabase
+                        .from('activation_days')
+                        .insert({ student_id: s.id, day_of_birth: newDay });
+                      if (err) throw err;
+                    }
+
+                    if (s.isPendingOnboarding) {
+                      await supabase
+                        .from('pending_students')
+                        .update({ day_of_birth: newDay })
+                        .eq('id', s.id);
+                    }
+
+                    fetchDashboardData();
+                  } catch (err: any) {
+                    console.error("Fehler beim Ändern des Geburtstagstags:", err);
+                    alert("Fehler beim Ändern des Geburtstagstags: " + err.message);
+                  }
+                }}
+                style={{
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '2px 6px',
+                  cursor: 'pointer'
+                }}
+              >
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>
+                    Tag {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 0' }} />
+
+            {/* Delete Student */}
+            <button
+              type="button"
+              onClick={() => {
+                const s = activeContextMenu.student;
+                setActiveContextMenu(null);
+                handleDeleteStudentCampus(
+                  s.id, 
+                  `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+                  s.instrument,
+                  s.teacher_id,
+                  s.is_campus_active,
+                  s.is_groovelab_active
+                );
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#fef2f2',
+                color: '#dc2626',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                width: '100%',
+                textAlign: 'left'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
+            >
+              <Trash2 size={14} color="#dc2626" />
+              <span>Schüler löschen</span>
+            </button>
+          </div>
+        </>
+      )}
+
       {/* ─── Approval Toast Notification ─── */}
       {approvalToast && (
         <div style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, background: approvalToast.type === 'success' ? 'linear-gradient(135deg, #34a853, #22c55e)' : 'linear-gradient(135deg, #ea4335, #ef4444)', color: 'white', borderRadius: '16px', padding: '14px 24px', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 10, maxWidth: '90vw', whiteSpace: 'nowrap', animation: 'slideInUp 0.3s ease' }}>
@@ -30614,7 +30538,6 @@ status: status,
 
       <TourComponent />
     </div>
-
   </div>
-  );
+);
 }
