@@ -28,14 +28,9 @@ interface CampusModuleProps {
 
 export const CampusModule: React.FC<CampusModuleProps> = (props) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const isBadSaeckingen = props.schoolName.toLowerCase().includes('bad säckingen') || 
-                          props.schoolName.toLowerCase().includes('bad saeckingen') || 
-                          props.schoolName.toLowerCase().includes('bad sackingen') || 
-                          props.schoolName.toLowerCase().includes('musäk');
-
   // Filter students: ONLY show active Campus students
   const campusStudentsOnly = props.students.filter((s: any) => {
-    return s.is_campus_active && isBadSaeckingen;
+    return s.is_campus_active;
   });
 
   const filteredStudents = campusStudentsOnly.filter((s: any) => {

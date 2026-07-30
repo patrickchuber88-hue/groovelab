@@ -258,12 +258,12 @@ export function ScheduleCalendarView({
   const [actionToast, setActionToast] = useState<{
     id: string;
     message: string;
-    undoFn: () => void;
+    undoFn?: () => void;
   } | null>(null);
   const toastTimeoutRef = useRef<any>(null);
   const [showMoreHeaderMenu, setShowMoreHeaderMenu] = useState<boolean>(false);
 
-  const showActionToast = (message: string, undoFn: () => void) => {
+  const showActionToast = (message: string, undoFn?: () => void) => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current);
     }
@@ -1235,6 +1235,10 @@ export function ScheduleCalendarView({
             : (originalOcc ? originalOcc.student_id : null);
           const targetDuration = change.duration || originalOcc?.duration || 30;
           
+          const targetRoomOverride = change.room_override_id !== undefined 
+            ? change.room_override_id 
+            : (originalOcc ? originalOcc.room_override_id : null);
+          
           const { error } = await supabase.from('schedule_occurrences')
             .update({
               date: change.date,
@@ -1242,7 +1246,8 @@ export function ScheduleCalendarView({
               status: change.status || 'pending_reschedule',
               original_date: origDateStr,
               student_id: targetStudentId,
-              duration: targetDuration
+              duration: targetDuration,
+              room_override_id: targetRoomOverride
             })
             .eq('id', change.id);
           
@@ -1660,6 +1665,30 @@ export function ScheduleCalendarView({
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students'
+        },
+        (payload) => {
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          if (
+            (newRec && (newRec.teacher_id === userId || oldRec?.teacher_id === userId)) ||
+            (oldRec && oldRec.teacher_id === userId)
+          ) {
+            if (oldRec?.teacher_id === userId && newRec?.teacher_id !== userId) {
+              showActionToast('ℹ️ Schüler wurde neu zugewiesen.');
+            }
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = setTimeout(() => {
+              loadOccurrencesRef.current();
+            }, 300);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -1726,7 +1755,8 @@ export function ScheduleCalendarView({
           evResult,
           rbData2Result,
           allOccsResult,
-          mainOccsResult
+          mainOccsResult,
+          schoolStudentsResult
         ] = await Promise.all([
           supabase.from('room_bookings').select('room_id, date, start_time, room:rooms(name)').eq('booked_by', userId).gte('date', startDateStr).lte('date', endDateStr),
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument), teacher:users!schedules_teacher_id_fkey(first_name, last_name)').eq('school_id', schoolId).not('room_id', 'is', null),
@@ -1734,7 +1764,8 @@ export function ScheduleCalendarView({
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
           supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time')
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time'),
+          supabase.from('students').select('id, teacher_id').eq('school_id', schoolId)
         ]);
 
         if (rbResult.data) roomBookings = rbResult.data;
@@ -1752,7 +1783,22 @@ export function ScheduleCalendarView({
         if (allOccsResult.data) setCachedWeekOccurrences(allOccsResult.data);
 
         if (!mainOccsResult.error && mainOccsResult.data) {
-          let filteredMainData = mainOccsResult.data;
+          const studentTeacherMap = new Map<string, string | null>();
+          (schoolStudentsResult.data || []).forEach((st: any) => {
+            studentTeacherMap.set(st.id, st.teacher_id);
+          });
+
+          // Filter out stray occurrences for unassigned students (without a teacher) or students belonging to other teachers
+          let filteredMainData = mainOccsResult.data.filter((occ: any) => {
+            if (!occ.student_id || occ.student_id === 'vacant') return true;
+            if (studentTeacherMap.has(occ.student_id)) {
+              const assignedTeacherId = studentTeacherMap.get(occ.student_id);
+              if (!assignedTeacherId || assignedTeacherId !== userId) {
+                return false; // Exclude unassigned students or students of other teachers
+              }
+            }
+            return true;
+          });
 
           fetchedData = filteredMainData.map((occ: any) => {
             const booking = roomBookings.find(b => 
@@ -3430,9 +3476,9 @@ export function ScheduleCalendarView({
     await persistChangesDirectly(changes);
   };
 
-  const handleCancel = async (e: React.MouseEvent, id: string) => {
+  const handleCancel = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await persistOccurrenceDirectly(id, { status: 'cancelled' });
+    updateOccurrence(id, { status: 'cancelled' }, 'Unterricht als abgesagt markiert');
   };
 
   const handleCancelBreak = async (e: React.MouseEvent, breakOcc: ScheduleOccurrence) => {
@@ -7257,7 +7303,7 @@ return (
             <button
               type="button"
               onClick={() => {
-                actionToast.undoFn();
+                if (actionToast.undoFn) actionToast.undoFn();
                 setActionToast(null);
               }}
               style={{
@@ -7345,7 +7391,7 @@ return (
               <button
                 onClick={savePendingChanges}
                 style={{
-                  background: '#34a853',
+                  background: brandColor,
                   border: 'none',
                   color: 'white',
                   padding: '8px 20px',
@@ -7353,19 +7399,19 @@ return (
                   fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)',
+                  boxShadow: `0 4px 12px ${brandColor}50`,
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
                 onMouseOver={e => {
-                  e.currentTarget.style.background = '#34a853';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(52, 168, 83, 0.45)';
+                  e.currentTarget.style.background = brandColor;
+                  e.currentTarget.style.boxShadow = `0 6px 16px ${brandColor}70`;
                 }}
                 onMouseOut={e => {
-                  e.currentTarget.style.background = '#34a853';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(52, 168, 83, 0.3)';
+                  e.currentTarget.style.background = brandColor;
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${brandColor}50`;
                 }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

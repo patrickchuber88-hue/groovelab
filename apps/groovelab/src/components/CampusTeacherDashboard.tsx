@@ -429,11 +429,32 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           }
         }
       )
+    const channelStudents = supabase
+      .channel(`realtime_teacher_students_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students'
+        },
+        (payload) => {
+          const newRec = payload.new as any;
+          const oldRec = payload.old as any;
+          if (
+            (newRec && (newRec.teacher_id === userId || oldRec?.teacher_id === userId)) ||
+            (oldRec && oldRec.teacher_id === userId)
+          ) {
+            refreshAllData(teacher.school_id, userId);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channelSchedules);
       supabase.removeChannel(channelOccurrences);
+      supabase.removeChannel(channelStudents);
     };
   }, [userId, teacher]);
 

@@ -1050,8 +1050,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
       const studentMap = new Map<string, Student>();
       const userToStudentIdMap = new Map<string, string>();
 
-      // Filter helper: include all school students to guarantee 1-to-1 parity with TeacherDashboard and AdminDashboard
-      const matchesTeacher = (_tId?: string | null, _sId?: string) => true;
+      // Filter helper: ONLY include students explicitly assigned to selected teacher or via recurring schedules/bands
+      const matchesTeacher = (tId?: string | null, sId?: string) => {
+        if (!selectedTeacherId) return false;
+        if (tId) {
+          return tId === selectedTeacherId;
+        }
+        if (sId && teacherAssignedStudentIds.has(sId)) {
+          return true;
+        }
+        return false;
+      };
 
       // A) Add all students from students table (authoritative for lesson duration & teacher assignment)
       allStudentsDb?.forEach(s => {

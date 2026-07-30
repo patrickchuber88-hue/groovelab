@@ -8138,10 +8138,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   const renderCompactStudentBoard = () => {
-    const isBadSaeckingen = schoolName.toLowerCase().includes('bad säckingen') || 
-                            schoolName.toLowerCase().includes('bad saeckingen') || 
-                            schoolName.toLowerCase().includes('bad sackingen') || 
-                            schoolName.toLowerCase().includes('musäk');
+
 
     // Show all students belonging to the school
     const campusStudentsOnly = students;

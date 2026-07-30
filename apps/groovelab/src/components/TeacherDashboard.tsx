@@ -4199,6 +4199,19 @@ export function TeacherDashboard({
       })
       .subscribe();
 
+    const channelStudents = supabase
+      .channel('realtime_teacher_students')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, (payload) => {
+        const oldRec = payload.old as any;
+        const newRec = payload.new as any;
+        if (oldRec?.teacher_id === userId && newRec?.teacher_id !== userId) {
+          setToastMessage('ℹ️ Ein Schüler wurde neu zugewiesen.');
+        }
+        debouncedFetchData();
+        setBriefingRefreshTicker(prev => prev + 1);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channelSessions);
       supabase.removeChannel(channelHelp);
@@ -4207,6 +4220,7 @@ export function TeacherDashboard({
       supabase.removeChannel(channelCrisis);
       supabase.removeChannel(channelOccurrences);
       supabase.removeChannel(channelUsers);
+      supabase.removeChannel(channelStudents);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [userId, activePlatform, selectedRoomId, locationMode]);

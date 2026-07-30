@@ -59,10 +59,7 @@ export const VerwaltungModule: React.FC<VerwaltungModuleProps> = (props) => {
   const [roomName, setRoomName] = useState('');
   const [editingRoom, setEditingRoom] = useState<any>(null);
   
-  const isBadSaeckingen = props.schoolName.toLowerCase().includes('bad säckingen') || 
-                          props.schoolName.toLowerCase().includes('bad saeckingen') || 
-                          props.schoolName.toLowerCase().includes('bad sackingen') || 
-                          props.schoolName.toLowerCase().includes('musäk');
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
