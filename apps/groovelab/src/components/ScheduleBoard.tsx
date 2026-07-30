@@ -45,6 +45,8 @@ export interface Student {
   assignedTime?: string; // e.g. "14:30"
   isBreak?: boolean;
   customStartTime?: string;
+  isPinned?: boolean;
+  preferenceMatch?: 'first' | 'secondary' | 'deviation';
   status?: 'ausstehend' | 'verplant' | 'aktiv' | 'in_bearbeitung';
   isGroup?: boolean;
   groupStudents?: Student[];
@@ -1767,12 +1769,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   // Helper to recalculate all lesson times in a column (gaps allowed, 100% zero-overlap guarantee)
   function recalculateBoardTimes(board: DayBoard, _priorityCardId?: string): DayBoard {
-    let currentTime = board.startAnchor;
+    let currentTime = board.startAnchor || '14:00';
     const updatedStudents = board.students.map(s => {
       let assignedStart = currentTime;
       let effectiveCustomTime = s.customStartTime;
+      let isPinned = s.isPinned;
 
-      if (s.customStartTime) {
+      if (s.isPinned && (s.customStartTime || s.assignedTime)) {
+        const targetTime = s.customStartTime || s.assignedTime || currentTime;
+        const [csh, csm] = parseTime(targetTime);
+        const [curh, curm] = parseTime(currentTime);
+        const csMin = csh * 60 + csm;
+        const curMin = curh * 60 + curm;
+
+        if (csMin >= curMin) {
+          // Pinned placement: gap preserved
+          assignedStart = targetTime;
+          effectiveCustomTime = targetTime;
+        } else {
+          // Overlap PREVENTED: Shifted down to end of preceding appointment and unpinned
+          assignedStart = currentTime;
+          effectiveCustomTime = undefined;
+          isPinned = false;
+        }
+      } else if (s.customStartTime) {
         const [csh, csm] = parseTime(s.customStartTime);
         const [curh, curm] = parseTime(currentTime);
         const csMin = csh * 60 + csm;
@@ -1795,7 +1815,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         ...s,
         assignedDay: board.dayOfWeek,
         assignedTime,
-        customStartTime: effectiveCustomTime
+        customStartTime: effectiveCustomTime,
+        isPinned
       };
     });
 
@@ -6184,6 +6205,25 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 )}
                               </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'auto' }}>
+                              {studentHasPrefs && (
+                                <span
+                                  style={{
+                                    fontSize: '0.58rem',
+                                    fontWeight: 700,
+                                    color: isInsideWunsch ? '#15803d' : (isStudentSperrzeitConflict ? '#b91c1c' : '#c2410c'),
+                                    background: isInsideWunsch ? '#dcfce7' : (isStudentSperrzeitConflict ? '#fee2e2' : '#ffedd5'),
+                                    padding: '1px 4px',
+                                    borderRadius: '3px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    pointerEvents: 'none'
+                                  }}
+                                  title={isInsideWunsch ? "1. Wunschzeit der Eltern getroffen" : (isStudentSperrzeitConflict ? "Sperrzeit-Konflikt!" : "Abweichende Uhrzeit")}
+                                >
+                                  {isInsideWunsch ? '✓ Wunsch' : (isStudentSperrzeitConflict ? '⚠️ Sperrzeit' : 'Abweichung')}
+                                </span>
+                              )}
                               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 {isInsideWunsch && (
                                   <span title="Wunschtermin garantiert getroffen!" style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -6192,6 +6232,48 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                 )}
                                 {bs.duration}m
                               </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setBoards(prev => prev.map(b => {
+                                    if (b.id !== board.id) return b;
+                                    const nextStudents = b.students.map(s => {
+                                      if (s.id !== bs.id) return s;
+                                      const newPinned = !s.isPinned;
+                                      return {
+                                        ...s,
+                                        isPinned: newPinned,
+                                        customStartTime: newPinned ? (s.customStartTime || s.assignedTime || '14:00') : undefined
+                                      };
+                                    });
+                                    return recalculateBoardTimes({ ...b, students: nextStudents });
+                                  }));
+                                  setToast({
+                                    message: !bs.isPinned 
+                                      ? `Uhrzeit ${bs.assignedTime || '14:00'} für ${bs.first_name || 'Schüler'} fixiert! 📌` 
+                                      : `Fixierung für ${bs.first_name || 'Schüler'} gelöst.`,
+                                    type: 'success'
+                                  });
+                                }}
+                                style={{
+                                  background: bs.isPinned ? 'rgba(234, 179, 8, 0.2)' : 'transparent',
+                                  border: 'none',
+                                  color: bs.isPinned ? '#ca8a04' : badgeColor,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  padding: '3px',
+                                  borderRadius: '4px',
+                                  opacity: bs.isPinned ? 1 : 0.65,
+                                  pointerEvents: 'auto'
+                                }}
+                                title={bs.isPinned ? "Fixierte Uhrzeit (Klick zum Lösen)" : "Uhrzeit fixieren (Pin)"}
+                              >
+                                <Pin size={11} strokeWidth={2.5} style={{ transform: bs.isPinned ? 'rotate(45deg)' : 'none' }} />
+                              </button>
                               <button 
                                 type="button" 
                                 onClick={(e) => {

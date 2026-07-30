@@ -1100,83 +1100,52 @@ export function ScheduleCalendarView({
         const originalOcc = baseOccurrences.find(o => o.id === change.id);
 
         if (change.id.startsWith('mock-')) {
-          if ((!change.student_id || change.student_id === 'vacant') && change.status !== 'cancelled') {
+          if ((!change.student_id || change.student_id === 'vacant' || change.student_id.startsWith('vacant-') || change.student_id.startsWith('break-')) && change.status !== 'cancelled') {
             continue;
           }
-          const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, isGroupBlock, groupOccurrences, ...insertData } = change as any;
-          insertData.original_date = insertData.original_date || change.date;
+          const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, isGroupBlock, groupOccurrences, student_acknowledged, schedule_id, ...insertData } = change as any;
           
-          if (!insertData.student_id) {
-            insertData.student_id = null;
-          }
-
-          const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
-          const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
+          const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
           
           insertData.original_date = origDateStr;
+          insertData.teacher_id = insertData.teacher_id || userId;
           insertData.status = change.status || 'pending_reschedule';
           
           if (isGroupBlock && groupOccurrences && groupOccurrences.length > 0) {
-            const groupInserts = [];
-            for (const gs of groupOccurrences) {
-              let scheduleId = undefined;
-              try {
-                const { data: schData } = await supabase
-                  .from('schedules')
-                  .select('id')
-                  .eq('student_id', gs.id)
-                  .eq('teacher_id', userId)
-                  .limit(1);
-                if (schData && schData.length > 0) {
-                  scheduleId = schData[0].id;
-                }
-              } catch (e) {}
-              
-              groupInserts.push({
+            const groupInserts = groupOccurrences
+              .filter((gs: any) => gs.id && gs.id.length > 10 && !gs.id.startsWith('break-') && !gs.id.startsWith('vacant-'))
+              .map((gs: any) => ({
                 ...insertData,
                 student_id: gs.id,
-                schedule_id: scheduleId,
                 duration: gs.duration || insertData.duration
-              });
-            }
+              }));
             
-            const { error } = await supabase.from('schedule_occurrences').insert(groupInserts);
-            if (error) throw error;
+            if (groupInserts.length > 0) {
+              const { error } = await supabase.from('schedule_occurrences').insert(groupInserts);
+              if (error) throw error;
+            }
           } else {
-            try {
-              const { data: schData } = await supabase
-                .from('schedules')
-                .select('id')
-                .eq('student_id', change.student_id || null)
-                .eq('teacher_id', userId)
-                .limit(1);
-              
-              if (schData && schData.length > 0) {
-                insertData.schedule_id = schData[0].id;
-              } else {
-                insertData.schedule_id = undefined;
-              }
-            } catch (schErr) {
-              console.warn('Error fetching schedule_id for mock insert:', schErr);
-              insertData.schedule_id = undefined;
+            if (!insertData.student_id || insertData.student_id.startsWith('break-') || insertData.student_id.startsWith('vacant-') || insertData.student_id === 'vacant') {
+              continue;
             }
-            
             const { error } = await supabase.from('schedule_occurrences').insert(insertData);
             if (error) throw error;
           }
         } else {
-          const origDateStr = change.original_date || (originalOcc ? originalOcc.date : change.date);
-          const origTimeStr = change.original_start_time || (originalOcc ? originalOcc.start_time : change.start_time);
+          const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
+          const targetStudentId = (change.student_id !== undefined && change.student_id !== null)
+            ? change.student_id
+            : (originalOcc ? originalOcc.student_id : null);
+          const targetDuration = change.duration || originalOcc?.duration || 30;
           
           const { error } = await supabase.from('schedule_occurrences')
             .update({
               date: change.date,
               start_time: change.start_time,
-              status: change.status,
+              status: change.status || 'pending_reschedule',
               original_date: origDateStr,
-              student_acknowledged: false,
-              student_id: change.student_id ? change.student_id : null,
-              duration: change.duration
+              student_id: targetStudentId,
+              duration: targetDuration
             })
             .eq('id', change.id);
           
@@ -1667,8 +1636,8 @@ export function ScheduleCalendarView({
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument)').eq('teacher_id', userId).eq('school_id', schoolId),
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
-          supabase.from('schedule_occurrences').select('id, date, start_time, duration, status, teacher_id, student_id, schedule_id, schedules!schedule_occurrences_schedule_id_fkey(room_id)').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
-          supabase.from('schedule_occurrences').select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id), schedules!schedule_occurrences_schedule_id_fkey(room_id, room:rooms(name))').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time')
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time')
         ]);
 
         if (rbResult.data) roomBookings = rbResult.data;
@@ -1686,13 +1655,7 @@ export function ScheduleCalendarView({
         if (allOccsResult.data) setCachedWeekOccurrences(allOccsResult.data);
 
         if (!mainOccsResult.error && mainOccsResult.data) {
-          const activePlatform = localStorage.getItem('groovelab_active_platform');
           let filteredMainData = mainOccsResult.data;
-          if (activePlatform === 'campus') {
-            filteredMainData = filteredMainData.filter((occ: any) => !occ.student || occ.student.is_campus_active);
-          } else if (activePlatform === 'groovelab') {
-            filteredMainData = filteredMainData.filter((occ: any) => !occ.student || occ.student.is_groovelab_active);
-          }
 
           fetchedData = filteredMainData.map((occ: any) => {
             const booking = roomBookings.find(b => 
@@ -1702,12 +1665,8 @@ export function ScheduleCalendarView({
             if (booking) {
               return {
                 ...occ,
-                template_room_id: occ.schedules?.room_id || null,
-                schedules: occ.schedules ? {
-                  ...occ.schedules,
-                  room_id: booking.room_id,
-                  room: booking.room
-                } : {
+                template_room_id: null,
+                schedules: {
                   room_id: booking.room_id,
                   room: booking.room
                 }
@@ -1725,18 +1684,18 @@ export function ScheduleCalendarView({
               const roomObj = rooms.find(r => r.id === matchingSlot.room_id);
               return {
                 ...occ,
-                template_room_id: occ.schedules?.room_id || null,
-                schedules: occ.schedules ? {
-                  ...occ.schedules,
-                  room_id: matchingSlot.room_id,
-                  room: roomObj ? { name: roomObj.name } : occ.schedules.room
-                } : {
+                template_room_id: null,
+                schedules: {
                   room_id: matchingSlot.room_id,
                   room: roomObj ? { name: roomObj.name } : null
                 }
               };
             }
-            return occ;
+            return {
+              ...occ,
+              template_room_id: null,
+              schedules: null
+            };
           });
         }
       } catch (err) {
@@ -1746,13 +1705,25 @@ export function ScheduleCalendarView({
       // Helper function to check if a database occurrence matches a template student
       const matchesTemplateStudent = (occ: any, s: any) => {
         if (!s || !occ) return false;
-        if (occ.student_id && (occ.student_id === s.id || occ.student_id === s.student_id || occ.student_id === s.studentId)) return true;
+        const occStudentId = occ.student_id;
+        if (occStudentId) {
+          if (occStudentId === s.id || occStudentId === s.student_id || occStudentId === s.studentId) return true;
+          if (s.groupStudents && Array.isArray(s.groupStudents)) {
+            if (s.groupStudents.some((gs: any) => gs.id === occStudentId || gs.student_id === occStudentId || gs.studentId === occStudentId)) {
+              return true;
+            }
+          }
+        }
         if (occ.student?.first_name && s.first_name) {
           const oFirst = occ.student.first_name.trim().toLowerCase();
           const sFirst = s.first_name.trim().toLowerCase();
-          const oLast = (occ.student.last_name || '').trim().toLowerCase();
-          const sLast = (s.last_name || '').trim().toLowerCase();
-          if (oFirst === sFirst && oLast === sLast) return true;
+          if (oFirst === sFirst) {
+            const oLast = (occ.student.last_name || '').trim().toLowerCase();
+            const sLast = (s.last_name || '').trim().toLowerCase();
+            if (!oLast || !sLast || oLast === sLast || oLast.startsWith(sLast[0]) || sLast.startsWith(oLast[0])) {
+              return true;
+            }
+          }
         }
         return false;
       };
@@ -1787,6 +1758,8 @@ export function ScheduleCalendarView({
                   student_id: '',
                   teacher_id: userId,
                   date: dateStr,
+                  original_date: dateStr,
+                  original_start_time: formattedTime,
                   start_time: formattedTime,
                   duration: student.duration,
                   status: 'scheduled',
@@ -1804,18 +1777,16 @@ export function ScheduleCalendarView({
                 });
               }
             } else {
-              // Check if a saved database record already covers this student (or any of the group students) in this week range
+              // Check if a saved database record already covers this student in this week range
               let hasDbRecordForThisSlot = false;
               if (student.isGroup && student.groupStudents) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   student.groupStudents.some((gs: any) => gs.id === o.student_id) &&
-                  (o.original_date === dateStr || (!o.original_date && o.date === dateStr)) &&
                   o.status !== 'cancelled'
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   matchesTemplateStudent(o, student) && 
-                  (o.original_date === dateStr || (!o.original_date && o.date === dateStr)) &&
                   o.status !== 'cancelled'
                 );
               }
@@ -1827,6 +1798,8 @@ export function ScheduleCalendarView({
                   student_id: student.id,
                   teacher_id: userId,
                   date: dateStr,
+                  original_date: dateStr,
+                  original_start_time: formattedTime,
                   start_time: formattedTime,
                   duration: student.duration,
                   status: 'scheduled',
@@ -1860,16 +1833,14 @@ export function ScheduleCalendarView({
           dayDate.setDate(dayDate.getDate() + offset);
           const dateStr = toLocalYYYYMMDD(dayDate);
 
-
-
           const formattedTime = slot.time_slot ? (slot.time_slot.includes(':') && slot.time_slot.split(':').length === 2 ? `${slot.time_slot}:00` : slot.time_slot) : '00:00:00';
           const alreadyExistsByTime = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5) && o.status !== 'cancelled') ||
                                 projectedData.some(p => p.date === dateStr && (p.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5));
           
           let alreadyExistsByStudent = false;
           if (slot.student_id) {
-            alreadyExistsByStudent = fetchedData.some(o => o.student_id === slot.student_id && (o.original_date === dateStr || (!o.original_date && o.date === dateStr)) && o.status !== 'cancelled') ||
-                                     projectedData.some(p => p.student_id === slot.student_id && (p.original_date === dateStr || (!p.original_date && p.date === dateStr)));
+            alreadyExistsByStudent = fetchedData.some(o => o.student_id === slot.student_id && o.status !== 'cancelled') ||
+                                     projectedData.some(p => p.student_id === slot.student_id);
           }
 
           if (!alreadyExistsByTime && !alreadyExistsByStudent) {
@@ -1899,6 +1870,8 @@ export function ScheduleCalendarView({
           }
         });
       }
+
+
 
       fetchedData = [...fetchedData, ...projectedData];
 
@@ -2062,16 +2035,13 @@ export function ScheduleCalendarView({
         return {
           teacher_id: userId,
           student_id: evt.student_id,
-          schedule_id: evt.schedule_id,
           duration: evt.duration,
           date: destDateStr,
           start_time: evt.start_time,
           status: evt.status,
           instrument: evt.instrument,
           notes: evt.notes,
-          original_date: destDateStr,
-          original_start_time: evt.start_time,
-          student_acknowledged: false
+          original_date: destDateStr
         };
       });
 
@@ -3055,10 +3025,26 @@ export function ScheduleCalendarView({
 
     const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
     srcGroupOccs.forEach(o => {
-      updatesMap[o.id] = { date: targetOcc.date, start_time: targetOcc.start_time, status: 'pending_reschedule' };
+      updatesMap[o.id] = { 
+        student_id: o.student_id,
+        date: targetOcc.date, 
+        start_time: targetOcc.start_time, 
+        original_date: o.original_date || o.date,
+        original_start_time: o.original_start_time || o.start_time,
+        status: 'pending_reschedule',
+        student_acknowledged: false
+      };
     });
     tgtGroupOccs.forEach(o => {
-      updatesMap[o.id] = { date: sourceOcc.date, start_time: sourceOcc.start_time, status: 'pending_reschedule' };
+      updatesMap[o.id] = { 
+        student_id: o.student_id,
+        date: sourceOcc.date, 
+        start_time: sourceOcc.start_time, 
+        original_date: o.original_date || o.date,
+        original_start_time: o.original_start_time || o.start_time,
+        status: 'pending_reschedule',
+        student_acknowledged: false
+      };
     });
 
     updateMultipleOccurrences(updatesMap);
@@ -4866,25 +4852,55 @@ export function ScheduleCalendarView({
  
                   const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
                   const isCancelled = ['cancelled', 'canceled_by_student'].includes(occ.status);
+
+                  const studentSchedule = cachedWeekSchedules.find((s: any) => s.student_id === occ.student_id && s.teacher_id === userId);
+                  
+                  let boardDayOfWeek: number | null = null;
+                  let boardAssignedTime: string | null = null;
+                  if (!studentSchedule && boards) {
+                    for (const board of boards) {
+                      const studentInBoard = board.students.find((s: any) => s.studentId === occ.student_id || s.id === occ.student_id);
+                      if (studentInBoard) {
+                        boardDayOfWeek = board.dayOfWeek;
+                        boardAssignedTime = studentInBoard.assignedTime;
+                        break;
+                      }
+                    }
+                  }
+
+                  const occDateObj = new Date(occ.date + 'T00:00:00');
+                  const occDayOfWeek = occDateObj.getDay() || 7;
+                  
+                  let isTimeOrDayMoved = false;
+                  if (studentSchedule) {
+                    isTimeOrDayMoved = studentSchedule.day_of_week !== occDayOfWeek ||
+                                       studentSchedule.time_slot?.substring(0, 5) !== occ.start_time.substring(0, 5);
+                  } else if (boardDayOfWeek !== null && boardAssignedTime !== null) {
+                    isTimeOrDayMoved = boardDayOfWeek !== occDayOfWeek ||
+                                       boardAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5);
+                  } else {
+                    isTimeOrDayMoved = (occ.original_date && occ.original_date !== occ.date) ||
+                                       (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) || false;
+                  }
+
                   const isRescheduled = !isBreak && !isVacant && !isSick && (
                     occ.status === 'pending_reschedule' || 
                     occ.status === 'rescheduled_confirmed' ||
+                    isTimeOrDayMoved ||
                     (occ.original_date && occ.original_date !== occ.date) ||
+                    (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
                     isRoomOverridden
                   );
-                  const isResetPending = !isBreak && !isVacant && !isSick &&
-                    occ.status === 'scheduled' &&
-                    occ.original_date &&
-                    occ.date === occ.original_date &&
-                    occ.student_acknowledged === false;
+                  const isResetPending = false;
  
                   const isWaiting = !isBreak && !isVacant && !isSick && (
                     isGroup 
-                      ? occurrencesInGroup.some(o => o.student_acknowledged === false)
-                      : (isResetPending || (isRescheduled && !(occ.status === 'rescheduled_confirmed' || occ.student_acknowledged)))
+                      ? occurrencesInGroup.some(o => o.status === 'pending_reschedule')
+                      : (occ.status === 'pending_reschedule' || isTimeOrDayMoved)
                   );
 
                   const isGroovelab = localStorage.getItem('groovelab_active_platform') !== 'campus';
+                  const isConfirmedReschedule = isRescheduled && occ.status === 'rescheduled_confirmed';
 
                   if (!isBreak && !isVacant && !isSick && !isCancelled) {
                     if (isGroup) {
@@ -4892,9 +4908,13 @@ export function ScheduleCalendarView({
                       const isGruppenunterricht = occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
                       if (isGruppenunterricht) {
                         if (isWaiting) {
+                          cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                          finalColors.border = '#eab308';
+                          finalColors.text = '#854d0e';
+                        } else if (isConfirmedReschedule) {
                           cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
                           finalColors.border = '#34a853';
-                          finalColors.text = '#34a853';
+                          finalColors.text = '#1e7e34';
                         } else {
                           cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                           finalColors.border = '#34a853';
@@ -4902,6 +4922,10 @@ export function ScheduleCalendarView({
                         }
                       } else {
                         if (isWaiting) {
+                          cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                          finalColors.border = '#eab308';
+                          finalColors.text = '#854d0e';
+                        } else if (isConfirmedReschedule) {
                           cardBackground = 'repeating-linear-gradient(-45deg, #e8f0fe 0px, #e8f0fe 8px, #ffffff 8px, #ffffff 16px)';
                           finalColors.border = '#0b57d0';
                           finalColors.text = '#174ea6';
@@ -4922,11 +4946,15 @@ export function ScheduleCalendarView({
                         finalColors.text = '#713f12';
                       }
                     } else {
-                      // Campus: green confirmed / green-white diagonal unconfirmed
+                      // Campus: yellow-dashed for pending / green-dashed for confirmed / solid green for regular
                       if (isWaiting) {
+                        cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#eab308';
+                        finalColors.text = '#854d0e';
+                      } else if (isConfirmedReschedule) {
                         cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
                         finalColors.border = '#34a853';
-                        finalColors.text = '#34a853';
+                        finalColors.text = '#1e7e34';
                       } else {
                         cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                         finalColors.border = '#34a853';
@@ -4973,7 +5001,7 @@ export function ScheduleCalendarView({
                       finalColors.text = '#5b21b6';
                     } else {
                       // Purple/white diagonal — room booking pending
-                      cardBackground = 'repeating-linear-gradient(-45deg, #ede9fe 0px, #ede9fe 8px, #ffffff 8px, #ffffff 16px)';
+                      cardBackground = 'repeating-linear-gradient(-45deg, #f5f3ff 0px, #f5f3ff 8px, #ffffff 8px, #ffffff 16px)';
                       finalColors.border = '#7c3aed';
                       finalColors.text = '#5b21b6';
                     }
@@ -5073,14 +5101,14 @@ export function ScheduleCalendarView({
                             : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                               ? `2px solid ${brandColor}`
                               : (isRescheduled 
-                                ? (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`) 
+                                ? (isWaiting ? `2px dashed ${finalColors.border}` : `2px dashed ${finalColors.border}`) 
                                 : isVacant 
                                   ? `1px dashed ${brandColor}` 
                                   : isBreak 
                                     ? '1px dashed #f97316' 
                                     : (isSick || isCancelled)
                                       ? '1px solid rgba(239, 68, 68, 0.15)' 
-                                      : (isWaiting ? `1px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`))),
+                                      : (isWaiting ? `2px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`))),
                           borderLeft: isGap 
                             ? undefined
                             : ((isGroupModeActive && selectedForGroup.includes(occ.id))
@@ -5198,8 +5226,8 @@ export function ScheduleCalendarView({
                                   }}>
                                     {isGroup 
                                       ? (isGruppenunterricht
-                                          ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${o.student?.last_name[0] || ''}.`).join(' & ')
-                                          : (occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${occurrencesInGroup[0].student.last_name[0]}. (${occurrencesInGroup.length})` : `${occurrencesInGroup.length} Schüler`)
+                                          ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join(' & ')
+                                          : (occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name, showRealNames)} (${occurrencesInGroup.length})` : `${occurrencesInGroup.length} Schüler`)
                                         ) 
                                       : (isBreak ? 'Pause' : displayNames)
                                     }
@@ -6498,30 +6526,36 @@ return (
                             if (!editOccState.id.startsWith('mock-')) {
                               try {
                                 setLoading(true);
-                                const targetDate = occ.original_date || occ.date;
-                                const targetStartTime = occ.original_start_time || occ.start_time;
-  
+                                const partnerOcc = occurrences.find(o => 
+                                  o.id !== editOccState.id &&
+                                  !o.id.startsWith('mock-') &&
+                                  (
+                                    (o.date === occ.date && o.original_date === occ.original_date) ||
+                                    (o.date === occ.original_date && o.original_date === occ.date)
+                                  )
+                                );
+                                
+                                const idsToDelete = [editOccState.id];
+                                if (partnerOcc) {
+                                  idsToDelete.push(partnerOcc.id);
+                                }
+
                                 const { error } = await supabase
                                   .from('schedule_occurrences')
-                                  .update({
-                                    date: targetDate,
-                                    start_time: targetStartTime,
-                                    status: 'scheduled',
-                                    student_acknowledged: false
-                                  })
-                                  .eq('id', editOccState.id);
+                                  .delete()
+                                  .in('id', idsToDelete);
                                 if (error) throw error;
-  
+
                                 try {
                                   await supabase.from('room_bookings')
                                     .delete()
                                     .eq('booked_by', userId)
-                                    .eq('date', occ.date)
-                                    .eq('start_time', occ.start_time);
+                                    .eq('date', occ.date);
                                   window.dispatchEvent(new CustomEvent('refresh-bookings'));
                                 } catch (roomErr) {}
 
                                 await loadOccurrences();
+                                await showAlert('Termin(e) erfolgreich auf den Stammtermin zurückgesetzt.');
                               } catch (err) {
                                 console.error(err);
                                 await showAlert('Fehler beim Zurücksetzen des Termins');
@@ -6535,7 +6569,7 @@ return (
                           }} 
                           style={{ padding: '8px 12px', borderRadius: '100px', border: '1px solid rgba(0,0,0,0.15)', background: 'transparent', color: '#1d1d1f', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
                         >
-                          Zurücksetzen
+                          Auf Stammtermin zurücksetzen
                         </button>
                       )}
                     </div>
