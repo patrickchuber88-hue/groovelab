@@ -2666,10 +2666,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const matchedStudent = (allStudentsList || []).find((st: any) => 
                 st.id === s.id || 
                 (st.first_name?.trim().toLowerCase() === s.first_name?.trim().toLowerCase() && 
-                 (st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase())
+                 ((st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase() ||
+                  (!st.last_name || !s.last_name || st.last_name.trim().toLowerCase().startsWith((s.last_name || '').trim().toLowerCase()[0] || '') || s.last_name.trim().toLowerCase().startsWith((st.last_name || '').trim().toLowerCase()[0] || ''))))
               );
               
-              const studentId = matchedStudent?.id || s.id || s.student_id;
+              const studentId = matchedStudent?.id || (s.id && s.id.length > 20 ? s.id : s.student_id);
               if (!studentId) return;
 
               const alreadyInSched = combinedSchedules.some(sch => 
@@ -2720,7 +2721,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
               // Check if override exists
               const actual = occurrences?.find((occ: any) => 
-                (occ.schedule_id === sch.id) && 
+                (occ.student_id === sch.student_id || (occ.schedule_id && occ.schedule_id === sch.id)) && 
                 (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
               );
 
