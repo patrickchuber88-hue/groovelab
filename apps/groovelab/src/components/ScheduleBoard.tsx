@@ -2259,21 +2259,29 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         const d = String(today.getDate()).padStart(2, '0');
         const todayStr = `${y}-${m}-${d}`;
 
+        const schoolStartYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
+        const schoolYearEnd = new Date(`${schoolStartYear + 1}-08-31T23:59:59`);
+
         (insertedSchedules || []).forEach((sch: any) => {
           const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration } = sch;
           if (!student_id || !day_of_week || !time_slot) return;
+          const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
 
-          for (let i = 0; i < 4; i++) {
-            const targetDate = new Date();
-            const currentDay = today.getDay() || 7;
-            const diff = day_of_week - currentDay + (i * 7);
-            targetDate.setDate(today.getDate() + diff);
+          let current = new Date(today);
+          const currentDay = current.getDay() || 7;
+          const diff = dayNum - currentDay;
+          let targetDate = new Date(current);
+          targetDate.setDate(current.getDate() + diff);
 
+          if (targetDate < today) {
+            targetDate.setDate(targetDate.getDate() + 7);
+          }
+
+          while (targetDate <= schoolYearEnd) {
             const ty = targetDate.getFullYear();
             const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
             const td = String(targetDate.getDate()).padStart(2, '0');
             const dateStr = `${ty}-${tm}-${td}`;
-            if (dateStr < todayStr) continue;
 
             const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
             occurrences.push({
@@ -2285,6 +2293,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               duration: duration || 45,
               status: 'scheduled'
             });
+
+            targetDate.setDate(targetDate.getDate() + 7);
           }
         });
 
