@@ -3040,8 +3040,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         schedules.forEach((sch: any) => {
           const sId = sch.student_id;
           const sFn = (sch.student?.first_name || sch.first_name || '').trim().toLowerCase();
-          if (sId && processedStudentIds.has(sId)) return;
-          if (sFn && processedStudentNames.has(sFn)) return;
+
+          const isAlreadyInBoard = combinedSchedules.some(cs => {
+            if (sId && (cs.student_id === sId || cs.board_student_id === sId || cs.id === sId || cs.student?.id === sId)) return true;
+            const csFn = (cs.student?.first_name || cs.first_name || '').trim().toLowerCase();
+            if (sFn && csFn && (sFn === csFn || sFn.startsWith(csFn) || csFn.startsWith(sFn))) return true;
+            return false;
+          });
+
+          if (isAlreadyInBoard) return;
 
           combinedSchedules.push(sch);
         });
@@ -4933,41 +4940,33 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               {isWeekExpanded && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
                                   {(() => {
-                                    // 1. Deduplicate by student and date so actual overrides (moved/rescheduled/cancelled) suppress virtual Stammtermine
-                                    const deduplicatedItems: any[] = [];
-                                    const studentMovedDates = new Map<string, any>();
-
-                                    wGroup.items.forEach(item => {
-                                      const isActualOverride = item.is_moved || 
-                                        item.status === 'pending_reschedule' || 
-                                        item.status === 'rescheduled' || 
-                                        item.status === 'cancelled' || 
-                                        item.status === 'canceled_by_student' || 
-                                        item.status === 'teacher_sick' ||
-                                        !item.is_virtual;
-
-                                      if (isActualOverride) {
-                                        const stId = item.student_id || item.student?.id || (item.student?.first_name ? item.student.first_name.trim().toLowerCase() : null);
-                                        if (stId) {
-                                          const key = `${item.date}_${stId}`;
-                                          studentMovedDates.set(key, item);
-                                        }
-                                      }
-                                    });
+                                    // 1. Deduplicate by student and date: ensure each student appears at most once per date, preferring actual overrides / moved / designer items
+                                    const studentDateMap = new Map<string, any>();
 
                                     wGroup.items.forEach(item => {
                                       const stId = item.student_id || item.student?.id || (item.student?.first_name ? item.student.first_name.trim().toLowerCase() : null);
-                                      const key = `${item.date}_${stId}`;
+                                      if (!stId) return;
 
-                                      if (studentMovedDates.has(key)) {
-                                        if (studentMovedDates.get(key) === item) {
-                                          deduplicatedItems.push(item);
-                                        }
+                                      const key = `${item.date}_${stId}`;
+                                      const existing = studentDateMap.get(key);
+
+                                      if (!existing) {
+                                        studentDateMap.set(key, item);
                                       } else {
-                                        deduplicatedItems.push(item);
+                                        const itemIsOverride = item.is_moved || item.status === 'pending_reschedule' || item.status === 'rescheduled' || item.status === 'cancelled' || item.status === 'canceled_by_student' || !item.is_virtual;
+                                        const existingIsOverride = existing.is_moved || existing.status === 'pending_reschedule' || existing.status === 'rescheduled' || existing.status === 'cancelled' || existing.status === 'canceled_by_student' || !existing.is_virtual;
+
+                                        if (itemIsOverride && !existingIsOverride) {
+                                          studentDateMap.set(key, item);
+                                        } else if (itemIsOverride === existingIsOverride) {
+                                          if (item.id?.startsWith('board-') && !existing.id?.startsWith('board-')) {
+                                            studentDateMap.set(key, item);
+                                          }
+                                        }
                                       }
                                     });
 
+                                    const deduplicatedItems = Array.from(studentDateMap.values());
                                     const groupedSlotItems: any[] = [];
                                     const slotMap = new Map<string, any[]>();
 
