@@ -2798,40 +2798,76 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       }
 
 
-      // 3. Load teacher planned_boards / campus_räume / groovelab_räume for designer slots
+      // 3. Load teacher planned_boards for designer slots (checking localStorage first to match ScheduleBoard.tsx)
       let teacherPlannedBoards: any[] = [];
       try {
-        const { data: tUser } = await supabase
-          .from('users')
-          .select('planned_boards, campus_räume, groovelab_räume')
-          .eq('id', userId)
-          .maybeSingle();
-
-        let rawPlanned = tUser?.planned_boards || (tUser as any)?.campus_räume || (tUser as any)?.groovelab_räume;
-
-        if (typeof rawPlanned === 'string') {
-          try {
-            rawPlanned = JSON.parse(rawPlanned);
-            if (typeof rawPlanned === 'string') {
-              rawPlanned = JSON.parse(rawPlanned);
-            }
-          } catch (e) {}
-        }
-
         let loadedDrafts: any[] = [];
         let loadedActiveDraftId = 'default';
         let loadedSubmittedDraftId = '';
 
-        if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
-          loadedDrafts = (rawPlanned as any).drafts;
-          loadedActiveDraftId = (rawPlanned as any).activeDraftId || 'default';
-          loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
-        } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
-          loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: rawPlanned }];
-        } else if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned)) {
-          const boardList = Object.values(rawPlanned);
-          if (boardList.length > 0) {
-            loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: boardList }];
+        // Priority 1: Check localStorage active teacher draft state (matches ScheduleBoard.tsx)
+        const activePlatform = (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : null) || 'campus';
+        const keysToTry = [
+          `groovelab_teacher_draft_state_${activePlatform}_${userId}`,
+          `groovelab_teacher_draft_state_campus_${userId}`,
+          `groovelab_teacher_draft_state_groovelab_${userId}`,
+          `groovelab_teacher_boards_${activePlatform}_${userId}`,
+          `groovelab_teacher_boards_campus_${userId}`,
+          `groovelab_teacher_boards_groovelab_${userId}`,
+          `groovelab_teacher_boards_${userId}`,
+          `groovelab_schedule_boards`,
+          `planned_boards`
+        ];
+
+        for (const k of keysToTry) {
+          const stored = localStorage.getItem(k);
+          if (stored) {
+            try {
+              let parsed = JSON.parse(stored);
+              if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+              if (parsed && parsed.drafts && Array.isArray(parsed.drafts) && parsed.drafts.length > 0) {
+                loadedDrafts = parsed.drafts;
+                loadedActiveDraftId = parsed.activeDraftId || 'default';
+                loadedSubmittedDraftId = parsed.submittedDraftId || '';
+                break;
+              } else if (Array.isArray(parsed) && parsed.length > 0) {
+                loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: parsed }];
+                break;
+              }
+            } catch (e) {}
+          }
+        }
+
+        // Priority 2: Fallback to Supabase users.planned_boards if no local draft found
+        if (loadedDrafts.length === 0) {
+          const { data: tUser } = await supabase
+            .from('users')
+            .select('planned_boards, campus_räume, groovelab_räume')
+            .eq('id', userId)
+            .maybeSingle();
+
+          let rawPlanned = tUser?.planned_boards || (tUser as any)?.campus_räume || (tUser as any)?.groovelab_räume;
+
+          if (typeof rawPlanned === 'string') {
+            try {
+              rawPlanned = JSON.parse(rawPlanned);
+              if (typeof rawPlanned === 'string') {
+                rawPlanned = JSON.parse(rawPlanned);
+              }
+            } catch (e) {}
+          }
+
+          if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
+            loadedDrafts = (rawPlanned as any).drafts;
+            loadedActiveDraftId = (rawPlanned as any).activeDraftId || 'default';
+            loadedSubmittedDraftId = (rawPlanned as any).submittedDraftId || '';
+          } else if (Array.isArray(rawPlanned) && rawPlanned.length > 0) {
+            loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: rawPlanned }];
+          } else if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned)) {
+            const boardList = Object.values(rawPlanned);
+            if (boardList.length > 0) {
+              loadedDrafts = [{ id: 'default', name: 'Entwurf 1', boards: boardList }];
+            }
           }
         }
 
