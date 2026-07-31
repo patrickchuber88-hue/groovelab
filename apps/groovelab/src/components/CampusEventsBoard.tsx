@@ -2899,10 +2899,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
       }
 
-      // Strictly use active DB schedules (Stundenplan Tab). Fallback to teacher's OWN planned_boards only if DB schedules are empty for this teacher.
-      let combinedSchedules: any[] = [...(schedules || [])];
+      // Priority: use active planned_boards if available so lessons orient directly by the Stundenplan!
+      let combinedSchedules: any[] = [];
 
-      if (combinedSchedules.length === 0 && teacherPlannedBoards.length > 0) {
+      if (teacherPlannedBoards && teacherPlannedBoards.length > 0) {
         let studentQuery = supabase
           .from('users')
           .select('id, first_name, last_name, instrument');
@@ -2932,35 +2932,40 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               if (!studentId) return;
 
               const boardDayNum = parseDayOfWeekNum(board.dayOfWeek);
+              const rawTime = s.assignedTime || s.startTime || s.time_slot || s.time || '14:00';
+              const formattedTimeSlot = rawTime.includes(':') && rawTime.split(':').length === 2 ? `${rawTime}:00` : rawTime;
 
-              const alreadyInSched = combinedSchedules.some(sch => 
-                sch.student_id === studentId && 
-                parseDayOfWeekNum(sch.day_of_week) === boardDayNum
+              const origSched = (schedules || []).find(sch => sch.student_id === studentId);
+              const isMovedFromStamm = origSched && (
+                parseDayOfWeekNum(origSched.day_of_week) !== boardDayNum ||
+                (origSched.time_slot && origSched.time_slot.substring(0, 5) !== formattedTimeSlot.substring(0, 5))
               );
 
-              if (!alreadyInSched) {
-                const rawTime = s.assignedTime || s.startTime || s.time_slot || s.time || '14:00';
-                const formattedTimeSlot = rawTime.includes(':') && rawTime.split(':').length === 2 ? `${rawTime}:00` : rawTime;
-
-                combinedSchedules.push({
-                  id: `board-${board.id}-${s.id || studentId}`,
-                  student_id: studentId,
-                  board_student_id: s.id || s.student_id,
-                  teacher_id: userId,
-                  day_of_week: boardDayNum,
-                  time_slot: formattedTimeSlot,
-                  duration: s.duration || 30,
-                  status: 'approved',
-                  student: matchedStudent || {
-                    first_name: firstName,
-                    last_name: lastName,
-                    instrument: s.instrument || ''
-                  }
-                });
-              }
+              combinedSchedules.push({
+                id: `board-${board.id}-${s.id || studentId}`,
+                student_id: studentId,
+                board_student_id: s.id || s.student_id,
+                teacher_id: userId,
+                day_of_week: boardDayNum,
+                time_slot: formattedTimeSlot,
+                original_time_slot: origSched?.time_slot,
+                original_day_of_week: origSched?.day_of_week,
+                duration: s.duration || 30,
+                status: isMovedFromStamm ? 'pending_reschedule' : 'approved',
+                is_moved: isMovedFromStamm,
+                student: matchedStudent || {
+                  first_name: firstName,
+                  last_name: lastName,
+                  instrument: s.instrument || ''
+                }
+              });
             });
           }
         });
+      }
+
+      if (combinedSchedules.length === 0) {
+        combinedSchedules = [...(schedules || [])];
       }
 
       // Generate visual list of occurrences for the school year
