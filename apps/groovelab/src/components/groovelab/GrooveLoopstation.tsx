@@ -177,10 +177,28 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       setIsDeviceCalibrated(true);
     } catch (e) {}
 
-    const cleanList = homeworkNotesList.filter(note => !note.startsWith('LATENCY:'));
+    const cleanList = homeworkNotesList ? homeworkNotesList.filter(note => !note.startsWith('LATENCY:')) : [];
     const updatedList = [...cleanList, `LATENCY:${offsetVal}`];
-    setHomeworkNotesList(updatedList);
-    await syncHomeworkNotes(updatedList);
+    if (setHomeworkNotesList) setHomeworkNotesList(updatedList);
+    if (syncHomeworkNotes) await syncHomeworkNotes(updatedList);
+
+    if (student?.id) {
+      try {
+        await supabase
+          .from('students')
+          .update({
+            device_calibration: {
+              device_hash: activeDeviceHash,
+              device_name: activeDeviceName,
+              latency_ms: offsetVal,
+              calibrated_at: new Date().toISOString()
+            }
+          })
+          .eq('id', student.id);
+      } catch (err) {
+        console.warn("Supabase student device calibration save:", err);
+      }
+    }
   };
 
   const [activeDeviceName, setActiveDeviceName] = useState<string>('Standard Audio');
@@ -325,7 +343,11 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const handleBounceTracks = async () => {
-    if (!useHeadphones || isPlaying || isAutoSequenceActive) return;
+    if (!useHeadphones) {
+      alert("⚠️ Die Bandmaschinen Ping-Pong Bounce-Funktion ist ausschließlich im Kopfhörer-Modus verfügbar, um Lautsprecher-Rückkopplungen zu vermeiden. Bitte aktiviere oben den Kopfhörer-Modus!");
+      return;
+    }
+    if (isPlaying || isAutoSequenceActive) return;
 
     const activeTrackBuffers: { trackId: number; buffer: AudioBuffer; volume: number }[] = [];
     tracks.forEach(track => {
@@ -2016,6 +2038,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const startRecording = async (trackId: number) => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
+      return;
+    }
+
+    // Beim ersten Klick auf REC immer zuerst Latenz-Kalibrierung durchführen
+    if (!isDeviceCalibrated && !isCalibratingLatency) {
+      await runAutoCalibrationSequence();
       return;
     }
 
@@ -4233,26 +4261,27 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                   <button
                     type="button"
                     onClick={handleBounceTracks}
-                    disabled={isBouncing || isPlaying || isAutoSequenceActive}
+                    disabled={!useHeadphones || isBouncing || isPlaying || isAutoSequenceActive}
+                    title={!useHeadphones ? "Bitte aktiviere den Kopfhörer-Modus für Bandmaschinen-Bounce" : "Mixe Spuren 1-4 auf Spur 1 zusammen"}
                     className="tactile-btn"
                     style={{
-                      background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                      background: useHeadphones ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : '#cbd5e1',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '5px 12px',
                       fontSize: '0.64rem',
                       fontWeight: 900,
-                      cursor: (isBouncing || isPlaying || isAutoSequenceActive) ? 'not-allowed' : 'pointer',
-                      opacity: (isBouncing || isPlaying || isAutoSequenceActive) ? 0.5 : 1,
+                      cursor: (!useHeadphones || isBouncing || isPlaying || isAutoSequenceActive) ? 'not-allowed' : 'pointer',
+                      opacity: (!useHeadphones || isBouncing || isPlaying || isAutoSequenceActive) ? 0.6 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 2px 6px rgba(202, 138, 4, 0.3)'
+                      boxShadow: useHeadphones ? '0 2px 6px rgba(202, 138, 4, 0.3)' : 'none'
                     }}
                   >
                     <Layers size={12} />
-                    {isBouncing ? 'Bouncen...' : '🎛️ Spuren zusammenführen (Bounce)'}
+                    {!useHeadphones ? '🎧 Kopfhörer-Modus erforderlich' : (isBouncing ? 'Bouncen...' : '🎛️ Spuren zusammenführen (Bounce)')}
                   </button>
                 )}
               </div>
