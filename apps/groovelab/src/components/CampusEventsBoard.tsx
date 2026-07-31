@@ -5012,8 +5012,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             group_occurrences: slotOccs
                                           });
                                         } else {
-                                          const nonCancelled = slotOccs.find(o => !['cancelled', 'canceled_by_student'].includes(o.status)) || slotOccs[0];
-                                          groupedSlotItems.push(nonCancelled);
+                                          const cancelledOrActual = slotOccs.find(o => ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(o.status)) || slotOccs.find(o => o.is_moved || !o.is_virtual) || slotOccs[0];
+                                          groupedSlotItems.push(cancelledOrActual);
                                         }
                                       } else {
                                         groupedSlotItems.push(slotOccs[0]);
