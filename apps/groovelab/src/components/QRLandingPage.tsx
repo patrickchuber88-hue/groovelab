@@ -41,12 +41,24 @@ const getInstrumentAvatarUrl = (instrument: string | null | undefined): string =
   if (inst.includes('cello')) return '/avatars/cello_avatar_new.png';
   if (inst.includes('geige') || inst.includes('violin') || inst.includes('violine')) return '/avatars/violine_avatar_new.png';
   if (inst.includes('klarinette') || inst.includes('clarinet')) return '/avatars/klarinette_avatar_new.png';
-  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete_avatar.png';
+  if (inst.includes('querflöte') || inst.includes('flute')) return '/avatars/querfloete.png';
   if (inst.includes('saxofon') || inst.includes('saxophone') || inst.includes('sax')) return '/avatars/saxophon_avatar_new.png';
   if (inst.includes('blockflöte') || inst.includes('recorder') || inst.includes('blockfloete')) return '/avatars/blockfloete_avatar.png';
   if (inst.includes('bariton') || inst.includes('baritone')) return '/avatars/bariton_avatar.png';
   if (inst.includes('oboe')) return '/avatars/oboe_avatar.png';
   return '/avatars/gitarre_avatar_new.png';
+};
+
+const getSimulatedNow = (): Date => {
+  const simStr = localStorage.getItem('groovelab_simulated_date');
+  if (!simStr) return new Date();
+  const startTsStr = localStorage.getItem('groovelab_simulated_start_timestamp');
+  const startTs = startTsStr ? parseInt(startTsStr, 10) : Date.now();
+  const elapsed = Date.now() - (isNaN(startTs) ? Date.now() : startTs);
+  const parts = simStr.split('-').map(Number);
+  if (parts.length !== 3 || isNaN(parts[0])) return new Date();
+  const base = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+  return new Date(base.getTime() + elapsed);
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -1215,11 +1227,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile || profile.role === 'admin' || profile.role === 'secretary' || profile.role === 'teacher') return;
     setLoadingDashboard(true);
     try {
-      const todayDate = new Date();
-      const todayStr = todayDate.toLocaleDateString('en-CA');
+      const todayDate = getSimulatedNow();
+      const todayStr = todayDate.toLocaleDateString('sv-SE');
       const pastLimitDate = new Date(todayDate);
       pastLimitDate.setDate(todayDate.getDate() - 30);
-      const pastLimitStr = pastLimitDate.toLocaleDateString('en-CA');
+      const pastLimitStr = pastLimitDate.toLocaleDateString('sv-SE');
 
       // Resolve all potential student IDs for this user (users.id, students.id, pending_students.id)
       const studentIds = new Set<string>([profile.id]);
@@ -1411,7 +1423,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const allMergedOccurrences: any[] = [];
       const usedActualIds = new Set<string>();
 
-      const startRange = new Date();
+      const startRange = getSimulatedNow();
       // Adjust startRange to Monday of this week
       const day = startRange.getDay() || 7;
       startRange.setDate(startRange.getDate() - day + 1);
@@ -1436,8 +1448,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
               // Find if there is an actual occurrence override in the DB
               const actual = (occData || []).find((occ: any) => 
-                occ.schedule_id === sch.id && 
-                (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
+                (occ.schedule_id === sch.id || occ.student_id === profile.id || studentIds.has(occ.student_id)) && 
+                (occ.original_date === dateStr || occ.date === dateStr)
               );
 
               if (actual) {
@@ -1511,9 +1523,35 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   useEffect(() => {
     fetchDashboardData();
+    const handleStorage = (e: Event) => {
+      if (e instanceof StorageEvent) {
+        if (e.key === 'groovelab_simulated_date' || e.key === 'groovelab_simulated_start_timestamp') {
+          fetchDashboardData();
+        }
+      } else {
+        fetchDashboardData();
+      }
+    };
+    const handleScheduleChange = () => {
+      fetchDashboardData();
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('groovelab_schedule_changed', handleScheduleChange);
+    window.addEventListener('refresh-bookings', handleScheduleChange);
+    window.addEventListener('students_updated', handleScheduleChange);
+    window.addEventListener('groovelab_students_updated', handleScheduleChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('groovelab_schedule_changed', handleScheduleChange);
+      window.removeEventListener('refresh-bookings', handleScheduleChange);
+      window.removeEventListener('students_updated', handleScheduleChange);
+      window.removeEventListener('groovelab_students_updated', handleScheduleChange);
+    };
   }, [fetchDashboardData]);
 
-  // Realtime synchronization for teacher homework edits
+  // Realtime synchronization for teacher homework & schedule edits
   useEffect(() => {
     if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile?.id) return;
 
@@ -1533,11 +1571,33 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           fetchDashboardData();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'schedule_occurrences'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          schema: 'public',
+          event: '*',
+          table: 'schedules'
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
       .subscribe();
 
     const handleHomeworkUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
-      if (customEvent.detail?.studentId === profile.id) {
+      if (!customEvent.detail?.studentId || customEvent.detail?.studentId === profile.id) {
         fetchDashboardData();
       }
     };
@@ -4108,11 +4168,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       );
     } else if (nextLesson) {
       const isShiftedPending = Boolean(nextLesson.needsAck);
-      const isShiftedConfirmed = Boolean(!nextLesson.needsAck && (nextLesson.isRescheduled || nextLesson.occ?.status === 'rescheduled_confirmed' || (nextLesson.occ?.original_date && nextLesson.occ?.original_date !== nextLesson.occ?.date)));
+      const isShiftedConfirmed = Boolean(!nextLesson.needsAck && (nextLesson.isRescheduled || nextLesson.occ?.status === 'rescheduled_confirmed'));
       const isPendingAdmin = Boolean(nextLesson.isPendingReview && !isShiftedPending && !isShiftedConfirmed);
 
-      const borderColor = isShiftedPending ? '1.5px dashed #eab308' : isShiftedConfirmed ? '1.5px dashed #34a853' : isPendingAdmin ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0');
-      const cardBg = isShiftedPending ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : isShiftedConfirmed ? 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)' : isPendingAdmin ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : (styles.card ? styles.card.background : '#ffffff');
+      const isShifted = isShiftedPending || isShiftedConfirmed;
+      const borderColor = isShiftedPending ? '1.5px dashed #eab308' : isShiftedConfirmed ? '1.5px solid #eab308' : isPendingAdmin ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0');
+      const cardBg = isShiftedPending ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : '#ffffff';
 
       return (
         <div style={{
@@ -4123,7 +4184,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           background: cardBg
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: isShiftedPending ? '#b45309' : (isShiftedConfirmed || !isPendingAdmin) ? '#34a853' : '#b45309', background: isShiftedPending ? '#fef3c7' : (isShiftedConfirmed || !isPendingAdmin) ? '#e6f4ea' : '#fef3c7', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
               Nächster Unterrichtstermin
             </span>
             {isShiftedPending ? (
@@ -4131,8 +4192,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 🗓️ Termin verschoben (ausstehend)
               </span>
             ) : isShiftedConfirmed ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-                🗓️ Termin verschoben (bestätigt)
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                🗓️ Termin verschoben <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
               </span>
             ) : isPendingAdmin ? (
               <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
@@ -4142,24 +4203,41 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           </div>
  
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Calendar size={16} color="#64748b" />
-              <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
-                {nextLesson.dateStr}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Clock size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <MapPin size={16} color="#64748b" />
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
-              </span>
-            </div>
+            {(() => {
+              const origTime = (nextLesson.occ?.original_start_time || nextLesson.occ?.schedule?.time_slot || '').substring(0, 5);
+              const newTime = (nextLesson.time || '').substring(0, 5);
+              const hasTimeChanged = Boolean(origTime && newTime && origTime !== newTime);
+
+              return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Calendar size={16} color="#64748b" />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>
+                      {nextLesson.dateStr}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Clock size={16} color={hasTimeChanged || isShifted ? '#d97706' : '#64748b'} />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b', display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      Start um {nextLesson.time ? nextLesson.time.substring(0, 5) : ''} Uhr
+                      {hasTimeChanged && origTime && (
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b' }}>
+                          (ursprünglich {origTime} Uhr)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <MapPin size={16} color="#64748b" />
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
+                      {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
 
             {isShiftedPending ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
@@ -4723,15 +4801,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const getVirtualNextLesson = () => {
       if (schedules.length === 0) return null;
       const sch = schedules[0];
-      const dayOfWeek = sch.day_of_week; // 1-7 (Mon-Sun)
-      const today = new Date();
-      const currentDay = today.getDay() || 7; // Monday = 1, ..., Sunday = 7
+      const dayOfWeek = sch.day_of_week;
+      const today = getSimulatedNow();
+      const currentDay = today.getDay() || 7;
       
       let diff = dayOfWeek - currentDay;
       if (diff <= 0) {
-        diff += 7; // next week
+        diff += 7;
       }
-      const nextDate = new Date();
+      const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + diff);
       return {
         dateStr: nextDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
@@ -4742,18 +4820,27 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     };
 
     const nextLessonInfo = (() => {
-      const todayStr = new Date().toLocaleDateString('en-CA');
-      const upcomingOcc = occurrences.find(o => o.date >= todayStr);
+      const simNow = getSimulatedNow();
+      const todayStr = simNow.toLocaleDateString('sv-SE');
+      const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_sick' && o.status !== 'canceled_by_teacher_sick');
+      const upcomingOcc = activeOccs.find(o => o.date >= todayStr);
       if (upcomingOcc) {
         const d = new Date(upcomingOcc.date + 'T00:00:00');
-        const isRescheduled = upcomingOcc.status === 'pending_reschedule' || (upcomingOcc.original_date && upcomingOcc.original_date !== upcomingOcc.date && upcomingOcc.status !== 'rescheduled_confirmed');
-        const needsAck = upcomingOcc.student_acknowledged === false && (isRescheduled || upcomingOcc.original_date);
-        const roomName = upcomingOcc.room_name || upcomingOcc.schedule?.room?.name || upcomingOcc.room?.name;
+        const isTimeShifted = Boolean(
+          (upcomingOcc.original_start_time && upcomingOcc.start_time && upcomingOcc.original_start_time.substring(0, 5) !== upcomingOcc.start_time.substring(0, 5)) ||
+          (upcomingOcc.schedule?.time_slot && upcomingOcc.start_time && upcomingOcc.schedule.time_slot.substring(0, 5) !== upcomingOcc.start_time.substring(0, 5))
+        );
+        const isDateShifted = Boolean(upcomingOcc.original_date && upcomingOcc.original_date !== upcomingOcc.date);
+        const isRoomShifted = Boolean(upcomingOcc.room_override_id || upcomingOcc.room_override_name);
+        const isRescheduled = upcomingOcc.status === 'pending_reschedule' || upcomingOcc.status === 'rescheduled_confirmed' || isTimeShifted || isDateShifted || isRoomShifted;
+
+        const needsAck = upcomingOcc.student_acknowledged === false && isRescheduled;
+        const roomName = upcomingOcc.room_override_name || upcomingOcc.room_name || upcomingOcc.schedule?.room?.name || upcomingOcc.room?.name;
 
         return {
           occ: upcomingOcc,
           dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-          time: upcomingOcc.start_time,
+          time: upcomingOcc.start_time || upcomingOcc.schedule?.time_slot,
           isPendingReview: upcomingOcc.schedule?.status === 'ready_for_admin_review' && !roomName && !upcomingOcc.schedule?.room_id,
           room_name: roomName,
           isRescheduled,
@@ -6008,13 +6095,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (schedules.length === 0) return null;
       const sch = schedules[0];
       const dayOfWeek = sch.day_of_week;
-      const today = new Date();
+      const today = getSimulatedNow();
       const currentDay = today.getDay() || 7;
       let diff = dayOfWeek - currentDay;
       if (diff <= 0) {
         diff += 7;
       }
-      const nextDate = new Date();
+      const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + diff);
       return {
         dateStr: nextDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
@@ -6025,18 +6112,27 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     };
 
     const nextLessonInfo = (() => {
-      const todayStr = new Date().toLocaleDateString('en-CA');
-      const upcomingOcc = occurrences.find(o => o.date >= todayStr);
+      const simNow = getSimulatedNow();
+      const todayStr = simNow.toLocaleDateString('sv-SE');
+      const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_sick' && o.status !== 'canceled_by_teacher_sick');
+      const upcomingOcc = activeOccs.find(o => o.date >= todayStr);
       if (upcomingOcc) {
         const d = new Date(upcomingOcc.date + 'T00:00:00');
-        const isRescheduled = upcomingOcc.status === 'pending_reschedule' || (upcomingOcc.original_date && upcomingOcc.original_date !== upcomingOcc.date && upcomingOcc.status !== 'rescheduled_confirmed');
-        const needsAck = upcomingOcc.student_acknowledged === false && (isRescheduled || upcomingOcc.original_date);
-        const roomName = upcomingOcc.room_name || upcomingOcc.schedule?.room?.name || upcomingOcc.room?.name;
+        const isTimeShifted = Boolean(
+          (upcomingOcc.original_start_time && upcomingOcc.start_time && upcomingOcc.original_start_time.substring(0, 5) !== upcomingOcc.start_time.substring(0, 5)) ||
+          (upcomingOcc.schedule?.time_slot && upcomingOcc.start_time && upcomingOcc.schedule.time_slot.substring(0, 5) !== upcomingOcc.start_time.substring(0, 5))
+        );
+        const isDateShifted = Boolean(upcomingOcc.original_date && upcomingOcc.original_date !== upcomingOcc.date);
+        const isRoomShifted = Boolean(upcomingOcc.room_override_id || upcomingOcc.room_override_name);
+        const isRescheduled = upcomingOcc.status === 'pending_reschedule' || upcomingOcc.status === 'rescheduled_confirmed' || isTimeShifted || isDateShifted || isRoomShifted;
+
+        const needsAck = upcomingOcc.student_acknowledged === false && isRescheduled;
+        const roomName = upcomingOcc.room_override_name || upcomingOcc.room_name || upcomingOcc.schedule?.room?.name || upcomingOcc.room?.name;
 
         return {
           occ: upcomingOcc,
           dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-          time: upcomingOcc.start_time,
+          time: upcomingOcc.start_time || upcomingOcc.schedule?.time_slot,
           isPendingReview: upcomingOcc.schedule?.status === 'ready_for_admin_review' && !roomName && !upcomingOcc.schedule?.room_id,
           room_name: roomName,
           isRescheduled,

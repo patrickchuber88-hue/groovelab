@@ -1243,6 +1243,13 @@ export function ScheduleCalendarView({
           insertData.original_date = origDateStr;
           insertData.teacher_id = insertData.teacher_id || userId;
           insertData.status = change.status || 'pending_reschedule';
+          const parsedSchId = schedule_id || (change.id && change.id.startsWith('mock-') ? change.id.split('-')[1] : null);
+          if (parsedSchId && parsedSchId.length > 10) {
+            insertData.schedule_id = parsedSchId;
+          }
+          if (change.original_start_time) {
+            insertData.original_start_time = change.original_start_time;
+          }
           
           if (isGroupBlock && groupOccurrences && groupOccurrences.length > 0) {
             const groupInserts = groupOccurrences
@@ -5087,16 +5094,28 @@ export function ScheduleCalendarView({
                       : (occ.status === 'pending_reschedule' || isTimeOrDayMoved || (occ.student_acknowledged === false && Boolean(occ.original_date)))
                   );
 
+                  const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
+
                   const isGroovelab = localStorage.getItem('groovelab_active_platform') !== 'campus';
 
-                  if (!isBreak && !isVacant && !isSick && !isCancelled) {
+                  if (isCancelled || isSick) {
+                    if (!isCancelledAck) {
+                      cardBackground = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+                      finalColors.border = '#ef4444';
+                      finalColors.text = '#991b1b';
+                    } else {
+                      cardBackground = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+                      finalColors.border = '#ef4444';
+                      finalColors.text = '#991b1b';
+                    }
+                  } else if (!isBreak && !isVacant) {
                     if (isGroup) {
                       if (isWaiting) {
                         cardBackground = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
                         finalColors.border = '#38bdf8';
                         finalColors.text = '#0369a1';
                       } else if (isConfirmedReschedule) {
-                        cardBackground = 'repeating-linear-gradient(-45deg, #e0f2fe 0px, #e0f2fe 8px, #ffffff 8px, #ffffff 16px)';
+                        cardBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
                         finalColors.border = '#0284c7';
                         finalColors.text = '#0369a1';
                       } else {
@@ -5121,9 +5140,9 @@ export function ScheduleCalendarView({
                         finalColors.border = '#eab308';
                         finalColors.text = '#854d0e';
                       } else if (isConfirmedReschedule) {
-                        cardBackground = 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#34a853';
-                        finalColors.text = '#1e7e34';
+                        cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fefce8 100%)';
+                        finalColors.border = '#eab308';
+                        finalColors.text = '#854d0e';
                       } else {
                         cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                         finalColors.border = '#34a853';
@@ -5277,7 +5296,7 @@ export function ScheduleCalendarView({
                             : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                               ? '2px solid #2563eb'
                               : (isRescheduled 
-                                ? (isWaiting ? `2px dashed ${finalColors.border}` : `2px dashed ${finalColors.border}`) 
+                                ? (isConfirmedReschedule ? '1px solid #eab308' : `2px dashed ${finalColors.border}`) 
                                 : isVacant 
                                   ? `1px dashed ${brandColor}` 
                                   : isBreak 
@@ -5578,8 +5597,14 @@ export function ScheduleCalendarView({
                                       </span>
                                     )}
                                     {isCancelled && !isExcused && !isUnexcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                         Abgesagt
+                                        {isCancelledAck && (
+                                          <span 
+                                            title="Gelesen & Rückgemeldet" 
+                                            style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block', boxShadow: '0 0 0 1px rgba(255,255,255,0.8)', flexShrink: 0 }} 
+                                          />
+                                        )}
                                       </span>
                                     )}
                                     {hasProtocol && (

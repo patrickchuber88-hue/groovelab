@@ -16,6 +16,20 @@ const cleanRoomName = (name: string | null | undefined): string => {
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
 };
 
+const getSimulatedNow = (): Date => {
+  const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+  if (!simStr) return new Date();
+  
+  const parts = simStr.split('-').map(Number);
+  if (parts.length !== 3 || isNaN(parts[0])) return new Date();
+
+  const baseSim = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0);
+  const simStartTime = Number(localStorage.getItem('groovelab_simulated_start_timestamp') || Date.now());
+  const elapsedMinutes = Math.floor((Date.now() - simStartTime) / 60000);
+
+  return new Date(baseSim.getTime() + elapsedMinutes * 60000);
+};
+
 const adjustPositions = (stations: any[], containerWidth: number = 364) => {
   const items = stations.map(s => ({
     ...s,
@@ -2732,7 +2746,7 @@ export function TeacherDashboard({
   }, [teacher?.schools?.calendar_url]);
 
   const isTodayHoliday = useMemo(() => {
-    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
     return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
   }, [holidays]);
 
@@ -3188,25 +3202,34 @@ export function TeacherDashboard({
   };
 
   const [currentTimeStr, setCurrentTimeStr] = useState<string>(() => {
-    const now = new Date();
+    const now = getSimulatedNow();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   });
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
+      const now = getSimulatedNow();
       setCurrentTimeStr(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
     };
     updateTime();
-    const interval = setInterval(updateTime, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(updateTime, 10000);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'groovelab_simulated_date' || e.key === 'groovelab_simulated_start_timestamp') {
+        updateTime();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const isWeekend = useMemo(() => {
-    const today = new Date();
+    const today = getSimulatedNow();
     const day = today.getDay();
     return day === 0 || day === 6;
-  }, []);
+  }, [currentTimeStr]);
 
   const firstLessonStartMin = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
@@ -3573,9 +3596,11 @@ export function TeacherDashboard({
   useEffect(() => {
     const loadBriefing = async () => {
       if (!userId) return;
+      const simNow = getSimulatedNow();
+      const simDateStr = simNow.toLocaleDateString('sv-SE');
       try {
         setBriefingLoading(true);
-        const resp = await fetch(`/api/briefing/teacher?userId=${userId}`);
+        const resp = await fetch(`/api/briefing/teacher?userId=${userId}&date=${simDateStr}`);
         if (resp.ok && resp.headers.get('content-type')?.includes('application/json')) {
           const data = await resp.json();
           if (data && data.success) {
@@ -3596,7 +3621,7 @@ export function TeacherDashboard({
           const schoolData = Array.isArray(teacherProfile.schools) ? teacherProfile.schools[0] : teacherProfile.schools;
           const allowMessages = schoolData?.allow_messages_global ?? true;
 
-          const rawDay = new Date().getDay();
+          const rawDay = simNow.getDay();
           const todayWeekday = rawDay === 0 ? 7 : rawDay;
 
            const dayNamesMap: Record<number, string> = { 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday', 7: 'Sunday' };
@@ -3846,7 +3871,7 @@ export function TeacherDashboard({
 
           timeline.sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
 
-          const now = new Date();
+          const now = simNow;
           const currentStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
           const nextSlot = timeline.find((s: any) => s.timeSlot >= currentStr) || timeline[0] || null;
           let prepMirror = null;
@@ -3898,8 +3923,8 @@ export function TeacherDashboard({
               note: allowMessages ? (p.exercises?.description || '') : '[SYSTEM: Nachrichten global stummgeschaltet]'
             }));
 
-            const currentWeekStr = getISOWeekRaw(new Date(), 1);
-            const prevWeekDate = new Date();
+            const currentWeekStr = getISOWeekRaw(simNow, 1);
+            const prevWeekDate = new Date(simNow);
             prevWeekDate.setDate(prevWeekDate.getDate() - 7);
             const prevWeekStr = getISOWeekRaw(prevWeekDate, 1);
 
@@ -3974,7 +3999,7 @@ export function TeacherDashboard({
           // Fetch rescheduled reminders for this week in fallback
           let rescheduledReminders: any[] = [];
           try {
-            const startOfWeek = new Date();
+            const startOfWeek = new Date(simNow);
             const currentDay = startOfWeek.getDay();
             const distance = currentDay === 0 ? -6 : 1 - currentDay; // distance to Monday
             const monday = new Date(startOfWeek);
@@ -4057,6 +4082,19 @@ export function TeacherDashboard({
     };
 
     loadBriefing();
+    const handleSimStorage = (e: Event) => {
+      if (e instanceof StorageEvent) {
+        if (e.key === 'groovelab_simulated_date' || e.key === 'groovelab_simulated_start_timestamp') {
+          setBriefingRefreshTicker(prev => prev + 1);
+        }
+      } else {
+        setBriefingRefreshTicker(prev => prev + 1);
+      }
+    };
+    window.addEventListener('storage', handleSimStorage);
+    return () => {
+      window.removeEventListener('storage', handleSimStorage);
+    };
   }, [userId, ticker, briefingRefreshTicker]);
 
   const unreadHelpCount = Math.max(0, helpRequests.length - lastSeenCounts.help);
@@ -7433,7 +7471,7 @@ export function TeacherDashboard({
                               { type: 'fact', text: "Der Begriff 'A cappella' bedeutete ursprünglich 'nach Kapellart' und bezeichnete Gesangsstücke, die ohne eigenständige Instrumentenbegleitung aufgeführt wurden.", author: "Musikgeschichte-Fakt" }
                             ];
 
-                            const today = new Date();
+                            const today = getSimulatedNow();
                             const dateSeed = today.getDate() + today.getMonth() * 31 + today.getFullYear();
                             const dailyWishIndex = dateSeed % wishes.length;
                             const dailyItemIndex = (dateSeed * 7 + 13) % materials.length;
@@ -7702,7 +7740,7 @@ export function TeacherDashboard({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
                             <Clock size={20} color="#0b57d0" />
-                            <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {new Date().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
+                            <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {getSimulatedNow().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{
@@ -7863,8 +7901,13 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isCanceled || isRescheduledAway) {
-                              slotBg = '#ffffff';
-                              slotBorder = isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2';
+                              const isSlotAck = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
+                              slotBg = isSlotAck 
+                                ? '#ffffff' 
+                                : (isRescheduledAway ? 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)');
+                              slotBorder = isSlotAck 
+                                ? (isRescheduledAway ? '1.5px solid #fef3c7' : '1.5px solid #fee2e2') 
+                                : (isRescheduledAway ? '2px dashed #eab308' : '2px dashed #ef4444');
                               slotBorderLeft = isRescheduledAway ? '5px solid #fbbc05' : '5px solid #ef4444';
                               titleColor = '#a1a1aa';
                               dotComponent = isCurrentSlot ? (
@@ -7989,8 +8032,9 @@ export function TeacherDashboard({
                                 }} />
                               );
                             } else if (isRescheduledPending) {
-                              slotBg = '#ffffff';
-                              slotBorder = '1.5px solid #fef3c7';
+                              const isReschAck = activeSlots.every((s: any) => s.student_acknowledged === true || s.status === 'rescheduled_confirmed');
+                              slotBg = isReschAck ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                              slotBorder = isReschAck ? '1.5px solid #fef3c7' : '2px dashed #eab308';
                               slotBorderLeft = '5px solid #fbbc05';
                               titleColor = '#8e8e93';
                               dotComponent = isCurrentSlot ? (
@@ -8161,7 +8205,7 @@ export function TeacherDashboard({
                                        });
                                      }
                                      // Log the date of the clicked appointment (today's date)
-                                     const todayStr = new Date().toLocaleDateString('sv-SE');
+                                     const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
                                      setSickUntilDate(todayStr);
                                      setIsSickWidgetExpanded(true);
                                    }}
@@ -8313,10 +8357,11 @@ export function TeacherDashboard({
                                         </div>
                                       ) : slot.student && (
                                         <div style={{ display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
-                                          {isCanceled || isRescheduledAway ? (
-                                            <>
-                                              {isRescheduledAway ? (() => {
-                                                return (
+                                          {isCanceled || isRescheduledAway ? (() => {
+                                            const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
+                                            return (
+                                              <>
+                                                {isRescheduledAway ? (
                                                   <span style={{ 
                                                     color: '#d97706', 
                                                     fontWeight: 700, 
@@ -8327,29 +8372,47 @@ export function TeacherDashboard({
                                                     marginLeft: 'auto',
                                                     fontFamily: 'Inter',
                                                     letterSpacing: '0.01em',
-                                                    flexShrink: 0
+                                                    flexShrink: 0,
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
                                                   }}>
                                                     Termin verschoben
+                                                    {isAcked && (
+                                                      <span 
+                                                        title="Gelesen & Rückgemeldet" 
+                                                        style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block', flexShrink: 0 }} 
+                                                      />
+                                                    )}
                                                   </span>
-                                                );
-                                              })() : (
-                                                <span style={{ 
-                                                  color: '#ef4444', 
-                                                  fontWeight: 700, 
-                                                  fontSize: '0.72rem', 
-                                                  background: 'rgba(239, 68, 68, 0.08)', 
-                                                  padding: '2px 8px', 
-                                                  borderRadius: '6px', 
-                                                  marginLeft: 'auto',
-                                                  fontFamily: 'Inter',
-                                                  letterSpacing: '0.01em',
-                                                  flexShrink: 0
-                                                }}>
-                                                  Heute abgesagt
-                                                </span>
-                                              )}
-                                            </>
-                                          ) : (
+                                                ) : (
+                                                  <span style={{ 
+                                                    color: '#ef4444', 
+                                                    fontWeight: 700, 
+                                                    fontSize: '0.72rem', 
+                                                    background: 'rgba(239, 68, 68, 0.08)', 
+                                                    padding: '2px 8px', 
+                                                    borderRadius: '6px', 
+                                                    marginLeft: 'auto',
+                                                    fontFamily: 'Inter',
+                                                    letterSpacing: '0.01em',
+                                                    flexShrink: 0,
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                  }}>
+                                                    Heute abgesagt
+                                                    {isAcked && (
+                                                      <span 
+                                                        title="Gelesen & Rückgemeldet" 
+                                                        style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block', flexShrink: 0 }} 
+                                                      />
+                                                    )}
+                                                  </span>
+                                                )}
+                                              </>
+                                            );
+                                          })() : (
                                             <>
                                               <span style={{ color: '#94a3b8', margin: '0 8px', fontWeight: 400, flexShrink: 0 }}>•</span>
                                               

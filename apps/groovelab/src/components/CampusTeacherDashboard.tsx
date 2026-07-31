@@ -24,7 +24,8 @@ import {
   Eye,
   EyeOff,
   TrendingUp,
-  Bell
+  Bell,
+  Flame
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
@@ -2042,29 +2043,29 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             {/* Gamified KPI Cards row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
 
-              {/* Card 1: Heutige Stunden (Blue) */}
+              {/* Card 1: Schüler Heute (Blue) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: 'white',
-                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)',
+                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.4)',
                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
                 padding: '14px 16px', boxSizing: 'border-box',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 border: '1px solid rgba(255, 255, 255, 0.12)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Heutige Stunden</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
                   <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Calendar size={14} color="white" />
+                    <Users size={14} color="white" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                   <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.length}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Std.</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>UE</span>
                 </div>
               </div>
 
-              {/* Card 2: Cockpit Auslastung (Green) */}
+              {/* Card 2: Ø Übe-Streak (Green) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
                 background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
@@ -2075,18 +2076,18 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 border: '1px solid rgba(255, 255, 255, 0.12)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Auslastung</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Streak</span>
                   <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <TrendingUp size={14} color="white" />
+                    <Flame size={14} color="white" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{rooms.length ? Math.min(100, Math.round((sortedTodaySchedules.length / 9) * 100)) : 75}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>%</span>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>0.0</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Tage</span>
                 </div>
               </div>
 
-              {/* Card 3: Ausstehende Alerts (Yellow) */}
+              {/* Card 3: Tages-Pensum (Yellow) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
                 background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: 'white',
@@ -2097,18 +2098,24 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 border: '1px solid rgba(255, 255, 255, 0.12)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Offene Alerts</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
                   <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Bell size={14} color="white" />
+                    <Clock size={14} color="white" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{notifications.filter(n => !n.resolved).length}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Offen</span>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {(() => {
+                      const totalMins = sortedTodaySchedules.reduce((acc, s) => acc + (s.duration || 45), 0);
+                      const h = Math.floor(totalMins / 60);
+                      const m = totalMins % 60;
+                      return h > 0 ? `${h}h ${m > 0 ? `${m}m` : ''}` : `${m}m`;
+                    })()}
+                  </span>
                 </div>
               </div>
 
-              {/* Card 4: Abgesagte Termine (Red) */}
+              {/* Card 4: Ausfälle (Red) */}
               <div style={{
                 position: 'relative', overflow: 'hidden',
                 background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
@@ -2119,11 +2126,13 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 border: '1px solid rgba(255, 255, 255, 0.12)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Abgesagt</span>
-                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', fontSize: '0.8rem' }}>✕</div>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
+                  <div style={{ background: 'rgba(255,255,255,0.18)', padding: '5px', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <AlertTriangle size={14} color="white" />
+                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.filter(s => s.status === 'canceled_by_student').length}</span>
+                  <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{sortedTodaySchedules.filter(s => s.status === 'canceled_by_student' || s.status === 'cancelled').length}</span>
                   <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.85 }}>Heute</span>
                 </div>
               </div>
