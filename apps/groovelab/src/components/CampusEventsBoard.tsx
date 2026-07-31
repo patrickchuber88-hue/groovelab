@@ -2682,6 +2682,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       let { data: schedules } = await scheduleQuery;
 
+      // Enrich schedules with student details for display matching
+      if (schedules && schedules.length > 0) {
+        const studentIdsToFetch = Array.from(new Set(schedules.map((s: any) => s.student_id).filter(Boolean)));
+        if (studentIdsToFetch.length > 0) {
+          const { data: dbStudents } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument')
+            .in('id', studentIdsToFetch);
+          
+          if (dbStudents && dbStudents.length > 0) {
+            const stMap = new Map<string, any>();
+            dbStudents.forEach((st: any) => stMap.set(st.id, st));
+            schedules = schedules.map((s: any) => ({
+              ...s,
+              student: s.student || stMap.get(s.student_id) || null
+            }));
+          }
+        }
+      }
+
       // 2. Load overrides/occurrences with plain select('*') to prevent PostgREST join errors
       let occurrenceQuery = supabase
         .from('schedule_occurrences')
@@ -2918,10 +2938,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
       }
 
-      // Priority: use active planned_boards if available so lessons orient directly by the Stundenplan!
+      // Priority: Use DB schedules (the actual Stundenplan) FIRST so lessons match Tab 1 (Stundenplan) 1:1!
       let combinedSchedules: any[] = [];
 
-      if (teacherPlannedBoards && teacherPlannedBoards.length > 0) {
+      if (schedules && schedules.length > 0) {
+        combinedSchedules = [...schedules];
+      } else if (teacherPlannedBoards && teacherPlannedBoards.length > 0) {
         let studentQuery = supabase
           .from('users')
           .select('id, first_name, last_name, instrument');
@@ -2981,10 +3003,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             });
           }
         });
-      }
-
-      if (combinedSchedules.length === 0) {
-        combinedSchedules = [...(schedules || [])];
       }
 
       // Generate visual list of occurrences for the school year
