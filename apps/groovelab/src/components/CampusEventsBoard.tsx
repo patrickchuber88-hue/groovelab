@@ -2961,12 +2961,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
       }
 
-      // Priority: Use DB schedules (the actual Stundenplan) FIRST so lessons match Tab 1 (Stundenplan) 1:1!
+      // Priority 1: Process teacher planned_boards (the active Stundenplan Designer layout)
       let combinedSchedules: any[] = [];
+      const processedStudentIds = new Set<string>();
+      const processedStudentNames = new Set<string>();
 
-      if (schedules && schedules.length > 0) {
-        combinedSchedules = [...schedules];
-      } else if (teacherPlannedBoards && teacherPlannedBoards.length > 0) {
+      if (teacherPlannedBoards && teacherPlannedBoards.length > 0) {
         let studentQuery = supabase
           .from('users')
           .select('id, first_name, last_name, instrument');
@@ -2999,7 +2999,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const rawTime = s.assignedTime || s.startTime || s.time_slot || s.time || '14:00';
               const formattedTimeSlot = rawTime.includes(':') && rawTime.split(':').length === 2 ? `${rawTime}:00` : rawTime;
 
-              const origSched = (schedules || []).find((sch: any) => sch.student_id === studentId);
+              const origSched = (schedules || []).find((sch: any) => 
+                sch.student_id === studentId ||
+                (sch.student?.first_name && firstName && sch.student.first_name.trim().toLowerCase() === firstName.trim().toLowerCase())
+              );
+
               const isMovedFromStamm = origSched && (
                 parseDayOfWeekNum(origSched.day_of_week) !== boardDayNum ||
                 (origSched.time_slot && origSched.time_slot.substring(0, 5) !== formattedTimeSlot.substring(0, 5))
@@ -3023,8 +3027,23 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   instrument: s.instrument || ''
                 }
               });
+
+              if (studentId) processedStudentIds.add(studentId);
+              if (firstName) processedStudentNames.add(firstName.trim().toLowerCase());
             });
           }
+        });
+      }
+
+      // Priority 2: Add any DB schedules for students not already in planned_boards
+      if (schedules && schedules.length > 0) {
+        schedules.forEach((sch: any) => {
+          const sId = sch.student_id;
+          const sFn = (sch.student?.first_name || sch.first_name || '').trim().toLowerCase();
+          if (sId && processedStudentIds.has(sId)) return;
+          if (sFn && processedStudentNames.has(sFn)) return;
+
+          combinedSchedules.push(sch);
         });
       }
 
