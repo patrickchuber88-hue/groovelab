@@ -956,10 +956,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           if (isPlaceholderInst(studentInstrument)) {
             try {
+              const stIds = [userData.id];
+              const { data: stDataForInst } = await supabase
+                .from('students')
+                .select('id')
+                .or(`id.eq.${userData.id},user_id.eq.${userData.id}`);
+              if (stDataForInst) stDataForInst.forEach((s: any) => { if (s.id && !stIds.includes(s.id)) stIds.push(s.id); });
+
               const { data: schData } = await supabase
                 .from('schedules')
                 .select('instrument, teacher_id')
-                .eq('student_id', userData.id)
+                .in('student_id', stIds)
                 .not('instrument', 'is', null)
                 .limit(1)
                 .maybeSingle();
@@ -1214,6 +1221,33 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       pastLimitDate.setDate(todayDate.getDate() - 30);
       const pastLimitStr = pastLimitDate.toLocaleDateString('en-CA');
 
+      // Resolve all potential student IDs for this user (users.id, students.id, pending_students.id)
+      const studentIds = new Set<string>([profile.id]);
+      try {
+        const { data: stData } = await supabase
+          .from('students')
+          .select('id, user_id')
+          .or(`id.eq.${profile.id},user_id.eq.${profile.id}`);
+        if (stData) {
+          stData.forEach((st: any) => {
+            if (st.id) studentIds.add(st.id);
+            if (st.user_id) studentIds.add(st.user_id);
+          });
+        }
+      } catch (e) {}
+      try {
+        const { data: psData } = await supabase
+          .from('pending_students')
+          .select('id')
+          .eq('id', profile.id);
+        if (psData) {
+          psData.forEach((ps: any) => {
+            if (ps.id) studentIds.add(ps.id);
+          });
+        }
+      } catch (e) {}
+      const studentIdList = Array.from(studentIds);
+
       // Fetch all dashboard data in parallel for optimal performance
       const [
         schRes,
@@ -1222,7 +1256,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         avatarRes,
         matrixRes,
         msgRes,
-        bookingsRes
+        bookingsRes,
+        roomsRes,
+        teachersRes
       ] = await Promise.all([
         supabase
           .from('schedules')
@@ -1231,7 +1267,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             teacher:teacher_id(first_name, last_name),
             room:room_id(name)
           `)
-          .eq('student_id', profile.id),
+          .in('student_id', studentIdList),
         supabase
           .from('schedule_occurrences')
           .select(`
@@ -1239,37 +1275,109 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             teacher:teacher_id(first_name, last_name),
             schedule:schedule_id(status, room:room_id(name))
           `)
-          .eq('student_id', profile.id)
+          .in('student_id', studentIdList)
           .gte('date', pastLimitStr)
           .order('date', { ascending: true })
           .order('start_time', { ascending: true }),
         supabase
           .from('student_stats')
           .select('*')
-          .eq('student_id', profile.id)
+          .in('student_id', studentIdList)
           .maybeSingle(),
         supabase
           .from('avatars')
           .select('*')
-          .eq('user_id', profile.id)
+          .in('user_id', studentIdList)
           .maybeSingle(),
         supabase
           .from('progress_matrix')
           .select('*')
-          .eq('student_id', profile.id)
+          .in('student_id', studentIdList)
           .order('updated_at', { ascending: false }),
         supabase
           .from('campus_direct_messages')
           .select('occurrence_id, is_read, recipient_id')
-          .or(`sender_id.eq.${profile.id},recipient_id.eq.${profile.id}`),
+          .or(`sender_id.in.(${studentIdList.join(',')}),recipient_id.in.(${studentIdList.join(',')})`),
         supabase
           .from('room_bookings')
           .select('room_id, date, start_time, booked_by, room:rooms(name)')
           .eq('school_id', profile.school_id)
-          .gte('date', pastLimitStr)
+          .gte('date', pastLimitStr),
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('school_id', profile.school_id),
+        supabase
+          .from('users')
+          .select('id, first_name, last_name, planned_boards, campus_räume, groovelab_räume')
+          .eq('school_id', profile.school_id)
+          .eq('role', 'teacher')
       ]);
 
-      const schData = schRes.data;
+      const roomMap = new Map<string, string>();
+      (roomsRes?.data || []).forEach((r: any) => roomMap.set(r.id, r.name));
+
+      const schData: any[] = [...(schRes.data || [])];
+      
+      // Enrich any existing schData with room names from roomMap if room object is missing
+      schData.forEach((sch: any) => {
+        if (!sch.room && sch.room_id && roomMap.has(sch.room_id)) {
+          sch.room = { name: roomMap.get(sch.room_id) };
+        }
+      });
+
+      // Also check planned_boards of all teachers in the school as fallback/complement
+      const teachersWithPlanned = teachersRes.data || [];
+      teachersWithPlanned.forEach((teacher: any) => {
+        const rawPlanned = teacher.planned_boards || teacher.campus_räume || teacher.groovelab_räume;
+        let boards: any[] = [];
+        if (rawPlanned && typeof rawPlanned === 'object' && !Array.isArray(rawPlanned) && (rawPlanned as any).drafts) {
+          const activeId = (rawPlanned as any).activeDraftId || (rawPlanned as any).drafts[0]?.id;
+          const draft = (rawPlanned as any).drafts.find((d: any) => d.id === activeId) || (rawPlanned as any).drafts[0];
+          boards = draft?.boards || [];
+        } else if (Array.isArray(rawPlanned)) {
+          boards = rawPlanned;
+        }
+
+        boards.forEach((board: any) => {
+          if (!board || !Array.isArray(board.students)) return;
+          board.students.forEach((s: any) => {
+            if (s.isBreak) return;
+            const isStudentMatch = 
+              studentIds.has(s.id) ||
+              (s.id && s.id === profile.id) ||
+              (s.first_name && profile.first_name && 
+               s.first_name.trim().toLowerCase() === profile.first_name.trim().toLowerCase() && 
+               (!s.last_name || !profile.last_name || s.last_name.trim().toLowerCase().startsWith(profile.last_name.trim().toLowerCase().substring(0, 1))));
+
+            if (isStudentMatch) {
+              const existingIndex = schData.findIndex((existing: any) => existing.day_of_week === board.dayOfWeek);
+              const slotTime = s.assignedTime || board.startAnchor || '14:00';
+              const roomName = (board.roomId && roomMap.get(board.roomId)) ? roomMap.get(board.roomId) : 'Groovelab Raum';
+              
+              if (existingIndex < 0) {
+                schData.push({
+                  id: `planned-${teacher.id}-${board.dayOfWeek}`,
+                  school_id: profile.school_id,
+                  teacher_id: teacher.id,
+                  student_id: profile.id,
+                  day_of_week: board.dayOfWeek,
+                  time_slot: slotTime,
+                  room_id: board.roomId || null,
+                  duration: s.duration || 30,
+                  status: board.roomId ? 'approved' : 'ready_for_admin_review',
+                  instrument: s.instrument || profile.instrument || 'Unterricht',
+                  teacher: { first_name: teacher.first_name, last_name: teacher.last_name },
+                  room: { name: roomName }
+                });
+              } else if (!schData[existingIndex].room && board.roomId && roomMap.has(board.roomId)) {
+                schData[existingIndex].room = { name: roomMap.get(board.roomId) };
+              }
+            }
+          });
+        });
+      });
+
       const occData = occRes.data;
       const statsData = statsRes.data;
       const avatarData = avatarRes.data;
@@ -1279,7 +1387,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       setRoomBookings(bookingsData);
       const unreadIds = allMsgs
-        .filter((m: any) => m.recipient_id === profile.id && !m.is_read)
+        .filter((m: any) => studentIds.has(m.recipient_id) && !m.is_read)
         .map((m: any) => m.occurrence_id)
         .filter(Boolean);
       const withMsgIds = allMsgs
@@ -1367,6 +1475,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           }
         });
       }
+
+      // Sort all merged occurrences chronologically by date and start_time
+      allMergedOccurrences.sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return (a.start_time || '').localeCompare(b.start_time || '');
+      });
 
       setSchedules(schData || []);
       setOccurrences(allMergedOccurrences);
@@ -3170,7 +3285,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               {group.items.map((occ: any) => {
                 const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-                const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
+                const isPendingReview = occ.schedule?.status === 'ready_for_admin_review' && !occ.room_name && !occ.schedule?.room_id;
                 const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
                 const hasMessages = activeChatOccIds.has(occ.id);
                 const isUnread = unreadMessageOccurrences.includes(occ.id);
@@ -3992,23 +4107,38 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         </div>
       );
     } else if (nextLesson) {
+      const isShiftedPending = Boolean(nextLesson.needsAck);
+      const isShiftedConfirmed = Boolean(!nextLesson.needsAck && (nextLesson.isRescheduled || nextLesson.occ?.status === 'rescheduled_confirmed' || (nextLesson.occ?.original_date && nextLesson.occ?.original_date !== nextLesson.occ?.date)));
+      const isPendingAdmin = Boolean(nextLesson.isPendingReview && !isShiftedPending && !isShiftedConfirmed);
+
+      const borderColor = isShiftedPending ? '1.5px dashed #eab308' : isShiftedConfirmed ? '1.5px dashed #34a853' : isPendingAdmin ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0');
+      const cardBg = isShiftedPending ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : isShiftedConfirmed ? 'repeating-linear-gradient(-45deg, #e6f4ea 0px, #e6f4ea 8px, #ffffff 8px, #ffffff 16px)' : isPendingAdmin ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : (styles.card ? styles.card.background : '#ffffff');
+
       return (
         <div style={{
           ...styles.card,
           padding: '16px',
           gap: '12px',
-          border: nextLesson.isPendingReview ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0'),
-          background: nextLesson.isPendingReview ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : (styles.card ? styles.card.background : '#ffffff')
+          border: borderColor,
+          background: cardBg
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: nextLesson.isPendingReview ? '#b45309' : '#34a853', background: nextLesson.isPendingReview ? '#fef3c7' : '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: isShiftedPending ? '#b45309' : (isShiftedConfirmed || !isPendingAdmin) ? '#34a853' : '#b45309', background: isShiftedPending ? '#fef3c7' : (isShiftedConfirmed || !isPendingAdmin) ? '#e6f4ea' : '#fef3c7', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
               Nächster Unterrichtstermin
             </span>
-            {nextLesson.isPendingReview && (
+            {isShiftedPending ? (
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                🗓️ Termin verschoben (ausstehend)
+              </span>
+            ) : isShiftedConfirmed ? (
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                🗓️ Termin verschoben (bestätigt)
+              </span>
+            ) : isPendingAdmin ? (
               <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
                 ⏳ In Prüfung
               </span>
-            )}
+            ) : null}
           </div>
  
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -4030,11 +4160,39 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 {nextLesson.room_name || (nextLesson.room && nextLesson.room.name) || 'Groovelab Raum'}
               </span>
             </div>
-            {nextLesson.isPendingReview && (
-              <div style={{ fontSize: '0.72rem', color: '#854d0e', fontWeight: 700, marginTop: '4px', background: '#fef9c3', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fef08a' }}>
-                Hinweis: Dieser Termin steht noch unter Vorbehalt der finalen Raumzuteilung durch das Sekretariat.
+
+            {isShiftedPending ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 700, background: '#fef9c3', padding: '8px 10px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+                  Termin wurde verschoben. Bitte bestätige die neue Unterrichtszeit:
+                </div>
+                {nextLesson.occ && (
+                  <button
+                    type="button"
+                    onClick={() => handleAcknowledgeOccurrence(nextLesson.occ)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: '#34a853',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 3px 10px rgba(52, 168, 83, 0.25)'
+                    }}
+                  >
+                    <CheckCircle size={16} />
+                    <span>Termin bestätigen</span>
+                  </button>
+                )}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       );
@@ -4577,18 +4735,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       nextDate.setDate(today.getDate() + diff);
       return {
         dateStr: nextDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-        time: sch.time_slot
+        time: sch.time_slot,
+        isPendingReview: sch.status === 'ready_for_admin_review' && !sch.room?.name && !sch.room_id,
+        room_name: sch.room?.name
       };
     };
 
     const nextLessonInfo = (() => {
-      if (occurrences.length > 0) {
-        const nextOcc = occurrences[0];
-        const d = new Date(nextOcc.date);
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const upcomingOcc = occurrences.find(o => o.date >= todayStr);
+      if (upcomingOcc) {
+        const d = new Date(upcomingOcc.date + 'T00:00:00');
+        const isRescheduled = upcomingOcc.status === 'pending_reschedule' || (upcomingOcc.original_date && upcomingOcc.original_date !== upcomingOcc.date && upcomingOcc.status !== 'rescheduled_confirmed');
+        const needsAck = upcomingOcc.student_acknowledged === false && (isRescheduled || upcomingOcc.original_date);
+        const roomName = upcomingOcc.room_name || upcomingOcc.schedule?.room?.name || upcomingOcc.room?.name;
+
         return {
+          occ: upcomingOcc,
           dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-          time: nextOcc.start_time,
-          isPendingReview: nextOcc.schedule?.status === 'ready_for_admin_review'
+          time: upcomingOcc.start_time,
+          isPendingReview: upcomingOcc.schedule?.status === 'ready_for_admin_review' && !roomName && !upcomingOcc.schedule?.room_id,
+          room_name: roomName,
+          isRescheduled,
+          needsAck
         };
       }
       return getVirtualNextLesson();
@@ -5849,18 +6018,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       nextDate.setDate(today.getDate() + diff);
       return {
         dateStr: nextDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-        time: sch.time_slot
+        time: sch.time_slot,
+        isPendingReview: sch.status === 'ready_for_admin_review' && !sch.room?.name && !sch.room_id,
+        room_name: sch.room?.name
       };
     };
 
     const nextLessonInfo = (() => {
-      if (occurrences.length > 0) {
-        const nextOcc = occurrences[0];
-        const d = new Date(nextOcc.date);
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const upcomingOcc = occurrences.find(o => o.date >= todayStr);
+      if (upcomingOcc) {
+        const d = new Date(upcomingOcc.date + 'T00:00:00');
+        const isRescheduled = upcomingOcc.status === 'pending_reschedule' || (upcomingOcc.original_date && upcomingOcc.original_date !== upcomingOcc.date && upcomingOcc.status !== 'rescheduled_confirmed');
+        const needsAck = upcomingOcc.student_acknowledged === false && (isRescheduled || upcomingOcc.original_date);
+        const roomName = upcomingOcc.room_name || upcomingOcc.schedule?.room?.name || upcomingOcc.room?.name;
+
         return {
+          occ: upcomingOcc,
           dateStr: d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
-          time: nextOcc.start_time,
-          isPendingReview: nextOcc.schedule?.status === 'ready_for_admin_review'
+          time: upcomingOcc.start_time,
+          isPendingReview: upcomingOcc.schedule?.status === 'ready_for_admin_review' && !roomName && !upcomingOcc.schedule?.room_id,
+          room_name: roomName,
+          isRescheduled,
+          needsAck
         };
       }
       return getVirtualNextLesson();

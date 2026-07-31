@@ -24,7 +24,8 @@ import {
   CheckCheck,
   ShieldCheck,
   RotateCcw,
-  MoreVertical
+  MoreVertical,
+  ArrowLeftRight
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -5066,14 +5067,15 @@ export function ScheduleCalendarView({
                   );
                   const isResetPending = false;
  
-                  const isWaiting = !isBreak && !isVacant && !isSick && (
+                  const isConfirmedReschedule = isRescheduled && (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true);
+
+                  const isWaiting = !isBreak && !isVacant && !isSick && !isConfirmedReschedule && (
                     isGroup 
-                      ? occurrencesInGroup.some(o => o.status === 'pending_reschedule')
-                      : (occ.status === 'pending_reschedule' || isTimeOrDayMoved)
+                      ? occurrencesInGroup.some(o => o.status === 'pending_reschedule' || (o.student_acknowledged === false && Boolean(o.original_date)))
+                      : (occ.status === 'pending_reschedule' || isTimeOrDayMoved || (occ.student_acknowledged === false && Boolean(occ.original_date)))
                   );
 
                   const isGroovelab = localStorage.getItem('groovelab_active_platform') !== 'campus';
-                  const isConfirmedReschedule = isRescheduled && occ.status === 'rescheduled_confirmed';
 
                   if (!isBreak && !isVacant && !isSick && !isCancelled) {
                     if (isGroup) {
@@ -5583,14 +5585,29 @@ export function ScheduleCalendarView({
                                          setHoveredTooltip(null);
                                        }}
                                        style={{ 
-                                         width: '8px', 
-                                         height: '8px', 
+                                         display: 'inline-flex',
+                                         alignItems: 'center',
+                                         gap: '3px',
+                                         flexShrink: 0
+                                       }} 
+                                     >
+                                       <ArrowLeftRight 
+                                         size={11} 
+                                         style={{ 
+                                           color: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'),
+                                           flexShrink: 0
+                                         }} 
+                                       />
+                                       <span style={{ 
+                                         width: '6px', 
+                                         height: '6px', 
                                          borderRadius: '50%', 
                                          background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'), 
                                          boxShadow: 'none',
-                                         display: 'inline-block' 
-                                       }} 
-                                     />
+                                         display: 'inline-block',
+                                         flexShrink: 0
+                                       }} />
+                                     </span>
                                     )}
                                   </div>
                                   
