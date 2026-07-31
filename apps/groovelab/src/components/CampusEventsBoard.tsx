@@ -4926,17 +4926,49 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                 </span>
                                 <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
                                   {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
-                                </span>
-                              </div>
-
-                              {/* Week Items List */}
+{/* Week Items List */}
                               {isWeekExpanded && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
                                   {(() => {
+                                    // 1. Deduplicate by student and date so actual overrides (moved/rescheduled/cancelled) suppress virtual Stammtermine
+                                    const deduplicatedItems: any[] = [];
+                                    const studentMovedDates = new Map<string, any>();
+
+                                    wGroup.items.forEach(item => {
+                                      const isActualOverride = item.is_moved || 
+                                        item.status === 'pending_reschedule' || 
+                                        item.status === 'rescheduled' || 
+                                        item.status === 'cancelled' || 
+                                        item.status === 'canceled_by_student' || 
+                                        item.status === 'teacher_sick' ||
+                                        !item.is_virtual;
+
+                                      if (isActualOverride) {
+                                        const stId = item.student_id || item.student?.id || (item.student?.first_name ? item.student.first_name.trim().toLowerCase() : null);
+                                        if (stId) {
+                                          const key = `${item.date}_${stId}`;
+                                          studentMovedDates.set(key, item);
+                                        }
+                                      }
+                                    });
+
+                                    wGroup.items.forEach(item => {
+                                      const stId = item.student_id || item.student?.id || (item.student?.first_name ? item.student.first_name.trim().toLowerCase() : null);
+                                      const key = `${item.date}_${stId}`;
+
+                                      if (studentMovedDates.has(key)) {
+                                        if (studentMovedDates.get(key) === item) {
+                                          deduplicatedItems.push(item);
+                                        }
+                                      } else {
+                                        deduplicatedItems.push(item);
+                                      }
+                                    });
+
                                     const groupedSlotItems: any[] = [];
                                     const slotMap = new Map<string, any[]>();
 
-                                    wGroup.items.forEach(occ => {
+                                    deduplicatedItems.forEach(occ => {
                                       const slotKey = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
                                       if (!slotMap.has(slotKey)) {
                                         slotMap.set(slotKey, []);
