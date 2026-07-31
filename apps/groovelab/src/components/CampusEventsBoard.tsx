@@ -2672,18 +2672,18 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         } catch (e) {}
       }
 
-      // Helper to parse day of week safely from number or string (e.g. "Montag" -> 1)
+      // Helper to parse day of week safely from number or string (e.g. "Montag" -> 1, "Di" -> 2)
       const parseDayOfWeekNum = (day: any): number => {
         if (typeof day === 'number') return day;
         if (!day) return 1;
-        const s = String(day).trim().toLowerCase();
-        if (s === 'montag' || s === 'monday' || s === '1') return 1;
-        if (s === 'dienstag' || s === 'tuesday' || s === '2') return 2;
-        if (s === 'mittwoch' || s === 'wednesday' || s === '3') return 3;
-        if (s === 'donnerstag' || s === 'thursday' || s === '4') return 4;
-        if (s === 'freitag' || s === 'friday' || s === '5') return 5;
-        if (s === 'samstag' || s === 'saturday' || s === '6') return 6;
-        if (s === 'sonntag' || s === 'sunday' || s === '7') return 7;
+        const s = String(day).trim().toLowerCase().replace(/\./g, '');
+        if (s === 'montag' || s === 'monday' || s === 'mo' || s === 'mon' || s === '1') return 1;
+        if (s === 'dienstag' || s === 'tuesday' || s === 'di' || s === 'tue' || s === '2') return 2;
+        if (s === 'mittwoch' || s === 'wednesday' || s === 'mi' || s === 'wed' || s === '3') return 3;
+        if (s === 'donnerstag' || s === 'thursday' || s === 'do' || s === 'thu' || s === '4') return 4;
+        if (s === 'freitag' || s === 'friday' || s === 'fr' || s === 'fri' || s === '5') return 5;
+        if (s === 'samstag' || s === 'saturday' || s === 'sa' || s === 'sat' || s === '6') return 6;
+        if (s === 'sonntag' || s === 'sunday' || s === 'so' || s === 'sun' || s === '7') return 7;
         const num = parseInt(s, 10);
         return isNaN(num) ? 1 : num;
       };
@@ -3841,9 +3841,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Split lesson list for Column 1
   const getFilteredLessons = () => {
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const nowTimeStr = d.toTimeString().substring(0, 8);
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
 
     // Show ALL regular lessons (upcoming + past) regardless of holiday periods
     return lessons.filter(occ => {
