@@ -5219,7 +5219,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                 fontSize: '12px', 
                                                 fontWeight: 800, 
                                                 color: textColor, 
-                                                textDecoration: isCanceled ? 'line-through' : 'none',
+                                                textDecoration: 'none',
                                                 overflow: 'hidden', 
                                                 textOverflow: 'ellipsis', 
                                                 whiteSpace: 'nowrap' 

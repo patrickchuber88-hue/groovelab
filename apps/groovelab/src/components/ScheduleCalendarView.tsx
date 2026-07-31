@@ -6422,7 +6422,7 @@ return (
 
                             return (
                               <div key={go.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: '10px', background: itemBg, border: itemBorder }}>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, textDecoration: isGoCancelled ? 'line-through' : 'none' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, textDecoration: 'none' }}>
                                   {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames)}
                                 </span>
                                 {!isGoCancelled && !isGoSick && (
