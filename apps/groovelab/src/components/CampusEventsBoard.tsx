@@ -3157,17 +3157,46 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       setLessons(allMergedOccurrences);
 
-      // Fetch active conversations (occurrence_ids & user_ids that have messages)
+      // Fetch active conversations (only human messages written by teacher or student, excluding system messages)
       const { data: activeChats } = await supabase
         .from('campus_direct_messages')
-        .select('occurrence_id, sender_id, recipient_id')
+        .select('occurrence_id, sender_id, recipient_id, content, is_system, message_type')
         .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`);
 
       if (activeChats) {
         const occIds = new Set<string>();
         const studentIds = new Set<string>();
 
+        const isHumanChatMessage = (c: any) => {
+          if (!c) return false;
+          if (c.is_system === true) return false;
+          if (c.message_type === 'system' || c.message_type === 'reschedule_request' || c.message_type === 'notification' || c.message_type === 'cancellation') return false;
+
+          const text = (c.content || '').trim();
+          if (!text) return false;
+
+          // Ignore system automated notifications (e.g. Terminverschiebung)
+          if (
+            text.startsWith('🗓️') ||
+            text.startsWith('❌') ||
+            text.startsWith('🔄') ||
+            text.startsWith('✨') ||
+            text.toLowerCase().startsWith('system:') ||
+            text.toLowerCase().includes('terminverschiebung') ||
+            text.toLowerCase().includes('termin verschoben') ||
+            text.toLowerCase().includes('termin abgesagt') ||
+            text.toLowerCase().includes('stundenplanänderung') ||
+            text.toLowerCase().includes('anfrage auf terminverschiebung')
+          ) {
+            return false;
+          }
+
+          return true;
+        };
+
         activeChats.forEach((c: any) => {
+          if (!isHumanChatMessage(c)) return; // Ignore system messages
+
           if (c.occurrence_id) occIds.add(c.occurrence_id);
           if (c.sender_id && c.sender_id !== userId) studentIds.add(c.sender_id);
           if (c.recipient_id && c.recipient_id !== userId) studentIds.add(c.recipient_id);
