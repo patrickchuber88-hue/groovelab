@@ -3020,21 +3020,27 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 return false;
               };
 
-              // Check if override exists
+              // Check if override exists for this date or originally from this date
               const actual = occurrences?.find((occ: any) => 
                 (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) && 
-                (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
+                (occ.original_date === dateStr || occ.date === dateStr)
+              );
+
+              // Check if occurrence for this schedule was moved away from dateStr
+              const actualMovedAway = !actual && occurrences?.some((occ: any) =>
+                (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) &&
+                occ.original_date === dateStr
               );
 
               if (actual) {
-                if (actual.student_id) {
+                if (actual.student_id && !usedActualIds.has(actual.id)) {
                   allMergedOccurrences.push({
                     ...actual,
                     schedule: sch
                   });
                   usedActualIds.add(actual.id);
                 }
-              } else {
+              } else if (!actualMovedAway) {
                 const timeSlotStr = sch.time_slot || '14:00';
                 const startTimeStr = timeSlotStr.includes(':') && timeSlotStr.split(':').length === 2 ? `${timeSlotStr}:00` : timeSlotStr;
 
@@ -4556,7 +4562,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 gap: '6px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: `0 4px 12px ${brandColor}55`,
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
                 fontSize: '0.78rem',
                 fontWeight: 800,
                 flexShrink: 0
