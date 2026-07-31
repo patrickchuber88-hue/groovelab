@@ -1879,7 +1879,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     }
   }, [userId]);
 
-  // Fetch all initial data
+  // Fetch all initial data and keep in 100% real-time sync with Stundenplan
   useEffect(() => {
     fetchLessons();
     fetchCustomEvents();
@@ -1890,6 +1890,29 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       fetchStudentEnsembles();
       fetchStudentProgramPoints();
     }
+
+    const handleSync = () => {
+      fetchLessons();
+    };
+
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('visibilitychange', handleSync);
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('groovelab_schedule_changed', handleSync);
+
+    const channel = supabase
+      .channel('realtime_events_board_schedule_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences' }, handleSync)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, handleSync)
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('visibilitychange', handleSync);
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('groovelab_schedule_changed', handleSync);
+      supabase.removeChannel(channel);
+    };
   }, [userId, schoolId, role]);
 
 

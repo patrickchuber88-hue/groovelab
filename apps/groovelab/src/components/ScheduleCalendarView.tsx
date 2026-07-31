@@ -231,6 +231,7 @@ export function ScheduleCalendarView({
       } else {
         localStorage.removeItem('groovelab_pending_schedule_changes');
       }
+      window.dispatchEvent(new Event('groovelab_schedule_changed'));
     } catch (e) {}
   }, [pendingChanges]);
   const [loading, setLoading] = useState(true);
