@@ -2935,7 +2935,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               const rawTime = s.assignedTime || s.startTime || s.time_slot || s.time || '14:00';
               const formattedTimeSlot = rawTime.includes(':') && rawTime.split(':').length === 2 ? `${rawTime}:00` : rawTime;
 
-              const origSched = (schedules || []).find(sch => sch.student_id === studentId);
+              const origSched = (schedules || []).find((sch: any) => sch.student_id === studentId);
               const isMovedFromStamm = origSched && (
                 parseDayOfWeekNum(origSched.day_of_week) !== boardDayNum ||
                 (origSched.time_slot && origSched.time_slot.substring(0, 5) !== formattedTimeSlot.substring(0, 5))
