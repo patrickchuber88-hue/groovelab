@@ -1,5 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw } from 'lucide-react';
+import { ACOUSTIC_STUDIO_SAMPLES } from './AcousticDrumSamples';
+
+// Helper to decode Base64 WAV into AudioBuffer
+const decodeBase64Wav = (ctx: AudioContext, b64Uri: string): AudioBuffer => {
+  const base64 = b64Uri.split(',')[1];
+  const binaryString = window.atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  // Synchronous PCM WAV decoding for instant 0ms play
+  const sr = ctx.sampleRate;
+  const numSamples = Math.floor((bytes.length - 44) / 2);
+  const buf = ctx.createBuffer(1, numSamples, sr);
+  const chan = buf.getChannelData(0);
+  const dataView = new DataView(bytes.buffer);
+  
+  for (let i = 0; i < numSamples; i++) {
+    const raw = dataView.getInt16(44 + i * 2, true);
+    chan[i] = raw / 32768.0;
+  }
+  return buf;
+};
 
 export interface GroovePracticeCompanionProps {
   useNotebookLayout?: boolean;
@@ -18,12 +41,13 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
-  const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco'>('metronome');
+  const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco' | 'singersongwriter'>('metronome');
   const [selectedVariation, setSelectedVariation] = useState<'A' | 'B' | 'C'>('A');
-  const [volKick, setVolKick] = useState(80);
-  const [volSnare, setVolSnare] = useState(80);
-  const [volHat, setVolHat] = useState(80);
-  const [volMetronome, setVolMetronome] = useState(80);
+  const [volMaster, setVolMaster] = useState(100);
+  const [volKick, setVolKick] = useState(100);
+  const [volSnare, setVolSnare] = useState(100);
+  const [volHat, setVolHat] = useState(100);
+  const [volMetronome, setVolMetronome] = useState(100);
   
   const [mutedInstruments, setMutedInstruments] = useState<string[]>([]);
   const [soloedInstruments, setSoloedInstruments] = useState<string[]>([]);
@@ -42,6 +66,7 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
   const progressFrameRef = useRef<number | null>(null);
 
   // Refs to allow real-time volume, variation, and solo/mute adjustments without rebuilding the scheduler loop
+  const volMasterRef = useRef(volMaster);
   const volKickRef = useRef(volKick);
   const volSnareRef = useRef(volSnare);
   const volHatRef = useRef(volHat);
@@ -50,6 +75,12 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
   const mutedInstrumentsRef = useRef(mutedInstruments);
   const soloedInstrumentsRef = useRef(soloedInstruments);
 
+  useEffect(() => {
+    volMasterRef.current = volMaster;
+    if (masterGainRef.current && audioCtxRef.current) {
+      masterGainRef.current.gain.setValueAtTime((volMaster / 100) * 1.5, audioCtxRef.current.currentTime);
+    }
+  }, [volMaster]);
   useEffect(() => { volKickRef.current = volKick; }, [volKick]);
   useEffect(() => { volSnareRef.current = volSnare; }, [volSnare]);
   useEffect(() => { volHatRef.current = volHat; }, [volHat]);
@@ -75,6 +106,51 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
   const bpmRef = useRef(bpm);
   const selectedStyleRef = useRef(selectedStyle);
   const isPlayingRef = useRef(isPlaying);
+  const sampleBufferCacheRef = useRef<Record<string, Record<string, AudioBuffer>>>({});
+
+  const getOrCreateGenreSampleBuffers = (ctx: AudioContext, genre: string): Record<string, AudioBuffer> => {
+    if (sampleBufferCacheRef.current[genre]) {
+      return sampleBufferCacheRef.current[genre];
+    }
+
+    // Decode REAL Studio Recorded PCM WAV Samples & Sterile Quartz Digital Metronome Click
+    const kickBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.kick);
+    const snareBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.snare);
+    const hatClosedBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.hatClosed);
+    const hatOpenBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.hatOpen);
+    const clickBuf = decodeBase64Wav(ctx, ACOUSTIC_STUDIO_SAMPLES.click);
+
+    // Helper: Render Wooden Rimshot AudioBuffer
+    const renderRimBuffer = (): AudioBuffer => {
+      const dur = 0.05;
+      const sr = ctx.sampleRate;
+      const buf = ctx.createBuffer(2, Math.floor(sr * dur), sr);
+      const L = buf.getChannelData(0);
+      const R = buf.getChannelData(1);
+      const len = buf.length;
+
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        const woodClick = Math.sin(2 * Math.PI * 980 * t) * Math.exp(-t * 80);
+        const val = woodClick * 0.40;
+        L[i] = val;
+        R[i] = val;
+      }
+      return buf;
+    };
+
+    const kitBuffers: Record<string, AudioBuffer> = {
+      kick: kickBuf,
+      snare: snareBuf,
+      hatClosed: hatClosedBuf,
+      hatOpen: hatOpenBuf,
+      rim: renderRimBuffer(),
+      click: clickBuf
+    };
+
+    sampleBufferCacheRef.current[genre] = kitBuffers;
+    return kitBuffers;
+  };
 
   useEffect(() => { bpmRef.current = bpm; }, [bpm]);
   useEffect(() => { selectedStyleRef.current = selectedStyle; }, [selectedStyle]);
@@ -112,8 +188,19 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
     audioCtxRef.current = audioCtx;
     
     const masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.8;
-    masterGain.connect(audioCtx.destination);
+    masterGain.gain.value = (volMasterRef.current / 100) * 1.5;
+
+    // 🎚️ Master Studio Bus Compressor & Limiter (100% Pure, Dry, Ring-Free Audio)
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
+    compressor.knee.setValueAtTime(4, audioCtx.currentTime);
+    compressor.ratio.setValueAtTime(4.0, audioCtx.currentTime);
+    compressor.attack.setValueAtTime(0.015, audioCtx.currentTime);
+    compressor.release.setValueAtTime(0.12, audioCtx.currentTime);
+
+    // Pure Direct Routing: MasterGain -> Compressor -> Destination
+    masterGain.connect(compressor);
+    compressor.connect(audioCtx.destination);
     masterGainRef.current = masterGain;
 
     const bufferSize = audioCtx.sampleRate * 0.25;
@@ -197,215 +284,33 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
     const hVol = getEffectiveVolume('hat', volHatRef.current);
     const mVol = getEffectiveVolume('click', volMetronomeRef.current);
 
-    const playKick = (volMul = 1.0) => {
-      if (kVol <= 0.001) return;
-      // Resonant drumhead sine sweep (warm bass body)
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.setValueAtTime(140, time);
+    const style = selectedStyleRef.current;
+    const kitBuffers = getOrCreateGenreSampleBuffers(ctx, style);
 
-      osc.connect(lp);
-      lp.connect(gain);
-      gain.connect(masterGain);
-
-      osc.frequency.setValueAtTime(110, time);
-      osc.frequency.exponentialRampToValueAtTime(46, time + 0.09);
-
-      gain.gain.setValueAtTime(kVol * volMul * 0.9, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
-      
-      osc.start(time);
-      osc.stop(time + 0.20);
-
-      // Acoustic leather beater contact slap
-      const beater = ctx.createOscillator();
-      const beaterGain = ctx.createGain();
-      beater.type = 'triangle';
-      
-      const beaterFilter = ctx.createBiquadFilter();
-      beaterFilter.type = 'bandpass';
-      beaterFilter.frequency.setValueAtTime(1700, time);
-      beaterFilter.Q.setValueAtTime(2.0, time);
-
-      beater.connect(beaterFilter);
-      beaterFilter.connect(beaterGain);
-      beaterGain.connect(masterGain);
-
-      beater.frequency.setValueAtTime(800, time);
-      beater.frequency.exponentialRampToValueAtTime(140, time + 0.008);
-
-      beaterGain.gain.setValueAtTime(kVol * volMul * 0.22, time);
-      beaterGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.01);
-
-      beater.start(time);
-      beater.stop(time + 0.015);
-    };
-
-    const playSnare = (volMul = 1.0) => {
-      if (sVol <= 0.001) return;
-      if (!noiseBufferRef.current) return;
-      
-      // Snappy snare wires rattle (filtered noise)
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBufferRef.current;
-      
-      const noiseFilter = ctx.createBiquadFilter();
-      noiseFilter.type = 'bandpass';
-      noiseFilter.frequency.setValueAtTime(2100, time);
-      noiseFilter.Q.setValueAtTime(1.4, time);
-      
-      const noiseHp = ctx.createBiquadFilter();
-      noiseHp.type = 'highpass';
-      noiseHp.frequency.setValueAtTime(950, time);
-
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(sVol * 0.36 * volMul, time);
-      noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
-      
-      noise.connect(noiseFilter);
-      noiseFilter.connect(noiseHp);
-      noiseHp.connect(noiseGain);
-      noiseGain.connect(masterGain);
-      
-      noise.start(time);
-      noise.stop(time + 0.18);
-
-      // Acoustic drumhead shell resonance tone
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(175, time);
-      osc1.frequency.exponentialRampToValueAtTime(125, time + 0.08);
-
-      gain1.gain.setValueAtTime(sVol * 0.40 * volMul, time);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
-      
-      osc1.connect(gain1);
-      gain1.connect(masterGain);
-      osc1.start(time);
-      osc1.stop(time + 0.11);
-
-      // Stick impact transient
-      const rim = ctx.createOscillator();
-      const rimGain = ctx.createGain();
-      rim.type = 'triangle';
-      rim.frequency.setValueAtTime(950, time);
-      rim.frequency.exponentialRampToValueAtTime(350, time + 0.01);
-      
-      rimGain.gain.setValueAtTime(sVol * 0.18 * volMul, time);
-      rimGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.014);
-      
-      rim.connect(rimGain);
-      rimGain.connect(masterGain);
-      rim.start(time);
-      rim.stop(time + 0.018);
-    };
-
-    const playRimClick = (volMul = 1.0) => {
-      if (sVol <= 0.001) return;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass';
-      hp.frequency.setValueAtTime(450, time);
-
-      osc.connect(hp);
-      hp.connect(gain);
-      gain.connect(masterGain);
-
-      osc.frequency.setValueAtTime(1100, time);
-      osc.frequency.exponentialRampToValueAtTime(580, time + 0.012);
-
-      gain.gain.setValueAtTime(sVol * 0.38 * volMul, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.016);
-      osc.start(time);
-      osc.stop(time + 0.02);
-    };
-
-    const playHat = (isOpen = false, volMul = 1.0) => {
-      if (hVol <= 0.001) return;
-      if (!noiseBufferRef.current) return;
-      
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBufferRef.current;
-      
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass';
-      hp.frequency.setValueAtTime(7000, time);
-
-      const bp = ctx.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.frequency.setValueAtTime(11500, time);
-      bp.Q.setValueAtTime(1.8, time);
-
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(hVol * (isOpen ? 0.14 : 0.09) * volMul, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + (isOpen ? 0.20 : 0.035));
-
-      noise.connect(hp);
-      hp.connect(bp);
-      bp.connect(gain);
-      gain.connect(masterGain);
-      
-      noise.start(time);
-      noise.stop(time + (isOpen ? 0.22 : 0.05));
-    };
-
-    const playClick = (isAccent = false) => {
-      if (mVol <= 0.001) return;
-      
-      // Resonant woodblock body with physical decay and pitch bend
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      
-      // Pitch drop simulating physical strike impact bending
-      osc.frequency.setValueAtTime(isAccent ? 1550 : 1050, time);
-      osc.frequency.exponentialRampToValueAtTime(isAccent ? 650 : 450, time + 0.012);
-      
-      // Bandpass filter to simulate wood block hollow enclosure resonance
-      const bp = ctx.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.frequency.setValueAtTime(isAccent ? 1200 : 850, time);
-      bp.Q.setValueAtTime(3.8, time);
-
-      osc.connect(bp);
-      bp.connect(gain);
-      gain.connect(masterGain);
-
-      gain.gain.setValueAtTime(mVol * 0.75, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.028);
-      osc.start(time);
-      osc.stop(time + 0.045);
-
-      // Mallet click transient (wood strike sound)
-      if (noiseBufferRef.current) {
-        const noise = ctx.createBufferSource();
-        noise.buffer = noiseBufferRef.current;
-        
-        const noiseFilter = ctx.createBiquadFilter();
-        noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.setValueAtTime(3200, time);
-        noiseFilter.Q.setValueAtTime(4.0, time);
-
-        const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(mVol * 0.42, time);
-        noiseGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.006);
-
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(masterGain);
-
-        noise.start(time);
-        noise.stop(time + 0.01);
+    // High-End Sample Playback with Micro-Ramp (Zero Clicking & Phase-Locked Metronome Alignment)
+    const playSample = (buffer: AudioBuffer, vol: number, volMultiplier = 1.0, pitchJitter = 0.0) => {
+      if (vol <= 0.001 || !buffer) return;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      if (pitchJitter > 0) {
+        source.playbackRate.value = 1 + (Math.random() * 2 - 1) * pitchJitter;
       }
+      const gain = ctx.createGain();
+      const targetGain = vol * volMultiplier * 1.5;
+      // Micro 0.8ms linear ramp prevents DC zero-crossing clicks & pops
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(targetGain, time + 0.0008);
+      
+      source.connect(gain);
+      gain.connect(masterGain);
+      source.start(time);
     };
+
+    const playKick = (volMul = 1.0) => playSample(kitBuffers.kick, kVol, volMul, 0.008);
+    const playSnare = (volMul = 1.0) => playSample(kitBuffers.snare, sVol, volMul, 0.015);
+    const playRimClick = (volMul = 1.0) => playSample(kitBuffers.rim, sVol, volMul * 0.8, 0.010);
+    const playHat = (isOpen = false, volMul = 1.0) => playSample(isOpen ? kitBuffers.hatOpen : kitBuffers.hatClosed, hVol, volMul, 0.018);
+    const playClick = (isAccent = false) => playSample(kitBuffers.click, mVol, isAccent ? 1.3 : 0.8, 0.005);
 
     const triggerVisualBeat = (beatIdx: number) => {
       ctx.resume().then(() => {
@@ -643,6 +548,26 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
         if (step === 4 || step === 12) playSnare(1.1);
         else if (step === 15) playSnare(0.8);
         if (step % 2 === 0) playHat(false, 0.8);
+      }
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (selectedStyleRef.current === 'singersongwriter') {
+      if (variant === 'A') {
+        // V1: Soft Acoustic Folk Pocket (Feathered Kick & Rimshot / Cross-Stick)
+        if (step === 0 || step === 10) playKick(0.75);
+        if (step === 4 || step === 12) playRimClick(0.9);
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.7 : 0.4);
+      } else if (variant === 'B') {
+        // V2: Groove+ (Shaker & Soft Brush Snare)
+        if (step === 0 || step === 10) playKick(0.8);
+        if (step === 4 || step === 12) playSnare(0.55); // soft brush snare
+        else if (step === 7 || step === 15) playSnare(0.18); // subtle brush scrape
+        if (step % 2 === 0) playHat(false, step % 4 === 0 ? 0.75 : 0.45);
+      } else {
+        // V3: Complex (Singer-Songwriter Acoustic Fill & Open Hat Sizzle)
+        if (step === 0 || step === 6 || step === 10) playKick(0.85);
+        if (step === 4 || step === 12) playSnare(0.65);
+        else if (step === 14 || step === 15) playRimClick(0.75); // acoustic wooden fill
+        if (step % 2 === 0) playHat(step === 10, step === 10 ? 0.8 : 0.5);
       }
       if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
     }
@@ -1115,6 +1040,7 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
           }}>
             {[
               { id: 'metronome', label: 'Metronom Klick' },
+              { id: 'singersongwriter', label: 'Singer-Songwriter (Akustik)' },
               { id: 'rock', label: 'Rock & Pop Groove' },
               { id: 'hiphop', label: 'Hip-Hop Pocket' },
               { id: 'swing', label: 'Jazz Swing' },
@@ -1148,6 +1074,43 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                 </button>
               );
             })}
+          </div>
+
+          {/* Master Volume & Power Boost Control */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            marginTop: '8px',
+            borderTop: '1px solid #f1f3f5',
+            paddingTop: '14px',
+            background: volMaster > 100 ? 'rgba(234, 179, 8, 0.06)' : 'transparent',
+            borderRadius: '12px',
+            padding: '12px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Volume2 style={{ width: '14px', height: '14px', color: volMaster > 100 ? '#d97706' : '#1d1d1f' }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d1d1f' }}>Master-Lautstärke</span>
+                {volMaster > 100 && (
+                  <span style={{ fontSize: '0.55rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eab308', color: '#ffffff', letterSpacing: '0.04em' }}>
+                    ⚡ POWER BOOST (+{Math.round((volMaster - 100) / 8.33)}dB)
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: volMaster > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace' }}>
+                {volMaster}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="200"
+              value={volMaster}
+              onChange={(e) => setVolMaster(Number(e.target.value))}
+              className="groovelab-fader"
+              style={{ flex: 1 }}
+            />
           </div>
 
           {/* Beat Variations Selector */}
@@ -1209,15 +1172,31 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
             borderTop: '1px solid #f1f3f5',
             paddingTop: '16px'
           }}>
-            <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              INSTRUMENTEN MIXER
-            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.58rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                INSTRUMENTEN MIXER
+              </span>
+              <span style={{ fontSize: '0.55rem', color: '#5f6368', background: '#f5f5f7', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, border: '1px solid #e5e7eb' }}>
+                🥁 {selectedStyle === 'singersongwriter' ? 'Singer-Songwriter Soft Mahogany Kit' :
+                     selectedStyle === 'swing' ? 'Smoky Vintage Jazz Brush Kit' :
+                     selectedStyle === 'hiphop' ? 'Dark Tape Boom-Bap Sub Kit' :
+                     selectedStyle === 'reggae' ? 'Deep Dub One-Drop Sub Kit' :
+                     selectedStyle === 'latin' ? 'Warm Percussive Bossa Kit' :
+                     selectedStyle === 'funk' ? '70s Vintage Damped Funk Break Kit' :
+                     selectedStyle === 'rock' ? 'Dark Vintage Birch Studio Rock Kit' :
+                     selectedStyle === 'walzer' ? 'Acoustic Chamber Waltz Kit' :
+                     selectedStyle === 'ballad68' ? 'Warm Slow Ballad Heartbeat Kit' :
+                     selectedStyle === 'disco' ? 'Damped 70s Studio Disco Kit' : 'Soft Hardwood Teak Click Kit'}
+              </span>
+            </div>
 
             {selectedStyle === 'metronome' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Klick-Lautstärke</span>
-                  <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volMetronome}%</span>
+                  <span style={{ fontSize: '0.62rem', color: volMetronome > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                    {volMetronome}% {volMetronome > 100 && '⚡'}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ display: 'flex', gap: '4px' }}>
@@ -1261,7 +1240,7 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                   <input
                     type="range"
                     min="0"
-                    max="100"
+                    max="200"
                     value={volMetronome}
                     onChange={(e) => setVolMetronome(Number(e.target.value))}
                     className="groovelab-fader"
@@ -1275,7 +1254,9 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Bass Drum (Kick)</span>
-                    <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volKick}%</span>
+                    <span style={{ fontSize: '0.62rem', color: volKick > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                      {volKick}% {volKick > 100 && '⚡'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', gap: '4px' }}>
@@ -1319,7 +1300,7 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                     <input
                       type="range"
                       min="0"
-                      max="100"
+                      max="200"
                       value={volKick}
                       onChange={(e) => setVolKick(Number(e.target.value))}
                       className="groovelab-fader"
@@ -1332,7 +1313,9 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Snare Drum</span>
-                    <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volSnare}%</span>
+                    <span style={{ fontSize: '0.62rem', color: volSnare > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                      {volSnare}% {volSnare > 100 && '⚡'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', gap: '4px' }}>
@@ -1376,7 +1359,7 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                     <input
                       type="range"
                       min="0"
-                      max="100"
+                      max="200"
                       value={volSnare}
                       onChange={(e) => setVolSnare(Number(e.target.value))}
                       className="groovelab-fader"
@@ -1389,7 +1372,9 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d1d1f' }}>Hi-Hat</span>
-                    <span style={{ fontSize: '0.62rem', color: '#86868b', fontFamily: 'SF Mono, monospace' }}>{volHat}%</span>
+                    <span style={{ fontSize: '0.62rem', color: volHat > 100 ? '#d97706' : '#86868b', fontFamily: 'SF Mono, monospace', fontWeight: 700 }}>
+                      {volHat}% {volHat > 100 && '⚡'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ display: 'flex', gap: '4px' }}>
@@ -1433,7 +1418,7 @@ export const GroovePracticeCompanion: React.FC<any> = ({ useNotebookLayout }) =>
                     <input
                       type="range"
                       min="0"
-                      max="100"
+                      max="200"
                       value={volHat}
                       onChange={(e) => setVolHat(Number(e.target.value))}
                       className="groovelab-fader"
