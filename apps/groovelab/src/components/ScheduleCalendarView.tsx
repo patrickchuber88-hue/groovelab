@@ -101,7 +101,10 @@ export function ScheduleCalendarView({
   onStartTour
 }: ScheduleCalendarViewProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
-  const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(15); // Default grid snap to 15 mins
+  const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('groovelab_grid_snap_minutes');
+    return saved ? Number(saved) : 15;
+  }); // Default grid snap to 15 mins or saved preference
   const [viewMode, setViewMode] = useState<'week' | 'day' | 'month'>('week');
   const [showMiniDatePicker, setShowMiniDatePicker] = useState(false);
   const [quickCreateState, setQuickCreateState] = useState<{ isOpen: boolean; date: string; start_time: string } | null>(null);
@@ -1799,18 +1802,19 @@ export function ScheduleCalendarView({
 
         if (!mainOccsResult.error && mainOccsResult.data) {
 
-          // Filter occurrences so unassigned/other-teacher occurrences are excluded, but own teacher occurrences are kept
-          let filteredMainData = mainOccsResult.data.filter((occ: any) => {
-            if (!occ.student_id || occ.student_id === 'vacant') return true;
-            if (studentTeacherMap.has(occ.student_id)) {
-              const assignedTeacherId = studentTeacherMap.get(occ.student_id);
-              if (!assignedTeacherId || assignedTeacherId !== userId) {
-                return false; // Exclude student without explicit teacher assignment
-              }
-            } else if (occ.teacher_id !== userId) {
-              return false;
+          // If occurrence student is NOT explicitly assigned to userId, convert to vacant slot (empty gap)
+          let filteredMainData = mainOccsResult.data.map((occ: any) => {
+            if (!occ.student_id || occ.student_id === 'vacant') return occ;
+            const assignedTeacherId = studentTeacherMap.get(occ.student_id) || occ.student?.teacher_id;
+            if (assignedTeacherId && assignedTeacherId !== userId) {
+              return {
+                ...occ,
+                student_id: 'vacant',
+                student: null,
+                vacant_student_id: occ.student_id
+              };
             }
-            return true;
+            return occ;
           });
 
           fetchedData = filteredMainData.map((occ: any) => {
@@ -2663,6 +2667,14 @@ export function ScheduleCalendarView({
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
+    const sourceOcc = occurrences.find(o => o.id === id);
+    const todayYYYYMMDD = new Date().toISOString().split('T')[0];
+    if (sourceOcc && sourceOcc.date && sourceOcc.date < todayYYYYMMDD) {
+      e.preventDefault();
+      alert('🔒 Vergangene Termine sind schreibgeschützt und können nicht verschoben werden.');
+      return;
+    }
+
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
     try {
@@ -2672,7 +2684,6 @@ export function ScheduleCalendarView({
       e.dataTransfer.setDragImage(blankImg, 0, 0);
     } catch (_) {}
     setDraggedId(id);
-    const sourceOcc = occurrences.find(o => o.id === id);
     draggedOccRef.current = sourceOcc || null;
     
     if (sourceOcc && sourceOcc.student_id && sourceOcc.student_id !== 'vacant') {
@@ -2968,7 +2979,6 @@ export function ScheduleCalendarView({
     const sourceOcc = occurrences.find(o => o.id === sourceId);
     if (!sourceOcc) return;
 
-    const duration = sourceOcc.duration || 30;
     const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
     const formattedStartTime = `${String(Math.floor(snappedMin / 60) % 24).padStart(2, '0')}:${String(snappedMin % 60).padStart(2, '0')}:00`;
 
@@ -2981,8 +2991,6 @@ export function ScheduleCalendarView({
       (o.schedules?.room_id || null) === (sourceOcc.schedules?.room_id || null)
     ) : [sourceOcc];
 
-    const sourceGroupIds = new Set(groupOccs.map(o => o.id));
-
     groupOccs.forEach(go => {
       updatesMap[go.id] = {
         date: targetDateStr,
@@ -2991,49 +2999,8 @@ export function ScheduleCalendarView({
       };
     });
 
-    // 2. Group all other active occurrences on targetDateStr by start_time to preserve group lessons
-    const activeOccs = occurrences.filter(o => 
-      !sourceGroupIds.has(o.id) &&
-      o.date === targetDateStr &&
-      o.student_id &&
-      o.student_id !== 'vacant' &&
-      !['cancelled', 'canceled_by_student'].includes(o.status)
-    );
-
-    const occurrencesByStartTime = new Map<string, ScheduleOccurrence[]>();
-    activeOccs.forEach(o => {
-      const list = occurrencesByStartTime.get(o.start_time) || [];
-      list.push(o);
-      occurrencesByStartTime.set(o.start_time, list);
-    });
-
-    const sortedStartTimes = Array.from(occurrencesByStartTime.keys()).sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
-
-    let nextAvailableMin = snappedMin + duration;
-
-    sortedStartTimes.forEach(timeStr => {
-      const occsInSlot = occurrencesByStartTime.get(timeStr)!;
-      const occStartMin = timeToMinutes(timeStr);
-      const slotDuration = Math.max(...occsInSlot.map(o => o.duration || 30));
-      const occEndMin = occStartMin + slotDuration;
-
-      if (occEndMin <= snappedMin) return;
-
-      if (occStartMin < nextAvailableMin) {
-        const shiftedTime = `${String(Math.floor(nextAvailableMin / 60) % 24).padStart(2, '0')}:${String(nextAvailableMin % 60).padStart(2, '0')}:00`;
-        occsInSlot.forEach(o => {
-          updatesMap[o.id] = {
-            start_time: shiftedTime,
-            status: 'pending_reschedule'
-          };
-        });
-        nextAvailableMin += slotDuration;
-      } else {
-        nextAvailableMin = occEndMin;
-      }
-    });
-
-    updateMultipleOccurrences(updatesMap, 'Termine verschoben');
+    // Do NOT shift downstream occurrences. Each appointment stays at its own assigned time.
+    updateMultipleOccurrences(updatesMap, 'Termin verschoben');
   };
 
   const handleDropOnDay = async (e: React.DragEvent, targetDateStr: string, dayBaselineMinutes: number) => {
@@ -3053,7 +3020,7 @@ export function ScheduleCalendarView({
     const duration = sourceOcc?.duration || 30;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = e.clientY - rect.top - grabOffset;
+    const relativeY = Math.max(0, e.clientY - rect.top);
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
     const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes));
 
@@ -3792,26 +3759,22 @@ export function ScheduleCalendarView({
   };
 
   const isTeacherScheduleUnlocked = useMemo(() => {
-    if (scheduleStatus === 'approved' || hasSubmittedSchedule) return true;
-    if (cachedWeekSchedules && cachedWeekSchedules.some((s: any) => (userId ? s.teacher_id === userId : true) && (!!s.room_id || s.status === 'approved'))) {
+    // Admin or secretary always sees Röntgen rooms if schedule exists
+    if (currentUserRole === 'admin' || currentUserRole === 'secretary') return true;
+    
+    // For teacher: schedule must be submitted and approved by administration
+    if ((scheduleStatus as string) === 'approved') return true;
+    if (hasSubmittedSchedule && (scheduleStatus as string) === 'approved') {
       return true;
     }
-    if (cachedWeekSchedules && cachedWeekSchedules.some((s: any) => userId ? s.teacher_id === userId : true)) {
+    
+    // If database schedules exist with an approved status or assigned room_id for this teacher
+    if (cachedWeekSchedules && cachedWeekSchedules.some((s: any) => (userId ? s.teacher_id === userId : true) && s.status === 'approved' && !!s.room_id)) {
       return true;
     }
-    if (schoolId) {
-      try {
-        const draftMapStr = localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`);
-        if (draftMapStr) {
-          const draftMap = JSON.parse(draftMapStr);
-          if (Object.keys(draftMap).some(k => (userId ? (k.startsWith(`${userId}_`) || k.includes(userId)) : true) && !!draftMap[k])) {
-            return true;
-          }
-        }
-      } catch {}
-    }
+    
     return false;
-  }, [scheduleStatus, hasSubmittedSchedule, cachedWeekSchedules, userId, schoolId]);
+  }, [scheduleStatus, hasSubmittedSchedule, cachedWeekSchedules, userId, currentUserRole]);
 
   const isLockedForTeacher = currentUserRole === 'teacher' && !isTeacherScheduleUnlocked;
 
@@ -3995,7 +3958,11 @@ export function ScheduleCalendarView({
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
                 <select
                   value={gridSnapMinutes}
-                  onChange={(e) => setGridSnapMinutes(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setGridSnapMinutes(val);
+                    localStorage.setItem('groovelab_grid_snap_minutes', String(val));
+                  }}
                   style={{
                     border: 'none',
                     fontSize: '0.78rem',
@@ -4908,12 +4875,14 @@ export function ScheduleCalendarView({
                 const groupLayouts = new Map<string, { left: number; width: number; colIndex: number; totalCols: number }>();
                 
                 try {
-                  // 1. Sort groups by start time
-                  const sortedGroups = [...renderedGroups].sort((a, b) => {
-                    const aStart = timeToMinutes(a.mainOcc.start_time);
-                    const bStart = timeToMinutes(b.mainOcc.start_time);
-                    return aStart - bStart;
-                  });
+                  // 1. Sort real student groups by start time (ignoring gaps and breaks)
+                  const sortedGroups = [...renderedGroups]
+                    .filter(g => !g.mainOcc.isGap && !g.mainOcc.isBreak && g.mainOcc.student_id !== 'vacant')
+                    .sort((a, b) => {
+                      const aStart = timeToMinutes(a.mainOcc.start_time);
+                      const bStart = timeToMinutes(b.mainOcc.start_time);
+                      return aStart - bStart;
+                    });
 
                   // 2. Find overlapping clusters
                   const clusters: any[][] = [];
@@ -5175,10 +5144,11 @@ export function ScheduleCalendarView({
                   const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
                   const isGruppenunterricht = isGroup && occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
                   const isEnsemble = isGroup && !isGruppenunterricht;
-
                   const displayNames = isGroup 
                     ? occurrencesInGroup.map(o => o.student?.first_name ? o.student.first_name.trim() : '').filter(Boolean).join(', ')
                     : `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim();
+
+                  if (isGap) return null;
 
                   return (
                     <React.Fragment key={group.key}>
