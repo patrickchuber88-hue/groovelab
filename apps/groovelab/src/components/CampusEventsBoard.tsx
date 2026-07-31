@@ -4940,7 +4940,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                               {isWeekExpanded && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
                                   {(() => {
-                                    // 1. Deduplicate by student and date: ensure each student appears at most once per date, preferring actual overrides / moved / designer items
+                                    // 1. Deduplicate by student and date: ensure each student appears at most once per date
                                     const studentDateMap = new Map<string, any>();
 
                                     const getStudentKey = (item: any) => {
@@ -4961,6 +4961,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       return String(rawId).trim().toLowerCase();
                                     };
 
+                                    const getItemPriorityScore = (o: any): number => {
+                                      if (!o) return 0;
+                                      const status = String(o.status || '').toLowerCase();
+
+                                      // 1. Explicit cancellation has highest priority (must show red dashed card)
+                                      if (['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(status)) {
+                                        return 100;
+                                      }
+                                      // 2. Rescheduled / moved appointment has 2nd highest priority (must show yellow dashed card)
+                                      if (o.is_moved || ['pending_reschedule', 'rescheduled', 'rescheduled_confirmed', 'reschedule_requested'].includes(status)) {
+                                        return 80;
+                                      }
+                                      // 3. Saved DB occurrence or Designer board card
+                                      if (!o.is_virtual || String(o.id || '').startsWith('board-')) {
+                                        return 50;
+                                      }
+                                      // 4. Virtual Stammtermin fallback
+                                      return 10;
+                                    };
+
                                     wGroup.items.forEach(item => {
                                       const stKey = getStudentKey(item);
                                       if (!stKey) return;
@@ -4971,17 +4991,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       if (!existing) {
                                         studentDateMap.set(key, item);
                                       } else {
-                                        const itemIsOverride = item.is_moved || item.status === 'pending_reschedule' || item.status === 'rescheduled' || item.status === 'cancelled' || item.status === 'canceled_by_student' || !item.is_virtual;
-                                        const existingIsOverride = existing.is_moved || existing.status === 'pending_reschedule' || existing.status === 'rescheduled' || existing.status === 'cancelled' || existing.status === 'canceled_by_student' || !existing.is_virtual;
+                                        const itemScore = getItemPriorityScore(item);
+                                        const existingScore = getItemPriorityScore(existing);
 
-                                        if (itemIsOverride && !existingIsOverride) {
+                                        if (itemScore > existingScore) {
                                           studentDateMap.set(key, item);
-                                        } else if (itemIsOverride === existingIsOverride) {
-                                          if (item.id?.startsWith('board-') && !existing.id?.startsWith('board-')) {
-                                            studentDateMap.set(key, item);
-                                          } else if (item.is_moved && !existing.is_moved) {
-                                            studentDateMap.set(key, item);
-                                          }
                                         }
                                       }
                                     });
