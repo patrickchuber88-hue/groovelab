@@ -3131,17 +3131,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 return false;
               };
 
-              // Check if actual occurrence exists on this date
+              const isSameScheduleOrStudent = (occ: any, sch: any) => {
+                if (!occ || !sch) return false;
+                if (occ.schedule_id && (occ.schedule_id === sch.id || occ.schedule_id === sch.db_id)) return true;
+                if (occ.id && (occ.id === sch.id || String(occ.id).includes(String(sch.id)))) return true;
+                return matchesTemplateStudent(occ, sch);
+              };
+
+              // Check if actual occurrence (from schedule_occurrences or pending changes) exists on this date
               const actual = occurrences?.find((occ: any) => 
-                (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) && 
+                isSameScheduleOrStudent(occ, sch) && 
                 occ.date === dateStr
               );
 
               // Check if occurrence for this schedule was moved away from dateStr
               const actualMovedAway = !actual && occurrences?.some((occ: any) =>
-                (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) &&
-                occ.original_date === dateStr &&
-                occ.date !== dateStr
+                isSameScheduleOrStudent(occ, sch) &&
+                ((occ.original_date && occ.original_date === dateStr && occ.date !== dateStr) ||
+                 (occ.date !== dateStr && occ.start_time && sch.time_slot && occ.start_time.substring(0, 5) !== sch.time_slot.substring(0, 5)))
               );
 
               if (actual) {
