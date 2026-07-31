@@ -4926,7 +4926,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                 </span>
                                 <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
                                   {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
-{/* Week Items List */}
+                                </span>
+                              </div>
+
+                              {/* Week Items List */}
                               {isWeekExpanded && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
                                   {(() => {
