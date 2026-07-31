@@ -215,7 +215,24 @@ export function ScheduleCalendarView({
   const schoolYearStart = new Date(schoolStartYear, 8, 1);  // Sept 1
   const schoolYearEnd   = new Date(schoolStartYear + 2, 6, 31); // July 31 of next school year
   const [baseOccurrences, setBaseOccurrences] = useState<ScheduleOccurrence[]>([]);
-  const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>({});
+  const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>(() => {
+    try {
+      const saved = localStorage.getItem('groovelab_pending_schedule_changes');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (Object.keys(pendingChanges).length > 0) {
+        localStorage.setItem('groovelab_pending_schedule_changes', JSON.stringify(pendingChanges));
+      } else {
+        localStorage.removeItem('groovelab_pending_schedule_changes');
+      }
+    } catch (e) {}
+  }, [pendingChanges]);
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const grabOffsetRef = useRef<number>(0);

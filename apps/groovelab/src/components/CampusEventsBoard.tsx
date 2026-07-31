@@ -2697,7 +2697,26 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
       }
 
-      let { data: occurrences } = await occurrenceQuery;
+      let { data: occurrencesData } = await occurrenceQuery;
+      let occurrences: any[] = occurrencesData || [];
+
+      // Merge pending changes from Stundenplan (localStorage)
+      try {
+        const pendingStr = localStorage.getItem('groovelab_pending_schedule_changes');
+        if (pendingStr) {
+          const pendingMap = JSON.parse(pendingStr);
+          Object.values(pendingMap).forEach((pOcc: any) => {
+            if (pOcc && pOcc.id) {
+              const idx = occurrences.findIndex((o: any) => o.id === pOcc.id);
+              if (idx >= 0) {
+                occurrences[idx] = { ...occurrences[idx], ...pOcc, is_moved: true, status: pOcc.status || 'pending_reschedule' };
+              } else {
+                occurrences.push({ ...pOcc, is_moved: true, status: pOcc.status || 'pending_reschedule' });
+              }
+            }
+          });
+        }
+      } catch (e) {}
 
       // Enrich occurrences with student details for name matching & display
       if (occurrences && occurrences.length > 0) {
@@ -4553,7 +4572,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           {icalActive && (
             <button
               onClick={() => setShowIcalModal(true)}
-              className="hover-scale pulse-calendar"
+              className="hover-scale"
               title="Unterrichtstermine abonnieren (iCal)"
               style={{
                 border: 'none',
@@ -4815,13 +4834,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                                     return groupedSlotItems.map(occ => {
                                       const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
-                                      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                                      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
                                       const isRescheduled = occ.status === 'pending_reschedule' || 
                                         occ.status === 'rescheduled_confirmed' ||
+                                        occ.status === 'rescheduled' ||
+                                        occ.is_moved === true ||
+                                        occ.is_rescheduled === true ||
                                         (occ.original_date && occ.original_date !== occ.date) ||
                                         (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
-                                        occ.is_moved === true ||
-                                        occ.is_rescheduled === true;
+                                        (occ.schedule && occ.schedule.time_slot && occ.start_time && occ.schedule.time_slot.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
+                                        (occ.original_time_slot && occ.start_time && occ.original_time_slot.substring(0, 5) !== occ.start_time.substring(0, 5));
                                         
                                       const hasMessages = activeChatOccIds.has(occ.id) ||
                                          (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
@@ -11271,15 +11293,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         @keyframes calendarPulse {
           0% {
             transform: scale(1);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+            box-shadow: 0 4px 12px rgba(52, 168, 83, 0.25);
           }
           50% {
-            transform: scale(1.08);
-            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.55);
+            transform: scale(1.03);
+            box-shadow: 0 6px 18px rgba(52, 168, 83, 0.4);
           }
           100% {
             transform: scale(1);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+            box-shadow: 0 4px 12px rgba(52, 168, 83, 0.25);
           }
         }
         .pulse-calendar {
