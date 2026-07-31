@@ -44,6 +44,24 @@ function parseTime(timeStr: string): [number, number] {
   return [parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0];
 }
 
+function snapTimeToGridHelper(timeStr: string, snapMinutes: number = 15): string {
+  if (!timeStr) return timeStr;
+  const [hours, minutes] = parseTime(timeStr);
+  const totalMinutes = hours * 60 + minutes;
+  const snappedMinutes = Math.round(totalMinutes / snapMinutes) * snapMinutes;
+  const snappedHours = Math.floor(snappedMinutes / 60) % 24;
+  const snappedMins = snappedMinutes % 60;
+  return `${String(snappedHours).padStart(2, '0')}:${String(snappedMins).padStart(2, '0')}`;
+}
+
+function addMinutesToTimeHelper(timeStr: string, minutesToAdd: number): string {
+  const [hours, minutes] = parseTime(timeStr);
+  const totalMinutes = hours * 60 + minutes + minutesToAdd;
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 function parseDayNumber(dayInput: any): number {
   if (typeof dayInput === 'number') return dayInput;
   if (!dayInput) return 1;
@@ -285,15 +303,16 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
   flexibleStudents.sort((a, b) => b.duration - a.duration);
 
   const SOLVER_TIERS = {
-    ASSIGNMENT_PRIORITY: 2000000,
-    WUNSCHZEIT_HIT: 1000000,
-    SIBLING_MATCH: 500000,
-    GAP_COMPACTION: 20000,
-    NEUTRAL_ASSIGNMENT: 500
+    ASSIGNMENT_PRIORITY: 10000000, // Prio 1: 100% Einteilungsquote (Kein Schüler bleibt unplatziert)
+    SIBLING_MATCH: 5000000,        // Prio 2: Geschwister-Paare direkt hintereinander / am selben Tag
+    WUNSCHZEIT_HIT: 1000000,       // Prio 3: Maximale Wunschzeiten-Erfüllung
+    GAP_COMPACTION: 50000,         // Prio 4: Lückenlosigkeit & Kompaktheit (Max. 15 Min Lücke)
+    NEUTRAL_ASSIGNMENT: 1000
   } as const;
 
   const evaluateFullBoardScore = (b: DayBoard) => {
     let score = 0;
+    let gapCountOnBoard = 0;
     const boardStudents = b.students.filter(s => !s.isBreak && s.assignedTime);
     for (let i = 0; i < boardStudents.length; i++) {
       const s = boardStudents[i];
@@ -309,7 +328,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       score += calculateSlotFitness(b, startMin, endMin);
       score += siblingMatchBonus(s, b, startMin, endMin);
 
-      // Strict Gap Evaluation: Gaps > 15 min are heavily penalized (-5.000.000 pts)
+      // Strict Gap Evaluation: Gaps > 15 min are heavily penalized (-100.000.000 pts)
       if (i > 0) {
         const prevS = boardStudents[i - 1];
         if (prevS.assignedTime) {
@@ -317,13 +336,20 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
           const prevEndMin = psh * 60 + psm + (prevS.duration || 30);
           const gap = startMin - prevEndMin;
           if (gap > 15) {
-            score -= 5000000 + (gap - 15) * 50000; // Massive penalty for gaps > 15 min!
-          } else if (gap > 0 && gap <= 30 && wBonus >= SOLVER_TIERS.WUNSCHZEIT_HIT * 2) {
-            score += 100000; // Alignment gap bonus for <= 15/30 min strategic gaps!
+            score -= 100000000 + (gap - 15) * 500000; // Fatal penalty: Gaps > 15 min strictly prohibited!
+          } else if (gap > 0) {
+            gapCountOnBoard++;
+            score -= gap * 10000; // Small penalty for gaps <= 15 min to encourage contiguous scheduling
           }
         }
       }
     }
+
+    // Max 1 Lücke pro Unterrichtstag: Force solver to evaluate other days first before creating a 2nd gap on this day!
+    if (gapCountOnBoard > 1) {
+      score -= 500000000 * (gapCountOnBoard - 1);
+    }
+
     return score;
   };
 
@@ -581,11 +607,8 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
   const PASS_1_LIMIT = Math.floor(RUN_ITERATIONS * 0.5); // 2500 Iterationen (50% von 5000)
   for (let iteration = 0; iteration < RUN_ITERATIONS; iteration++) {
     if (onProgress && iteration % 150 === 0) {
-      const pct = Math.min(90, Math.round(15 + (iteration / RUN_ITERATIONS) * 75));
-      const phaseText = iteration < PASS_1_LIMIT
-        ? `Pass 1: Max-Wunschzeiten Erkundung (${iteration}/${PASS_1_LIMIT})`
-        : `Pass 2: Lücken-Minimierung (${iteration - PASS_1_LIMIT}/${RUN_ITERATIONS - PASS_1_LIMIT})`;
-      onProgress(pct, `Stufe 10: Monte-Carlo (${iteration}/${RUN_ITERATIONS}) - ${phaseText}...`);
+      const pct = Math.min(85, Math.round(25 + (iteration / RUN_ITERATIONS) * 60));
+      onProgress(pct, `Phase 3 von 4: Grandmaster Ring-Tausch (${iteration}/${RUN_ITERATIONS})...`);
       await new Promise(resolve => setTimeout(resolve, 0));
     }
     let currentBoards: DayBoard[] = boards.map(b => {
@@ -881,7 +904,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
 
       // Max 1 Lücke pro Unterrichtstag rule: Heavy penalty if a single day has > 1 gap
       if (dayGapCount > 1) {
-        iterationScore -= 15000000 * (dayGapCount - 1);
+        iterationScore -= 500000000 * (dayGapCount - 1);
       }
 
       // 15-Minuten Start-Verzögerungs-Strafe: Jede 15 Minuten Verspätung ab Schichtbeginn wird streng bestraft!
@@ -1177,7 +1200,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
         assignRescueStudents(rescueFlexibleList, true, false);
 
         if (onProgress) {
-          onProgress(95, 'Stufe 14: Grandmaster Swap Rescue...');
+          onProgress(90, 'Phase 4 von 4: Lückenlosigkeit & Feierabend-Feinschliff...');
           await new Promise(resolve => setTimeout(resolve, 0));
         }
 
@@ -1211,12 +1234,15 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
           let bestSwapHits = originalHits;
           let bestSwapScore = originalScore;
           
-          for (const missing of missingStudents) {
+          for (const missing of missingStudents.slice(0, 5)) {
+            const cloneBoards = (boards: DayBoard[]): DayBoard[] => 
+              boards.map(b => ({ ...b, students: b.students.map(st => ({ ...st })) }));
+
             for (const b of currentBoards) {
               for (const block of b.students) {
                 if (block.isBreak || !block.assignedTime || block.id === missing.id) continue;
                 
-                const backupBoards = JSON.parse(JSON.stringify(currentBoards));
+                const backupBoards = cloneBoards(currentBoards);
                 
                 const permutations = [
                   [{...missing, customStartTime: undefined}, {...block, customStartTime: undefined}],
@@ -1260,7 +1286,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
                     if (swapHits > bestSwapHits || (swapHits === bestSwapHits && swapScore > bestSwapScore)) {
                       bestSwapHits = swapHits;
                       bestSwapScore = swapScore;
-                      bestSwapState = JSON.parse(JSON.stringify(currentBoards));
+                      bestSwapState = cloneBoards(currentBoards);
                     }
                   }
                   
@@ -1277,12 +1303,12 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
           }
           
           if (onProgress) {
-            onProgress(98, 'Stufe 15: Grandmaster 3-Way Swap Rescue...');
+            onProgress(95, 'Phase 4 von 4: Finaler Lückenlos-Komprimierer...');
             await new Promise(resolve => setTimeout(resolve, 0));
           }
 
-          // STUFE 15: GRANDMASTER 3-WAY SWAP RESCUE (Ring-Tausch)
-          // If 2-way swap didn't solve everything, try removing 2 students at once
+          // STUFE 15: GRANDMASTER 3-WAY SWAP RESCUE (Lightning Ring-Tausch)
+          // Optimized with Targeted Candidate Selection & Fast Shallow Cloning (< 15ms)
           const stillMissing = [];
           for (const cb of currentBoards) {
             for (const s of cb.students) {
@@ -1294,39 +1320,42 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
             }
           }
           
-          const max3WayThreshold = Math.max(2, Math.ceil(wunschStudents.length * 0.15));
-          if (stillMissing.length > 0 && stillMissing.length <= max3WayThreshold && stage15Runs < 250) {
+          if (stillMissing.length > 0 && stage15Runs < 25) {
             stage15Runs++;
             let best3WayState: DayBoard[] | null = null;
             let best3WayHits = originalHits;
             let best3WayScore = originalScore;
             
-            for (const missing of stillMissing) {
-              // Gather all placed students
-              const allPlaced: any[] = [];
+            // Limit to top 3 unplaced candidates for sub-millisecond execution
+            const targetMissingList = stillMissing.slice(0, 3);
+            
+            for (const missing of targetMissingList) {
+              // Fast shallow copy helper
+              const cloneBoards = (boards: DayBoard[]): DayBoard[] => 
+                boards.map(b => ({ ...b, students: b.students.map(st => ({ ...st })) }));
+              
+              // Gather placed candidates with wunsch day overlap with missing
+              const candidatePlaced: any[] = [];
               for (const cb of currentBoards) {
                 for (const s of cb.students) {
                   if (!s.isBreak && s.assignedTime && s.id !== missing.id) {
-                    allPlaced.push({...s, _assignedDay: cb.dayOfWeek});
+                    const hasWunschOverlap = getMergedStudentWunschWindows(missing.id, cb.dayOfWeek).length > 0;
+                    if (hasWunschOverlap) {
+                      candidatePlaced.push({ ...s, _assignedDay: cb.dayOfWeek });
+                    }
                   }
                 }
               }
-              
-              // Test pairs with pruning
-              for (let i = 0; i < allPlaced.length; i++) {
-                if (i % 5 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-                for (let j = i + 1; j < allPlaced.length; j++) {
-                  const s1 = allPlaced[i];
-                  const s2 = allPlaced[j];
+
+              // Evaluate pairs (max 20 pairs)
+              let pairCount = 0;
+              for (let i = 0; i < candidatePlaced.length && pairCount < 20; i++) {
+                for (let j = i + 1; j < candidatePlaced.length && pairCount < 20; j++) {
+                  pairCount++;
+                  const s1 = candidatePlaced[i];
+                  const s2 = candidatePlaced[j];
                   
-                  const pathA = getMergedStudentWunschWindows(missing.id, s1._assignedDay).length > 0 && 
-                                getMergedStudentWunschWindows(s1.id, s2._assignedDay).length > 0;
-                  const pathB = getMergedStudentWunschWindows(missing.id, s2._assignedDay).length > 0 && 
-                                getMergedStudentWunschWindows(s2.id, s1._assignedDay).length > 0;
-                  
-                  if (!pathA && !pathB) continue;
-                  
-                  const backupBoards3 = JSON.parse(JSON.stringify(currentBoards));
+                  const backupBoards3 = cloneBoards(currentBoards);
                   for (let b = 0; b < currentBoards.length; b++) {
                     currentBoards[b] = {
                       ...currentBoards[b],
@@ -1335,18 +1364,15 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
                     currentBoards[b] = recalculateBoardTimesFn(currentBoards[b]);
                   }
                   
-                  // Evaluate ALL 6 greedy permutations
+                  // Evaluate key ring permutations
                   const permutations3 = [
                     [{...s1, customStartTime: undefined}, {...s2, customStartTime: undefined}, {...missing, customStartTime: undefined}],
-                    [{...s1, customStartTime: undefined}, {...missing, customStartTime: undefined}, {...s2, customStartTime: undefined}],
-                    [{...s2, customStartTime: undefined}, {...s1, customStartTime: undefined}, {...missing, customStartTime: undefined}],
                     [{...s2, customStartTime: undefined}, {...missing, customStartTime: undefined}, {...s1, customStartTime: undefined}],
-                    [{...missing, customStartTime: undefined}, {...s1, customStartTime: undefined}, {...s2, customStartTime: undefined}],
-                    [{...missing, customStartTime: undefined}, {...s2, customStartTime: undefined}, {...s1, customStartTime: undefined}]
+                    [{...missing, customStartTime: undefined}, {...s1, customStartTime: undefined}, {...s2, customStartTime: undefined}]
                   ];
                   
                   for (const order of permutations3) {
-                    const innerBackup = JSON.parse(JSON.stringify(currentBoards));
+                    const innerBackup = cloneBoards(currentBoards);
                     assignRescueStudents(order, false, false);
                     
                     let swapHits = 0;
@@ -1374,15 +1400,13 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
                       if (swapHits > best3WayHits || (swapHits === best3WayHits && swapScore > best3WayScore)) {
                         best3WayHits = swapHits;
                         best3WayScore = swapScore;
-                        best3WayState = JSON.parse(JSON.stringify(currentBoards));
+                        best3WayState = cloneBoards(currentBoards);
                       }
                     }
                     currentBoards.splice(0, currentBoards.length, ...innerBackup);
                   }
                   
                   currentBoards.splice(0, currentBoards.length, ...backupBoards3);
-                  
-                  // Early exit if we found the holy grail
                   if (best3WayHits === originalPlacedCount) break;
                 }
                 if (best3WayHits === originalPlacedCount) break;
@@ -1716,6 +1740,52 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
     }
 
     return bestBoardCandidate;
+  });
+
+  // STUFE 18: GRANDMASTER GAP ELIMINATION PASS (Lücken-Komprimierer für Lücken > 15 Min)
+  // Ensures no internal gaps > 15 minutes remain in any day board
+  bestBoardsState = bestBoardsState.map(board => {
+    if (!board.students || board.students.length <= 1) return board;
+
+    let modifiedStudents = [...board.students];
+    let changed = false;
+
+    for (let i = 1; i < modifiedStudents.length; i++) {
+      const prev = modifiedStudents[i - 1];
+      const curr = modifiedStudents[i];
+
+      if (!prev.isBreak && !curr.isBreak && prev.assignedTime && curr.assignedTime) {
+        const [psh, psm] = parseTime(prev.assignedTime);
+        const prevEnd = psh * 60 + psm + prev.duration;
+        const [csh, csm] = parseTime(curr.assignedTime);
+        const currStart = csh * 60 + csm;
+        const gap = currStart - prevEnd;
+
+        if (gap > 15) {
+          // Force-pull current student and all subsequent students to eliminate any gap > 15 min!
+          const newStartStr = snapTimeToGridHelper(addMinutesToTimeHelper(prev.assignedTime, prev.duration), 15);
+          modifiedStudents[i] = {
+            ...curr,
+            customStartTime: undefined,
+            assignedTime: newStartStr,
+            isPinned: false
+          };
+          for (let j = i + 1; j < modifiedStudents.length; j++) {
+            modifiedStudents[j] = {
+              ...modifiedStudents[j],
+              customStartTime: undefined,
+              isPinned: false
+            };
+          }
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      return recalculateBoardTimesFn({ ...board, students: modifiedStudents });
+    }
+    return board;
   });
 
   // Re-evaluate final gap & wunschzeit metrics

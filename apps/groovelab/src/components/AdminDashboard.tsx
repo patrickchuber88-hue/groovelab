@@ -660,10 +660,9 @@ export function AdminDashboard({
       return;
     }
 
-    // 3. Fallback: select the first of the teacher's rooms if selectedCampusRoomId is empty or not in myRooms
-    const currentIsValid = myRooms.some((r: any) => r.id === selectedCampusRoomId);
+    const currentIsValid = selectedCampusRoomId === 'all' || myRooms.some((r: any) => r.id === selectedCampusRoomId);
     if (!selectedCampusRoomId || !currentIsValid) {
-      setSelectedCampusRoomId(myRooms[0].id);
+      setSelectedCampusRoomId(myRooms[0]?.id || 'all');
     }
     setHasInitializedRoom(true);
   }, [myRooms, schedules, campusBookings, userId, admin, hasInitializedRoom, selectedCampusRoomId]);
@@ -6617,10 +6616,12 @@ export function AdminDashboard({
       const opHours = schoolObj?.opening_hours || {};
       const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
       const DAYS_MAP = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const glRooms = rooms.filter((r: any) => r.name && r.name.toLowerCase().includes('groovelab'));
+
       for (let d = 1; d <= 7; d++) {
         const dayKey = dayKeys[d];
         const dayHours = opHours[dayKey];
-        if (dayHours && dayHours.active === true && dayHours.roomId) {
+        if (dayHours && dayHours.active === true) {
           const startTimeStr = dayHours.start || '14:00';
           const endTimeStr = dayHours.end || '18:00';
           // Calculate duration in minutes
@@ -6628,20 +6629,26 @@ export function AdminDashboard({
           const [ehStr, emStr] = endTimeStr.split(':');
           const duration = (parseInt(ehStr) * 60 + parseInt(emStr)) - (parseInt(shStr) * 60 + parseInt(smStr));
 
-          virtualGroovelabSchedules.push({
-            id: `virtual_groovelab_schedule_${d}`,
-            room_id: dayHours.roomId,
-            day_of_week: DAYS_MAP[d],
-            teacher_id: 'groovelab',
-            teacher: { first_name: 'Groove', last_name: 'Lab' },
-            teacher_name: 'Groove Lab',
-            purpose: 'GrooveLab Plattform',
-            time_slot: startTimeStr,
-            start_time: startTimeStr,
-            end_time: endTimeStr,
-            duration: duration,
-            status: 'approved',
-            is_approved: true
+          const targetRoomIds = glRooms.length > 0
+            ? glRooms.map((r: any) => r.id)
+            : (dayHours.roomId ? [dayHours.roomId] : ['groovelab']);
+
+          targetRoomIds.forEach((targetRoomId: string, idx: number) => {
+            virtualGroovelabSchedules.push({
+              id: `virtual_groovelab_schedule_${d}_${idx}`,
+              room_id: targetRoomId,
+              day_of_week: DAYS_MAP[d],
+              teacher_id: 'groovelab',
+              teacher: { first_name: 'Groove', last_name: 'Lab' },
+              teacher_name: 'Groove Lab',
+              purpose: 'GrooveLab Plattform',
+              time_slot: startTimeStr,
+              start_time: startTimeStr,
+              end_time: endTimeStr,
+              duration: duration,
+              status: 'approved',
+              is_approved: true
+            });
           });
         }
       }
@@ -6734,7 +6741,9 @@ export function AdminDashboard({
     });
 
     // Derived selected room to keep logic aligned
-    const selectedRoom = roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0];
+    const selectedRoom = selectedCampusRoomId === 'all'
+      ? { id: 'all', name: 'Alle Räume' }
+      : (roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0]);
 
     const getBookingsForSlot = (dayIdx: number, hourStr: string) => {
       if (!selectedRoom) return [];
@@ -6832,9 +6841,21 @@ export function AdminDashboard({
       }
       const activeLessons: LessonSlot[] = [];
 
+      const isRoomMatch = (targetRoomId?: string) => {
+        if (!selectedRoom || selectedRoom.id === 'all') return true;
+        if (targetRoomId && targetRoomId === selectedRoom.id) return true;
+        if (!targetRoomId || targetRoomId === 'groovelab') {
+          if (selectedRoom.name.toLowerCase().includes('groovelab')) return true;
+          const fallbackRoom = roomsToRender[0] || rooms[0];
+          if (fallbackRoom && fallbackRoom.id === selectedRoom.id) return true;
+        }
+        return false;
+      };
+
       // A. Regular weekly recurring schedules
       const daySchedules = (mergedSchedules || []).filter((s: any) => {
-        if (s.room_id !== selectedRoom.id) return false;
+        const sRoomId = s.room_id || s.roomId;
+        if (!isRoomMatch(sRoomId)) return false;
         const matchesDay = s.day_of_week === targetDay || 
                            s.day_of_week === targetDayInt || 
                            String(s.day_of_week) === String(targetDayInt);
@@ -6879,7 +6900,7 @@ export function AdminDashboard({
       // B. Rescheduled occurrences moved TO targetDateStr in selectedRoom
       (scheduleOccurrences || []).forEach((occ: any) => {
         const roomId = occ.schedules?.room_id || occ.room_id;
-        if (roomId !== selectedRoom.id) return;
+        if (!isRoomMatch(roomId)) return;
         if (occ.date !== targetDateStr) return;
         if (['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)) return;
 
@@ -6915,24 +6936,16 @@ export function AdminDashboard({
       const mergedBlocks: LessonSlot[] = [];
       Object.keys(teacherMap).forEach((tKey) => {
         const list = teacherMap[tKey];
+        if (!list || list.length === 0) return;
         list.sort((a, b) => a.startMin - b.startMin);
-
-        let current: LessonSlot | null = null;
-        list.forEach((item) => {
-          if (!current) {
-            current = { ...item };
-          } else {
-            if (item.startMin <= current.endMin + 5) {
-              current.endMin = Math.max(current.endMin, item.endMin);
-            } else {
-              mergedBlocks.push(current);
-              current = { ...item };
-            }
-          }
+        const minStart = list[0].startMin;
+        const maxEnd = Math.max(...list.map(item => item.endMin));
+        mergedBlocks.push({
+          teacherId: list[0].teacherId,
+          teacherName: list[0].teacherName,
+          startMin: minStart,
+          endMin: maxEnd
         });
-        if (current) {
-          mergedBlocks.push(current);
-        }
       });
 
       // Filter merged teaching blocks that intersect with hourStr slot
@@ -8730,6 +8743,10 @@ export function AdminDashboard({
                                   const colWidth = 100;
                                   const colLeft = 0;
                                   const isSchedule = b.isSchedule;
+                                  const isGroovelabBlock = b.teacherId === 'groovelab' || 
+                                                            (b.purpose && b.purpose.toLowerCase().includes('groovelab')) ||
+                                                            (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
+                                                            (selectedRoom && selectedRoom.name && selectedRoom.name.toLowerCase().includes('groovelab'));
 
                                   // Apple Calendar Color Schemes
                                   let bg = 'rgba(175, 82, 222, 0.08)';
