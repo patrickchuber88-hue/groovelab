@@ -7268,64 +7268,7 @@ return (
         );
       })()}
       
-      {/* Instant Action Confirmation Toast with Undo Button */}
-      {actionToast && (
-        <>
-          <style>{`
-            @keyframes floating-slide-down {
-              0% { transform: translateY(-30px); opacity: 0; }
-              100% { transform: translateY(0); opacity: 1; }
-            }
-          `}</style>
-          <div style={{
-            position: 'fixed',
-            top: '24px',
-            right: '24px',
-            background: 'rgba(29, 29, 31, 0.94)',
-            backdropFilter: 'blur(20px) saturate(190%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-            color: '#ffffff',
-            borderRadius: '16px',
-            padding: '10px 16px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            zIndex: 9999,
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            animation: 'floating-slide-down 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-          }}>
-            <span>{actionToast.message}</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (actionToast.undoFn) actionToast.undoFn();
-                setActionToast(null);
-              }}
-              style={{
-                background: 'rgba(255, 255, 255, 0.16)',
-                border: '1px solid rgba(255, 255, 255, 0.25)',
-                color: '#ffffff',
-                padding: '6px 12px',
-                borderRadius: '100px',
-                fontSize: '0.76rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.28)'}
-              onMouseOut={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'}
-            >
-              <RotateCcw size={12} />
-              <span>Rückgängig</span>
-            </button>
-          </div>
-        </>
-      )}
+
 
       {/* Floating Save Actions Bar at the bottom of the screen */}
       {Object.keys(pendingChanges).length > 0 && (
