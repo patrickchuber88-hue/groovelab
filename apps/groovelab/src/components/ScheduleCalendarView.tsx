@@ -3019,6 +3019,9 @@ export function ScheduleCalendarView({
     const sourceId = e.dataTransfer.getData('text/plain') || draggedId || (draggedOccRef.current ? draggedOccRef.current.id : '');
     if (!sourceId) return;
 
+    const sourceOcc = occurrences.find(o => o.id === sourceId);
+    const duration = sourceOcc?.duration || 30;
+
     const snapMinutes = (lastSnapMinutesRef.current && lastSnapMinutesRef.current.dateStr === targetDateStr)
       ? lastSnapMinutesRef.current.minutes
       : null;
