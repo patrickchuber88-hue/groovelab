@@ -219,6 +219,7 @@ export function ScheduleCalendarView({
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const grabOffsetRef = useRef<number>(0);
+  const lastSnapMinutesRef = useRef<{ dateStr: string; minutes: number } | null>(null);
   const draggedOccRef = useRef<ScheduleOccurrence | null>(null);
   const [cachedWeekSchedules, setCachedWeekSchedules] = useState<any[]>([]);
   const [cachedWeekEvents, setCachedWeekEvents] = useState<any[]>([]);
@@ -2750,6 +2751,7 @@ export function ScheduleCalendarView({
   const handleDragEnd = () => {
     setDraggedId(null);
     draggedOccRef.current = null;
+    lastSnapMinutesRef.current = null;
     cleanupDragGhost();
     stopAutoScroll();
     setSelectedStudentPrefs([]);
@@ -2765,18 +2767,21 @@ export function ScheduleCalendarView({
     e.dataTransfer.dropEffect = 'move';
     
     const rect = e.currentTarget.getBoundingClientRect();
-    const grabOffset = grabOffsetRef.current || 20;
+    const grabOffset = Math.min(Math.max(0, grabOffsetRef.current || 0), 40);
     const relativeY = e.clientY - rect.top - grabOffset;
     const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
     
     // Snap to grid
-    const snappedMinutes = Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes;
+    const snap = gridSnapMinutes || 15;
+    const snappedMinutes = Math.round(droppedMinutes / snap) * snap;
     
     // Clamp to valid values based on dragged occurrence duration
     const sourceOcc = draggedOccRef.current;
     if (!sourceOcc) return;
     const duration = sourceOcc.duration || 30;
     const clampedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, snappedMinutes));
+
+    lastSnapMinutesRef.current = { dateStr: targetDateStr, minutes: clampedMinutes };
     
     // Position/update the ghost DOM element directly
     const previewTopPx = (clampedMinutes - dayBaselineMinutes) * 2.5;
@@ -3014,15 +3019,21 @@ export function ScheduleCalendarView({
     const sourceId = e.dataTransfer.getData('text/plain') || draggedId || (draggedOccRef.current ? draggedOccRef.current.id : '');
     if (!sourceId) return;
 
-    const grabOffset = grabOffsetRef.current || 0;
+    const snapMinutes = (lastSnapMinutesRef.current && lastSnapMinutesRef.current.dateStr === targetDateStr)
+      ? lastSnapMinutesRef.current.minutes
+      : null;
 
-    const sourceOcc = occurrences.find(o => o.id === sourceId);
-    const duration = sourceOcc?.duration || 30;
+    let snappedMinutes = snapMinutes;
+    if (snappedMinutes === null || isNaN(snappedMinutes)) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const grabOffset = Math.min(Math.max(0, grabOffsetRef.current || 0), 40);
+      const relativeY = Math.max(0, e.clientY - rect.top - grabOffset);
+      const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
+      const snap = gridSnapMinutes || 15;
+      snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / snap) * snap));
+    }
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = Math.max(0, e.clientY - rect.top);
-    const droppedMinutes = dayBaselineMinutes + (relativeY / 2.5);
-    const snappedMinutes = Math.min(1440 - duration, Math.max(dayBaselineMinutes, Math.round(droppedMinutes / gridSnapMinutes) * gridSnapMinutes));
+    lastSnapMinutesRef.current = null;
 
     await executeRippleDownShift(sourceId, targetDateStr, snappedMinutes);
     setDraggedId(null);
@@ -5155,6 +5166,10 @@ export function ScheduleCalendarView({
                       <div 
                         id={`occ-${occ.id}`}
                         draggable={!( (currentUserRole === 'admin' || currentUserRole === 'secretary') && !hasSubmittedSchedule ) && !isBreak && !isVacant}
+                        onMouseDown={(e) => {
+                          const cardRect = e.currentTarget.getBoundingClientRect();
+                          grabOffsetRef.current = Math.max(0, Math.min(e.clientY - cardRect.top, 40));
+                        }}
                         onDragStart={(e) => handleDragStart(e, occ.id)}
                         onDragEnd={handleDragEnd}
                         onDragOver={handleDragOver}
