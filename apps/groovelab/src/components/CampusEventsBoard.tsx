@@ -2699,8 +2699,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (role === 'student') {
         scheduleQuery = scheduleQuery.eq('student_id', userId);
-      } else {
-        scheduleQuery = scheduleQuery.eq('teacher_id', userId);
+      } else if (effectiveSchoolId) {
+        scheduleQuery = scheduleQuery.or(`teacher_id.eq.${userId},school_id.eq.${effectiveSchoolId}`);
       }
 
       let { data: schedules } = await scheduleQuery;
@@ -2736,8 +2736,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (role === 'student') {
         occurrenceQuery = occurrenceQuery.eq('student_id', userId);
-      } else {
-        occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
+      } else if (effectiveSchoolId) {
+        occurrenceQuery = occurrenceQuery.or(`teacher_id.eq.${userId},school_id.eq.${effectiveSchoolId}`);
       }
 
       let { data: occurrencesData } = await occurrenceQuery;
@@ -3055,7 +3055,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (combinedSchedules.length > 0) {
         combinedSchedules.forEach((sch: any) => {
-          if (!sch.student_id) return; // Skip unassigned slots/breaks
+          if (!sch.student_id && !sch.student && !sch.first_name && !sch.name && !sch.board_student_id) return; // Skip unassigned slots/breaks
           const dayOfWeekNum = parseDayOfWeekNum(sch.day_of_week);
           const current = new Date(schoolYearStart);
           while (current <= schoolYearEnd) {
@@ -3181,7 +3181,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (occurrences) {
         occurrences.forEach((occ: any) => {
-          if (!occ.student_id) return; // Skip unassigned slots/breaks
+          if (!occ.student_id && !occ.student && !occ.first_name && !occ.name && !occ.board_student_id) return; // Skip unassigned slots/breaks
           if (!usedActualIds.has(occ.id)) {
             const occTime = occ.start_time || occ.time_slot || '14:00:00';
             allMergedOccurrences.push({
