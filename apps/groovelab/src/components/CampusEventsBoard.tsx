@@ -2743,8 +2743,25 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       let { data: occurrencesData } = await occurrenceQuery;
       let occurrences: any[] = occurrencesData || [];
 
-      // Merge pending changes from Stundenplan (localStorage)
+      // Merge active occurrences and pending changes directly from Stundenplan tab (localStorage)
       try {
+        const activeCalStr = localStorage.getItem(`groovelab_calendar_active_occurrences_${userId}`) || localStorage.getItem('groovelab_calendar_active_occurrences_latest');
+        if (activeCalStr) {
+          const activeCalList = JSON.parse(activeCalStr);
+          if (Array.isArray(activeCalList) && activeCalList.length > 0) {
+            activeCalList.forEach((aOcc: any) => {
+              if (aOcc && aOcc.id && !aOcc.id.startsWith('vacant-')) {
+                const idx = occurrences.findIndex((o: any) => o.id === aOcc.id);
+                if (idx >= 0) {
+                  occurrences[idx] = { ...occurrences[idx], ...aOcc };
+                } else {
+                  occurrences.push(aOcc);
+                }
+              }
+            });
+          }
+        }
+
         const pendingStr = localStorage.getItem('groovelab_pending_schedule_changes');
         if (pendingStr) {
           const pendingMap = JSON.parse(pendingStr);

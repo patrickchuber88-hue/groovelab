@@ -567,6 +567,17 @@ export function ScheduleCalendarView({
   }, [baseOccurrences, pendingChanges]);
 
   useEffect(() => {
+    if (occurrences && occurrences.length > 0) {
+      try {
+        const key = `groovelab_calendar_active_occurrences_${userId}`;
+        localStorage.setItem(key, JSON.stringify(occurrences));
+        localStorage.setItem('groovelab_calendar_active_occurrences_latest', JSON.stringify(occurrences));
+        window.dispatchEvent(new Event('groovelab_schedule_changed'));
+      } catch (e) {}
+    }
+  }, [occurrences, userId]);
+
+  useEffect(() => {
     setRoomDropdownOpen(false);
     if (!editOccState) {
       setFreeRooms([]);
