@@ -3151,10 +3151,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 occ.date === dateStr
               );
 
-              // Check if occurrence for this schedule was moved away from dateStr
+              // Check if occurrence for this schedule was moved away or modified on dateStr
               const actualMovedAway = !actual && occurrences?.some((occ: any) =>
                 isSameScheduleOrStudent(occ, sch) &&
-                ((occ.original_date && occ.original_date === dateStr && occ.date !== dateStr) ||
+                (occ.is_moved ||
+                 ['pending_reschedule', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick'].includes(occ.status) ||
+                 (occ.original_date && occ.original_date === dateStr && occ.date !== dateStr) ||
                  (occ.date !== dateStr && occ.start_time && sch.time_slot && occ.start_time.substring(0, 5) !== sch.time_slot.substring(0, 5)))
               );
 
@@ -4944,7 +4946,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     const studentDateMap = new Map<string, any>();
 
                                     const getStudentKey = (item: any) => {
-                                      const fn = (
+                                      let fn = (
                                         item.student?.first_name || 
                                         item.student_first_name || 
                                         item.first_name || 
@@ -4954,7 +4956,24 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         ''
                                       ).trim().toLowerCase().split(' ')[0];
 
-                                      if (fn && fn !== 'schüler' && fn !== 'pause') {
+                                      if (!fn || fn === 'schüler' || fn === 'pause' || fn === 'vacant') {
+                                        const idStr = String(item.id || item.student_id || item.board_student_id || '');
+                                        if (idStr) {
+                                          const cleaned = idStr
+                                            .replace(/^virtual-student-/i, '')
+                                            .replace(/^board-[^-]+-/i, '')
+                                            .replace(/^mock-[^-]+-/i, '')
+                                            .replace(/^sched-proj-[^-]+-/i, '')
+                                            .split('-')[0]
+                                            .trim()
+                                            .toLowerCase();
+                                          if (cleaned && cleaned.length >= 2 && !/^[0-9a-f]{8}$/i.test(cleaned) && cleaned !== 'student' && cleaned !== 'vacant') {
+                                            fn = cleaned;
+                                          }
+                                        }
+                                      }
+
+                                      if (fn && fn !== 'schüler' && fn !== 'pause' && fn !== 'vacant') {
                                         return fn;
                                       }
                                       const rawId = item.student_id || item.student?.id || item.board_student_id || item.id || '';
