@@ -3071,51 +3071,42 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   ) return true;
                 }
 
-                const occFirstRaw = (
-                  occ.student?.first_name || 
-                  occ.student_first_name || 
-                  occ.first_name || 
-                  occ.firstName || 
-                  occ.studentName || 
-                  occ.student_name || 
-                  occ.title || 
-                  occ.name || 
-                  ''
-                ).trim().toLowerCase();
-
-                const schFirstRaw = (
-                  sch.student?.first_name || 
-                  sch.first_name || 
-                  sch.firstName || 
-                  sch.name || 
-                  sch.title || 
-                  ''
-                ).trim().toLowerCase();
-
-                if (!occFirstRaw || !schFirstRaw) return false;
-
-                const occFirst = occFirstRaw.split(' ')[0];
-                const schFirst = schFirstRaw.split(' ')[0];
-
-                if (occFirst && schFirst && occFirst === schFirst) {
-                  const occLast = (
-                    occ.student?.last_name || 
-                    occ.student_last_name || 
-                    occ.last_name || 
-                    occ.lastName || 
-                    (occFirstRaw.split(' ').length > 1 ? occFirstRaw.split(' ').slice(1).join(' ') : '')
+                const extractFirstName = (obj: any, idVal: any) => {
+                  const directName = (
+                    obj.student?.first_name || 
+                    obj.student_first_name || 
+                    obj.first_name || 
+                    obj.firstName || 
+                    obj.studentName || 
+                    obj.student_name || 
+                    obj.title || 
+                    obj.name || 
+                    ''
                   ).trim().toLowerCase();
 
-                  const schLast = (
-                    sch.student?.last_name || 
-                    sch.last_name || 
-                    sch.lastName || 
-                    (schFirstRaw.split(' ').length > 1 ? schFirstRaw.split(' ').slice(1).join(' ') : '')
-                  ).trim().toLowerCase();
+                  if (directName) return directName.split(' ')[0];
 
-                  if (!occLast || !schLast || occLast === schLast || occLast.startsWith(schLast[0]) || schLast.startsWith(occLast[0])) {
-                    return true;
+                  const idStr = String(idVal || '');
+                  if (idStr) {
+                    const cleaned = idStr
+                      .replace(/^virtual-student-/i, '')
+                      .replace(/^board-[^-]+-/i, '')
+                      .replace(/^sched-proj-[^-]+-/i, '')
+                      .split('-')[0]
+                      .trim()
+                      .toLowerCase();
+                    if (cleaned && cleaned.length >= 2 && !/^[0-9a-f]{8}$/i.test(cleaned)) {
+                      return cleaned;
+                    }
                   }
+                  return '';
+                };
+
+                const occFirst = extractFirstName(occ, occStudentId);
+                const schFirst = extractFirstName(sch, schStudentId);
+
+                if (occFirst && schFirst && (occFirst === schFirst || occFirst.startsWith(schFirst) || schFirst.startsWith(occFirst))) {
+                  return true;
                 }
 
                 return false;
@@ -3135,7 +3126,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               );
 
               if (actual) {
-                if (actual.student_id && !usedActualIds.has(actual.id)) {
+                if (!usedActualIds.has(actual.id)) {
                   const actTime = actual.start_time || actual.time_slot || sch.start_time || sch.time_slot || '14:00:00';
                   allMergedOccurrences.push({
                     ...actual,
