@@ -3054,32 +3054,65 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
               const matchesTemplateStudent = (occ: any, sch: any) => {
                 if (!occ || !sch) return false;
-                const occStudentId = occ.student_id;
-                const schStudentId = sch.student_id || sch.studentId || sch.board_student_id || sch.id;
+                const occStudentId = occ.student_id || occ.student?.id || occ.student?.user_id || occ.user_id;
+                const schStudentId = sch.student_id || sch.studentId || sch.board_student_id || sch.student?.id || sch.student?.user_id || sch.id;
                 if (occStudentId && schStudentId) {
                   if (
-                    occStudentId === schStudentId ||
-                    occStudentId === sch.id ||
-                    occStudentId === sch.student_id ||
-                    occStudentId === sch.board_student_id ||
-                    occStudentId === sch.studentId ||
-                    occStudentId === sch.db_id ||
-                    occStudentId === sch.user_id ||
-                    sch.student_id === occ.student?.id ||
-                    sch.student_id === occ.student?.user_id ||
-                    sch.board_student_id === occ.student?.id
+                    String(occStudentId) === String(schStudentId) ||
+                    String(occStudentId) === String(sch.id) ||
+                    String(occStudentId) === String(sch.student_id) ||
+                    String(occStudentId) === String(sch.board_student_id) ||
+                    String(occStudentId) === String(sch.studentId) ||
+                    String(occStudentId) === String(sch.db_id) ||
+                    String(occStudentId) === String(sch.user_id) ||
+                    String(sch.student_id) === String(occ.student?.id) ||
+                    String(sch.student_id) === String(occ.student?.user_id) ||
+                    String(sch.board_student_id) === String(occ.student?.id)
                   ) return true;
                 }
 
-                const occFirstRaw = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
-                const schFirstRaw = (sch.student?.first_name || sch.first_name || sch.firstName || sch.name || '').trim().toLowerCase();
-                
+                const occFirstRaw = (
+                  occ.student?.first_name || 
+                  occ.student_first_name || 
+                  occ.first_name || 
+                  occ.firstName || 
+                  occ.studentName || 
+                  occ.student_name || 
+                  occ.title || 
+                  occ.name || 
+                  ''
+                ).trim().toLowerCase();
+
+                const schFirstRaw = (
+                  sch.student?.first_name || 
+                  sch.first_name || 
+                  sch.firstName || 
+                  sch.name || 
+                  sch.title || 
+                  ''
+                ).trim().toLowerCase();
+
+                if (!occFirstRaw || !schFirstRaw) return false;
+
                 const occFirst = occFirstRaw.split(' ')[0];
                 const schFirst = schFirstRaw.split(' ')[0];
 
                 if (occFirst && schFirst && occFirst === schFirst) {
-                  const occLast = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
-                  const schLast = (sch.student?.last_name || sch.last_name || sch.lastName || '').trim().toLowerCase();
+                  const occLast = (
+                    occ.student?.last_name || 
+                    occ.student_last_name || 
+                    occ.last_name || 
+                    occ.lastName || 
+                    (occFirstRaw.split(' ').length > 1 ? occFirstRaw.split(' ').slice(1).join(' ') : '')
+                  ).trim().toLowerCase();
+
+                  const schLast = (
+                    sch.student?.last_name || 
+                    sch.last_name || 
+                    sch.lastName || 
+                    (schFirstRaw.split(' ').length > 1 ? schFirstRaw.split(' ').slice(1).join(' ') : '')
+                  ).trim().toLowerCase();
+
                   if (!occLast || !schLast || occLast === schLast || occLast.startsWith(schLast[0]) || schLast.startsWith(occLast[0])) {
                     return true;
                   }
