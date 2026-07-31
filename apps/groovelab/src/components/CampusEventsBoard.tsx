@@ -4895,6 +4895,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       const isRescheduled = occ.status === 'pending_reschedule' || 
                                         occ.status === 'rescheduled_confirmed' ||
                                         occ.status === 'rescheduled' ||
+                                        occ.status === 'reschedule_requested' ||
+                                        occ.status === 'pending_student_approval' ||
+                                        occ.status === 'pending_approval' ||
+                                        occ.status === 'pending' ||
+                                        occ.student_acknowledged === false ||
+                                        occ.student_confirmed === false ||
                                         occ.is_moved === true ||
                                         occ.is_rescheduled === true ||
                                         (occ.original_date && occ.original_date !== occ.date) ||
