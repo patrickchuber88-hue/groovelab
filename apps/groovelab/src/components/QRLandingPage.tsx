@@ -4172,7 +4172,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const isPendingAdmin = Boolean(nextLesson.isPendingReview && !isShiftedPending && !isShiftedConfirmed);
 
       const isShifted = isShiftedPending || isShiftedConfirmed;
-      const borderColor = isShiftedPending ? '1.5px dashed #eab308' : isShiftedConfirmed ? '1.5px solid #eab308' : isPendingAdmin ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0');
+      const borderColor = isShiftedPending ? '1.5px dashed #eab308' : isPendingAdmin ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0');
       const cardBg = isShiftedPending ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : '#ffffff';
 
       return (
