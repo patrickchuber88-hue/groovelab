@@ -5019,6 +5019,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     const getItemPriorityScore = (o: any): number => {
                                       if (!o) return 0;
                                       const status = String(o.status || '').toLowerCase();
+                                      const idStr = String(o.id || '');
+                                      const schedIdStr = String(o.schedule_id || o.schedule?.id || '');
 
                                       // 1. Explicit cancellation has highest priority (must show red dashed card)
                                       if (['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(status)) {
@@ -5028,11 +5030,15 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       if (o.is_moved || ['pending_reschedule', 'rescheduled', 'rescheduled_confirmed', 'reschedule_requested'].includes(status)) {
                                         return 80;
                                       }
-                                      // 3. Saved DB occurrence or Designer board card
-                                      if (!o.is_virtual || String(o.id || '').startsWith('board-')) {
+                                      // 3. Designer board card (Stundenplan-Designer layout created by teacher)
+                                      if (idStr.includes('board-') || schedIdStr.includes('board-')) {
+                                        return 60;
+                                      }
+                                      // 4. Saved DB occurrence in schedule_occurrences
+                                      if (!o.is_virtual) {
                                         return 50;
                                       }
-                                      // 4. Virtual Stammtermin fallback
+                                      // 5. Virtual Stammtermin fallback from old schedules DB table
                                       return 10;
                                     };
 
@@ -5051,6 +5057,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                                         if (itemScore > existingScore) {
                                           studentDateMap.set(key, item);
+                                        } else if (itemScore === existingScore) {
+                                          const itemIdStr = String(item.id || '');
+                                          if (itemIdStr.includes('board-') || item.is_moved) {
+                                            studentDateMap.set(key, item);
+                                          }
                                         }
                                       }
                                     });
