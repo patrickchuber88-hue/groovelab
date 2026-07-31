@@ -4943,11 +4943,29 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     // 1. Deduplicate by student and date: ensure each student appears at most once per date, preferring actual overrides / moved / designer items
                                     const studentDateMap = new Map<string, any>();
 
-                                    wGroup.items.forEach(item => {
-                                      const stId = item.student_id || item.student?.id || (item.student?.first_name ? item.student.first_name.trim().toLowerCase() : null);
-                                      if (!stId) return;
+                                    const getStudentKey = (item: any) => {
+                                      const fn = (
+                                        item.student?.first_name || 
+                                        item.student_first_name || 
+                                        item.first_name || 
+                                        item.firstName || 
+                                        item.studentName || 
+                                        item.student_name || 
+                                        ''
+                                      ).trim().toLowerCase().split(' ')[0];
 
-                                      const key = `${item.date}_${stId}`;
+                                      if (fn && fn !== 'schüler' && fn !== 'pause') {
+                                        return fn;
+                                      }
+                                      const rawId = item.student_id || item.student?.id || item.board_student_id || item.id || '';
+                                      return String(rawId).trim().toLowerCase();
+                                    };
+
+                                    wGroup.items.forEach(item => {
+                                      const stKey = getStudentKey(item);
+                                      if (!stKey) return;
+
+                                      const key = `${item.date}_${stKey}`;
                                       const existing = studentDateMap.get(key);
 
                                       if (!existing) {
@@ -4960,6 +4978,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                           studentDateMap.set(key, item);
                                         } else if (itemIsOverride === existingIsOverride) {
                                           if (item.id?.startsWith('board-') && !existing.id?.startsWith('board-')) {
+                                            studentDateMap.set(key, item);
+                                          } else if (item.is_moved && !existing.is_moved) {
                                             studentDateMap.set(key, item);
                                           }
                                         }
