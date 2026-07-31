@@ -3071,21 +3071,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         });
       }
 
-      // Priority 2: Add any DB schedules for students not already in planned_boards
-      if (schedules && schedules.length > 0) {
+      // Priority 2: Only fall back to old DB schedules table if no teacherPlannedBoards exist at all
+      if ((!teacherPlannedBoards || teacherPlannedBoards.length === 0) && schedules && schedules.length > 0) {
         schedules.forEach((sch: any) => {
-          const sId = sch.student_id;
-          const sFn = (sch.student?.first_name || sch.first_name || '').trim().toLowerCase();
-
-          const isAlreadyInBoard = combinedSchedules.some(cs => {
-            if (sId && (cs.student_id === sId || cs.board_student_id === sId || cs.id === sId || cs.student?.id === sId)) return true;
-            const csFn = (cs.student?.first_name || cs.first_name || '').trim().toLowerCase();
-            if (sFn && csFn && (sFn === csFn || sFn.startsWith(csFn) || csFn.startsWith(sFn))) return true;
-            return false;
-          });
-
-          if (isAlreadyInBoard) return;
-
           combinedSchedules.push(sch);
         });
       }
