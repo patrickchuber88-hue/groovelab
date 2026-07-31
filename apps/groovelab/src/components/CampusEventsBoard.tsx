@@ -3080,8 +3080,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
               if (actual) {
                 if (actual.student_id && !usedActualIds.has(actual.id)) {
+                  const actTime = actual.start_time || actual.time_slot || sch.start_time || sch.time_slot || '14:00:00';
                   allMergedOccurrences.push({
                     ...actual,
+                    start_time: actTime,
                     schedule: sch
                   });
                   usedActualIds.add(actual.id);
@@ -3115,7 +3117,11 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         occurrences.forEach((occ: any) => {
           if (!occ.student_id) return; // Skip unassigned slots/breaks
           if (!usedActualIds.has(occ.id)) {
-            allMergedOccurrences.push(occ);
+            const occTime = occ.start_time || occ.time_slot || '14:00:00';
+            allMergedOccurrences.push({
+              ...occ,
+              start_time: occTime
+            });
           }
         });
       }
