@@ -3030,9 +3030,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   ) return true;
                 }
 
-                const occFirst = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
-                const schFirst = (sch.student?.first_name || sch.first_name || sch.firstName || sch.name || '').trim().toLowerCase();
+                const occFirstRaw = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
+                const schFirstRaw = (sch.student?.first_name || sch.first_name || sch.firstName || sch.name || '').trim().toLowerCase();
                 
+                const occFirst = occFirstRaw.split(' ')[0];
+                const schFirst = schFirstRaw.split(' ')[0];
+
                 if (occFirst && schFirst && occFirst === schFirst) {
                   const occLast = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
                   const schLast = (sch.student?.last_name || sch.last_name || sch.lastName || '').trim().toLowerCase();
@@ -3044,16 +3047,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 return false;
               };
 
-              // Check if override exists for this date or originally from this date
+              // Check if actual occurrence exists on this date
               const actual = occurrences?.find((occ: any) => 
                 (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) && 
-                (occ.original_date === dateStr || occ.date === dateStr)
+                occ.date === dateStr
               );
 
               // Check if occurrence for this schedule was moved away from dateStr
               const actualMovedAway = !actual && occurrences?.some((occ: any) =>
                 (matchesTemplateStudent(occ, sch) || (occ.schedule_id && occ.schedule_id === sch.id)) &&
-                occ.original_date === dateStr
+                occ.original_date === dateStr &&
+                occ.date !== dateStr
               );
 
               if (actual) {
