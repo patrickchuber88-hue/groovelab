@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   ChevronLeft, 
@@ -25,7 +25,8 @@ import {
   ShieldCheck,
   RotateCcw,
   MoreVertical,
-  ArrowLeftRight
+  ArrowLeftRight,
+  RefreshCw
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -237,6 +238,55 @@ export function ScheduleCalendarView({
   const [loading, setLoading] = useState(true);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const grabOffsetRef = useRef<number>(0);
+  const [currentRescheduleIndex, setCurrentRescheduleIndex] = useState(0);
+  const [allOpenReschedules, setAllOpenReschedules] = useState<ScheduleOccurrence[]>([]);
+  const fetchAllOpenReschedules = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument), schedules:schedules(room_id, room:rooms(name))')
+        .eq('teacher_id', userId)
+        .in('status', ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule'])
+        .order('date', { ascending: true });
+
+      const isCancelledLesson = (occ: any) => {
+        if (occ.isGap || occ.isBreak || occ.isVacant) return false;
+        return ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule'].includes(occ.status);
+      };
+
+      let dbOpen: ScheduleOccurrence[] = [];
+      if (data && !error) {
+        dbOpen = data.filter(occ => isCancelledLesson(occ));
+      }
+
+      // Also collect cancelled lessons from current visible baseOccurrences
+      const currentWeekOpen = baseOccurrences.filter(occ => isCancelledLesson(occ));
+
+      // Merge and deduplicate DB + currentWeek cancelled lessons
+      const seen = new Set<string>();
+      const merged: ScheduleOccurrence[] = [];
+
+      [...dbOpen, ...currentWeekOpen].forEach(occ => {
+        const key = occ.id || `${occ.date}_${occ.student_id || ''}_${occ.start_time}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(occ);
+        }
+      });
+
+      setAllOpenReschedules(merged);
+    } catch (err) {
+      console.warn('Error fetching all open reschedules:', err);
+    }
+  }, [userId, baseOccurrences]);
+
+  useEffect(() => {
+    fetchAllOpenReschedules();
+    const handleScheduleChange = () => fetchAllOpenReschedules();
+    window.addEventListener('groovelab_schedule_changed', handleScheduleChange);
+    return () => window.removeEventListener('groovelab_schedule_changed', handleScheduleChange);
+  }, [fetchAllOpenReschedules]);
   const lastSnapMinutesRef = useRef<{ dateStr: string; minutes: number } | null>(null);
   const draggedOccRef = useRef<ScheduleOccurrence | null>(null);
   const [cachedWeekSchedules, setCachedWeekSchedules] = useState<any[]>([]);
@@ -1247,9 +1297,6 @@ export function ScheduleCalendarView({
           if (parsedSchId && parsedSchId.length > 10) {
             insertData.schedule_id = parsedSchId;
           }
-          if (change.original_start_time) {
-            insertData.original_start_time = change.original_start_time;
-          }
           
           if (isGroupBlock && groupOccurrences && groupOccurrences.length > 0) {
             const groupInserts = groupOccurrences
@@ -2011,15 +2058,15 @@ export function ScheduleCalendarView({
                 }
               }
 
-              // Check if a saved database record already covers this student in this week range
+              // Check if a saved database record already covers this student on THIS SPECIFIC DATE
               let hasDbRecordForThisSlot = false;
               if (student.isGroup && student.groupStudents) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  student.groupStudents.some((gs: any) => gs.id === o.student_id)
+                  o.date === dateStr && student.groupStudents.some((gs: any) => gs.id === o.student_id)
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  matchesTemplateStudent(o, student)
+                  o.date === dateStr && matchesTemplateStudent(o, student)
                 );
               }
               
@@ -2066,13 +2113,13 @@ export function ScheduleCalendarView({
           const dateStr = toLocalYYYYMMDD(dayDate);
 
           const formattedTime = slot.time_slot ? (slot.time_slot.includes(':') && slot.time_slot.split(':').length === 2 ? `${slot.time_slot}:00` : slot.time_slot) : '00:00:00';
-          const alreadyExistsByTime = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5) && o.status !== 'cancelled') ||
+          const alreadyExistsByTime = fetchedData.some(o => o.date === dateStr && (o.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5)) ||
                                 projectedData.some(p => p.date === dateStr && (p.start_time || '').substring(0, 5) === (formattedTime || '').substring(0, 5));
           
           let alreadyExistsByStudent = false;
           if (slot.student_id) {
-            alreadyExistsByStudent = fetchedData.some(o => o.student_id === slot.student_id && o.status !== 'cancelled') ||
-                                     projectedData.some(p => p.student_id === slot.student_id);
+            alreadyExistsByStudent = fetchedData.some(o => o.student_id === slot.student_id && o.date === dateStr) ||
+                                     projectedData.some(p => p.student_id === slot.student_id && p.date === dateStr);
           }
 
           if (!alreadyExistsByTime && !alreadyExistsByStudent) {
@@ -2103,9 +2150,36 @@ export function ScheduleCalendarView({
         });
       }
 
-
-
       fetchedData = [...fetchedData, ...projectedData];
+
+      // Strict Deduplication: DB occurrences always take precedence over projected fallback cards
+      const seenKeys = new Set<string>();
+      const deduplicatedData: ScheduleOccurrence[] = [];
+
+      for (const occ of fetchedData) {
+        if (!occ || !occ.id) continue;
+        const isRealDb = !occ.id.startsWith('mock-') && !occ.id.startsWith('sched-proj-');
+        
+        if (isRealDb) {
+          const dbKey = `db_${occ.id}`;
+          if (!seenKeys.has(dbKey)) {
+            seenKeys.add(dbKey);
+            const studId = occ.student_id || occ.student?.first_name || 'unknown';
+            const slotKey = `slot_${studId}_${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+            seenKeys.add(slotKey);
+            deduplicatedData.push(occ);
+          }
+        } else {
+          const studId = occ.student_id || occ.student?.first_name || 'unknown';
+          const slotKey = `slot_${studId}_${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+          if (!seenKeys.has(slotKey)) {
+            seenKeys.add(slotKey);
+            deduplicatedData.push(occ);
+          }
+        }
+      }
+
+      fetchedData = deduplicatedData;
 
       // Filter out regular schedule items if they fall during holidays.
       // In the holidays, only Nachholtermine (rescheduled appointments from outside the holidays) are allowed.
@@ -2421,23 +2495,39 @@ export function ScheduleCalendarView({
   };
 
   const handleResetWeek = async () => {
+    const confirmReset = await showConfirm(
+      'Möchtest du wirklich alle Terminänderungen, Verschiebungen und Ausfälle für diese Kalenderwoche auf die Stammdaten des Stundenplans zurücksetzen?'
+    );
+    if (!confirmReset) return;
+
     const weekStartStr = toLocalYYYYMMDD(weekStart);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     const weekEndStr = toLocalYYYYMMDD(weekEnd);
 
+    // 1. Fully purge pending changes for this week and clear localStorage
     setPendingChanges(prev => {
       const next = { ...prev };
       Object.keys(next).forEach(id => {
         const occ = next[id];
+        if (!occ) {
+          delete next[id];
+          return;
+        }
         const origDate = occ.original_date || occ.date;
-        if ((origDate >= weekStartStr && origDate <= weekEndStr) || 
-            (occ.date >= weekStartStr && occ.date <= weekEndStr)) {
+        if (!origDate || (origDate >= weekStartStr && origDate <= weekEndStr) || (occ.date >= weekStartStr && occ.date <= weekEndStr)) {
           delete next[id];
         }
       });
       return next;
     });
+    
+    try {
+      localStorage.removeItem('groovelab_pending_schedule_changes');
+      localStorage.removeItem(`groovelab_calendar_active_occurrences_${userId}`);
+      localStorage.removeItem('groovelab_calendar_active_occurrences_latest');
+    } catch (e) {}
+
     setSwapLinks([]);
 
     try {
@@ -2474,23 +2564,28 @@ export function ScheduleCalendarView({
         }
       }
 
-      // Fetch occurrences about to be deleted so we can clean up their room bookings
-      const { data: occurrencesToDelete } = await supabase
-        .from('schedule_occurrences')
-        .select('date, start_time')
-        .eq('teacher_id', userId)
-        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
+      // Fetch occurrences about to be deleted so we can clean up their room bookings & DB records
+      const [resByDate, resByOrigDate] = await Promise.all([
+        supabase.from('schedule_occurrences').select('id, date, start_time').gte('date', weekStartStr).lte('date', weekEndStr),
+        supabase.from('schedule_occurrences').select('id, date, start_time').gte('original_date', weekStartStr).lte('original_date', weekEndStr)
+      ]);
 
-      const { error } = await supabase
-        .from('schedule_occurrences')
-        .delete()
-        .eq('teacher_id', userId)
-        .or(`and(date.gte.${weekStartStr},date.lte.${weekEndStr}),and(original_date.gte.${weekStartStr},original_date.lte.${weekEndStr})`);
-      
-      if (error) throw error;
+      const occurrencesToDelete = [
+        ...(resByDate.data || []),
+        ...(resByOrigDate.data || [])
+      ];
 
-      // Clean up corresponding room bookings
-      if (occurrencesToDelete && occurrencesToDelete.length > 0) {
+      const idsToDelete = Array.from(new Set(occurrencesToDelete.map(o => o.id)));
+
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .delete()
+          .in('id', idsToDelete);
+        
+        if (error) throw error;
+
+        // Clean up corresponding room bookings
         try {
           await Promise.all(
             occurrencesToDelete.map(occ =>
@@ -2508,6 +2603,8 @@ export function ScheduleCalendarView({
       }
 
       await loadOccurrences();
+      await fetchAllOpenReschedules();
+      await showAlert('Stammdaten für diese Kalenderwoche erfolgreich geladen & zurückgesetzt.');
     } catch (err) {
       console.error('Error resetting saved occurrences for week:', err);
       await showAlert('Fehler beim Zurücksetzen der gespeicherten Termine');
@@ -4029,6 +4126,110 @@ export function ScheduleCalendarView({
                   <option value={5}>5 Min</option>
                 </select>
               </div>
+
+              {/* Offene Ersatztermine Navigation Capsule - Visible in EVERY calendar week */}
+              {allOpenReschedules && allOpenReschedules.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#fef3c7',
+                  border: '1px solid #fcd34d',
+                  borderRadius: '10px',
+                  padding: '2px 8px',
+                  height: '32px',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 1px 4px rgba(245, 158, 11, 0.12)'
+                }}>
+                  <button
+                    onClick={() => {
+                      const targetOcc = allOpenReschedules[currentRescheduleIndex];
+                      if (targetOcc) {
+                        const occDate = new Date(targetOcc.date);
+                        if (!isNaN(occDate.getTime())) {
+                          setCurrentDate(occDate);
+                        }
+                        setEditOccState({
+                          id: targetOcc.id,
+                          date: targetOcc.date,
+                          start_time: targetOcc.start_time,
+                          room_id: targetOcc.schedules?.room_id || (targetOcc as any).room_id || null,
+                          duration: targetOcc.duration
+                        });
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#b45309',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                    title="Klicken, um diesen Ersatztermin zu bearbeiten"
+                  >
+                    <RefreshCw size={13} style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
+                      {allOpenReschedules.length} {allOpenReschedules.length === 1 ? 'offener Ersatztermin' : 'offene Ersatztermine'}
+                    </span>
+                    {allOpenReschedules[currentRescheduleIndex]?.student && (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', background: 'rgba(255,255,255,0.7)', padding: '1px 5px', borderRadius: '4px', marginLeft: '2px' }}>
+                        ({allOpenReschedules[currentRescheduleIndex].student.first_name})
+                      </span>
+                    )}
+                  </button>
+
+                  {allOpenReschedules.length > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px', borderLeft: '1px solid rgba(180, 83, 9, 0.2)', paddingLeft: '6px' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentRescheduleIndex(prev => (prev > 0 ? prev - 1 : allOpenReschedules.length - 1));
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #fcd34d',
+                          borderRadius: '5px',
+                          padding: '1px 3px',
+                          color: '#b45309',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Vorheriger Ersatztermin"
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#92400e', padding: '0 3px', fontFamily: 'monospace' }}>
+                        {currentRescheduleIndex + 1}/{allOpenReschedules.length}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentRescheduleIndex(prev => (prev < allOpenReschedules.length - 1 ? prev + 1 : 0));
+                        }}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #fcd34d',
+                          borderRadius: '5px',
+                          padding: '1px 3px',
+                          color: '#b45309',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        title="Nächster Ersatztermin"
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -4574,7 +4775,8 @@ export function ScheduleCalendarView({
                   const rect = e.currentTarget.getBoundingClientRect();
                   const clickY = e.clientY - rect.top;
                   const clickedMinutes = dayBaselineMinutes + (clickY / 2.5);
-                  const snappedMinutes = Math.round(clickedMinutes / gridSnapMinutes) * gridSnapMinutes;
+                  const snap = gridSnapMinutes || 15;
+                  const snappedMinutes = Math.round(clickedMinutes / snap) * snap;
                   const h = Math.floor(snappedMinutes / 60) % 24;
                   const m = snappedMinutes % 60;
                   const startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
@@ -4582,6 +4784,7 @@ export function ScheduleCalendarView({
                 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px`, cursor: 'pointer' }}
               >
+
                 {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
                 {draggedId && (() => {
                   const dayOfWeek = dayDate.getDay() === 0 ? 7 : dayDate.getDay();
@@ -4799,32 +5002,52 @@ export function ScheduleCalendarView({
 
                 {/* Real-time Apple Calendar style Snap Ghost Preview Card calculated directly in DOM */}
 
-                {markers.map(m => (
-                  <div 
-                    key={m.hour} 
-                    style={{ 
-                      position: 'absolute', 
-                      left: 0, 
-                      right: 0, 
-                      top: `${m.top}px`, 
-                      borderTop: '1px dashed rgba(0, 0, 0, 0.05)', 
-                      height: 0,
-                      pointerEvents: 'none',
-                      zIndex: 0
-                    }}
-                  >
-                    <span style={{ 
-                      position: 'absolute', 
-                      left: '4px', 
-                      top: '-7px', 
-                      fontSize: '0.6rem', 
-                      color: 'rgba(0,0,0,0.25)', 
-                      fontWeight: 600 
-                    }}>
-                      {String(m.hour).padStart(2, '0')}:00
-                    </span>
-                  </div>
-                ))}
+                {/* Ultra-subtle Apple Calendar Style Grid Guidelines */}
+                {(() => {
+                  const step = gridSnapMinutes || 15;
+                  const startMin = Math.ceil(dayBaselineMinutes / step) * step;
+                  const totalMin = 1440;
+                  const lines = [];
+
+                  for (let min = startMin; min < totalMin; min += step) {
+                    const isHour = min % 60 === 0;
+                    const isHalfHour = min % 30 === 0;
+                    const topPx = (min - dayBaselineMinutes) * 2.5;
+
+                    lines.push(
+                      <div 
+                        key={min} 
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: `${topPx}px`,
+                          borderTop: isHour 
+                            ? '1px solid rgba(0, 0, 0, 0.05)' 
+                            : (isHalfHour ? '1px solid rgba(0, 0, 0, 0.025)' : '1px solid rgba(0, 0, 0, 0.015)'),
+                          height: 0,
+                          pointerEvents: 'none',
+                          zIndex: 0
+                        }}
+                      >
+                        {isHour && (
+                          <span style={{ 
+                            position: 'absolute', 
+                            left: '4px', 
+                            top: '-7px', 
+                            fontSize: '0.62rem', 
+                            color: '#94a3b8', 
+                            fontWeight: 700,
+                            userSelect: 'none'
+                          }}>
+                            {String(Math.floor(min / 60) % 24).padStart(2, '0')}:00
+                          </span>
+                        )}
+                      </div>
+                    );
+                  }
+                  return lines;
+                })()}
 
                 {/* Google Calendar Real-Time "Red Jet-Line" Current Time Indicator */}
                 {(() => {
@@ -5046,37 +5269,70 @@ export function ScheduleCalendarView({
                   const isRoomOverridden = occ.template_room_id !== undefined && occ.template_room_id !== (occ.schedules?.room_id || null);
                   const isCancelled = ['cancelled', 'canceled_by_student'].includes(occ.status);
 
-                  const studentSchedule = cachedWeekSchedules.find((s: any) => s.student_id === occ.student_id && s.teacher_id === userId);
-                  
-                  let boardDayOfWeek: number | null = null;
-                  let boardAssignedTime: string | null = null;
-                  if (!studentSchedule && boards) {
+                  let masterDayOfWeek: number | null = null;
+                  let masterAssignedTime: string | null = null;
+                  const occFn = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
+                  const occLn = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
+
+                  // 1. Check current Stundenplan-Designer boards template FIRST (primary UI master)
+                  if (boards && boards.length > 0) {
                     for (const board of boards) {
-                      const studentInBoard = board.students.find((s: any) => s.studentId === occ.student_id || s.id === occ.student_id);
+                      const studentInBoard = board.students?.find((s: any) => {
+                        if (occ.student_id) {
+                          if (
+                            s.id === occ.student_id ||
+                            s.studentId === occ.student_id ||
+                            s.student_id === occ.student_id ||
+                            s.user_id === occ.student_id ||
+                            s.db_id === occ.student_id
+                          ) return true;
+                        }
+                        const sFn = (s.first_name || s.firstName || '').trim().toLowerCase();
+                        const sLn = (s.last_name || s.lastName || '').trim().toLowerCase();
+                        if (sFn && occFn && sFn === occFn) {
+                          if (!sLn || !occLn || sLn === occLn || sLn.startsWith(occLn[0]) || occLn.startsWith(sLn[0])) {
+                            return true;
+                          }
+                        }
+                        return false;
+                      });
                       if (studentInBoard) {
-                        boardDayOfWeek = board.dayOfWeek;
-                        boardAssignedTime = studentInBoard.assignedTime;
+                        masterDayOfWeek = board.dayOfWeek;
+                        masterAssignedTime = studentInBoard.assignedTime;
                         break;
                       }
                     }
                   }
 
+                  // 2. Fallback to database schedules table if not in boards
+                  const studentSchedule = cachedWeekSchedules.find((s: any) => s.student_id === occ.student_id && s.teacher_id === userId);
+                  if (masterDayOfWeek === null && studentSchedule) {
+                    masterDayOfWeek = studentSchedule.day_of_week;
+                    masterAssignedTime = studentSchedule.time_slot;
+                  }
+
                   const occDateObj = new Date(occ.date + 'T00:00:00');
                   const occDayOfWeek = occDateObj.getDay() || 7;
+
+                  const isAtMasterSlot = Boolean(
+                    masterDayOfWeek !== null && 
+                    masterAssignedTime !== null && 
+                    masterDayOfWeek === occDayOfWeek && 
+                    masterAssignedTime.substring(0, 5) === occ.start_time.substring(0, 5)
+                  );
                   
                   let isTimeOrDayMoved = false;
-                  if (studentSchedule) {
-                    isTimeOrDayMoved = studentSchedule.day_of_week !== occDayOfWeek ||
-                                       studentSchedule.time_slot?.substring(0, 5) !== occ.start_time.substring(0, 5);
-                  } else if (boardDayOfWeek !== null && boardAssignedTime !== null) {
-                    isTimeOrDayMoved = boardDayOfWeek !== occDayOfWeek ||
-                                       boardAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5);
+                  if (isAtMasterSlot) {
+                    isTimeOrDayMoved = false;
+                  } else if (masterDayOfWeek !== null && masterAssignedTime !== null) {
+                    isTimeOrDayMoved = masterDayOfWeek !== occDayOfWeek ||
+                                       masterAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5);
                   } else {
                     isTimeOrDayMoved = (occ.original_date && occ.original_date !== occ.date) ||
                                        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) || false;
                   }
 
-                  const isRescheduled = !isBreak && !isVacant && !isSick && (
+                  const isRescheduled = !isBreak && !isVacant && !isSick && !isAtMasterSlot && (
                     occ.status === 'pending_reschedule' || 
                     occ.status === 'rescheduled_confirmed' ||
                     isTimeOrDayMoved ||
@@ -5088,7 +5344,7 @@ export function ScheduleCalendarView({
  
                   const isConfirmedReschedule = isRescheduled && (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true);
 
-                  const isWaiting = !isBreak && !isVacant && !isSick && !isConfirmedReschedule && (
+                  const isWaiting = !isBreak && !isVacant && !isSick && !isAtMasterSlot && !isConfirmedReschedule && (
                     isGroup 
                       ? occurrencesInGroup.some(o => o.status === 'pending_reschedule' || (o.student_acknowledged === false && Boolean(o.original_date)))
                       : (occ.status === 'pending_reschedule' || isTimeOrDayMoved || (occ.student_acknowledged === false && Boolean(occ.original_date)))
@@ -5326,8 +5582,8 @@ export function ScheduleCalendarView({
                           filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
                           position: 'absolute',
                           top: `${topPx}px`,
-                          left: `calc(${layout?.left || 0}% + 8px)`,
-                          width: `calc(${layout?.width || 100}% - 16px)`,
+                          left: (isCancelled || isSick) ? 'calc(0% + 8px)' : `calc(${layout?.left || 0}% + 8px)`,
+                          width: (isCancelled || isSick) ? 'calc(100% - 16px)' : `calc(${layout?.width || 100}% - 16px)`,
                           boxShadow: (isGroupModeActive && selectedForGroup.includes(occ.id))
                             ? '0 0 12px rgba(37, 99, 235, 0.45)'
                             : '0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.01)',
@@ -5338,7 +5594,8 @@ export function ScheduleCalendarView({
                           WebkitTouchCallout: 'none',
                           touchAction: 'manipulation',
                           visibility: isVacant ? (isGap ? 'visible' : 'hidden') : 'visible',
-                          height: `${(occ.duration || 30) * 2.5 - 8}px`,
+                          height: `${Math.max(28, (occ.duration || 30) * 2.5 - 8)}px`,
+                          minHeight: '28px',
                           flexShrink: 0,
                           boxSizing: 'border-box',
                           overflow: 'hidden'
@@ -5439,31 +5696,43 @@ export function ScheduleCalendarView({
                                     }
                                   </span>
 
-                                  {(isRescheduled || isResetPending) && (
-                                    <span 
-                                      className={isWaiting ? 'pulse-yellow-indicator' : ''}
-                                      onMouseEnter={(e) => {
-                                        onMouseEnterHelper(e, isResetPending, occ);
-                                      }}
-                                      onMouseMove={(e) => {
-                                        e.stopPropagation();
-                                        setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.stopPropagation();
-                                        setHoveredTooltip(null);
-                                      }}
-                                      style={{ 
-                                        width: '6px', 
-                                        height: '6px', 
-                                        borderRadius: '50%', 
-                                        background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'), 
-                                        boxShadow: 'none',
-                                        display: 'inline-block',
-                                        flexShrink: 0
-                                      }} 
-                                    />
-                                  )}
+                                  {(isRescheduled || isResetPending) && (() => {
+                                     const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
+                                     return (
+                                       <span 
+                                         onMouseEnter={(e) => {
+                                           onMouseEnterHelper(e, isResetPending, occ);
+                                         }}
+                                         onMouseMove={(e) => {
+                                           e.stopPropagation();
+                                           setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                         }}
+                                         onMouseLeave={(e) => {
+                                           e.stopPropagation();
+                                           setHoveredTooltip(null);
+                                         }}
+                                         style={{ 
+                                           fontSize: '0.58rem',
+                                           fontWeight: 800,
+                                           padding: '1px 5px',
+                                           borderRadius: '4px',
+                                           display: 'inline-flex',
+                                           alignItems: 'center',
+                                           gap: '2px',
+                                           textTransform: 'uppercase',
+                                           letterSpacing: '0.02em',
+                                           background: isConfirmed ? '#e6f4ea' : '#fef3c7',
+                                           color: isConfirmed ? '#137333' : '#b45309',
+                                           border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                                           flexShrink: 0,
+                                           marginLeft: '4px'
+                                         }} 
+                                       >
+                                         <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
+                                       </span>
+                                     );
+                                   })()}
+
                                 </div>
 
                                 {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
@@ -5527,7 +5796,7 @@ export function ScheduleCalendarView({
                             }
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <span style={{ 
                                       fontSize: '0.7rem', 
@@ -5542,6 +5811,7 @@ export function ScheduleCalendarView({
                                     }}>
                                       <input
                                         type="time"
+                                        step={gridSnapMinutes * 60}
                                         value={occ.start_time.substring(0, 5)}
                                         onClick={(e) => e.stopPropagation()}
                                         onChange={async (e) => {
@@ -5581,6 +5851,9 @@ export function ScheduleCalendarView({
                                     {isGroup && (
                                       <Users size={12} style={{ color: finalColors.text, opacity: 0.7 }} />
                                     )}
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
                                     {isSick && (
                                       <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
                                         Entfällt
@@ -5597,7 +5870,7 @@ export function ScheduleCalendarView({
                                       </span>
                                     )}
                                     {isCancelled && !isExcused && !isUnexcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                                         Abgesagt
                                         {isCancelledAck && (
                                           <span 
@@ -5612,87 +5885,83 @@ export function ScheduleCalendarView({
                                         📝 Protokoll
                                       </span>
                                     )}
-                                    {(isRescheduled || isResetPending) && (
-                                     <span 
-                                       className={isWaiting ? 'pulse-yellow-indicator' : ''}
-                                       onMouseEnter={(e) => {
-                                         onMouseEnterHelper(e, isResetPending, occ);
-                                       }}
-                                       onMouseMove={(e) => {
-                                         e.stopPropagation();
-                                         setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                       }}
-                                       onMouseLeave={(e) => {
-                                         e.stopPropagation();
-                                         setHoveredTooltip(null);
-                                       }}
-                                       style={{ 
-                                         display: 'inline-flex',
-                                         alignItems: 'center',
-                                         gap: '3px',
-                                         flexShrink: 0
-                                       }} 
-                                     >
-                                       <ArrowLeftRight 
-                                         size={11} 
+                                    {(isRescheduled || isResetPending) && (() => {
+                                     const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
+                                     return (
+                                       <span 
+                                         onMouseEnter={(e) => {
+                                           onMouseEnterHelper(e, isResetPending, occ);
+                                         }}
+                                         onMouseMove={(e) => {
+                                           e.stopPropagation();
+                                           setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                         }}
+                                         onMouseLeave={(e) => {
+                                           e.stopPropagation();
+                                           setHoveredTooltip(null);
+                                         }}
                                          style={{ 
-                                           color: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'),
+                                           fontSize: '0.58rem',
+                                           fontWeight: 800,
+                                           padding: '1px 5px',
+                                           borderRadius: '4px',
+                                           display: 'inline-flex',
+                                           alignItems: 'center',
+                                           gap: '2px',
+                                           textTransform: 'uppercase',
+                                           letterSpacing: '0.02em',
+                                           background: isConfirmed ? '#e6f4ea' : '#fef3c7',
+                                           color: isConfirmed ? '#137333' : '#b45309',
+                                           border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
                                            flexShrink: 0
                                          }} 
-                                       />
-                                       <span style={{ 
-                                         width: '6px', 
-                                         height: '6px', 
-                                         borderRadius: '50%', 
-                                         background: isResetPending ? '#f59e0b' : ((occ.status === 'rescheduled_confirmed' || occ.student_acknowledged) ? '#34a853' : '#f59e0b'), 
-                                         boxShadow: 'none',
-                                         display: 'inline-block',
-                                         flexShrink: 0
-                                       }} />
-                                     </span>
-                                    )}
+                                       >
+                                         <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
+                                       </span>
+                                     );
+                                   })()}
+                                   
+                                   {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                     <button 
+                                       onClick={async (e) => {
+                                         e.stopPropagation();
+                                         if (isBreak) {
+                                           handleCancelBreak(e, occ);
+                                         } else {
+                                           if (isGroup) {
+                                             if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                               const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                                               occurrencesInGroup.forEach(go => {
+                                                 updatesMap[go.id] = { status: 'cancelled' };
+                                               });
+                                               updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
+                                             }
+                                           } else {
+                                             handleCancel(e, occ.id);
+                                           }
+                                         }
+                                       }}
+                                       title={isBreak ? "Pause löschen" : "Termin absagen"}
+                                       style={{ 
+                                         background: 'transparent', 
+                                         border: 'none', 
+                                         cursor: 'pointer', 
+                                         color: finalColors.text, 
+                                         opacity: 0.5, 
+                                         padding: '2px', 
+                                         display: 'flex', 
+                                         alignItems: 'center', 
+                                         justifyContent: 'center', 
+                                         borderRadius: '4px', 
+                                         transition: 'all 0.1s' 
+                                       }}
+                                       onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                       onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                     >
+                                       <X size={12} strokeWidth={2.5} />
+                                     </button>
+                                   )}
                                   </div>
-                                  
-                                  {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
-                                    <button 
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        if (isBreak) {
-                                          handleCancelBreak(e, occ);
-                                        } else {
-                                          if (isGroup) {
-                                            if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
-                                              const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                              occurrencesInGroup.forEach(go => {
-                                                updatesMap[go.id] = { status: 'cancelled' };
-                                              });
-                                              updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
-                                            }
-                                          } else {
-                                            handleCancel(e, occ.id);
-                                          }
-                                        }
-                                      }}
-                                      title={isBreak ? "Pause löschen" : "Termin absagen"}
-                                      style={{ 
-                                        background: 'transparent', 
-                                        border: 'none', 
-                                        cursor: 'pointer', 
-                                        color: finalColors.text, 
-                                        opacity: 0.5, 
-                                        padding: '2px', 
-                                        display: 'flex', 
-                                        alignItems: 'center', 
-                                        justifyContent: 'center', 
-                                        borderRadius: '4px', 
-                                        transition: 'all 0.1s' 
-                                      }}
-                                      onMouseOver={e => e.currentTarget.style.opacity = '1'}
-                                      onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
-                                    >
-                                      <X size={12} strokeWidth={2.5} />
-                                    </button>
-                                  )}
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '2px' }}>
@@ -6141,6 +6410,7 @@ return (
         const isCancelled = occ?.status && ['cancelled', 'canceled_by_student'].includes(occ.status);
         const canDiscard = isMoved || isCancelled;
         const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim() : 'Schüler';
+        const isPastDate = editOccState?.date ? new Date(editOccState.date) < new Date(new Date().setHours(0,0,0,0)) : false;
         
         const modalTitle = occ?.student_id 
           ? (isGruppenunterrichtOcc 
@@ -6689,7 +6959,7 @@ return (
                       </div>
                     )}
 
-                    {/* Explicit Cancel Lesson Section */}
+                    {/* Explicit Cancel / Ersatztermin Lesson Section */}
                     {!isCancelled && (
                       <div style={{ marginBottom: '16px' }}>
                         <button 
@@ -6701,11 +6971,11 @@ return (
                             width: '100%',
                             padding: '10px 12px', 
                             borderRadius: '10px', 
-                            border: '1px solid rgba(255, 59, 48, 0.2)', 
-                            background: 'rgba(255, 59, 48, 0.05)', 
-                            color: '#ff3b30', 
+                            border: '1px solid rgba(245, 158, 11, 0.3)', 
+                            background: 'rgba(245, 158, 11, 0.08)', 
+                            color: '#d97706', 
                             fontSize: '0.82rem', 
-                            fontWeight: 700, 
+                            fontWeight: 800, 
                             cursor: 'pointer', 
                             display: 'flex',
                             alignItems: 'center',
@@ -6715,8 +6985,8 @@ return (
                           }}
                           className="hover-scale-mini"
                         >
-                          <Trash2 size={15} />
-                          Termin absagen
+                          <RefreshCw size={15} />
+                          {isPastDate ? 'Ausfall melden & Ersatztermin anbieten' : 'Termin ausfallen lassen (Ersatztermin offen)'}
                         </button>
                       </div>
                     )}

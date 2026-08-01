@@ -1417,6 +1417,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         event: 'homework-changed',
         payload: { studentId: student.id }
       });
+      setTimeout(() => supabase.removeChannel(channel), 1000);
     } catch (e) {
       console.warn('Realtime broadcast error:', e);
     }

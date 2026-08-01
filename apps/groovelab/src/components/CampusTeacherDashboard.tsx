@@ -25,7 +25,9 @@ import {
   EyeOff,
   TrendingUp,
   Bell,
-  Flame
+  Flame,
+  ChevronLeft,
+  RefreshCw
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 
@@ -88,6 +90,14 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
   const [studentAvailabilities, setStudentAvailabilities] = useState<any[]>([]);
   const [draggedScheduleId, setDraggedScheduleId] = useState<string | null>(null);
   const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
+
+  // Ersatztermin Modal & Navigation State
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [rescheduleTargetSched, setRescheduleTargetSched] = useState<any>(null);
+  const [rescheduleProposedDate, setRescheduleProposedDate] = useState('');
+  const [rescheduleProposedTime, setRescheduleProposedTime] = useState('15:00');
+  const [rescheduleNote, setRescheduleNote] = useState('');
+  const [currentRescheduleIndex, setCurrentRescheduleIndex] = useState(0);
 
   // Board 4: Krankheits-Bypass
   const [sickStartDate, setSickStartDate] = useState('');
@@ -850,6 +860,66 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     return [...todaySchedules].sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
   }, [todaySchedules]);
 
+  // Open Ersatztermine list (all canceled or pending reschedule items needing a replacement)
+  const openReschedules = useMemo(() => {
+    return rawWeekSchedules.filter(s => 
+      s.student && (
+        s.status === 'canceled_by_student' || 
+        s.status === 'teacher_sick' || 
+        s.status === 'canceled_by_teacher_sick' || 
+        s.status === 'cancelled' ||
+        s.status === 'open_reschedule' ||
+        s.status === 'pending_reschedule'
+      )
+    );
+  }, [rawWeekSchedules]);
+
+  const handleOpenProposeReschedule = (sched: any) => {
+    setRescheduleTargetSched(sched);
+    const tom = new Date();
+    tom.setDate(tom.getDate() + 1);
+    const tomStr = `${tom.getFullYear()}-${String(tom.getMonth() + 1).padStart(2, '0')}-${String(tom.getDate()).padStart(2, '0')}`;
+    setRescheduleProposedDate(tomStr);
+    setRescheduleProposedTime(sched.time_slot ? sched.time_slot.substring(0, 5) : '15:00');
+    setRescheduleNote('');
+    setRescheduleModalOpen(true);
+  };
+
+  const handleSubmitRescheduleProposal = async () => {
+    if (!rescheduleTargetSched || !rescheduleProposedDate || !rescheduleProposedTime) {
+      alert('Bitte wähle ein Datum und eine Uhrzeit für den Ersatztermin aus.');
+      return;
+    }
+    try {
+      const scheduleId = rescheduleTargetSched.id || rescheduleTargetSched.schedule_id;
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: 'pending_reschedule' })
+        .eq('id', scheduleId);
+
+      if (error) throw error;
+
+      const studentId = rescheduleTargetSched.student_id || rescheduleTargetSched.student?.id;
+      if (studentId) {
+        await supabase.from('system_alerts').insert({
+          school_id: teacher?.school_id || null,
+          teacher_id: userId,
+          type: 'Ersatztermin vorgeschlagen',
+          message: `🔄 Dein Coach ${teacher?.first_name || ''} hat dir einen Ersatztermin am ${new Date(rescheduleProposedDate).toLocaleDateString('de-DE')} um ${rescheduleProposedTime} Uhr vorgeschlagen.`,
+          created_at: new Date().toISOString(),
+          resolved: false
+        });
+      }
+
+      await refreshAllData(teacher.school_id, teacher.id);
+      setRescheduleModalOpen(false);
+      alert('Ersatztermin erfolgreich vorgeschlagen! Der Schüler/die Eltern wurden benachrichtigt.');
+    } catch (err: any) {
+      console.error('Error proposing reschedule:', err);
+      alert('Fehler beim Vorschlagen des Ersatztermins: ' + (err.message || err));
+    }
+  };
+
   // Check if slot is currently active based on current system clock
   const isSlotActive = (timeSlot: string) => {
     if (!timeSlot || !currentTimeStr) return false;
@@ -893,6 +963,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
         event: 'homework-changed',
         payload: { studentId }
       });
+      setTimeout(() => supabase.removeChannel(channel), 1000);
     } catch (e) {
       console.warn('Realtime broadcast error:', e);
     }
@@ -2138,8 +2209,6 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
               </div>
 
             </div>
-
-            {/* Terminänderungen & Alerts Widget */}
             {notifications.length > 0 && (
               <div style={{ background: 'rgba(30, 41, 59, 0.4)', borderRadius: '24px', padding: '20px', border: '1px solid rgba(255, 255, 255, 0.05)', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2288,17 +2357,33 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
  
                           <div className="flex flex-col items-end gap-1.5">
                             {isSick ? (
-                              <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-red-500/10 text-red-400 border border-red-500/20 rounded-md">
-                                Ausfall (Krankheit)
-                              </span>
+                              <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-red-500/10 text-red-400 border border-red-500/20 rounded-md">
+                                  Ausfall (Krankheit)
+                                </span>
+                                <button
+                                  onClick={() => handleOpenProposeReschedule(sched)}
+                                  className="px-2 py-1 text-[9px] font-black uppercase rounded bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1"
+                                >
+                                  <RefreshCw size={10} /> Ersatztermin anbieten
+                                </button>
+                              </div>
                             ) : !sched.student ? (
                               <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-md">
                                 Pause
                               </span>
-                            ) : sched.status === 'canceled_by_student' ? (
-                              <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-slate-800 text-slate-500 rounded-md border border-slate-700">
-                                Abgesagt
-                              </span>
+                            ) : (sched.status === 'canceled_by_student' || sched.status === 'cancelled' || sched.status === 'open_reschedule') ? (
+                              <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-amber-500/10 text-amber-400 rounded-md border border-amber-500/30">
+                                  Abgesagt (Nachholung offen)
+                                </span>
+                                <button
+                                  onClick={() => handleOpenProposeReschedule(sched)}
+                                  className="px-2 py-1 text-[9px] font-black uppercase rounded bg-amber-500 hover:bg-amber-400 text-slate-950 shadow transition flex items-center gap-1"
+                                >
+                                  <RefreshCw size={10} /> Ersatztermin anbieten
+                                </button>
+                              </div>
                             ) : sched.status === 'pending_reschedule' ? (
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                                 <span className="px-2.5 py-1 text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">
@@ -3554,6 +3639,88 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Ersatztermin anbieten */}
+      {rescheduleModalOpen && rescheduleTargetSched && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <RefreshCw size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Ersatztermin anbieten</h3>
+                  <p className="text-xs text-slate-400 font-semibold">
+                    Schüler: {rescheduleTargetSched.student?.first_name} {maskLastName(rescheduleTargetSched.student?.last_name, showRealNames)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRescheduleModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Neues Ausweich-Datum
+                </label>
+                <input
+                  type="date"
+                  value={rescheduleProposedDate}
+                  onChange={(e) => setRescheduleProposedDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Uhrzeit (Beginn)
+                </label>
+                <input
+                  type="time"
+                  value={rescheduleProposedTime}
+                  onChange={(e) => setRescheduleProposedTime(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Hinweis an den Schüler (optional)
+                </label>
+                <textarea
+                  value={rescheduleNote}
+                  onChange={(e) => setRescheduleNote(e.target.value)}
+                  placeholder="z.B. Nachholstunde für den Ausfall vom Montag"
+                  rows={2}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setRescheduleModalOpen(false)}
+                className="flex-1 px-4 py-2.5 text-xs font-bold text-slate-400 bg-slate-800 hover:bg-slate-700 rounded-xl transition"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSubmitRescheduleProposal}
+                className="flex-1 px-4 py-2.5 text-xs font-black uppercase text-slate-950 bg-amber-500 hover:bg-amber-400 rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={14} />
+                <span>Angebot senden</span>
+              </button>
             </div>
           </div>
         </div>

@@ -6205,7 +6205,7 @@ export function AdminDashboard({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
           {teachers.map(t => {
             const isObserver = !!t.is_observer;
-            const accentColor = isObserver ? '#94a3b8' : (t.role === 'admin' ? '#f59e0b' : brandColor);
+            const accentColor = isObserver ? '#94a3b8' : (t.role === 'admin' ? '#ea4335' : brandColor);
             return (
               <div 
                 key={t.id} 
@@ -13375,7 +13375,7 @@ export function AdminDashboard({
       URL.revokeObjectURL(blobUrl);
     };
 
-    const brandColor = activePlatform === 'groovelab' ? '#f59e0b' : '#34a853';
+    const brandColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
 
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', overflowY: 'auto' }} onClick={() => setSelectedQRUser(null)}>

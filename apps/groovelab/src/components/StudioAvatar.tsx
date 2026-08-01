@@ -68,11 +68,10 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   const targetUser = user;
   const role = (targetUser?.role || '').toLowerCase();
 
-  if (activePlat === 'secretary' || activePlat === 'admin') {
-    // In administration/secretariat module, ALWAYS display the chalkboard image
+  if (role === 'admin' || role === 'secretary' || activePlat === 'secretary' || activePlat === 'admin') {
+    // Users belonging to administration & secretariat (roles admin and secretary) must ALWAYS display chalkboard image across all modules
     displaySrc = '/campus_login_hero.png';
   } else if (activePlat === 'groovelab') {
-    // IN GROOVELAB MODULE: ONLY MUSICIAN AVATARS ALLOWED! NEVER DISPLAY /campus_login_hero.png!
     const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
     const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;
     const userAvatar = (targetUser?.avatar_url === '/campus_login_hero.png') ? null : targetUser?.avatar_url;
@@ -81,19 +80,14 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
     if (candidate) {
       displaySrc = candidate;
     } else {
-      if (role === 'teacher' || role === 'admin' || role === 'secretary') {
+      if (role === 'teacher') {
         displaySrc = '/avatar_ghost.jpg';
       } else {
         displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || targetUser?.instrument, role);
       }
     }
   } else if (activePlat === 'campus') {
-    // In Campus module, display instrument avatar for teachers and students across the entire dashboard
-    if (role === 'admin' || role === 'secretary') {
-      displaySrc = '/campus_login_hero.png';
-    } else {
-      displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
-    }
+    displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
   }
 
   const handleClick = (e: React.MouseEvent) => {

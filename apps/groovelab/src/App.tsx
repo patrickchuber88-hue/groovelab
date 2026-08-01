@@ -3753,24 +3753,21 @@ function App() {
       const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
       const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
 
+      const isCampusActive = schoolHasCampus && userData.is_campus_active !== false;
+      const isGroovelabActive = schoolHasGroove && userData.is_groovelab_active !== false;
+
       let allowedPlatform: 'campus' | 'groovelab' = 'campus';
-      if (!schoolHasCampus && schoolHasGroove) {
-        allowedPlatform = 'groovelab';
-      } else if (schoolHasCampus && !schoolHasGroove) {
+      let defaultTab = 'briefing';
+
+      if (isCampusActive) {
         allowedPlatform = 'campus';
-      } else if (userData.is_campus_active && !userData.is_groovelab_active) {
-        allowedPlatform = 'campus';
-      } else if (!userData.is_campus_active && userData.is_groovelab_active) {
+        defaultTab = 'briefing';
+      } else if (isGroovelabActive) {
         allowedPlatform = 'groovelab';
+        defaultTab = 'live';
       } else {
-        const storedPlat = localStorage.getItem('groovelab_active_platform') as 'campus' | 'groovelab' | null;
-        if (storedPlat === 'campus' && !schoolHasCampus) {
-          allowedPlatform = 'groovelab';
-        } else if (storedPlat === 'groovelab' && !schoolHasGroove) {
-          allowedPlatform = 'campus';
-        } else {
-          allowedPlatform = storedPlat || (schoolHasCampus ? 'campus' : 'groovelab');
-        }
+        allowedPlatform = 'campus';
+        defaultTab = 'qr_landing';
       }
 
       if (isInitial) {
@@ -3784,7 +3781,7 @@ function App() {
           
           const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
           const storedTab = localStorage.getItem(storageKey);
-          const startTab = storedTab ? storedTab : (startPlat === 'campus' ? 'briefing' : 'live');
+          const startTab = storedTab ? storedTab : defaultTab;
           
           setActiveStudentTab(startTab);
           localStorage.setItem(storageKey, startTab);
@@ -3795,13 +3792,7 @@ function App() {
           
           const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
           const storedTab = localStorage.getItem(storageKey);
-          let startTab = storedTab ? storedTab : 'live';
-          
-          // Auto-correct student-only tabs for teachers immediately on startup
-          const studentTabs = ['briefing', 'practice_board', 'mediathek', 'practice', 'library', 'repertoire', 'matching'];
-          if (studentTabs.includes(startTab)) {
-            startTab = 'live';
-          }
+          let startTab = storedTab ? storedTab : defaultTab;
           
           setActiveStudentTab(startTab);
           localStorage.setItem(storageKey, startTab);
@@ -3815,7 +3806,7 @@ function App() {
           localStorage.setItem('groovelab_secretary_subtab', storedSubtab || 'briefing');
           
           const storedTab = localStorage.getItem('campus_active_tab');
-          const startTab = storedTab ? storedTab : 'briefing';
+          const startTab = storedTab ? storedTab : defaultTab;
           
           setActiveStudentTab(startTab);
           localStorage.setItem('campus_active_tab', startTab);
@@ -6558,7 +6549,7 @@ function App() {
     const currentStationId = stationId !== undefined ? stationId : stationIdFromStorage;
     const localIsKioskMode = (currentStationId && currentStationId !== 'skip') || (typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
 
-    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist').eq('id', userId).single();
+    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, schools(has_campus_subscription, has_groovelab_subscription)').eq('id', userId).single();
     if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
       const endsAt = new Date(userToLogin.contract_ends_at).getTime();
       if (Date.now() > endsAt) {
@@ -6577,29 +6568,41 @@ function App() {
     const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
     if (currentRole === 'admin' || currentRole === 'secretary') {
       localStorage.setItem('groovelab_active_workspace', 'secretary');
-      localStorage.setItem('groovelab_active_platform', 'campus');
-      localStorage.setItem('campus_active_tab', 'briefing');
       if (currentRole === 'secretary') {
         localStorage.setItem('groovelab_secretary_subtab', 'briefing');
       }
     } else if (currentRole === 'student') {
       localStorage.setItem('groovelab_active_workspace', 'student');
-      if (!localIsKioskMode) {
-        localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'briefing');
-      } else {
-        localStorage.setItem('groovelab_active_platform', 'groovelab');
-        localStorage.setItem('groovelab_active_tab', 'live');
-      }
     } else {
       localStorage.setItem('groovelab_active_workspace', 'teacher');
-      if (!localIsKioskMode) {
-        localStorage.setItem('groovelab_active_platform', 'campus');
-        localStorage.setItem('campus_active_tab', 'live');
-      } else {
-        localStorage.setItem('groovelab_active_platform', 'groovelab');
-        localStorage.setItem('groovelab_active_tab', 'live');
-      }
+    }
+
+    // Determine module availability for user & school
+    const schoolObj = Array.isArray(userToLogin?.schools) ? userToLogin.schools[0] : userToLogin?.schools;
+    const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
+    const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+
+    const isCampusActive = schoolHasCampus && userToLogin?.is_campus_active !== false;
+    const isGroovelabActive = schoolHasGroove && userToLogin?.is_groovelab_active !== false;
+
+    if (isCampusActive) {
+      // 1. Campus -> Briefing Board
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'briefing');
+      setActivePlatform('campus');
+      setActiveStudentTab('briefing');
+    } else if (isGroovelabActive) {
+      // 2. GrooveLab -> Live Lab Board
+      localStorage.setItem('groovelab_active_platform', 'groovelab');
+      localStorage.setItem('groovelab_active_tab', 'live');
+      setActivePlatform('groovelab');
+      setActiveStudentTab('live');
+    } else {
+      // 3. Fallback: QR Landingpage
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'qr_landing');
+      setActivePlatform('campus');
+      setActiveStudentTab('qr_landing');
     }
 
     // Force checkout from active sessions for Campus logins / Admins / Secretaries to prevent automatic check-in visibility
