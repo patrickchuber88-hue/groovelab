@@ -304,8 +304,9 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(() => {
     const saved = localStorage.getItem('groovelab_grid_snap_minutes');
-    return saved ? Number(saved) : 15;
-  }); // Default snap to 15 mins or saved preference
+    const parsed = saved ? Number(saved) : 15;
+    return [15, 30, 60].includes(parsed) ? parsed : 15;
+  }); // Default snap to 15 mins or saved preference (5 min option removed)
   const masterStudentsRef = useRef<Student[]>([]);
 
   // Grab offset ref for millimeter-precise mouse drag without cursor jump (ported from ScheduleCalendarView)
@@ -4483,7 +4484,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     }}
                     style={{ border: 'none', fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', background: 'transparent', outline: 'none', cursor: 'pointer', padding: 0 }}
                   >
-                    <option value={5}>5 Min</option>
                     <option value={15}>15 Min</option>
                     <option value={30}>30 Min</option>
                     <option value={60}>60 Min</option>

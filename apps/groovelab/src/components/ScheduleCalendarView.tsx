@@ -104,8 +104,9 @@ export function ScheduleCalendarView({
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(() => {
     const saved = localStorage.getItem('groovelab_grid_snap_minutes');
-    return saved ? Number(saved) : 15;
-  }); // Default grid snap to 15 mins or saved preference
+    const parsed = saved ? Number(saved) : 15;
+    return [15, 30].includes(parsed) ? parsed : 15;
+  }); // Default grid snap to 15 mins or saved preference (5 min option removed)
   const [viewMode, setViewMode] = useState<'week' | 'day' | 'month'>('week');
   const [showMiniDatePicker, setShowMiniDatePicker] = useState(false);
   const [quickCreateState, setQuickCreateState] = useState<{ isOpen: boolean; date: string; start_time: string } | null>(null);
@@ -4121,9 +4122,8 @@ export function ScheduleCalendarView({
                     padding: 0
                   }}
                 >
-                  <option value={30}>30 Min</option>
                   <option value={15}>15 Min</option>
-                  <option value={5}>5 Min</option>
+                  <option value={30}>30 Min</option>
                 </select>
               </div>
 
