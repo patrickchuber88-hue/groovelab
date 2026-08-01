@@ -160,6 +160,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [schoolData, setSchoolData] = useState<any>(null);
   const [showParentAgb, setShowParentAgb] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showActivationInfoModal, setShowActivationInfoModal] = useState(false);
+
+  const handleVollzugriffClick = () => {
+    const isProfileActive = Boolean(
+      profile?.is_pin_activated ||
+      profile?.has_parent_pin ||
+      profile?.personal_pin ||
+      profile?.parent_pin
+    );
+    if (isProfileActive) {
+      setPinPurpose('unlock_app');
+      setPageState('pin_required');
+    } else {
+      setShowActivationInfoModal(true);
+    }
+  };
 
   // PIN-Eingabe
   const [pinInput, setPinInput] = useState('');
@@ -2329,8 +2345,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         }
 
         try {
-          await supabase.from('students').update({ is_pin_activated: true, status: 'aktiv' }).eq('id', profile.id);
-          await supabase.from('pending_students').update({ is_pin_activated: true, status: 'aktiv' }).eq('id', profile.id);
+          await supabase.from('students').update({
+            personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            status: 'aktiv'
+          }).eq('id', profile.id);
+
+          await supabase.from('pending_students').update({
+            personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            status: 'aktiv'
+          }).eq('id', profile.id);
         } catch (e) {
           console.warn('[QRLanding] Optional table update warning:', e);
         }
@@ -6852,6 +6881,290 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             );
           })()}
 
+          {/* Marketing Activation Modal for Inactive Users */}
+          {(() => {
+            if (!showActivationInfoModal) return null;
+
+            return (
+              <div style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 99999,
+                background: 'rgba(15, 23, 42, 0.78)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+                animation: 'fadeIn 0.25s ease-out'
+              }}>
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: '28px',
+                  width: '100%',
+                  maxWidth: '480px',
+                  maxHeight: '90vh',
+                  overflowY: 'auto',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                  border: '1px solid rgba(226, 232, 240, 0.8)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative'
+                }}>
+                  {/* Header Hero Banner */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+                    padding: '28px 24px 24px',
+                    borderRadius: '28px 28px 0 0',
+                    position: 'relative',
+                    color: '#ffffff',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '-50px',
+                      right: '-50px',
+                      width: '180px',
+                      height: '180px',
+                      background: 'radial-gradient(circle, rgba(52, 168, 83, 0.4) 0%, rgba(0,0,0,0) 70%)',
+                      borderRadius: '50%',
+                      pointerEvents: 'none'
+                    }} />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowActivationInfoModal(false)}
+                      style={{
+                        position: 'absolute',
+                        top: '16px',
+                        right: '16px',
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        border: 'none',
+                        color: '#ffffff',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      ✕
+                    </button>
+
+                    <span style={{
+                      background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                      color: '#ffffff',
+                      fontSize: '0.7rem',
+                      fontWeight: 900,
+                      padding: '4px 10px',
+                      borderRadius: '100px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 8px rgba(52, 168, 83, 0.3)'
+                    }}>
+                      <Sparkles size={12} /> Vollzugriff Freischalten
+                    </span>
+
+                    <h3 style={{ margin: '12px 0 6px', fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.025em', color: '#ffffff', fontFamily: "'Urbanist', sans-serif" }}>
+                      Campus-Groovelab Erleben 🚀
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.45, fontWeight: 500 }}>
+                      Schalte deinen Vollzugriff frei und erhalte Zugriff auf alle Premium-Funktionen deiner Musikschule!
+                    </p>
+                  </div>
+
+                  {/* Feature List */}
+                  <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {[
+                      {
+                        icon: '🎯',
+                        title: 'Übe-Pfad & Übe-Streak',
+                        desc: 'Belohnungssystem, tägliche Motivation & Streaks zum Level-XP Sammeln.',
+                        bg: '#f0fdf4',
+                        border: '#bbf7d0',
+                        iconBg: '#dcfce7'
+                      },
+                      {
+                        icon: '📖',
+                        title: 'Digitales Hausaufgabenheft & Protokoll',
+                        desc: 'Alle Aufgaben, Lehrer-Feedback & Meisterwerk-Dokumentation an einem Ort.',
+                        bg: '#f0f9ff',
+                        border: '#bae6fd',
+                        iconBg: '#e0f2fe'
+                      },
+                      {
+                        icon: '🎛️',
+                        title: 'Audio-Loopstation & Aufnahmen',
+                        desc: 'Multi-Track Looper mit 100% Sample-Genauigkeit, Aufnahmefunktion & Cloud-Archiv.',
+                        bg: '#fefce8',
+                        border: '#fef08a',
+                        iconBg: '#fef9c3'
+                      },
+                      {
+                        icon: '⏱️',
+                        title: 'Übe-Begleiter & Fokus-Timer',
+                        desc: 'Integrierter Übe-Timer mit Sound-Effekten und automatischer XP-Gutschrift.',
+                        bg: '#faf5ff',
+                        border: '#e9d5ff',
+                        iconBg: '#f3e8ff'
+                      },
+                      {
+                        icon: '📊',
+                        title: 'Skill-Radar, Songs & Lehrwerke',
+                        desc: 'Visuelle Fortschrittsanalyse für Stücke, Lehrwerk-Kapitel, Techniken & Repertoire.',
+                        bg: '#fff1f2',
+                        border: '#fecdd3',
+                        iconBg: '#ffe4e6'
+                      },
+                      {
+                        icon: '🏆',
+                        title: 'Sticker & Errungenschaften',
+                        desc: 'Sammelbare Abzeichen und Sticker für erreichte Lern-Meilensteine freischalten.',
+                        bg: '#fef3c7',
+                        border: '#fde047',
+                        iconBg: '#fef9c3'
+                      },
+                      {
+                        icon: '💬',
+                        title: '1:1 Lehrkraft-Shoutbox',
+                        desc: 'Direkte Nachrichten & Terminabsprachen mit deiner Lehrkraft für alle kommenden Stunden.',
+                        bg: '#f8fafc',
+                        border: '#e2e8f0',
+                        iconBg: '#f1f5f9'
+                      },
+                      {
+                        icon: '⚡',
+                        title: 'Performance & Highlights',
+                        desc: 'Verfolge deine persönliche Entfaltung, Band-Erfolge und Meilensteine.',
+                        bg: '#f5f3ff',
+                        border: '#ddd6fe',
+                        iconBg: '#ede9fe'
+                      }
+                    ].map((item, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        background: item.bg,
+                        border: `1px solid ${item.border}`
+                      }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '10px',
+                          background: item.iconBg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.1rem',
+                          flexShrink: 0,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
+                        }}>
+                          {item.icon}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                            {item.title}
+                          </span>
+                          <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.35, fontWeight: 500 }}>
+                            {item.desc}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer Actions */}
+                  <div style={{
+                    padding: '16px 24px 24px',
+                    borderTop: '1px solid #f1f5f9',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    background: '#ffffff',
+                    borderRadius: '0 0 28px 28px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowActivationInfoModal(false);
+                        setPinPurpose('unlock_app');
+                        setPageState('pin_required');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        borderRadius: '14px',
+                        background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 800,
+                        fontSize: '0.92rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                      }}
+                    >
+                      <Lock size={16} color="#ffffff" />
+                      <span>Jetzt Code / PIN eingeben</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        alert('Wende dich einfach an dein Sekretariat oder deinen Lehrer, um den Vollzugriff für dein Profil freischalten zu lassen!');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '14px',
+                        background: '#f1f5f9',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        fontWeight: 750,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      📩 Bei der Musikschule anfragen
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowActivationInfoModal(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '4px 0',
+                        textAlign: 'center'
+                      }}
+                    >
+                      Vielleicht später
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Main Content Area */}
           <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
@@ -6876,10 +7189,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          setPinPurpose('unlock_app');
-                          setPageState('pin_required');
-                        }}
+                        onClick={handleVollzugriffClick}
                         style={{
                           background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
                           color: '#ffffff',
@@ -7106,10 +7416,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          setPinPurpose('unlock_app');
-                          setPageState('pin_required');
-                        }}
+                        onClick={handleVollzugriffClick}
                         style={{
                           background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
                           color: '#ffffff',

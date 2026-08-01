@@ -13692,9 +13692,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 .update({
                                   personal_pin: pinFormNew,
                                   parent_pin: pinFormNew,
+                                  onboarding_pin: pinFormNew,
                                   is_pin_activated: true
                                 })
                                 .eq('id', studentId);
+
+                              try {
+                                await supabase.from('students').update({
+                                  personal_pin: pinFormNew,
+                                  parent_pin: pinFormNew,
+                                  onboarding_pin: pinFormNew,
+                                  is_pin_activated: true
+                                }).eq('id', studentId);
+
+                                await supabase.from('pending_students').update({
+                                  personal_pin: pinFormNew,
+                                  parent_pin: pinFormNew,
+                                  onboarding_pin: pinFormNew,
+                                  is_pin_activated: true
+                                }).eq('id', studentId);
+                              } catch (e) {}
+
+                              localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
 
                               if (error) {
                                 setPinFormError('Fehler beim Speichern der PIN: ' + error.message);

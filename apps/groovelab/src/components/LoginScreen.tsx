@@ -7741,9 +7741,29 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     .from('users')
                     .update({
                       personal_pin: pinSetupInput,
+                      parent_pin: pinSetupInput,
+                      onboarding_pin: pinSetupInput,
                       is_pin_activated: true
                     })
                     .eq('id', pinSetupUser.id);
+
+                  try {
+                    await supabase.from('students').update({
+                      personal_pin: pinSetupInput,
+                      parent_pin: pinSetupInput,
+                      onboarding_pin: pinSetupInput,
+                      is_pin_activated: true
+                    }).eq('id', pinSetupUser.id);
+
+                    await supabase.from('pending_students').update({
+                      personal_pin: pinSetupInput,
+                      parent_pin: pinSetupInput,
+                      onboarding_pin: pinSetupInput,
+                      is_pin_activated: true
+                    }).eq('id', pinSetupUser.id);
+                  } catch (e) {}
+
+                  localStorage.setItem(`groovelab_user_pin_${pinSetupUser.id}`, pinSetupInput);
 
                   sessionStorage.removeItem('groovelab_qr_token');
 

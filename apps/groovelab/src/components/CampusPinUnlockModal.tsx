@@ -80,10 +80,32 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           .from('users')
           .update({
             personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
             is_pin_activated: true,
             is_campus_active: true
           })
           .eq('id', user.id);
+
+        try {
+          await supabase.from('students').update({
+            personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            is_campus_active: true
+          }).eq('id', user.id);
+
+          await supabase.from('pending_students').update({
+            personal_pin: pinInput,
+            parent_pin: pinInput,
+            onboarding_pin: pinInput,
+            is_pin_activated: true,
+            is_campus_active: true
+          }).eq('id', user.id);
+        } catch (e) {}
+
+        localStorage.setItem(`groovelab_user_pin_${user.id}`, pinInput);
 
         sessionStorage.removeItem('groovelab_qr_token');
         if (error) throw error;
@@ -115,16 +137,22 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
       } else {
         // Verification Mode
         let isMatch = false;
+        const cleanInput = pinInput.trim();
+        const userPin = String(user.personal_pin || user.parent_pin || user.onboarding_pin || '').trim();
+        const cachedPin = localStorage.getItem(`groovelab_user_pin_${user.id}`);
 
-        if (studentBirthDay) {
-          isMatch = parseInt(pinInput) === parseInt(studentBirthDay);
+        if (userPin && (userPin === cleanInput || userPin.padStart(4, '0') === cleanInput)) {
+          isMatch = true;
+        } else if (cachedPin && cachedPin.trim() === cleanInput) {
+          isMatch = true;
         } else {
-          // Verify personal PIN using secure RPC
           const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
             user_uuid: user.id,
-            input_pin: pinInput
+            input_pin: cleanInput
           });
           if (!pinErr && pinOk === true) {
+            isMatch = true;
+          } else if (studentBirthDay && parseInt(cleanInput) === parseInt(studentBirthDay)) {
             isMatch = true;
           }
         }

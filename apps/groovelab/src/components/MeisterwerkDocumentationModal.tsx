@@ -61,6 +61,7 @@ export const cleanNotesText = (text: string | null | undefined): string => {
              !trimmed.startsWith('AUDIO:') &&
              !trimmed.startsWith('LOOP:') &&
              !trimmed.startsWith('LATENCY:') &&
+             !trimmed.startsWith('RHYTHM_SCORE:') &&
              !trimmed.startsWith('STUDENT_NOTE_PUBLIC:') &&
              !trimmed.startsWith('STUDENT_NOTE_PRIVATE:');
     })
@@ -1114,6 +1115,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // Valid teacher fallback UUID
     return '11079eae-664a-49a4-8692-771d83a3193c';
   };
+
+  const [activeRhythmSong, setActiveRhythmSong] = useState<{ songTitle: string; targetBpm: number; songId?: string } | null>(null);
 
   const syncHomeworkNotes = async (notesList: string[]) => {
     if (student.id === 'teacher-self') {
@@ -4611,6 +4614,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           ) : activeViewMode === 'practice' ? (
             <GroovePracticeCompanion
               useNotebookLayout={useNotebookLayout}
+              isCampusModule={true}
+              activeSongContext={activeRhythmSong}
+              onRhythmScoreUpdate={(score, details) => {
+                if (details.beatsCount >= 12) {
+                  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const starsStr = '⭐'.repeat(details.stars || 1);
+                  const entry = `RHYTHM_SCORE:${score}%|${details.bpm}|${details.beatsCount}|${timeStr}|${starsStr}|${details.songTitle || ''}`;
+                  setHomeworkNotesList(prev => {
+                    const filtered = prev.filter(n => !n.startsWith('RHYTHM_SCORE:'));
+                    const updated = [...filtered, entry];
+                    syncHomeworkNotes(updated).catch(err => console.error('Error syncing rhythm score:', err));
+                    return updated;
+                  });
+                }
+              }}
             />
           ) : activeViewMode === 'recordings' ? (
             <>
@@ -8439,6 +8457,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                         );
                                       })()}
                                       <span>{item.title}</span> <span style={{ color: '#4b5563', fontWeight: 700, marginLeft: '4px', letterSpacing: '-0.02em' }}>· {formatPageNumbers(item.pages)}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveRhythmSong({
+                                            songTitle: `${item.title} (${formatPageNumbers(item.pages)})`,
+                                            targetBpm: 100
+                                          });
+                                          setActiveViewMode('practice');
+                                        }}
+                                        style={{
+                                          background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                                          color: '#15803d',
+                                          border: '1px solid #34a853',
+                                          borderRadius: '8px',
+                                          padding: '2px 8px',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 800,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          marginLeft: 'auto'
+                                        }}
+                                      >
+                                        <Mic size={10} />
+                                        <span>Mit Rhythmus-Coach üben 🎙️</span>
+                                      </button>
                                     </div>
                                     {/* Horizontal premium badge chips */}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingLeft: '2px' }}>
@@ -8613,7 +8658,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                   if (visibleNotes.length === 0) return null;
 
                                   const audioNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("AUDIO:"));
-                                  const textNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:") && !item.note.startsWith("LATENCY:"));
+                                  const rhythmNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => item.note.startsWith("RHYTHM_SCORE:"));
+                                  const textNotes = homeworkNotesList.map((note, idx) => ({ note, idx })).filter(item => !item.note.startsWith("AUDIO:") && !item.note.startsWith("STICKER:") && !item.note.startsWith("LATENCY:") && !item.note.startsWith("RHYTHM_SCORE:"));
 
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px', marginTop: '4px' }}>
@@ -8623,7 +8669,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                       
                                       {/* Audio Notes (Cassettes) side-by-side */}
                                       {audioNotes.length > 0 && (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px', marginBottom: textNotes.length > 0 ? '6px' : '2px' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '4px', marginBottom: textNotes.length > 0 || rhythmNotes.length > 0 ? '6px' : '2px' }}>
                                           {audioNotes.map((item, index) => {
                                             const parts = item.note.substring(6).split('|');
                                             return (
@@ -8633,6 +8679,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                                                   label={parts[3] || `Play-Along #${index + 1}`}
                                                   onDelete={() => handleDeleteNote(item.idx)}
                                                 />
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+
+                                      {/* ⚡ Campus Rhythmus-Coach Badges */}
+                                      {rhythmNotes.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+                                          {rhythmNotes.map((item) => {
+                                            const parts = item.note.substring(13).split('|');
+                                            const score = parts[0] || '---';
+                                            const bpm = parts[1] || '---';
+                                            const beats = parts[2] || '';
+                                            const time = parts[3] || '';
+                                            const stars = parts[4] || '⭐';
+                                            const songTitle = parts[5] || '';
+                                            return (
+                                              <div key={item.idx} style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                                                border: '1px solid #34a853',
+                                                padding: '6px 12px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.76rem',
+                                                fontWeight: 800,
+                                                color: '#15803d',
+                                                boxShadow: '0 2px 6px rgba(52, 168, 83, 0.15)'
+                                              }}>
+                                                <Activity size={14} style={{ color: '#34a853' }} />
+                                                <span>{stars} Rhythmus-Präzision: {score}</span>
+                                                <span style={{ fontSize: '0.68rem', opacity: 0.85, fontWeight: 700 }}>
+                                                  {songTitle ? `• ${songTitle}` : ''} ({bpm} BPM {beats ? `• ${beats} Hits` : ''} {time ? `• ${time}` : ''})
+                                                </span>
+                                                {!readOnly && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteNote(item.idx)}
+                                                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0 2px' }}
+                                                  >
+                                                    <X size={12} />
+                                                  </button>
+                                                )}
                                               </div>
                                             );
                                           })}

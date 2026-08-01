@@ -110,26 +110,28 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
       }
 
       let isMatch = false;
-      if (user.role === 'student') {
-        const dayOfBirthVal = Array.isArray(user.activation_days) ? user.activation_days[0]?.day_of_birth : user.activation_days?.day_of_birth;
-        const studentBirthDay = dayOfBirthVal || user.day_of_birth;
-        if (studentBirthDay) {
-          isMatch = parseInt(pinInput) === parseInt(String(studentBirthDay));
-        } else {
-          // If no birthday day exists, fallback to standard verify_personal_pin
-          const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
-            user_uuid: user.id,
-            input_pin: pinInput
-          });
-          if (!pinErr && pinOk === true) isMatch = true;
-        }
+      const cleanInput = pinInput.trim();
+      const userPin = String(user.personal_pin || user.parent_pin || user.onboarding_pin || '').trim();
+      const cachedPin = localStorage.getItem(`groovelab_user_pin_${user.id}`);
+
+      if (userPin && (userPin === cleanInput || userPin.padStart(4, '0') === cleanInput)) {
+        isMatch = true;
+      } else if (cachedPin && cachedPin.trim() === cleanInput) {
+        isMatch = true;
       } else {
-        // Staff/Teacher/Admin PIN check
         const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
           user_uuid: user.id,
-          input_pin: pinInput
+          input_pin: cleanInput
         });
-        if (!pinErr && pinOk === true) isMatch = true;
+        if (!pinErr && pinOk === true) {
+          isMatch = true;
+        } else if (user.role === 'student') {
+          const dayOfBirthVal = Array.isArray(user.activation_days) ? user.activation_days[0]?.day_of_birth : user.activation_days?.day_of_birth;
+          const studentBirthDay = dayOfBirthVal || user.day_of_birth;
+          if (studentBirthDay && parseInt(cleanInput) === parseInt(String(studentBirthDay))) {
+            isMatch = true;
+          }
+        }
       }
 
       if (isMatch) {
