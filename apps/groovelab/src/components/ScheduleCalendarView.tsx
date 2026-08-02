@@ -1899,10 +1899,8 @@ export function ScheduleCalendarView({
                 vacant_student_id: occ.student_id
               };
             }
-            // Normalize unmoved slots back to clean scheduled (green) Stammtermin
-            const isMovedDate = Boolean(occ.original_date && occ.original_date !== occ.date);
-            const isMovedTime = Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
-            if (!isMovedDate && !isMovedTime && occ.status === 'pending_reschedule') {
+            // All regular appointments render in clean scheduled (green) Stammtermin across all weeks
+            if (occ.status === 'pending_reschedule' || !occ.status) {
               return {
                 ...occ,
                 status: 'scheduled',
