@@ -1947,9 +1947,25 @@ export function ScheduleCalendarView({
         console.warn('DB fetch failed', err);
       }
 
+      const getStudentNameParts = (s: any) => {
+        let fn = (s.first_name || s.firstName || '').trim();
+        let ln = (s.last_name || s.lastName || '').trim();
+        if (!fn) {
+          const full = (s.name || s.studentName || s.fullName || '').trim();
+          if (full) {
+            const parts = full.split(' ');
+            fn = parts[0] || '';
+            ln = parts.slice(1).join(' ') || '';
+          }
+        }
+        return { fn: fn.toLowerCase(), ln: ln.toLowerCase() };
+      };
+
       // Helper function to check if a database occurrence matches a template student
       const matchesTemplateStudent = (occ: any, s: any) => {
         if (!s || !occ) return false;
+
+        // 1. Direct ID matching against student ID aliases
         const occStudentId = occ.student_id;
         if (occStudentId) {
           if (
@@ -1973,20 +1989,27 @@ export function ScheduleCalendarView({
           }
         }
 
-        const oFirst = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
-        const sFirst = (s.first_name || s.firstName || '').trim().toLowerCase();
+        // 2. Name matching (first_name & last_name)
+        const oFirst = (occ.student?.first_name || occ.student_first_name || occ.first_name || '').trim().toLowerCase();
+        const { fn: sFirst, ln: sLast } = getStudentNameParts(s);
 
-        if (oFirst && sFirst && oFirst === sFirst) {
-          const oLast = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
-          const sLast = (s.last_name || s.lastName || '').trim().toLowerCase();
+        if (oFirst && sFirst && (oFirst === sFirst || oFirst.includes(sFirst) || sFirst.includes(oFirst))) {
+          const oLast = (occ.student?.last_name || occ.student_last_name || occ.last_name || '').trim().toLowerCase();
           if (!oLast || !sLast || oLast === sLast || oLast.startsWith(sLast[0]) || sLast.startsWith(oLast[0])) {
             return true;
           }
         }
+
+        // 3. Fallback matching against notes/title (e.g. if student name was embedded in notes)
+        if (sFirst && sFirst.length >= 3) {
+          const notesStr = (occ.notes || occ.title || '').toLowerCase();
+          if (notesStr.includes(sFirst)) {
+            return true;
+          }
+        }
+
         return false;
       };
-
-
 
       // Merge projected mock data with database entries so that every slot defined in the designer
       // template (boards) is always visible in the calendar, even if only one or a few are saved in the DB.
@@ -2013,7 +2036,7 @@ export function ScheduleCalendarView({
               if (!isBreakCancelled && !isOccupied) {
                 projectedData.push({
                   id: `mock-${board.id}-${student.id}`,
-                  student_id: '',
+                  student_id: student.id,
                   teacher_id: userId,
                   date: dateStr,
                   original_date: dateStr,
@@ -2059,15 +2082,15 @@ export function ScheduleCalendarView({
                 }
               }
 
-              // Check if a saved database record already covers this student on THIS SPECIFIC DATE
+              // Check if a saved database record already covers this student on THIS SPECIFIC DATE (or if student has a rescheduled occurrence on/from this date)
               let hasDbRecordForThisSlot = false;
               if (student.isGroup && student.groupStudents) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  o.date === dateStr && student.groupStudents.some((gs: any) => gs.id === o.student_id)
+                  (o.date === dateStr || o.original_date === dateStr) && student.groupStudents.some((gs: any) => gs.id === o.student_id)
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  o.date === dateStr && matchesTemplateStudent(o, student)
+                  (o.date === dateStr || o.original_date === dateStr) && matchesTemplateStudent(o, student)
                 );
               }
               
@@ -5287,9 +5310,17 @@ export function ScheduleCalendarView({
                             s.db_id === occ.student_id
                           ) return true;
                         }
-                        const sFn = (s.first_name || s.firstName || '').trim().toLowerCase();
-                        const sLn = (s.last_name || s.lastName || '').trim().toLowerCase();
-                        if (sFn && occFn && sFn === occFn) {
+                        let sFn = (s.first_name || s.firstName || '').trim().toLowerCase();
+                        let sLn = (s.last_name || s.lastName || '').trim().toLowerCase();
+                        if (!sFn) {
+                          const full = (s.name || s.studentName || s.fullName || '').trim();
+                          if (full) {
+                            const parts = full.split(' ');
+                            sFn = (parts[0] || '').toLowerCase();
+                            sLn = (parts.slice(1).join(' ') || '').toLowerCase();
+                          }
+                        }
+                        if (sFn && occFn && (sFn === occFn || occFn.includes(sFn) || sFn.includes(occFn))) {
                           if (!sLn || !occLn || sLn === occLn || sLn.startsWith(occLn[0]) || occLn.startsWith(sLn[0])) {
                             return true;
                           }
