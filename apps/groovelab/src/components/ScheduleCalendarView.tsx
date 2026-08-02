@@ -5394,7 +5394,8 @@ export function ScheduleCalendarView({
 
                   const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
 
-                  const isGroovelab = localStorage.getItem('groovelab_active_platform') !== 'campus';
+                  const activePlatform = localStorage.getItem('groovelab_active_platform') || 'campus';
+                  const isGroovelab = activePlatform === 'groovelab';
 
                   if (isCancelled || isSick) {
                     if (!isCancelledAck) {
@@ -5744,6 +5745,32 @@ export function ScheduleCalendarView({
                                      const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
                                      return (
                                        <span 
+                                         onClick={async (e) => {
+                                           e.stopPropagation();
+                                           if (isConfirmed) return;
+                                           try {
+                                             if (!occ.id.startsWith('mock-')) {
+                                               await supabase.from('schedule_occurrences').update({
+                                                 teacher_acknowledged: true,
+                                                 student_acknowledged: true,
+                                                 status: 'rescheduled_confirmed'
+                                               }).eq('id', occ.id);
+                                             }
+                                             setPendingChanges(prev => ({
+                                               ...prev,
+                                               [occ.id]: {
+                                                 ...occ,
+                                                 teacher_acknowledged: true,
+                                                 student_acknowledged: true,
+                                                 status: 'rescheduled_confirmed'
+                                               }
+                                             }));
+                                             await loadOccurrences();
+                                             await showAlert('Rückmeldung als gelesen & bestätigt markiert.');
+                                           } catch (err) {
+                                             console.error('Error confirming occurrence:', err);
+                                           }
+                                         }}
                                          onMouseEnter={(e) => {
                                            onMouseEnterHelper(e, isResetPending, occ);
                                          }}
@@ -5769,8 +5796,10 @@ export function ScheduleCalendarView({
                                            color: isConfirmed ? '#137333' : '#b45309',
                                            border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
                                            flexShrink: 0,
-                                           marginLeft: '4px'
+                                           marginLeft: '4px',
+                                           cursor: isConfirmed ? 'default' : 'pointer'
                                          }} 
+                                         title={isConfirmed ? 'Termin ist bestätigt' : 'Klicken, um die Rückmeldung als gelesen & grün zu markieren'}
                                        >
                                          <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
                                        </span>
