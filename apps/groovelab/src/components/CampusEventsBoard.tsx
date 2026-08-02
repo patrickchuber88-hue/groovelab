@@ -3115,10 +3115,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         });
       }
 
-      // Priority 2: Only fall back to old DB schedules table if no teacherPlannedBoards exist at all
-      if ((!teacherPlannedBoards || teacherPlannedBoards.length === 0) && schedules && schedules.length > 0) {
+      // Always ensure all DB schedules (especially for students) are included in combinedSchedules
+      if (schedules && schedules.length > 0) {
         schedules.forEach((sch: any) => {
-          combinedSchedules.push(sch);
+          const dayOfWeekNum = parseDayOfWeekNum(sch.day_of_week);
+          const alreadyExists = combinedSchedules.some(cs => 
+            cs.id === sch.id || 
+            (cs.student_id && String(cs.student_id) === String(sch.student_id) && cs.day_of_week === dayOfWeekNum)
+          );
+          if (!alreadyExists) {
+            combinedSchedules.push(sch);
+          }
         });
       }
 
@@ -3216,7 +3223,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               // Check if actual occurrence (from schedule_occurrences or pending changes) exists on this date
               const actual = occurrences?.find((occ: any) => 
                 isSameScheduleOrStudent(occ, sch) && 
-                occ.date === dateStr
+                (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
               );
 
               // Check if occurrence for this schedule was moved away or modified on dateStr

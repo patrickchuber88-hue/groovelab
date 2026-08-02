@@ -10017,7 +10017,7 @@ function App() {
                   </div>
 
                   <h1 style={{ fontSize: '3.5rem', fontWeight: 900, color: '#1e293b', margin: '0 0 16px 0', letterSpacing: '-0.03em' }}>
-                    {user.role === 'student' ? (activePlatform === 'groovelab' ? user.first_name : 'Hausaufgabenheft') : (activePlatform === 'groovelab' ? `${user.first_name} ${user.last_name || ''}` : `${user.first_name} ${user.last_name?.[0] || ''}.`)}
+                    {user.role === 'student' ? (activePlatform === 'groovelab' ? user.first_name : 'Hausaufgabenheft') : `${user.first_name} ${user.last_name || ''}`.trim()}
                   </h1>
 
                   {/* GrooveLab Instrument Selection Buttons for Coach */}
@@ -12131,7 +12131,7 @@ function App() {
                             </div>
                             <div>
                               <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>
-                                {user.role === 'student' ? user.first_name : (activePlatform === 'groovelab' ? `${user.first_name} ${user.last_name || ''}` : `${user.first_name} ${user.last_name?.[0] || ''}.`)}
+                                {user.role === 'student' ? user.first_name : `${user.first_name} ${user.last_name || ''}`.trim()}
                               </div>
                               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
                                 {dateFormatted}

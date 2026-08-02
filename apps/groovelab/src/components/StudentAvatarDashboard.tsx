@@ -3082,29 +3082,37 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
           const today = new Date();
           const currentDay = today.getDay() || 7;
           const schDay = typeof sch.day_of_week === 'number' ? sch.day_of_week : (
-            sch.day_of_week === 'Monday' ? 1 : sch.day_of_week === 'Tuesday' ? 2 : sch.day_of_week === 'Wednesday' ? 3 : sch.day_of_week === 'Thursday' ? 4 : sch.day_of_week === 'Friday' ? 5 : sch.day_of_week === 'Saturday' ? 6 : 7
+            sch.day_of_week === 'Monday' || sch.day_of_week === 'Montag' ? 1 :
+            sch.day_of_week === 'Tuesday' || sch.day_of_week === 'Dienstag' ? 2 :
+            sch.day_of_week === 'Wednesday' || sch.day_of_week === 'Mittwoch' ? 3 :
+            sch.day_of_week === 'Thursday' || sch.day_of_week === 'Donnerstag' ? 4 :
+            sch.day_of_week === 'Friday' || sch.day_of_week === 'Freitag' ? 5 :
+            sch.day_of_week === 'Saturday' || sch.day_of_week === 'Samstag' ? 6 :
+            sch.day_of_week === 'Sunday' || sch.day_of_week === 'Sonntag' ? 7 : (parseInt(String(sch.day_of_week), 10) || 1)
           );
           
           let diff = schDay - currentDay;
           if (diff < 0) diff += 7;
           
-          const targetDate = new Date(today);
-          targetDate.setDate(today.getDate() + diff);
-          const dateStr = toLocalYYYYMMDD(targetDate);
+          for (let week = 0; week < 8; week++) {
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() + diff + (week * 7));
+            const dateStr = toLocalYYYYMMDD(targetDate);
 
-          const existsInOccur = mergedList.some(o => o.date === dateStr);
-          if (!existsInOccur) {
-            mergedList.push({
-              id: `virtual-${sch.id}-${dateStr}`,
-              schedule_id: sch.id,
-              student_id: studentId,
-              teacher_id: sch.teacher_id,
-              date: dateStr,
-              start_time: sch.time_slot,
-              status: sch.status || 'scheduled',
-              teacher: sch.teacher,
-              schedule: sch
-            });
+            const existsInOccur = mergedList.some(o => o.date === dateStr);
+            if (!existsInOccur) {
+              mergedList.push({
+                id: `virtual-${sch.id}-${dateStr}`,
+                schedule_id: sch.id,
+                student_id: studentId,
+                teacher_id: sch.teacher_id,
+                date: dateStr,
+                start_time: sch.time_slot,
+                status: sch.status || 'scheduled',
+                teacher: sch.teacher,
+                schedule: sch
+              });
+            }
           }
         });
       }
@@ -3234,12 +3242,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth();
 
-      let schoolYearStart = new Date(currentYear - 1, 8, 1);
-      let schoolYearEnd = new Date(currentYear, 6, 31);
+      let schoolYearStart = new Date(currentYear - 1, 8, 1); // 1. Sept past year
+      let schoolYearEnd = new Date(currentYear, 7, 31);      // 31. Aug current year
 
-      if (currentMonth >= 7) {
-        schoolYearStart = new Date(currentYear, 8, 1);
-        schoolYearEnd = new Date(currentYear + 1, 6, 31);
+      if (currentMonth >= 8) { // School year switches on Sept 1st (month index 8)
+        schoolYearStart = new Date(currentYear, 8, 1);       // 1. Sept current year
+        schoolYearEnd = new Date(currentYear + 1, 7, 31);   // 31. Aug next year
       }
 
       const startStr = toLocalYYYYMMDD(schoolYearStart);

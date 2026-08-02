@@ -48,32 +48,52 @@ const resolveCampusAvatar = (u: any): string => {
   const role = (u.role || '').toLowerCase();
   const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
   
+  // Teachers in Campus module must ALWAYS display their instrument avatar (per AGENTS.md)!
+  const isTeacher = role === 'teacher' || roles.includes('teacher');
+  if (isTeacher) {
+    return getInstrumentAvatarUrl(u.instrument || 'Gitarre');
+  }
+
   if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
     return '/campus_login_hero.png';
   }
   
   if (role === 'student') {
     const studentInstrument = u.instrument || 'Nicht festgelegt';
-    const inst = studentInstrument.toLowerCase().trim();
-    if (inst.includes('guitar') || inst.includes('gitarre')) {
-      if (u.photo_url && (u.photo_url.includes('egitarre_avatar') || u.photo_url.includes('gitarre_avatar_new'))) {
-        return u.photo_url;
-      }
-      return '/avatars/gitarre_avatar_new.png';
-    }
     return getInstrumentAvatarUrl(studentInstrument);
-  } else {
-    // Teachers
-    return getInstrumentAvatarUrl(u.instrument);
   }
+  return getInstrumentAvatarUrl(u.instrument || 'Gitarre');
 };
 
 const formatStudentDisplayName = (u: any): string => {
   if (!u) return '';
   const firstName = u.first_name || '';
-  const lastName = u.last_name || '';
-  if (u.role === 'student' && lastName.trim()) {
-    return `${firstName} ${lastName.trim().charAt(0)}.`;
+  let lastName = u.last_name || u.full_last_name || '';
+  const role = (u.role || '').toLowerCase();
+  const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+  const isTeacherRole = role === 'teacher' || roles.includes('teacher');
+
+  if (isTeacherRole) {
+    if (u.full_last_name) {
+      lastName = u.full_last_name;
+    }
+    return `${firstName} ${lastName}`.trim();
+  }
+
+  // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
+  if (role === 'student' || role === 'pupil') {
+    if (lastName.trim()) {
+      const trimmedLn = lastName.trim();
+      if (trimmedLn.length === 2 && trimmedLn.endsWith('.')) {
+        return `${firstName} ${trimmedLn}`;
+      }
+      return `${firstName} ${trimmedLn.charAt(0)}.`;
+    }
+    return firstName;
+  }
+
+  if (u.full_last_name) {
+    lastName = u.full_last_name;
   }
   return `${firstName} ${lastName}`.trim();
 };
@@ -432,7 +452,85 @@ export default function CampusDirectMessages({
   }, []);
 
   useEffect(() => {
-    if (isStudent) return;
+    if (isStudent) {
+      const fetchStudentTeachers = async () => {
+        try {
+          const studentId = user?.id || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
+          if (!studentId) return;
+
+          const teacherMap = new Map<string, any>();
+
+          // 1. Direct teacher_id on student profile
+          const directTeacherId = user?.teacher_id;
+          if (directTeacherId) {
+            const { data: directTeacher } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', directTeacherId)
+              .maybeSingle();
+            if (directTeacher) {
+              teacherMap.set(directTeacher.id, directTeacher);
+            }
+          }
+
+          // 2. Teachers from schedules
+          try {
+            const { data: scheds } = await supabase
+              .from('schedules')
+              .select('teacher_id, teacher:users!schedules_teacher_id_fkey(*)')
+              .eq('student_id', studentId);
+            (scheds || []).forEach((sc: any) => {
+              if (sc.teacher && sc.teacher.id) {
+                teacherMap.set(sc.teacher.id, sc.teacher);
+              } else if (sc.teacher_id && !teacherMap.has(sc.teacher_id)) {
+                const matchInSchool = (schoolUsers || []).find((su: any) => su.id === sc.teacher_id);
+                if (matchInSchool) teacherMap.set(sc.teacher_id, matchInSchool);
+              }
+            });
+          } catch (e) {}
+
+          // 3. Teachers from schedule_occurrences
+          try {
+            const { data: occs } = await supabase
+              .from('schedule_occurrences')
+              .select('teacher_id, teacher:users!schedule_occurrences_teacher_id_fkey(*)')
+              .eq('student_id', studentId);
+            (occs || []).forEach((o: any) => {
+              if (o.teacher && o.teacher.id) {
+                teacherMap.set(o.teacher.id, o.teacher);
+              } else if (o.teacher_id && !teacherMap.has(o.teacher_id)) {
+                const matchInSchool = (schoolUsers || []).find((su: any) => su.id === o.teacher_id);
+                if (matchInSchool) teacherMap.set(o.teacher_id, matchInSchool);
+              }
+            });
+          } catch (e) {}
+
+          // 4. Teachers with existing 1:1 messages
+          if (campusMessages && campusMessages.length > 0) {
+            campusMessages.forEach((m: any) => {
+              const partnerId = m.sender_id === studentId ? m.recipient_id : m.sender_id;
+              if (partnerId && partnerId !== studentId && !teacherMap.has(partnerId)) {
+                const existingInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
+                if (existingInSchool && (existingInSchool.role === 'teacher' || (Array.isArray(existingInSchool.roles) && existingInSchool.roles.includes('teacher')))) {
+                  teacherMap.set(partnerId, existingInSchool);
+                }
+              }
+            });
+          }
+
+          const result = Array.from(teacherMap.values());
+          console.log('[CampusDirectMessages] Teachers for student:', studentId, 'Count:', result.length);
+          setAssignedStudents(result);
+        } catch (err) {
+          console.error('[CampusDirectMessages] Error fetching student teachers:', err);
+        }
+      };
+
+      fetchStudentTeachers();
+      const timer = setTimeout(fetchStudentTeachers, 800);
+      return () => clearTimeout(timer);
+    }
+
     const fetchAssignedStudents = async () => {
       try {
         const teacherId = user?.id || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id')) : null);
@@ -624,13 +722,13 @@ export default function CampusDirectMessages({
     return false;
   };
 
-  // Determine source list based on user role: Teachers only see their assigned students!
+  // Determine source list based on user role: Students see strictly their assigned teachers!
   const userRole = (user?.role || '').toLowerCase();
   const isAdminOrSecretary = userRole === 'admin' || userRole === 'secretary';
 
-  const sourceUsers = isAdminOrSecretary 
-    ? [...schoolUsers, ...assignedStudents] 
-    : assignedStudents;
+  const sourceUsers = isAdminOrSecretary
+    ? [...(schoolUsers || []), ...(assignedStudents || [])] 
+    : (assignedStudents || []);
 
   const allAvailableUsersMap = new Map<string, any>();
   sourceUsers.forEach(u => {
@@ -645,8 +743,8 @@ export default function CampusDirectMessages({
     if (u.id === user.id) return false;
     if (selectedRecipient && u.id === selectedRecipient.id) return true;
     if (isStudent) {
-      return (u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'))) && 
-        (String(u.id) === String(user.teacher_id) || (Array.isArray(user.teacher_ids) && user.teacher_ids.map(String).includes(String(u.id))));
+      const isTeacherRole = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
+      return isTeacherRole;
     }
 
     const role = (u.role || '').toLowerCase();
@@ -711,6 +809,13 @@ export default function CampusDirectMessages({
   };
 
   useEffect(() => {
+    if (!selectedRecipient && finalPartnersList.length > 0) {
+      const directTeacher = finalPartnersList.find(p => String(p.id) === String(user?.teacher_id));
+      setSelectedRecipient(directTeacher || finalPartnersList[0]);
+    }
+  }, [finalPartnersList, selectedRecipient, setSelectedRecipient, user?.teacher_id]);
+
+  useEffect(() => {
     if (selectedRecipient) {
       scrollToBottom();
       const unreadFromRecipient = campusMessages.some(m => 
@@ -744,23 +849,30 @@ export default function CampusDirectMessages({
 
     const fetchOccurrencesForStudent = async () => {
       try {
-        const studentId = selectedRecipient.id;
+        const targetStudentId = isStudent ? user?.id : selectedRecipient?.id;
+        const targetTeacherId = isStudent ? selectedRecipient?.id : user?.id;
+
+        if (!targetStudentId) {
+          setStudentOccurrences([]);
+          return;
+        }
+
         const todayObj = new Date();
         const yyyy = todayObj.getFullYear();
         const mm = String(todayObj.getMonth() + 1).padStart(2, '0');
         const dd = String(todayObj.getDate()).padStart(2, '0');
         const todayDateStr = `${yyyy}-${mm}-${dd}`;
 
-        // Fetch recurring schedules & actual occurrences in parallel
+        // Fetch recurring schedules & actual occurrences in parallel strictly for targetStudentId
         const [schRes, occRes] = await Promise.all([
           supabase
             .from('schedules')
             .select('*')
-            .eq('student_id', studentId),
+            .eq('student_id', targetStudentId),
           supabase
             .from('schedule_occurrences')
             .select('*')
-            .or(`student_id.eq.${studentId},teacher_id.eq.${studentId}`)
+            .eq('student_id', targetStudentId)
             .gte('date', todayDateStr)
             .order('date', { ascending: true })
         ]);
@@ -779,9 +891,18 @@ export default function CampusDirectMessages({
         if (schData.length > 0) {
           schData.forEach(sch => {
             const current = new Date(startRange);
+            const targetDay = typeof sch.day_of_week === 'number' ? sch.day_of_week : (
+              sch.day_of_week === 'Monday' || sch.day_of_week === 'Montag' ? 1 :
+              sch.day_of_week === 'Tuesday' || sch.day_of_week === 'Dienstag' ? 2 :
+              sch.day_of_week === 'Wednesday' || sch.day_of_week === 'Mittwoch' ? 3 :
+              sch.day_of_week === 'Thursday' || sch.day_of_week === 'Donnerstag' ? 4 :
+              sch.day_of_week === 'Friday' || sch.day_of_week === 'Freitag' ? 5 :
+              sch.day_of_week === 'Saturday' || sch.day_of_week === 'Samstag' ? 6 :
+              sch.day_of_week === 'Sunday' || sch.day_of_week === 'Sonntag' ? 7 : (parseInt(String(sch.day_of_week), 10) || 1)
+            );
+
             while (current <= endRange) {
               const currentDay = current.getDay() === 0 ? 7 : current.getDay();
-              const targetDay = Number(sch.day_of_week) || 1;
               const diff = targetDay - currentDay;
               
               const targetDate = new Date(current);
@@ -800,7 +921,7 @@ export default function CampusDirectMessages({
                   mergedOccurrences.push({
                     id: `virtual-${sch.id}-${dateStr}`,
                     schedule_id: sch.id,
-                    student_id: studentId,
+                    student_id: targetStudentId,
                     teacher_id: sch.teacher_id,
                     date: dateStr,
                     start_time: sch.time_slot ? (sch.time_slot.split(':').length === 2 ? `${sch.time_slot}:00` : sch.time_slot) : '18:00',
@@ -836,11 +957,15 @@ export default function CampusDirectMessages({
 
   const activeOccurrenceTabs = useMemo(() => {
     if (!selectedRecipient) return [];
-    const occMap = new Map<string, any>();
+    
+    // Group occurrences by slot key: `${occ.date}_${timeStr}`
+    const slotMap = new Map<string, { occ: any; ids: string[] }>();
 
-    // Add DB occurrences ONLY if they have messages OR represent a reschedule/change
-    (studentOccurrences || []).forEach(occ => {
-      if (!occ || !occ.id || occ.date < todayStr) return;
+    const processOcc = (occ: any) => {
+      if (!occ || !occ.date || occ.date < todayStr) return;
+      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student' || occ.status === 'deleted') return;
+      const timeStr = occ.start_time ? occ.start_time.slice(0, 5) : '18:00';
+      const slotKey = `${occ.date}_${timeStr}`;
 
       const occMessages = activeThreadMessages.filter(m => String(m.occurrence_id) === String(occ.id));
       const hasMessages = occMessages.length > 0;
@@ -852,21 +977,34 @@ export default function CampusDirectMessages({
         (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
 
       if (hasMessages || isShiftOrChanged) {
-        occMap.set(String(occ.id), occ);
+        if (!slotMap.has(slotKey)) {
+          slotMap.set(slotKey, { occ, ids: [String(occ.id)] });
+        } else {
+          const existing = slotMap.get(slotKey)!;
+          if (!existing.ids.includes(String(occ.id))) {
+            existing.ids.push(String(occ.id));
+          }
+          if (existing.occ.is_virtual && !occ.is_virtual) {
+            existing.occ = occ;
+          }
+        }
       }
-    });
+    };
+
+    (studentOccurrences || []).forEach(processOcc);
 
     // Also include any occurrences referenced in activeThreadMessages
     activeThreadMessages.forEach(msg => {
-      if (msg.occurrence_id && !occMap.has(String(msg.occurrence_id))) {
-        const linkedOcc = studentOccurrences.find(o => String(o.id) === String(msg.occurrence_id));
+      if (msg.occurrence_id) {
+        const msgOccId = String(msg.occurrence_id);
+        const linkedOcc = studentOccurrences.find(o => String(o.id) === msgOccId);
         if (linkedOcc && linkedOcc.date >= todayStr) {
-          occMap.set(String(linkedOcc.id), linkedOcc);
+          processOcc(linkedOcc);
         } else if (!linkedOcc) {
           const msgDate = msg.created_at ? msg.created_at.split('T')[0] : todayStr;
           if (msgDate >= todayStr) {
-            occMap.set(String(msg.occurrence_id), {
-              id: msg.occurrence_id,
+            processOcc({
+              id: msgOccId,
               date: msgDate,
               start_time: '18:00',
               is_virtual: true
@@ -876,15 +1014,15 @@ export default function CampusDirectMessages({
       }
     });
 
-    // Sort tabs chronologically by date + start_time ascending (next upcoming lesson first)
-    const tabs = Array.from(occMap.values()).map(occ => {
+    // Convert deduplicated slots into tabs
+    const tabs = Array.from(slotMap.values()).map(({ occ, ids }) => {
       const occDate = parseLocalDate(occ.date);
       const dayName = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
       const formattedDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
       const timeStr = occ.start_time ? occ.start_time.slice(0, 5) : '';
       const label = `${dayName} ${formattedDate}${timeStr ? ` ${timeStr}` : ''}`;
 
-      const occMessages = activeThreadMessages.filter(m => String(m.occurrence_id) === String(occ.id));
+      const occMessages = activeThreadMessages.filter(m => m.occurrence_id && ids.includes(String(m.occurrence_id)));
       const unreadCount = occMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read).length;
 
       const isShiftOrChanged = 
@@ -894,7 +1032,8 @@ export default function CampusDirectMessages({
         (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
 
       return {
-        id: String(occ.id),
+        id: ids[0],
+        allIds: ids,
         date: occ.date,
         start_time: occ.start_time || '18:00',
         label,
@@ -947,8 +1086,8 @@ export default function CampusDirectMessages({
   const displayedMessages = useMemo(() => {
     if (activeSubTab === 'general') return generalMessages;
     
-    // Active appointment tab
-    const selectedOccTab = activeOccurrenceTabs.find(tab => tab.id === activeSubTab);
+    // Active appointment tab (matching primary ID or any merged slot ID)
+    const selectedOccTab = activeOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
     if (selectedOccTab) {
       return selectedOccTab.messages;
     }
