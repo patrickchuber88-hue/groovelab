@@ -5652,72 +5652,207 @@ export function ScheduleCalendarView({
                               );
                             }
                             return (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '100%', width: '100%', gap: '4px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', minWidth: 0, flex: 1 }}>
-                                  <span style={{ 
-                                    fontSize: '0.65rem', 
-                                    fontWeight: 800, 
-                                    color: finalColors.text, 
-                                    background: 'rgba(0,0,0,0.04)', 
-                                    padding: '1px 3px', 
-                                    borderRadius: '3px',
-                                    whiteSpace: 'nowrap',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '2px'
-                                  }}>
-                                    <input
-                                      type="time"
-                                      value={occ.start_time.substring(0, 5)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onChange={async (e) => {
-                                        e.stopPropagation();
-                                        const newTime = e.target.value;
-                                        if (!newTime) return;
-                                        const formattedTime = newTime.length === 5 ? `${newTime}:00` : newTime;
-                                        const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
-                                          [occ.id]: { start_time: formattedTime }
-                                        };
-                                        updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
-                                      }}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        fontSize: '0.65rem',
-                                        fontWeight: 800,
-                                        color: finalColors.text,
-                                        outline: 'none',
-                                        padding: 0,
-                                        cursor: 'pointer',
-                                        fontFamily: 'inherit',
-                                        width: '42px'
-                                      }}
-                                      title="Startzeit manuell anpassen"
-                                    />
-                                    {(() => {
-                                      const roomId = occ.schedules?.room_id || occ.schedule?.room_id || occ.room_id || occ.student?.room_id;
-                                      let rName = roomId ? rooms.find(r => String(r.id) === String(roomId))?.name : '';
-                                      if (!rName) {
-                                        rName = occ.schedules?.room?.name || occ.schedule?.room?.name || occ.room?.name || occ.room_name || occ.raum || (typeof occ.room === 'string' ? occ.room : '');
-                                      }
-                                      if (!rName && selectedRoomIdForXRay) {
-                                        const rObj = rooms.find(r => String(r.id) === String(selectedRoomIdForXRay));
-                                        if (rObj) rName = rObj.name;
-                                      }
-                                      if (!rName && rooms && rooms.length > 0) {
-                                        const rObj = rooms.find(r => r.name?.includes('4')) || rooms[0];
-                                        if (rObj) rName = rObj.name;
-                                      }
-                                      return rName ? ` (${rName})` : '';
-                                    })()}
-                                  </span>
-                                  
+                              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', justifyContent: 'space-between', padding: '1px 0', gap: '2px' }}>
+                                {/* Row 1: Header (Time + Room Pill left, Status Badge & Close right) */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flexShrink: 0 }}>
+                                    <span style={{ 
+                                      fontSize: '0.65rem', 
+                                      fontWeight: 800, 
+                                      color: finalColors.text, 
+                                      background: 'rgba(0,0,0,0.04)', 
+                                      padding: '1px 4px', 
+                                      borderRadius: '3px',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '2px',
+                                      flexShrink: 0
+                                    }}>
+                                      <input
+                                        type="time"
+                                        value={occ.start_time.substring(0, 5)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={async (e) => {
+                                          e.stopPropagation();
+                                          const newTime = e.target.value;
+                                          if (!newTime) return;
+                                          const formattedTime = newTime.length === 5 ? `${newTime}:00` : newTime;
+                                          const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {
+                                            [occ.id]: { start_time: formattedTime }
+                                          };
+                                          updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800,
+                                          color: finalColors.text,
+                                          outline: 'none',
+                                          padding: 0,
+                                          cursor: 'pointer',
+                                          fontFamily: 'inherit',
+                                          width: '38px'
+                                        }}
+                                        title="Startzeit manuell anpassen"
+                                      />
+                                      {(() => {
+                                        const roomId = occ.schedules?.room_id || occ.schedule?.room_id || occ.room_id || occ.student?.room_id;
+                                        let rName = roomId ? rooms.find(r => String(r.id) === String(roomId))?.name : '';
+                                        if (!rName) {
+                                          rName = occ.schedules?.room?.name || occ.schedule?.room?.name || occ.room?.name || occ.room_name || occ.raum || (typeof occ.room === 'string' ? occ.room : '');
+                                        }
+                                        if (!rName && selectedRoomIdForXRay) {
+                                          const rObj = rooms.find(r => String(r.id) === String(selectedRoomIdForXRay));
+                                          if (rObj) rName = rObj.name;
+                                        }
+                                        if (!rName && rooms && rooms.length > 0) {
+                                          const rObj = rooms.find(r => r.name?.includes('4')) || rooms[0];
+                                          if (rObj) rName = rObj.name;
+                                        }
+                                        return rName ? (
+                                          <span style={{ fontWeight: 600, opacity: 0.75, fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
+                                            ({rName})
+                                          </span>
+                                        ) : null;
+                                      })()}
+                                    </span>
+                                    
+                                    {isGroup && (
+                                      <Users size={10} style={{ color: finalColors.text, opacity: 0.7, flexShrink: 0 }} />
+                                    )}
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                                    {(isRescheduled || isResetPending) && (() => {
+                                       const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
+                                       return (
+                                         <span 
+                                           onClick={async (e) => {
+                                             e.stopPropagation();
+                                             if (isConfirmed) return;
+                                             try {
+                                               if (occ.id.startsWith('mock-')) {
+                                                 await supabase.from('schedule_occurrences').upsert({
+                                                   date: occ.date,
+                                                   original_date: occ.date,
+                                                   start_time: occ.start_time,
+                                                   original_start_time: occ.start_time,
+                                                   duration: occ.duration || 45,
+                                                   teacher_id: userId,
+                                                   student_id: occ.student_id === 'vacant' ? null : occ.student_id,
+                                                   status: 'scheduled',
+                                                   teacher_acknowledged: true,
+                                                   student_acknowledged: true
+                                                 });
+                                               } else {
+                                                 await supabase.from('schedule_occurrences').update({
+                                                   teacher_acknowledged: true,
+                                                   student_acknowledged: true,
+                                                   status: 'rescheduled_confirmed'
+                                                 }).eq('id', occ.id);
+                                               }
+                                               setPendingChanges(prev => ({
+                                                 ...prev,
+                                                 [occ.id]: {
+                                                   ...occ,
+                                                   teacher_acknowledged: true,
+                                                   student_acknowledged: true,
+                                                   status: 'rescheduled_confirmed'
+                                                 }
+                                               }));
+                                               await loadOccurrences();
+                                               await showAlert('Rückmeldung für diesen Termin als gelesen & bestätigt markiert (jetzt grün).');
+                                             } catch (err) {
+                                               console.error('Error confirming occurrence:', err);
+                                             }
+                                           }}
+                                           onMouseEnter={(e) => {
+                                             onMouseEnterHelper(e, isResetPending, occ);
+                                           }}
+                                           onMouseMove={(e) => {
+                                             e.stopPropagation();
+                                             setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+                                           }}
+                                           onMouseLeave={(e) => {
+                                             e.stopPropagation();
+                                             setHoveredTooltip(null);
+                                           }}
+                                           style={{ 
+                                             fontSize: '0.56rem',
+                                             fontWeight: 800,
+                                             padding: '1px 4px',
+                                             borderRadius: '3px',
+                                             display: 'inline-flex',
+                                             alignItems: 'center',
+                                             gap: '2px',
+                                             textTransform: 'uppercase',
+                                             letterSpacing: '0.02em',
+                                             background: isConfirmed ? '#e6f4ea' : '#fef3c7',
+                                             color: isConfirmed ? '#137333' : '#b45309',
+                                             border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
+                                             flexShrink: 0,
+                                             whiteSpace: 'nowrap',
+                                             cursor: isConfirmed ? 'default' : 'pointer'
+                                           }} 
+                                           title={isConfirmed ? 'Termin ist bestätigt' : 'Klicken, um die Rückmeldung als gelesen & grün zu markieren'}
+                                         >
+                                           <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
+                                         </span>
+                                       );
+                                     })()}
+
+                                    {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                      <button 
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (isBreak) {
+                                            handleCancelBreak(e, occ);
+                                          } else {
+                                            if (isGroup) {
+                                              if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
+                                                const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                                                occurrencesInGroup.forEach(go => {
+                                                  updatesMap[go.id] = { status: 'cancelled' };
+                                                });
+                                                updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
+                                              }
+                                            } else {
+                                              handleCancel(e, occ.id);
+                                            }
+                                          }
+                                        }}
+                                        title={isBreak ? "Pause löschen" : "Termin absagen"}
+                                        style={{ 
+                                          background: 'transparent', 
+                                          border: 'none', 
+                                          cursor: 'pointer', 
+                                          color: finalColors.text, 
+                                          opacity: 0.5, 
+                                          padding: '1px', 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center', 
+                                          borderRadius: '3px',
+                                          transition: 'all 0.1s' 
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                        onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                      >
+                                        <X size={10} strokeWidth={2.5} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Row 2: Student Name & Group Icon */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', overflow: 'hidden' }}>
                                   {isGroup && (
-                                    <Users size={10} style={{ color: finalColors.text, opacity: 0.7, flexShrink: 0 }} />
+                                    <Users size={11} style={{ color: finalColors.text, opacity: 0.8, flexShrink: 0 }} />
                                   )}
-                                  
                                   <span style={{ 
-                                    fontSize: '0.7rem', 
+                                    fontSize: '0.72rem', 
                                     fontWeight: 700, 
                                     color: finalColors.text, 
                                     whiteSpace: 'nowrap', 
@@ -5732,127 +5867,7 @@ export function ScheduleCalendarView({
                                       : (isBreak ? 'Pause' : displayNames)
                                     }
                                   </span>
-
-                                  {(isRescheduled || isResetPending) && (() => {
-                                     const isConfirmed = (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true) && !isResetPending;
-                                     return (
-                                       <span 
-                                         onClick={async (e) => {
-                                           e.stopPropagation();
-                                           if (isConfirmed) return;
-                                           try {
-                                             if (occ.id.startsWith('mock-')) {
-                                               await supabase.from('schedule_occurrences').upsert({
-                                                 date: occ.date,
-                                                 original_date: occ.date,
-                                                 start_time: occ.start_time,
-                                                 original_start_time: occ.start_time,
-                                                 duration: occ.duration || 45,
-                                                 teacher_id: userId,
-                                                 student_id: occ.student_id === 'vacant' ? null : occ.student_id,
-                                                 status: 'scheduled',
-                                                 teacher_acknowledged: true,
-                                                 student_acknowledged: true
-                                               });
-                                             } else {
-                                               await supabase.from('schedule_occurrences').update({
-                                                 teacher_acknowledged: true,
-                                                 student_acknowledged: true,
-                                                 status: 'rescheduled_confirmed'
-                                               }).eq('id', occ.id);
-                                             }
-                                             setPendingChanges(prev => ({
-                                               ...prev,
-                                               [occ.id]: {
-                                                 ...occ,
-                                                 teacher_acknowledged: true,
-                                                 student_acknowledged: true,
-                                                 status: 'rescheduled_confirmed'
-                                               }
-                                             }));
-                                             await loadOccurrences();
-                                             await showAlert('Rückmeldung für diesen Termin als gelesen & bestätigt markiert (jetzt grün).');
-                                           } catch (err) {
-                                             console.error('Error confirming occurrence:', err);
-                                           }
-                                         }}
-                                         onMouseEnter={(e) => {
-                                           onMouseEnterHelper(e, isResetPending, occ);
-                                         }}
-                                         onMouseMove={(e) => {
-                                           e.stopPropagation();
-                                           setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-                                         }}
-                                         onMouseLeave={(e) => {
-                                           e.stopPropagation();
-                                           setHoveredTooltip(null);
-                                         }}
-                                         style={{ 
-                                           fontSize: '0.58rem',
-                                           fontWeight: 800,
-                                           padding: '1px 5px',
-                                           borderRadius: '4px',
-                                           display: 'inline-flex',
-                                           alignItems: 'center',
-                                           gap: '2px',
-                                           textTransform: 'uppercase',
-                                           letterSpacing: '0.02em',
-                                           background: isConfirmed ? '#e6f4ea' : '#fef3c7',
-                                           color: isConfirmed ? '#137333' : '#b45309',
-                                           border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fde68a',
-                                           flexShrink: 0,
-                                           marginLeft: '4px',
-                                           cursor: isConfirmed ? 'default' : 'pointer'
-                                         }} 
-                                         title={isConfirmed ? 'Termin ist bestätigt' : 'Klicken, um die Rückmeldung als gelesen & grün zu markieren'}
-                                       >
-                                         <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
-                                       </span>
-                                     );
-                                   })()}
-
                                 </div>
-
-                                {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
-                                  <button 
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      if (isBreak) {
-                                        handleCancelBreak(e, occ);
-                                      } else {
-                                        if (isGroup) {
-                                          if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
-                                            const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                            occurrencesInGroup.forEach(go => {
-                                              updatesMap[go.id] = { status: 'cancelled' };
-                                            });
-                                            updateMultipleOccurrences(updatesMap, 'Änderung vorgenommen');
-                                          }
-                                        } else {
-                                          handleCancel(e, occ.id);
-                                        }
-                                      }
-                                    }}
-                                    title={isBreak ? "Pause löschen" : "Termin absagen"}
-                                    style={{ 
-                                      background: 'transparent', 
-                                      border: 'none', 
-                                      cursor: 'pointer', 
-                                      color: finalColors.text, 
-                                      opacity: 0.5, 
-                                      padding: '2px', 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      borderRadius: '4px',
-                                      transition: 'all 0.1s' 
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.opacity = '1'}
-                                    onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
-                                  >
-                                    <X size={11} strokeWidth={2.5} />
-                                  </button>
-                                )}
                               </div>
                             );
                           }
