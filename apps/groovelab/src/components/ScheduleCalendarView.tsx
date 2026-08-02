@@ -5372,19 +5372,21 @@ export function ScheduleCalendarView({
                                        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) || false;
                   }
 
+                  const isActualMove = isTimeOrDayMoved ||
+                    Boolean(occ.original_date && occ.original_date !== occ.date) ||
+                    Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
+
                   const isRescheduled = !isBreak && !isVacant && !isSick && !isAtMasterSlot && (
-                    occ.status === 'pending_reschedule' || 
-                    occ.status === 'rescheduled_confirmed' ||
-                    isTimeOrDayMoved ||
-                    (occ.original_date && occ.original_date !== occ.date) ||
-                    (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
-                    isRoomOverridden
+                    isActualMove ||
+                    (isRoomOverridden && occ.status !== 'scheduled') ||
+                    (occ.status === 'rescheduled_confirmed' && isActualMove) ||
+                    (occ.status === 'pending_reschedule' && isActualMove)
                   );
                   const isResetPending = false;
  
                   const isConfirmedReschedule = isRescheduled && (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true);
 
-                  const isWaiting = !isBreak && !isVacant && !isSick && !isAtMasterSlot && !isConfirmedReschedule && (
+                  const isWaiting = !isBreak && !isVacant && !isSick && !isAtMasterSlot && isActualMove && !isConfirmedReschedule && (
                     isGroup 
                       ? occurrencesInGroup.some(o => o.status === 'pending_reschedule' || (o.student_acknowledged === false && Boolean(o.original_date)))
                       : (occ.status === 'pending_reschedule' || isTimeOrDayMoved || (occ.student_acknowledged === false && Boolean(occ.original_date)))
