@@ -1078,11 +1078,19 @@ function MobileBriefingView({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {(() => {
             const todayStr = new Date().toLocaleDateString('sv-SE');
-            const upcomingConfirmed = (scheduleOccurrences || []).filter(occ => 
-              (occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed' || occ.status === 'cancelled') && occ.date > todayStr
-            );
+            const combinedList = [...(scheduleOccurrences || [])];
+            const seenKeys = new Set<string>();
+            const upcomingConfirmed = combinedList.filter(occ => {
+              if (!occ || !occ.date) return false;
+              if (occ.date < todayStr) return false;
+              if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student') return false;
+              const key = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+              if (seenKeys.has(key)) return false;
+              seenKeys.add(key);
+              return true;
+            });
             if (upcomingConfirmed.length > 0) {
-              return upcomingConfirmed.slice(0, 2).map(occ => {
+              return upcomingConfirmed.slice(0, 4).map(occ => {
                 const d = new Date(occ.date);
                 const isCancelled = occ.status === 'cancelled';
                 
@@ -3052,19 +3060,64 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     if (!studentId) return;
     setLoadingSchedule(true);
     try {
-      const { data, error } = await supabase
+      const todayStr = toLocalYYYYMMDD(new Date());
+
+      const { data: occurrences } = await supabase
         .from('schedule_occurrences')
         .select('*, schedule:schedule_id(*, rooms(name)), teacher:users!schedule_occurrences_teacher_id_fkey(first_name, last_name)')
         .eq('student_id', studentId)
-        .gte('date', toLocalYYYYMMDD(new Date()))
+        .gte('date', todayStr)
         .order('date', { ascending: true })
         .order('start_time', { ascending: true });
-      
-      if (!error && data) {
-        setRawScheduleOccurrences(data);
+
+      const { data: schedules } = await supabase
+        .from('schedules')
+        .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name), rooms(name)')
+        .eq('student_id', studentId);
+
+      const mergedList: any[] = [...(occurrences || [])];
+
+      if (schedules && schedules.length > 0) {
+        schedules.forEach(sch => {
+          const today = new Date();
+          const currentDay = today.getDay() || 7;
+          const schDay = typeof sch.day_of_week === 'number' ? sch.day_of_week : (
+            sch.day_of_week === 'Monday' ? 1 : sch.day_of_week === 'Tuesday' ? 2 : sch.day_of_week === 'Wednesday' ? 3 : sch.day_of_week === 'Thursday' ? 4 : sch.day_of_week === 'Friday' ? 5 : sch.day_of_week === 'Saturday' ? 6 : 7
+          );
+          
+          let diff = schDay - currentDay;
+          if (diff < 0) diff += 7;
+          
+          const targetDate = new Date(today);
+          targetDate.setDate(today.getDate() + diff);
+          const dateStr = toLocalYYYYMMDD(targetDate);
+
+          const existsInOccur = mergedList.some(o => o.date === dateStr);
+          if (!existsInOccur) {
+            mergedList.push({
+              id: `virtual-${sch.id}-${dateStr}`,
+              schedule_id: sch.id,
+              student_id: studentId,
+              teacher_id: sch.teacher_id,
+              date: dateStr,
+              start_time: sch.time_slot,
+              status: sch.status || 'scheduled',
+              teacher: sch.teacher,
+              schedule: sch
+            });
+          }
+        });
       }
+
+      mergedList.sort((a, b) => {
+        const dateDiff = (a.date || '').localeCompare(b.date || '');
+        if (dateDiff !== 0) return dateDiff;
+        return (a.start_time || '').localeCompare(b.start_time || '');
+      });
+
+      setRawScheduleOccurrences(mergedList);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching student schedule:', err);
     } finally {
       setLoadingSchedule(false);
     }
@@ -3215,9 +3268,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       if (schedules) {
         schedules.forEach(sch => {
           const current = new Date(schoolYearStart);
+          const schDay = typeof sch.day_of_week === 'number' ? sch.day_of_week : (
+            sch.day_of_week === 'Monday' || sch.day_of_week === 'Montag' ? 1 :
+            sch.day_of_week === 'Tuesday' || sch.day_of_week === 'Dienstag' ? 2 :
+            sch.day_of_week === 'Wednesday' || sch.day_of_week === 'Mittwoch' ? 3 :
+            sch.day_of_week === 'Thursday' || sch.day_of_week === 'Donnerstag' ? 4 :
+            sch.day_of_week === 'Friday' || sch.day_of_week === 'Freitag' ? 5 :
+            sch.day_of_week === 'Saturday' || sch.day_of_week === 'Samstag' ? 6 :
+            sch.day_of_week === 'Sunday' || sch.day_of_week === 'Sonntag' ? 7 : (parseInt(String(sch.day_of_week), 10) || 1)
+          );
           while (current <= schoolYearEnd) {
             const currentDay = current.getDay() || 7;
-            const diff = sch.day_of_week - currentDay;
+            const diff = schDay - currentDay;
             const targetDate = new Date(current);
             targetDate.setDate(current.getDate() + diff);
 
@@ -6877,13 +6939,13 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       width: '38px',
                       height: '38px',
                       borderRadius: '12px',
-                      background: node.done ? 'rgba(52, 168, 83, 0.25)' : (node.current ? 'rgba(250, 204, 21, 0.3)' : 'rgba(255, 255, 255, 0.1)'),
-                      border: node.current ? '2.5px solid #facc15' : (node.done ? '1.5px solid #34a853' : '1.5px solid rgba(255, 255, 255, 0.25)'),
+                      background: node.done ? 'rgba(52, 168, 83, 0.25)' : (node.current ? 'rgba(250, 204, 21, 0.12)' : 'rgba(255, 255, 255, 0.05)'),
+                      border: node.done ? '2px solid #34a853' : (node.current ? '1.5px dashed rgba(250, 204, 21, 0.6)' : '1.5px solid rgba(255, 255, 255, 0.15)'),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: node.current ? '0 0 16px rgba(250, 204, 21, 0.7)' : (node.done ? '0 0 8px rgba(52, 168, 83, 0.4)' : 'none'),
-                      transform: node.current ? 'scale(1.12)' : 'scale(1)',
+                      boxShadow: node.done ? '0 0 12px rgba(52, 168, 83, 0.4)' : 'none',
+                      transform: node.done ? 'scale(1.05)' : 'scale(1)',
                       transition: 'all 0.3s ease',
                       overflow: 'hidden',
                       padding: '3px'
@@ -6895,7 +6957,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           width: '100%',
                           height: '100%',
                           objectFit: 'contain',
-                          filter: node.done || node.current ? 'none' : 'grayscale(100%) opacity(0.4)'
+                          filter: node.done ? 'none' : 'grayscale(100%) opacity(0.35)'
                         }}
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
@@ -6903,6 +6965,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           if (parent) {
                             const span = document.createElement('span');
                             span.style.fontSize = '1.1rem';
+                            span.style.filter = node.done ? 'none' : 'grayscale(100%) opacity(0.35)';
                             span.innerText = node.icon;
                             parent.appendChild(span);
                           }
@@ -8181,31 +8244,38 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </span>
                   </div>
 
-                  {/* Glowing 3D Sticker Showcase */}
+                  {/* 3D Sticker Showcase */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div style={{
                       width: '72px',
                       height: '72px',
                       borderRadius: '20px',
-                      background: `radial-gradient(circle, ${stickerColor}25 0%, rgba(255,255,255,0) 70%)`,
-                      border: `2px solid ${stickerColor}40`,
+                      background: totalFocusMinutes >= targetMin ? `radial-gradient(circle, ${stickerColor}25 0%, rgba(255,255,255,0) 70%)` : '#f8fafc',
+                      border: totalFocusMinutes >= targetMin ? `2px solid ${stickerColor}` : `1.5px dashed ${stickerColor}60`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: `0 8px 24px ${stickerColor}30`,
+                      boxShadow: totalFocusMinutes >= targetMin ? `0 8px 24px ${stickerColor}30` : 'none',
                       flexShrink: 0,
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      padding: '4px'
                     }}>
                       <img 
                         src={`/stickers/${stickerId}.png?v=1`} 
                         alt={stickerTitle} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          filter: totalFocusMinutes >= targetMin ? 'none' : 'grayscale(100%) opacity(0.4)'
+                        }}
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
                             const span = document.createElement('span');
-                            span.style.fontSize = '2.5rem';
+                            span.style.fontSize = '2.2rem';
+                            span.style.filter = totalFocusMinutes >= targetMin ? 'none' : 'grayscale(100%) opacity(0.4)';
                             span.innerText = stickerEmoji;
                             parent.appendChild(span);
                           }
@@ -10422,27 +10492,35 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       : 'Ein neuer Moment für Musik. Nimm dir heute ein paar Minuten für deine Übungsziele!'}
                   </p>
 
-                  {briefingData?.todayLesson || scheduleOccurrences?.length > 0 ? (() => {
-                    const nextOcc = scheduleOccurrences[0];
+                  {(() => {
+                    const nextOcc = (scheduleOccurrences || [])[0] || (schoolYearOccurrences || [])[0];
                     const hasToday = !!briefingData?.todayLesson;
                     
-                    const teacherId = hasToday ? briefingData.todayLesson.teacher_id : nextOcc?.teacher_id;
-                    const teacherName = hasToday ? briefingData.todayLesson.teacher : (nextOcc?.teacher ? `Herr/Frau ${nextOcc.teacher.last_name}` : 'Lehrkraft');
-                    const timeLabel = hasToday ? briefingData.todayLesson.time : nextOcc?.start_time?.substring(0, 5);
+                    const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
+                    const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
                     
                     const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
                     const todayStr = new Date().toISOString().split('T')[0];
                     
-                    const targetDateStr = hasToday ? todayStr : nextOcc?.date;
+                    const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
                     const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
                     const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
                     const label = `${targetDayOfWeek} (${formattedDate}), ${timeLabel} Uhr`;
-  
+
                     const todayOcc = (scheduleOccurrences || []).find(occ => occ.date === todayStr);
                     const finalOccurId = hasToday 
                       ? (todayOcc?.id || briefingData?.todayLesson?.id || `today-${teacherId}-${todayStr}`) 
-                      : nextOcc?.id;
-  
+                      : (nextOcc?.id || `sched-${studentId}`);
+
+                    const lessonText = hasToday 
+                      ? `Heute, ${briefingData.todayLesson.time} Uhr` 
+                      : (nextOcc ? (() => {
+                          const d = new Date(nextOcc.date);
+                          return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
+                        })() : 'Demnächst');
+
+                    const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
+
                     return (
                       <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         <div style={{ 
@@ -10458,59 +10536,47 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           border: '1px solid rgba(52, 168, 83, 0.15)'
                         }}>
                           <Calendar size={13} color="#34a853" />
-                          <span>Nächster Unterricht: {hasToday ? `Heute, ${briefingData.todayLesson.time} Uhr` : (() => {
-                            if(!nextOcc) return 'Demnächst';
-                            const d = new Date(nextOcc.date);
-                            return `${d.toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit'})} - ${nextOcc.start_time?.substring(0,5)} Uhr`;
-                          })()}</span>
+                          <span>Nächster Unterricht: {lessonText}</span>
                         </div>
-  
-                        {teacherId && (() => {
-                          const hasMessage = finalOccurId && occurrencesWithMessages.includes(finalOccurId);
-                          return (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAppointmentChatData({
-                                  teacherId,
-                                  date: targetDateStr,
-                                  start_time: timeLabel,
-                                  label,
-                                  occurrenceId: finalOccurId
-                                });
-                                setShowAppointmentChat(true);
-                              }}
-                              title="Shoutbox öffnen"
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                background: hasMessage ? '#fef3c7' : '#e0e7ff', 
-                                color: hasMessage ? '#d97706' : '#4f46e5', 
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '50%',
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                flexShrink: 0,
-                                boxShadow: hasMessage ? '0 4px 10px rgba(217, 119, 6, 0.1)' : '0 4px 10px rgba(79, 70, 229, 0.1)'
-                              }}
-                              onMouseOver={e => e.currentTarget.style.background = hasMessage ? '#fde68a' : '#c7d2fe'}
-                              onMouseOut={e => e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#e0e7ff'}
-                            >
-                              <MessageSquare size={14} fill={hasMessage ? 'currentColor' : 'none'} />
-                            </button>
-                          );
-                        })()}
+
+                        {teacherId && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAppointmentChatData({
+                                teacherId,
+                                date: targetDateStr,
+                                start_time: timeLabel,
+                                label,
+                                occurrenceId: finalOccurId
+                              });
+                              setShowAppointmentChat(true);
+                            }}
+                            title="Shoutbox öffnen"
+                            style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              background: hasMessage ? '#fef3c7' : '#e0e7ff', 
+                              color: hasMessage ? '#d97706' : '#4f46e5', 
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              flexShrink: 0,
+                              boxShadow: hasMessage ? '0 4px 10px rgba(217, 119, 6, 0.1)' : '0 4px 10px rgba(79, 70, 229, 0.1)'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.background = hasMessage ? '#fde68a' : '#c7d2fe'}
+                            onMouseOut={e => e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#e0e7ff'}
+                          >
+                            <MessageSquare size={14} fill={hasMessage ? 'currentColor' : 'none'} />
+                          </button>
+                        )}
                       </div>
                     );
-                  })() : (
-                    <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(52, 168, 83, 0.06)', color: '#34a853', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
-                      <Calendar size={13} color="#34a853" />
-                      <span>Nächster Unterricht: Demnächst</span>
-                    </div>
-                  )}
+                  })()}
                 </div>
               </div>
 
@@ -11351,11 +11417,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {(() => {
                     const todayStr = new Date().toLocaleDateString('sv-SE');
-                    const upcomingConfirmed = (scheduleOccurrences || []).filter(occ => 
-                      (occ.status === 'scheduled' || occ.status === 'rescheduled_confirmed' || occ.status === 'cancelled') && occ.date > todayStr
-                    );
+                    const combinedList = [...(scheduleOccurrences || []), ...(schoolYearOccurrences || [])];
+                    const seenKeys = new Set<string>();
+                    const upcomingConfirmed = combinedList.filter(occ => {
+                      if (!occ || !occ.date) return false;
+                      if (occ.date < todayStr) return false;
+                      if (occ.status === 'rescheduled_away' || occ.status === 'canceled_by_student') return false;
+                      const key = `${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+                      if (seenKeys.has(key)) return false;
+                      seenKeys.add(key);
+                      return true;
+                    });
                     if (upcomingConfirmed.length > 0) {
-                      return upcomingConfirmed.slice(0, 2).map(occ => {
+                      return upcomingConfirmed.slice(0, 4).map(occ => {
                         const d = new Date(occ.date);
                         const isCancelled = occ.status === 'cancelled';
                         
