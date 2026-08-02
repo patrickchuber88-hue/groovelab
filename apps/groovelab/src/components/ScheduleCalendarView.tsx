@@ -5397,8 +5397,13 @@ export function ScheduleCalendarView({
 
                   const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
 
-                  const activePlatform = localStorage.getItem('groovelab_active_platform') || 'campus';
-                  const isGroovelab = activePlatform === 'groovelab';
+                  const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
+                  const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
+                  const displayNames = isGroup 
+                    ? occurrencesInGroup.map(o => `${o.student?.first_name || o.student_first_name || o.first_name || ''} ${maskLastName(o.student?.last_name || o.student_last_name || o.last_name || '', showRealNames)}`.trim()).filter(Boolean).join(' & ')
+                    : (occ.student_id === 'vacant' ? 'Freier Platz' : (`${fn} ${maskLastName(ln, showRealNames)}`.trim() || occ.name || occ.student_name || 'Unbekannt'));
+
+                  const isGroupLesson = isGroup || Boolean(displayNames && (displayNames.includes('&') || displayNames.includes(' & ')));
 
                   if (isCancelled || isSick) {
                     if (!isCancelledAck) {
@@ -5421,20 +5426,38 @@ export function ScheduleCalendarView({
                         finalColors.border = '#eab308';
                         finalColors.text = '#713f12';
                       }
-                    } else {
-                      // Campus module color definitions:
+                    } else if (isGroupLesson) {
+                      // Campus Group Lessons Color Palette (Signature Blue):
                       if (isWaiting) {
-                        // Gelb gestrichelt = verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
+                        // Blau gestreift = Gruppentermin verschoben / Entwurf, unbestätigt
+                        cardBackground = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+                        finalColors.border = '#0284c7';
+                        finalColors.text = '#0369a1';
+                      } else if (isConfirmedReschedule) {
+                        // Vollton Blau = Gruppentermin verschoben & durch Schüler bestätigt
+                        cardBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                        finalColors.border = '#0284c7';
+                        finalColors.text = '#0369a1';
+                      } else {
+                        // Vollton Blau = Stammtermin Gruppentermin
+                        cardBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                        finalColors.border = '#0284c7';
+                        finalColors.text = '#0369a1';
+                      }
+                    } else {
+                      // Campus Single Lessons Color Palette (Green / Yellow):
+                      if (isWaiting) {
+                        // Gelb gestrichelt = Einzeltermin verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
                         cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
                         finalColors.border = '#eab308';
                         finalColors.text = '#854d0e';
                       } else if (isConfirmedReschedule) {
-                        // Vollton Gelb = Termin verschoben und durch Schüler bestätigt
+                        // Vollton Gelb = Einzeltermin verschoben und durch Schüler bestätigt
                         cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
                         finalColors.border = '#eab308';
                         finalColors.text = '#854d0e';
                       } else {
-                        // Vollton Grün = Unveränderter Stammtermin aus dem Stundenplan-Designer
+                        // Vollton Grün = Unveränderter Stammtermin Einzeltermin aus dem Stundenplan-Designer
                         cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                         finalColors.border = '#34a853';
                         finalColors.text = '#34a853';
@@ -5497,11 +5520,6 @@ export function ScheduleCalendarView({
                   const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
                   const isGruppenunterricht = isGroup && occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
                   const isEnsemble = isGroup && !isGruppenunterricht;
-                  const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
-                  const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
-                  const displayNames = isGroup 
-                    ? occurrencesInGroup.map(o => `${o.student?.first_name || o.student_first_name || o.first_name || ''} ${maskLastName(o.student?.last_name || o.student_last_name || o.last_name || '', showRealNames)}`.trim()).filter(Boolean).join(' & ')
-                    : `${fn} ${maskLastName(ln, showRealNames)}`.trim();
 
                   if (isGap) return null;
 
@@ -5848,8 +5866,8 @@ export function ScheduleCalendarView({
 
                                 {/* Row 2: Student Name & Group Icon */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', overflow: 'hidden' }}>
-                                  {isGroup && (
-                                    <Users size={11} style={{ color: finalColors.text, opacity: 0.8, flexShrink: 0 }} />
+                                  {isGroupLesson && (
+                                    <Users size={11} style={{ color: finalColors.text, opacity: 0.85, flexShrink: 0 }} />
                                   )}
                                   <span style={{ 
                                     fontSize: '0.72rem', 
@@ -6058,18 +6076,15 @@ export function ScheduleCalendarView({
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', width: '100%', marginBottom: '2px' }}>
-                                  {isGroup ? (
-                                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                      {displayNames}
-                                    </div>
-                                  ) : (
-                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {displayNames}
-                                      {isBreak && (
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.6 }}> • {occ.duration || 15} Min</span>
-                                      )}
-                                    </div>
-                                  )}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                    {isGroupLesson && (
+                                      <Users size={12} style={{ color: finalColors.text, opacity: 0.85, flexShrink: 0 }} />
+                                    )}
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayNames}</span>
+                                    {isBreak && (
+                                      <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.6 }}> • {occ.duration || 15} Min</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -6235,66 +6250,16 @@ return (
                                 )}
                               </div>
 
-                              {isGroup ? (
-                                isGruppenunterricht ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
-                                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {displayNames}
-                                    </div>
-                                    <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                      Gruppenunterricht ({occurrencesInGroup.length} Schüler)
-                                    </div>
+                              {isGroupLesson ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <Users size={13} style={{ color: finalColors.text, opacity: 0.85, flexShrink: 0 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayNames}</span>
                                   </div>
-                                ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flex: 1, minHeight: 0 }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {displayNames}
-                                      </div>
-                                      <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                        Ensemble- / Bandstunde ({occurrencesInGroup.length} Schüler)
-                                      </div>
-                                    </div>
-                                    
-                                    <div style={{ 
-                                      display: 'flex', 
-                                      flexWrap: 'wrap', 
-                                      gap: '4px', 
-                                      overflowY: 'auto', 
-                                      maxHeight: `${(occ.duration || 30) * 2.5 - 52}px`,
-                                      scrollbarWidth: 'none'
-                                    }}>
-                                      {occurrencesInGroup.map(o => {
-                                        const name = `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim();
-                                        const acknowledged = o.student_acknowledged;
-                                        return (
-                                          <span 
-                                            key={o.id} 
-                                            style={{ 
-                                              background: 'rgba(255, 255, 255, 0.65)', 
-                                              border: `1px solid ${finalColors.border}22`,
-                                              color: finalColors.text, 
-                                              fontSize: '0.68rem', 
-                                              fontWeight: 700, 
-                                              padding: '2px 8px', 
-                                              borderRadius: '6px', 
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              whiteSpace: 'nowrap',
-                                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                                            }}
-                                          >
-                                            <span>{name}</span>
-                                            <span style={{ fontSize: '0.62rem', opacity: 0.8, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>
-                                              {acknowledged ? '✓' : '🕒'}
-                                            </span>
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
+                                  <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                    Gruppenunterricht ({occurrencesInGroup.length > 1 ? occurrencesInGroup.length : 2} Schüler)
                                   </div>
-                                )
+                                </div>
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: finalColors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
