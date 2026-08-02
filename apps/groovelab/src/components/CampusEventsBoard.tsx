@@ -2066,16 +2066,14 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
     };
   }, [activeChatOcc, userId, role]);
 
-  const handleSendChatMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatTypedMessage.trim() || !activeChatOcc) return;
+  const sendDirectChatMessage = async (contentToSend: string) => {
+    if (!contentToSend.trim() || !activeChatOcc) return;
 
     const studentId = role === 'student' ? userId : activeChatOcc.student_id;
     const recipientId = role === 'student' ? activeChatOcc.teacher_id : activeChatOcc.student_id;
     if (!studentId || !recipientId) return;
 
-    const messageContent = chatTypedMessage.trim();
-    setChatTypedMessage('');
+    const messageContent = contentToSend.trim();
 
     try {
       const targetOccId = await ensureActualOccurrence(activeChatOcc);
@@ -2146,10 +2144,19 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         console.error('Failed to dispatch push notification for shoutbox:', pushErr);
       }
 
-      await fetchChat(studentId, activeChatOcc.id);
+      await fetchChat(userId, targetOccId);
     } catch (err) {
       console.error('Error sending chat message:', err);
     }
+  };
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatTypedMessage.trim() || !activeChatOcc) return;
+
+    const messageContent = chatTypedMessage.trim();
+    setChatTypedMessage('');
+    await sendDirectChatMessage(messageContent);
   };
 
   // Smart search for participants (debounced 250ms)
@@ -5150,8 +5157,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         occ.isRoomChanged || 
                                         occ.is_room_booking || 
                                         occ.isRoomBooking || 
+                                        occ.is_extra_room ||
+                                        occ.isExtraRoom ||
+                                        occ.room_booking_required ||
                                         (defaultRoomName && rName && defaultRoomName !== rName) || 
-                                        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
+                                        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id)) ||
+                                        (isRescheduled && (occ.room_id || occ.room_override_name || occ.roomOverrideName))
                                       );
 
                                       let dateBlockBg = '#f8fafc';
@@ -12696,33 +12707,75 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
               {/* Music Pedagogical Quick Reply Chips */}
               {!isFrozen && (
-                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '10px 20px 4px 20px', background: '#fafbfc' }}>
-                  {[
-                    '👍 Ja, geht klar!',
-                    '❌ Nein, geht leider nicht',
-                    '⏳ Bin 5 Min. später',
-                    '🎼 Bitte Notenheft mitbringen',
-                    '📝 Hausaufgabe im Aufgabenheft',
-                    '✅ Termin ist bestätigt'
-                  ].map((text, i) => (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  overflowX: 'auto',
+                  padding: '10px 20px 4px 20px',
+                  background: '#fafbfc',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}>
+                  {/* 1-Click Direct Emoji Reaction Buttons */}
+                  <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
+                    {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
+                      <button
+                        key={`event-emoji-${idx}`}
+                        type="button"
+                        onClick={() => sendDirectChatMessage(emoji)}
+                        style={{
+                          padding: '4px 9px',
+                          borderRadius: '100px',
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          flexShrink: 0
+                        }}
+                        className="hover-scale"
+                        title={`Schnell-Reaktion ${emoji} senden`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Role-Specific Authentic Text Phrases */}
+                  {(role === 'student' ? [
+                    { label: 'Vielen Dank!', text: 'Vielen Dank!' },
+                    { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
+                    { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
+                    { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
+                    { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
+                  ] : [
+                    { label: 'Super, danke!', text: 'Super, danke!' },
+                    { label: 'Passt perfekt!', text: 'Passt perfekt, bis dann!' },
+                    { label: 'Termin geht klar', text: 'Der Termin geht klar, ist eingetragen!' },
+                    { label: '5 Min später', text: 'Ich verspäte mich leider um ca. 5 Minuten.' },
+                    { label: 'Bis zum Unterricht!', text: 'Wir sehen uns beim Unterricht!' }
+                  ]).map((phrase, idx) => (
                     <button
-                      key={i}
+                      key={`event-phrase-${idx}`}
                       type="button"
-                      onClick={() => setChatTypedMessage(text)}
+                      onClick={() => setChatTypedMessage(phrase.text)}
                       style={{
-                        padding: '5px 10px',
-                        borderRadius: '16px',
+                        padding: '5px 12px',
+                        borderRadius: '100px',
                         background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        color: '#334155',
-                        fontSize: '0.72rem',
+                        border: '1px solid #bbf7d0',
+                        color: '#15803d',
+                        fontSize: '0.75rem',
                         fontWeight: 700,
-                        cursor: 'pointer',
                         whiteSpace: 'nowrap',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                        flexShrink: 0
                       }}
+                      className="hover-scale"
                     >
-                      {text}
+                      {phrase.label}
                     </button>
                   ))}
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   Send, 
@@ -76,6 +76,16 @@ const formatStudentDisplayName = (u: any): string => {
     return `${firstName} ${lastName.trim().charAt(0)}.`;
   }
   return `${firstName} ${lastName}`.trim();
+};
+
+const parseLocalDate = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  const cleanDate = dateStr.split('T')[0];
+  const parts = cleanDate.split('-').map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(dateStr);
 };
 
 const AppleSystemNotificationCard: React.FC<{ 
@@ -404,7 +414,7 @@ export default function CampusDirectMessages({
   const [typedMessage, setTypedMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
-  const [activeSubTab, setActiveSubTab] = useState<'chat' | 'system'>('chat');
+  const [activeSubTab, setActiveSubTab] = useState<string>('general');
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
@@ -593,7 +603,11 @@ export default function CampusDirectMessages({
   }, [user?.id, user?.school_id, user?.schools?.id, isStudent, schoolUsers]);
 
   const isSystemMessage = (msg: any) => {
-    if (msg.occurrence_id) return true;
+    if (!msg) return false;
+    // Human messages with a valid sender_id (student or teacher) are NEVER system messages
+    if (msg.sender_id && msg.sender_id !== 'system') {
+      return false;
+    }
     const content = msg.content || '';
     if (content.includes('Unterrichtstermin') || 
         content.includes('Termin wurde') || 
@@ -708,29 +722,269 @@ export default function CampusDirectMessages({
     }
   }, [selectedRecipient, campusMessages]);
 
+  // Get active messages in the current thread (sorted chronologically)
+  const activeThreadMessages = useMemo(() => {
+    if (!selectedRecipient) return [];
+    return [...campusMessages]
+      .filter(m => 
+        (m.sender_id === user.id && m.recipient_id === selectedRecipient.id) ||
+        (m.sender_id === selectedRecipient.id && m.recipient_id === user.id)
+      )
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [campusMessages, selectedRecipient, user.id]);
+
+  // 1. Fetch occurrences for selected recipient
+  const [studentOccurrences, setStudentOccurrences] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!selectedRecipient?.id) {
+      setStudentOccurrences([]);
+      return;
+    }
+
+    const fetchOccurrencesForStudent = async () => {
+      try {
+        const studentId = selectedRecipient.id;
+        const todayObj = new Date();
+        const yyyy = todayObj.getFullYear();
+        const mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(todayObj.getDate()).padStart(2, '0');
+        const todayDateStr = `${yyyy}-${mm}-${dd}`;
+
+        // Fetch recurring schedules & actual occurrences in parallel
+        const [schRes, occRes] = await Promise.all([
+          supabase
+            .from('schedules')
+            .select('*')
+            .eq('student_id', studentId),
+          supabase
+            .from('schedule_occurrences')
+            .select('*')
+            .or(`student_id.eq.${studentId},teacher_id.eq.${studentId}`)
+            .gte('date', todayDateStr)
+            .order('date', { ascending: true })
+        ]);
+
+        const occData: any[] = occRes.data || [];
+        const schData: any[] = schRes.data || [];
+
+        // Project recurring schedules for next 4 weeks
+        const mergedOccurrences: any[] = [...occData];
+        const existingDates = new Set(occData.map(o => o.date));
+
+        const startRange = new Date(todayObj);
+        const endRange = new Date(todayObj);
+        endRange.setDate(todayObj.getDate() + 28); // 4 weeks ahead
+
+        if (schData.length > 0) {
+          schData.forEach(sch => {
+            const current = new Date(startRange);
+            while (current <= endRange) {
+              const currentDay = current.getDay() === 0 ? 7 : current.getDay();
+              const targetDay = Number(sch.day_of_week) || 1;
+              const diff = targetDay - currentDay;
+              
+              const targetDate = new Date(current);
+              targetDate.setDate(current.getDate() + diff);
+
+              const tYyyy = targetDate.getFullYear();
+              const tMm = String(targetDate.getMonth() + 1).padStart(2, '0');
+              const tDd = String(targetDate.getDate()).padStart(2, '0');
+              const dateStr = `${tYyyy}-${tMm}-${tDd}`;
+
+              const endStr = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}`;
+
+              if (dateStr >= todayDateStr && dateStr <= endStr) {
+                if (!existingDates.has(dateStr)) {
+                  existingDates.add(dateStr);
+                  mergedOccurrences.push({
+                    id: `virtual-${sch.id}-${dateStr}`,
+                    schedule_id: sch.id,
+                    student_id: studentId,
+                    teacher_id: sch.teacher_id,
+                    date: dateStr,
+                    start_time: sch.time_slot ? (sch.time_slot.split(':').length === 2 ? `${sch.time_slot}:00` : sch.time_slot) : '18:00',
+                    duration: sch.duration || 30,
+                    status: 'scheduled',
+                    is_virtual: true
+                  });
+                }
+              }
+              current.setDate(current.getDate() + 7);
+            }
+          });
+        }
+
+        // Sort chronologically
+        mergedOccurrences.sort((a, b) => {
+          const comp = a.date.localeCompare(b.date);
+          if (comp !== 0) return comp;
+          return (a.start_time || '').localeCompare(b.start_time || '');
+        });
+
+        setStudentOccurrences(mergedOccurrences);
+      } catch (err) {
+        console.error('[CampusDirectMessages] Error fetching student occurrences:', err);
+      }
+    };
+
+    fetchOccurrencesForStudent();
+  }, [selectedRecipient?.id]);
+
+  // 2. Compute dynamic date-based occurrence tabs for active/upcoming appointments (date >= today)
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const activeOccurrenceTabs = useMemo(() => {
+    if (!selectedRecipient) return [];
+    const occMap = new Map<string, any>();
+
+    // Add DB occurrences ONLY if they have messages OR represent a reschedule/change
+    (studentOccurrences || []).forEach(occ => {
+      if (!occ || !occ.id || occ.date < todayStr) return;
+
+      const occMessages = activeThreadMessages.filter(m => String(m.occurrence_id) === String(occ.id));
+      const hasMessages = occMessages.length > 0;
+      
+      const isShiftOrChanged = 
+        (occ.status && occ.status !== 'scheduled' && occ.status !== 'confirmed') ||
+        occ.rescheduled_from ||
+        occ.original_date ||
+        (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
+
+      if (hasMessages || isShiftOrChanged) {
+        occMap.set(String(occ.id), occ);
+      }
+    });
+
+    // Also include any occurrences referenced in activeThreadMessages
+    activeThreadMessages.forEach(msg => {
+      if (msg.occurrence_id && !occMap.has(String(msg.occurrence_id))) {
+        const linkedOcc = studentOccurrences.find(o => String(o.id) === String(msg.occurrence_id));
+        if (linkedOcc && linkedOcc.date >= todayStr) {
+          occMap.set(String(linkedOcc.id), linkedOcc);
+        } else if (!linkedOcc) {
+          const msgDate = msg.created_at ? msg.created_at.split('T')[0] : todayStr;
+          if (msgDate >= todayStr) {
+            occMap.set(String(msg.occurrence_id), {
+              id: msg.occurrence_id,
+              date: msgDate,
+              start_time: '18:00',
+              is_virtual: true
+            });
+          }
+        }
+      }
+    });
+
+    // Sort tabs chronologically by date + start_time ascending (next upcoming lesson first)
+    const tabs = Array.from(occMap.values()).map(occ => {
+      const occDate = parseLocalDate(occ.date);
+      const dayName = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+      const formattedDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      const timeStr = occ.start_time ? occ.start_time.slice(0, 5) : '';
+      const label = `${dayName} ${formattedDate}${timeStr ? ` ${timeStr}` : ''}`;
+
+      const occMessages = activeThreadMessages.filter(m => String(m.occurrence_id) === String(occ.id));
+      const unreadCount = occMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read).length;
+
+      const isShiftOrChanged = 
+        (occ.status && occ.status !== 'scheduled' && occ.status !== 'confirmed') ||
+        occ.rescheduled_from ||
+        occ.original_date ||
+        (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
+
+      return {
+        id: String(occ.id),
+        date: occ.date,
+        start_time: occ.start_time || '18:00',
+        label,
+        unreadCount,
+        isShiftOrChanged: Boolean(isShiftOrChanged),
+        messages: occMessages,
+        occurrence: occ
+      };
+    }).sort((a, b) => {
+      const dateA = `${a.date}T${a.start_time}`;
+      const dateB = `${b.date}T${b.start_time}`;
+      return dateA.localeCompare(dateB);
+    });
+
+    return tabs;
+  }, [selectedRecipient, studentOccurrences, activeThreadMessages, todayStr, user.id]);
+
+  // 3. General direct messages (without occurrence_id)
+  const generalMessages = useMemo(() => {
+    return activeThreadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m));
+  }, [activeThreadMessages]);
+
+  // 4. Smart Auto-Tab Selection Priority when switching students
+  useEffect(() => {
+    if (!selectedRecipient) return;
+
+    // Priority 1: Occurrence tab with unread messages
+    const unreadOccTab = activeOccurrenceTabs.find(tab => tab.unreadCount > 0);
+    if (unreadOccTab) {
+      setActiveSubTab(unreadOccTab.id);
+      return;
+    }
+
+    // Priority 2: General tab with unread messages
+    const unreadGeneral = generalMessages.filter(m => m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read).length;
+    if (unreadGeneral > 0) {
+      setActiveSubTab('general');
+      return;
+    }
+
+    // Priority 3: Next upcoming appointment tab if available, otherwise 'general'
+    if (activeOccurrenceTabs.length > 0) {
+      setActiveSubTab(activeOccurrenceTabs[0].id);
+    } else {
+      setActiveSubTab('general');
+    }
+  }, [selectedRecipient?.id]);
+
+  // 5. Messages displayed in the chat area for currently active sub-tab
+  const displayedMessages = useMemo(() => {
+    if (activeSubTab === 'general') return generalMessages;
+    
+    // Active appointment tab
+    const selectedOccTab = activeOccurrenceTabs.find(tab => tab.id === activeSubTab);
+    if (selectedOccTab) {
+      return selectedOccTab.messages;
+    }
+    return generalMessages;
+  }, [activeSubTab, generalMessages, activeOccurrenceTabs]);
+
+  const sendDirectQuickMessage = async (content: string) => {
+    if (!content.trim() || !selectedRecipient) return;
+    
+    if (activeSubTab !== 'general' && activeSubTab !== 'system') {
+      const targetOccTab = activeOccurrenceTabs.find(tab => tab.id === activeSubTab);
+      if (targetOccTab) {
+        await supabase.from('campus_direct_messages').insert({
+          sender_id: user.id,
+          recipient_id: selectedRecipient.id,
+          content: content.trim(),
+          occurrence_id: targetOccTab.id,
+          read_by: [user.id]
+        });
+        setTimeout(scrollToBottom, 50);
+        return;
+      }
+    }
+
+    await onSendMessage(selectedRecipient.id, content.trim());
+    setTimeout(scrollToBottom, 50);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!typedMessage.trim() || !selectedRecipient) return;
     
     const messageText = typedMessage.trim();
     setTypedMessage('');
-    await onSendMessage(selectedRecipient.id, messageText);
-    setTimeout(scrollToBottom, 50);
+    await sendDirectQuickMessage(messageText);
   };
-
-  // Get active messages in the current thread (sorted chronologically)
-  const activeThreadMessages = selectedRecipient
-    ? [...campusMessages]
-        .filter(m => 
-          (m.sender_id === user.id && m.recipient_id === selectedRecipient.id) ||
-          (m.sender_id === selectedRecipient.id && m.recipient_id === user.id)
-        )
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    : [];
-
-  const systemMessages = activeThreadMessages.filter(isSystemMessage);
-  const directChatMessages = activeThreadMessages.filter(m => !isSystemMessage(m));
-  const displayedMessages = activeSubTab === 'chat' ? directChatMessages : systemMessages;
 
   return (
     <div className="animation-slide-up" style={{ 
@@ -887,7 +1141,7 @@ export default function CampusDirectMessages({
                         position: 'absolute',
                         bottom: '-2px',
                         right: '-2px',
-                        background: '#34a853',
+                        background: '#ea4335',
                         color: 'white',
                         borderRadius: '50%',
                         width: '18px',
@@ -898,7 +1152,7 @@ export default function CampusDirectMessages({
                         alignItems: 'center',
                         justifyContent: 'center',
                         border: '2px solid white',
-                        boxShadow: '0 2px 5px rgba(52, 168, 83, 0.3)'
+                        boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
                       }}>
                         {partner.unreadCount}
                       </div>
@@ -1036,60 +1290,103 @@ export default function CampusDirectMessages({
               </div>
             </div>
 
-            {/* Sub-Tab Bar: Direktnachrichten vs. Termin-System */}
+            {/* Apple Safari/Messages Style Dynamic Date-Based Tab Bar */}
             <div style={{ 
               display: 'flex', 
-              gap: '8px', 
-              padding: '10px 20px', 
+              gap: '6px', 
+              padding: '10px 16px', 
               background: '#ffffff', 
               borderBottom: '1px solid #f1f5f9',
-              alignItems: 'center'
+              alignItems: 'center',
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
             }}>
+              {/* Tab 1: Allgemein */}
               <button
                 type="button"
-                onClick={() => setActiveSubTab('chat')}
+                onClick={() => setActiveSubTab('general')}
                 style={{
-                  padding: '7px 16px',
+                  padding: '6px 14px',
                   borderRadius: '100px',
                   border: 'none',
-                  background: activeSubTab === 'chat' ? '#34a853' : '#f1f5f9',
-                  color: activeSubTab === 'chat' ? 'white' : '#64748b',
+                  background: activeSubTab === 'general' ? '#34a853' : '#f1f5f9',
+                  color: activeSubTab === 'general' ? 'white' : '#64748b',
                   fontSize: '0.78rem',
                   fontWeight: 800,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  transition: 'all 0.2s'
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  boxShadow: activeSubTab === 'general' ? '0 2px 6px rgba(52,168,83,0.2)' : 'none'
                 }}
                 className="hover-scale"
               >
                 <MessageSquare size={13} />
-                <span>Direktnachrichten ({directChatMessages.length})</span>
+                <span>Allgemein ({generalMessages.length})</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('system')}
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: '100px',
-                  border: 'none',
-                  background: activeSubTab === 'system' ? '#34a853' : '#f1f5f9',
-                  color: activeSubTab === 'system' ? 'white' : '#64748b',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s'
-                }}
-                className="hover-scale"
-              >
-                <Calendar size={13} />
-                <span>Termin-System ({systemMessages.length})</span>
-              </button>
+              {/* Dynamic Date-Based Appointment Tabs in Campus Green Theme */}
+              {activeOccurrenceTabs.map(tab => {
+                const isActive = activeSubTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveSubTab(tab.id)}
+                    style={{
+                      padding: '7px 16px',
+                      borderRadius: '100px',
+                      border: isActive ? 'none' : '1px solid #bbf7d0',
+                      background: isActive ? '#34a853' : '#e6f4ea',
+                      color: isActive ? 'white' : '#15803d',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                      boxShadow: isActive ? '0 3px 10px rgba(52, 168, 83, 0.22)' : 'none'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Calendar size={13} color={isActive ? '#ffffff' : '#34a853'} />
+                    <span>{tab.label}</span>
+                    {tab.unreadCount > 0 ? (
+                      <span style={{
+                        background: isActive ? '#ffffff' : '#ea4335',
+                        color: isActive ? '#ea4335' : '#ffffff',
+                        borderRadius: '100px',
+                        padding: '1px 6px',
+                        minWidth: '16px',
+                        height: '16px',
+                        fontSize: '0.62rem',
+                        fontWeight: 900,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 4px rgba(234, 67, 53, 0.35)'
+                      }}>
+                        {tab.unreadCount}
+                      </span>
+                    ) : tab.isShiftOrChanged ? (
+                      <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: isActive ? '#ffffff' : '#ea4335',
+                        boxShadow: '0 0 6px rgba(234, 67, 53, 0.6)',
+                        display: 'inline-block'
+                      }} />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Message History */}
@@ -1102,50 +1399,194 @@ export default function CampusDirectMessages({
               gap: '16px',
               background: '#fafbfc'
             }} className="custom-scrollbar">
+              {/* Apple Senior App Designer - Glassmorphic Calendar Event Card */}
+              {activeSubTab !== 'general' && (() => {
+                const currentTab = activeOccurrenceTabs.find(t => t.id === activeSubTab);
+                if (!currentTab) return null;
+                const occDate = parseLocalDate(currentTab.date);
+                const dayName = occDate.toLocaleDateString('de-DE', { weekday: 'long' });
+                const dateFormatted = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+                const timeFormatted = currentTab.start_time ? currentTab.start_time.slice(0, 5) : '';
+
+                // Extract Stammtermin (original date) if rescheduled
+                const occObj = currentTab.occurrence || currentTab;
+                let stammterminText: string | null = null;
+                if (occObj) {
+                  let rawOrig = occObj.original_date || occObj.rescheduled_from;
+                  if (!rawOrig && occObj.notes) {
+                    const match = occObj.notes.match(/(\d{4}-\d{2}-\d{2})/);
+                    if (match) rawOrig = match[1];
+                  }
+                  if (rawOrig && rawOrig !== currentTab.date) {
+                    try {
+                      const origDate = parseLocalDate(rawOrig);
+                      if (!isNaN(origDate.getTime())) {
+                        const origDayName = origDate.toLocaleDateString('de-DE', { weekday: 'long' });
+                        const origDateFormatted = origDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+                        stammterminText = `${origDayName}, ${origDateFormatted}`;
+                      }
+                    } catch (e) {}
+                  }
+                }
+
+                return (
+                  <div style={{
+                    background: stammterminText ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(254, 252, 232, 0.9))' : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 253, 244, 0.85))',
+                    border: stammterminText ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid rgba(52, 168, 83, 0.25)',
+                    borderRadius: '20px',
+                    padding: '16px 20px',
+                    marginBottom: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    boxShadow: stammterminText ? '0 10px 25px -5px rgba(234, 179, 8, 0.12), 0 4px 10px -2px rgba(0,0,0,0.03)' : '0 10px 25px -5px rgba(52, 168, 83, 0.08), 0 4px 10px -2px rgba(0,0,0,0.03)',
+                    backdropFilter: 'blur(12px)'
+                  }}>
+                    {/* Left: Apple Calendar Tear-Off Badge & Details */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                      {/* Apple Calendar Badge Block */}
+                      <div style={{
+                        width: '52px',
+                        height: '56px',
+                        borderRadius: '14px',
+                        background: '#ffffff',
+                        border: stammterminText ? '1.5px solid #fef08a' : '1.5px solid #bbf7d0',
+                        boxShadow: stammterminText ? '0 3px 10px rgba(234, 179, 8, 0.18)' : '0 3px 10px rgba(52, 168, 83, 0.12)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        textAlign: 'center'
+                      }}>
+                        {/* Top Banner (Month) */}
+                        <div style={{
+                          background: stammterminText ? '#ca8a04' : '#34a853',
+                          color: '#ffffff',
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          padding: '2px 0'
+                        }}>
+                          {occDate.toLocaleDateString('de-DE', { month: 'short' })}
+                        </div>
+                        {/* Date Number */}
+                        <div style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          color: stammterminText ? '#854d0e' : '#166534',
+                          lineHeight: 1
+                        }}>
+                          {occDate.getDate()}
+                        </div>
+                      </div>
+
+                      {/* Event Information */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: stammterminText ? '#a16207' : '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            1:1 Termin-Shoutbox
+                          </span>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            background: stammterminText ? '#fef3c7' : '#dcfce7',
+                            color: stammterminText ? '#b45309' : '#15803d',
+                            padding: '2px 8px',
+                            borderRadius: '100px',
+                            fontWeight: 800,
+                            border: stammterminText ? '1px solid #fde047' : '1px solid #bbf7d0'
+                          }}>
+                            {stammterminText ? '🔄 Termin verschoben' : 'Anstehender Unterricht'}
+                          </span>
+                        </div>
+
+                        {stammterminText ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>📍 Stammtermin (Original):</span>
+                              <span style={{ textDecoration: 'line-through', opacity: 0.9 }}>{stammterminText}</span>
+                            </div>
+                            <div style={{ fontSize: '0.98rem', color: '#166534', fontWeight: 900, letterSpacing: '-0.01em' }}>
+                              <span>➔ Verschoben auf:</span> {dayName}, {dateFormatted}
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.98rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
+                            {dayName}, {dateFormatted}
+                          </div>
+                        )}
+
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={12} color={stammterminText ? '#ca8a04' : '#34a853'} />
+                          <span>{timeFormatted ? `Start um ${timeFormatted} Uhr` : 'Terminzeit vereinbart'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Apple Action Pill Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          if (currentTab?.date) {
+                            localStorage.setItem('campus_calendar_target_date', currentTab.date);
+                          }
+                          localStorage.setItem('campus_active_tab', 'schedule');
+                          localStorage.setItem('groovelab_active_tab', 'schedule');
+                          window.location.reload();
+                        }
+                      }}
+                      style={{
+                        padding: '9px 18px',
+                        borderRadius: '100px',
+                        border: 'none',
+                        background: stammterminText ? '#d97706' : '#34a853',
+                        color: '#ffffff',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: stammterminText ? '0 3px 12px rgba(217, 119, 6, 0.3)' : '0 3px 12px rgba(52, 168, 83, 0.25)',
+                        flexShrink: 0,
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Calendar size={13} color="#ffffff" />
+                      <span>Im Stundenplan anzeigen</span>
+                    </button>
+                  </div>
+                );
+              })()}
+
               {displayedMessages.length === 0 ? (
-                activeSubTab === 'chat' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
-                    <div style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      background: '#e6f4ea',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#34a853'
-                    }}>
-                      <MessageSquare size={30} strokeWidth={2} />
-                    </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-                      Noch keine Direktnachrichten mit {formatStudentDisplayName(selectedRecipient)}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
-                      Schreibe eine persönliche Nachricht oder Fragen zum Unterricht!
-                    </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: '#e6f4ea',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#34a853'
+                  }}>
+                    <MessageSquare size={30} strokeWidth={2} />
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
-                    <div style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '50%',
-                      background: '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#64748b'
-                    }}>
-                      <Calendar size={30} strokeWidth={2} />
-                    </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-                      Keine Termin-Systemnachrichten
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
-                      Hier erscheinen automatische Nachrichten zu Terminverlegungen und Absagen.
-                    </div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
+                    Noch keine Nachrichten mit {formatStudentDisplayName(selectedRecipient)}
                   </div>
-                )
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
+                    Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!
+                  </div>
+                </div>
               ) : (
                 displayedMessages.map(msg => {
                   const isSelf = msg.sender_id === user.id;
@@ -1168,60 +1609,89 @@ export default function CampusDirectMessages({
                       key={msg.id}
                       style={{
                         display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: isSelf ? 'flex-end' : 'flex-start',
-                        maxWidth: '80%',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        maxWidth: '82%',
                         alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                        gap: '4px'
+                        flexDirection: isSelf ? 'row-reverse' : 'row'
                       }}
                     >
-                      {/* Appointment Badge */}
-                      {isAppointmentLinked && (
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          background: isSelf ? 'rgba(52, 168, 83, 0.12)' : '#e6f4ea',
-                          border: '1px solid rgba(52, 168, 83, 0.25)',
-                          color: '#15803d',
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          padding: '3px 9px',
-                          borderRadius: '8px',
-                          marginBottom: '2px'
-                        }}>
-                          <Calendar size={11} color="#34a853" />
-                          <span>Termin-Bezug</span>
-                        </div>
+                      {/* Avatar for non-self messages */}
+                      {!isSelf && (
+                        <img
+                          src={resolveCampusAvatar(selectedRecipient)}
+                          alt=""
+                          style={{
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '2px solid white',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                            flexShrink: 0,
+                            marginTop: '2px'
+                          }}
+                        />
                       )}
 
-                      <div 
-                        style={{
-                          padding: '12px 18px',
-                          borderRadius: isSelf ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                          background: isSelf ? '#e6f4ea' : '#ffffff',
-                          color: '#0f172a',
-                          boxShadow: isSelf ? '0 2px 8px rgba(52, 168, 83, 0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
-                          border: isSelf ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          fontSize: '0.9rem',
-                          fontWeight: 500,
-                          lineHeight: '1.5',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word'
-                        }}
-                      >
-                        {msg.content}
-                      </div>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>
-                        <span>
-                          {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {isSelf && (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px' }}>
-                            <CheckCheck size={14} color={msg.is_read ? '#15803d' : '#94a3b8'} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start', gap: '3px' }}>
+                        {/* Student Name Header */}
+                        {!isSelf && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginLeft: '4px' }}>
+                            {formatStudentDisplayName(selectedRecipient)}
+                          </span>
+                        )}
+
+                        {/* 1:1 Termin-Shoutbox Badge */}
+                        {isAppointmentLinked && (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: isSelf ? 'rgba(52, 168, 83, 0.12)' : '#e6f4ea',
+                            border: '1px solid #bbf7d0',
+                            color: '#15803d',
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            padding: '3px 9px',
+                            borderRadius: '8px',
+                            marginBottom: '2px'
+                          }}>
+                            <Calendar size={11} color="#34a853" />
+                            <span>1:1 Termin-Shoutbox</span>
                           </div>
                         )}
+
+                        {/* Chat Bubble */}
+                        <div 
+                          style={{
+                            padding: '12px 18px',
+                            borderRadius: isSelf ? '20px 20px 4px 20px' : '4px 20px 20px 20px',
+                            background: isSelf ? '#e6f4ea' : '#ffffff',
+                            color: '#0f172a',
+                            boxShadow: isSelf ? '0 2px 8px rgba(52, 168, 83, 0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
+                            border: isSelf ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            lineHeight: '1.5',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                          }}
+                        >
+                          {msg.content}
+                        </div>
+                        
+                        {/* Timestamp & Read Receipt */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
+                          <span>
+                            {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {isSelf && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px' }}>
+                              <CheckCheck size={14} color={msg.is_read ? '#15803d' : '#94a3b8'} />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1237,39 +1707,86 @@ export default function CampusDirectMessages({
               </div>
             ) : (
               <div style={{ borderTop: '1px solid #f1f5f9', background: '#f8fafc', padding: isMobile ? '8px 12px 12px 12px' : '12px 24px' }}>
-                {/* Quick Replies Pill Bar */}
-                <div style={{
-                  display: 'flex',
-                  gap: '6px',
-                  overflowX: 'auto',
-                  paddingBottom: '8px',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none'
-                }}>
-                  {['👍 Daumen hoch', '🎶 Passt, danke!', '⏳ 5 Min später', '📅 Termin bestätigt', '🎹 Alles klar!'].map((reply, idx) => (
-                    <button
-                      key={`qr-${idx}`}
-                      type="button"
-                      onClick={() => setTypedMessage(reply)}
-                      style={{
-                        padding: '5px 12px',
-                        borderRadius: '100px',
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        color: '#475569',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                        flexShrink: 0
-                      }}
-                      className="hover-scale"
-                    >
-                      {reply}
-                    </button>
-                  ))}
-                </div>
+                {/* Quick Replies Pill Bar: 1-Click Emoji Reactions + Role-Specific Natural German Phrases */}
+                {(() => {
+                  const emojiReactions = ['👍', '🎵', '👏', '🙏'];
+                  const isUserTeacher = user?.role?.toLowerCase() === 'teacher' || user?.role?.toLowerCase() === 'admin';
+                  const textPhrases = isUserTeacher ? [
+                    { label: 'Super, danke!', text: 'Super, danke!' },
+                    { label: 'Passt perfekt!', text: 'Passt perfekt, bis dann!' },
+                    { label: 'Termin geht klar', text: 'Der Termin geht klar, ist eingetragen!' },
+                    { label: '5 Min später', text: 'Ich verspäte mich leider um ca. 5 Minuten.' },
+                    { label: 'Bis zum Unterricht!', text: 'Wir sehen uns beim Unterricht!' }
+                  ] : [
+                    { label: 'Vielen Dank!', text: 'Vielen Dank!' },
+                    { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
+                    { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
+                    { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
+                    { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
+                  ];
+
+                  return (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      overflowX: 'auto',
+                      paddingBottom: '8px',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none'
+                    }}>
+                      {/* 1-Click Direct Emoji Reaction Buttons */}
+                      <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
+                        {emojiReactions.map((emoji, idx) => (
+                          <button
+                            key={`emoji-${idx}`}
+                            type="button"
+                            onClick={() => sendDirectQuickMessage(emoji)}
+                            style={{
+                              padding: '4px 9px',
+                              borderRadius: '100px',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                              flexShrink: 0
+                            }}
+                            className="hover-scale"
+                            title={`Schnell-Reaktion ${emoji} senden`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Role-Specific Authentic Text Phrases */}
+                      {textPhrases.map((phrase, idx) => (
+                        <button
+                          key={`phrase-${idx}`}
+                          type="button"
+                          onClick={() => setTypedMessage(phrase.text)}
+                          style={{
+                            padding: '5px 12px',
+                            borderRadius: '100px',
+                            background: '#ffffff',
+                            border: '1px solid #bbf7d0',
+                            color: '#15803d',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale"
+                        >
+                          {phrase.label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', width: '100%' }}>
                   <input 

@@ -133,7 +133,20 @@ export function ScheduleCalendarView({
     return new Date(baseSim.getTime() + elapsedMinutes * 60000);
   };
 
-  const [currentDate, setCurrentDate] = useState(() => getSimulatedNow());
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const targetDateStr = localStorage.getItem('campus_calendar_target_date');
+      if (targetDateStr) {
+        localStorage.removeItem('campus_calendar_target_date');
+        const clean = targetDateStr.split('T')[0];
+        const parts = clean.split('-').map(Number);
+        if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+      }
+    }
+    return getSimulatedNow();
+  });
   const [showWeekend, setShowWeekend] = useState(false);
   const [focusedDayOffset, setFocusedDayOffset] = useState<number | null>(null);
   const [currentMinutes, setCurrentMinutes] = useState(() => {
@@ -4794,19 +4807,7 @@ export function ScheduleCalendarView({
                 onDragOver={(e) => handleDragOverDay(e, dateStr, dayBaselineMinutes)}
                 onDragLeave={handleDragLeaveDay}
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
-                onClick={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const clickY = e.clientY - rect.top;
-                  const clickedMinutes = dayBaselineMinutes + (clickY / 2.5);
-                  const snap = gridSnapMinutes || 15;
-                  const snappedMinutes = Math.round(clickedMinutes / snap) * snap;
-                  const h = Math.floor(snappedMinutes / 60) % 24;
-                  const m = snappedMinutes % 60;
-                  const startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
-                  setQuickCreateState({ isOpen: true, date: dateStr, start_time: startTime });
-                }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px`, cursor: 'pointer' }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
               >
 
                 {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
@@ -5485,20 +5486,37 @@ export function ScheduleCalendarView({
                   });
                   const hasRoomRegularBlock = roomRegMin !== Infinity;
 
-                  // Determine if this occurrence is outside the teacher's regular schedule window for this room.
+                  const defaultRoomId = occ.schedules?.room_id || occ.schedules?.rooms?.id || occ.template_room_id;
+                  const activeRoomId = occ.room_id || occ.schedules?.room_id;
+                  const isRoomChanged = Boolean(
+                    occ.room_override_id || 
+                    occ.roomOverrideId || 
+                    occ.room_override_name || 
+                    occ.roomOverrideName || 
+                    occ.is_room_changed || 
+                    occ.isRoomChanged || 
+                    occ.is_room_booking || 
+                    occ.isRoomBooking || 
+                    occ.is_extra_room ||
+                    occ.isExtraRoom ||
+                    occ.room_booking_required ||
+                    (defaultRoomId && activeRoomId && String(defaultRoomId) !== String(activeRoomId)) ||
+                    (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
+                  );
+
+                  // Determine if this occurrence is outside the teacher's regular schedule window or has an altered room.
                   // If so, it needs a separate room booking → show in purple.
                   const isOutsideSchedule = !isBreak && !isVacant && !isSick && !isCancelled &&
-                    hasRoomRegularBlock && (occStartMinutes < roomRegMin || occEndMinutes > roomRegMax);
+                    ((hasRoomRegularBlock && (occStartMinutes < roomRegMin || occEndMinutes > roomRegMax)) || isRoomChanged);
 
                   // Room booking approved = occ has a confirmed manual room booking for this slot.
-                  // We detect this via occ.room_booking_approved flag (set by backend/AdminDashboard).
-                  const roomBookingApproved = isOutsideSchedule && (occ.room_booking_approved === true);
+                  const roomBookingApproved = isOutsideSchedule && (occ.room_booking_approved === true || occ.student_acknowledged === true || occ.status === 'rescheduled_confirmed');
 
-                  // Override card color to purple for outside-schedule occurrences
+                  // Override card color to purple for outside-schedule or room-changed occurrences
                   if (isOutsideSchedule) {
                     if (roomBookingApproved) {
                       // Solid purple — room booking confirmed by secretary
-                      cardBackground = 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)';
+                      cardBackground = 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)';
                       finalColors.border = '#7c3aed';
                       finalColors.text = '#5b21b6';
                     } else {
@@ -7937,85 +7955,6 @@ return (
         </div>
       );
     })()}
-
-    {/* Google Calendar Quick-Click Creation Modal */}
-    {quickCreateState && quickCreateState.isOpen && (
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 99999
-        }}
-        onClick={() => setQuickCreateState(null)}
-      >
-        <div
-          onClick={e => e.stopPropagation()}
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '20px',
-            padding: '24px 28px',
-            maxWidth: '420px',
-            width: '90%',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CalendarIcon size={18} />
-              </div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f' }}>Termin erstellen</h3>
-            </div>
-            <button onClick={() => setQuickCreateState(null)} className="apple-btn" style={{ padding: '4px' }}><X size={16} /></button>
-          </div>
-
-          <div style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 600 }}>
-            {new Date(quickCreateState.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} • {quickCreateState.start_time.substring(0, 5)} Uhr
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                const date = quickCreateState.date;
-                const startTime = quickCreateState.start_time;
-                setQuickCreateState(null);
-                setEditOccState({
-                  id: `new-${Date.now()}`,
-                  date,
-                  start_time: startTime,
-                  room_id: null,
-                  duration: 45
-                });
-              }}
-              className="apple-btn active"
-              style={{
-                background: brandColor,
-                color: '#ffffff',
-                fontWeight: 700,
-                padding: '10px 16px',
-                borderRadius: '10px',
-                justifyContent: 'center',
-                fontSize: '0.9rem'
-              }}
-            >
-              <span>Unterrichtstermin anlegen</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
 
     </div>
   );

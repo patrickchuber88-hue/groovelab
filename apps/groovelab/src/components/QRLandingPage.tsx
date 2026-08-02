@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
 
@@ -163,13 +163,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [showActivationInfoModal, setShowActivationInfoModal] = useState(false);
 
   const handleVollzugriffClick = () => {
-    const isProfileActive = Boolean(
-      profile?.is_pin_activated ||
-      profile?.has_parent_pin ||
-      profile?.personal_pin ||
-      profile?.parent_pin
-    );
-    if (isProfileActive) {
+    if (profile?.is_campus_active) {
       setPinPurpose('unlock_app');
       setPageState('pin_required');
     } else {
@@ -1083,6 +1077,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           hasPinCreated = true;
         }
 
+        // Falls Schüler zum ersten Mal die QR-Landingpage öffnet und noch keine PIN angelegt hat -> Zwingend PIN-Einrichtungsbildschirm anzeigen!
+        if (userData.role === 'student' && !hasPinCreated) {
+          sessionStorage.setItem('groovelab_qr_token', token);
+          setPinPurpose('setup_initial_pin');
+          setPageState('pin_required');
+          return;
+        }
+
         // Direkte Anzeige der QR-Landingpage ohne anfängliche PIN-Abfrage (Netflix-Prinzip für Schnellzugriff auf Hausaufgaben & Stundenplan)
         setParentUnlocked(wasUnlocked);
         setLessonsUnlocked(wasUnlocked);
@@ -1445,7 +1447,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       startRange.setDate(startRange.getDate() - day + 1);
       
       const endRange = new Date(startRange);
-      endRange.setDate(startRange.getDate() + 28); // 4 weeks in the future
+      endRange.setDate(startRange.getDate() + 365); // Full school year (365 days) for active profiles
 
       if (schData) {
         schData.forEach((sch: any) => {
@@ -2319,13 +2321,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         // Store local PIN backups immediately
         localStorage.setItem(`groovelab_user_pin_${profile.id}`, pinInput);
         localStorage.setItem(`groovelab_pin_${token}`, pinInput);
-        sessionStorage.setItem(`groovelab_lessons_unlocked_${profile.id}`, 'true');
-        setLessonsUnlocked(true);
+        setLessonsUnlocked(false);
+        setParentUnlocked(false);
 
         // Update in-memory profile PIN
         profile.personal_pin = pinInput;
         profile.parent_pin = pinInput;
         profile.is_pin_activated = true;
+        setProfile(prev => prev ? { ...prev, has_parent_pin: true, is_pin_activated: true, personal_pin: pinInput, parent_pin: pinInput } : null);
 
         let userUpdatePayload: any = {
           personal_pin: pinInput,
@@ -2388,8 +2391,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           });
         }
 
-        localStorage.setItem(`groovelab_parent_unlocked_${token}`, 'true');
-        setParentUnlocked(true);
         setPinInput('');
         sessionStorage.setItem('groovelab_qr_token', token);
         setPageState('profile');
@@ -2658,16 +2659,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     };
   }, [activeChatOcc, profile?.id]);
 
-  const handleSendChatMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatTypedMessage.trim() || !activeChatOcc || !profile?.id) return;
+  const sendDirectChatMessage = async (contentToSend: string) => {
+    if (!contentToSend.trim() || !activeChatOcc || !profile?.id) return;
 
     const studentId = profile.id;
     const recipientId = activeChatOcc.teacher_id;
     if (!studentId || !recipientId) return;
 
-    const messageContent = chatTypedMessage.trim();
-    setChatTypedMessage('');
+    const messageContent = contentToSend.trim();
 
     try {
       // Optimistic update
@@ -2698,7 +2697,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         return newSet;
       });
 
-      // Send push notification to teacher
+      // Send push notification to teacher with full appointment context
       try {
         const { data: senderProfile } = await supabase
           .from('users')
@@ -2706,12 +2705,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           .eq('id', studentId)
           .single();
         const senderName = `${senderProfile?.first_name || 'Ein Schüler'} ${maskLastName(profile.last_name)}`;
+        const occDateStr = activeChatOcc?.date ? new Date(activeChatOcc.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+        const timeStr = activeChatOcc?.start_time ? activeChatOcc.start_time.slice(0, 5) : '';
+        const dateCtx = occDateStr ? `(Termin ${occDateStr}${timeStr ? `, ${timeStr} Uhr` : ''})` : '';
 
         await supabase.functions.invoke('send-push', {
           body: {
             userId: recipientId,
-            title: `Termin-Shoutbox`,
-            body: `${senderName}: ${messageContent}`,
+            title: `1:1 Shoutbox`,
+            body: `${senderName} ${dateCtx}: ${messageContent}`,
             url: '/'
           }
         });
@@ -2723,6 +2725,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     } catch (err) {
       console.error('Error sending chat message:', err);
     }
+  };
+
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatTypedMessage.trim() || !activeChatOcc || !profile?.id) return;
+
+    const messageContent = chatTypedMessage.trim();
+    setChatTypedMessage('');
+    await sendDirectChatMessage(messageContent);
   };
 
   const handleCancelOccurrence = async (occ: any) => {
@@ -3219,8 +3230,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     });
 
     const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local timezone
-    const upcomingOccurrences = sortedOccurrences.filter(occ => occ.date >= todayStr);
+    const allUpcomingOccurrences = sortedOccurrences.filter(occ => occ.date >= todayStr);
     const pastOccurrences = sortedOccurrences.filter(occ => occ.date < todayStr);
+
+    const isCampusActive = profile?.is_campus_active === true;
+    const upcomingOccurrences = isCampusActive ? allUpcomingOccurrences : allUpcomingOccurrences.slice(0, 4);
 
     if (sortedOccurrences.length === 0) {
       return (
@@ -3928,6 +3942,64 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <p style={{ margin: 0, fontSize: '0.85rem', fontStyle: 'italic', fontWeight: 650 }}>
               Keine anstehenden Termine erfasst
             </p>
+          </div>
+        )}
+
+        {/* Activation Banner for Inactive Profiles */}
+        {!isCampusActive && (
+          <div 
+            onClick={() => setShowActivationInfoModal(true)}
+            style={{
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              border: '1.5px solid #bbf7d0',
+              borderRadius: '20px',
+              padding: '16px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.1)',
+              marginTop: '4px'
+            }}
+            className="hover-scale"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '12px',
+                background: '#ffffff',
+                border: '1px solid #bbf7d0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Sparkles size={18} color="#16a34a" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                  Alle Termine des Schuljahres freischalten
+                </span>
+                <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 650 }}>
+                  Inaktives Profil: Zeigt 4 Termine • Hier tippen für Vollzugriff
+                </span>
+              </div>
+            </div>
+            <div style={{
+              padding: '6px 12px',
+              borderRadius: '100px',
+              background: '#ffffff',
+              border: '1px solid #bbf7d0',
+              color: '#15803d',
+              fontWeight: 800,
+              fontSize: '0.74rem',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+            }}>
+              Aktivieren
+            </div>
           </div>
         )}
 
@@ -4797,31 +4869,33 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </button>
           )}
 
-          <button
-            onClick={() => {
-              setPageState('profile');
-              setPinInput('');
-              setPinError(null);
-            }}
-            style={{
-              width: '100%',
-              padding: '16px',
-              borderRadius: '16px',
-              border: 'none',
-              background: '#f1f5f9',
-              color: '#475569',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              marginTop: '-14px'
-            }}
-          >
-            <ArrowLeft size={16} /> Abbrechen
-          </button>
+          {pinPurpose !== 'setup_initial_pin' && (
+            <button
+              onClick={() => {
+                setPageState('profile');
+                setPinInput('');
+                setPinError(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                borderRadius: '16px',
+                border: 'none',
+                background: '#f1f5f9',
+                color: '#475569',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '-14px'
+              }}
+            >
+              <ArrowLeft size={16} /> Abbrechen
+            </button>
+          )}
 
           <div style={styles.brandFooter}>
             <Music size={14} color="#34a853" />
@@ -6968,132 +7042,255 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     </button>
 
                     <span style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
-                      color: '#ffffff',
+                      background: 'rgba(52, 168, 83, 0.15)',
+                      color: '#34a853',
+                      border: '1px solid rgba(52, 168, 83, 0.3)',
                       fontSize: '0.7rem',
                       fontWeight: 900,
-                      padding: '4px 10px',
+                      padding: '4px 12px',
                       borderRadius: '100px',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
-                      boxShadow: '0 2px 8px rgba(52, 168, 83, 0.3)'
+                      gap: '6px'
                     }}>
-                      <Sparkles size={12} /> Vollzugriff Freischalten
+                      <Sparkles size={12} color="#34a853" /> Campus Freischalten
                     </span>
 
-                    <h3 style={{ margin: '12px 0 6px', fontSize: '1.4rem', fontWeight: 900, letterSpacing: '-0.025em', color: '#ffffff', fontFamily: "'Urbanist', sans-serif" }}>
-                      Campus-Groovelab Erleben 🚀
+                    <h3 style={{ margin: '12px 0 6px', fontSize: '1.45rem', fontWeight: 900, letterSpacing: '-0.025em', color: '#ffffff', fontFamily: "'Urbanist', sans-serif" }}>
+                      Erlebe deinen vollen Musikschul-Campus
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.45, fontWeight: 500 }}>
-                      Schalte deinen Vollzugriff frei und erhalte Zugriff auf alle Premium-Funktionen deiner Musikschule!
+                      Entfalte dein volles Musik-Potenzial mit allen digitalen Werkzeugen deiner Musikschule.
                     </p>
                   </div>
 
-                  {/* Feature List */}
-                  <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Apple HIG Feature List with Vibrant iOS App Store Accents */}
+                  <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {[
                       {
-                        icon: '🎯',
-                        title: 'Übe-Pfad & Übe-Streak',
-                        desc: 'Belohnungssystem, tägliche Motivation & Streaks zum Level-XP Sammeln.',
-                        bg: '#f0fdf4',
-                        border: '#bbf7d0',
-                        iconBg: '#dcfce7'
+                        Icon: Timer,
+                        title: 'Fokus-Timer, Streaks & Übe-Pfad',
+                        desc: 'Fokussierte Übe-Sessions zum Gewohnheitsaufbau – mit Streaks, XP-Belohnungen & Level-Fortschritt.',
+                        color: '#16a34a',
+                        iconBg: '#dcfce7',
+                        iconBorder: '#bbf7d0',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
+                        cardBorder: '#bbf7d0'
                       },
                       {
-                        icon: '📖',
+                        Icon: BookOpen,
                         title: 'Digitales Hausaufgabenheft & Protokoll',
                         desc: 'Alle Aufgaben, Lehrer-Feedback & Meisterwerk-Dokumentation an einem Ort.',
-                        bg: '#f0f9ff',
-                        border: '#bae6fd',
-                        iconBg: '#e0f2fe'
+                        color: '#0284c7',
+                        iconBg: '#e0f2fe',
+                        iconBorder: '#bae6fd',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%)',
+                        cardBorder: '#bae6fd'
                       },
                       {
-                        icon: '🎛️',
-                        title: 'Audio-Loopstation & Aufnahmen',
-                        desc: 'Multi-Track Looper mit 100% Sample-Genauigkeit, Aufnahmefunktion & Cloud-Archiv.',
-                        bg: '#fefce8',
-                        border: '#fef08a',
-                        iconBg: '#fef9c3'
+                        Icon: Radio,
+                        title: 'Präzise Audio-Loopstation & Aufnahmen',
+                        desc: 'Nahtloser Multi-Track Looper mit automatischer Takt-Synchronisation, Aufnahmefunktion & Cloud-Archiv.',
+                        color: '#ca8a04',
+                        iconBg: '#fef9c3',
+                        iconBorder: '#fef08a',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)',
+                        cardBorder: '#fef08a'
                       },
                       {
-                        icon: '⏱️',
-                        title: 'Übe-Begleiter & Fokus-Timer',
-                        desc: 'Integrierter Übe-Timer mit Sound-Effekten und automatischer XP-Gutschrift.',
-                        bg: '#faf5ff',
-                        border: '#e9d5ff',
-                        iconBg: '#f3e8ff'
+                        Icon: Play,
+                        title: 'Übe-Begleiter & Play-Alongs',
+                        desc: 'Integriertes Metronom & Drum-Tracks zum aktiven Mitspielen beim täglichen Üben.',
+                        color: '#9333ea',
+                        iconBg: '#f3e8ff',
+                        iconBorder: '#e9d5ff',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #faf5ff 100%)',
+                        cardBorder: '#e9d5ff'
                       },
                       {
-                        icon: '📊',
-                        title: 'Skill-Radar, Songs & Lehrwerke',
-                        desc: 'Visuelle Fortschrittsanalyse für Stücke, Lehrwerk-Kapitel, Techniken & Repertoire.',
-                        bg: '#fff1f2',
-                        border: '#fecdd3',
-                        iconBg: '#ffe4e6'
+                        Icon: Calendar,
+                        title: 'Stundenplan & Schuljahr-Termine',
+                        desc: 'Vollständige Jahresübersicht aller Unterrichtstermine, Raumplanung & Verschiebungs-Anfragen.',
+                        color: '#4f46e5',
+                        iconBg: '#e0e7ff',
+                        iconBorder: '#c7d2fe',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)',
+                        cardBorder: '#c7d2fe'
                       },
                       {
-                        icon: '🏆',
+                        Icon: MessageSquare,
+                        title: 'Direktnachrichten & Termin-Shoutbox (DSGVO)',
+                        desc: '100% datenschutzkonforme Nachrichten & terminbezogene 1:1 Shoutbox für jede Unterrichtsstunde.',
+                        color: '#059669',
+                        iconBg: '#ccfbf1',
+                        iconBorder: '#99f6e4',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%)',
+                        cardBorder: '#99f6e4'
+                      },
+                      {
+                        Icon: Trophy,
                         title: 'Sticker & Errungenschaften',
-                        desc: 'Sammelbare Abzeichen und Sticker für erreichte Lern-Meilensteine freischalten.',
-                        bg: '#fef3c7',
-                        border: '#fde047',
-                        iconBg: '#fef9c3'
+                        desc: 'Sammelbare Abzeichen und Erfolge für erreichte Lern- und Übe-Meilensteine.',
+                        color: '#d97706',
+                        iconBg: '#fef3c7',
+                        iconBorder: '#fde047',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)',
+                        cardBorder: '#fde68a'
                       },
                       {
-                        icon: '💬',
-                        title: '1:1 Lehrkraft-Shoutbox',
-                        desc: 'Direkte Nachrichten & Terminabsprachen mit deiner Lehrkraft für alle kommenden Stunden.',
-                        bg: '#f8fafc',
-                        border: '#e2e8f0',
-                        iconBg: '#f1f5f9'
+                        Icon: Award,
+                        title: 'Performance & Highlights Board',
+                        desc: 'Feiere persönliche Meilensteine, Klassen-Erfolge & deinen Beitrag zum Gesamterfolg deiner Musikschule.',
+                        color: '#7c3aed',
+                        iconBg: '#ede9fe',
+                        iconBorder: '#ddd6fe',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)',
+                        cardBorder: '#ddd6fe'
                       },
                       {
-                        icon: '⚡',
-                        title: 'Performance & Highlights',
-                        desc: 'Verfolge deine persönliche Entfaltung, Band-Erfolge und Meilensteine.',
-                        bg: '#f5f3ff',
-                        border: '#ddd6fe',
-                        iconBg: '#ede9fe'
+                        Icon: BarChart3,
+                        title: 'Skill-Radar & Entwicklungs-Analyse',
+                        desc: '360°-Visualisierung deiner musikalischen Stärken, Technik, Rhythmik & persönlichen Superkraft.',
+                        color: '#e11d48',
+                        iconBg: '#ffe4e6',
+                        iconBorder: '#fecdd3',
+                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #fff1f2 100%)',
+                        cardBorder: '#fecdd3'
                       }
-                    ].map((item, idx) => (
-                      <div key={idx} style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '12px',
-                        padding: '12px',
-                        borderRadius: '16px',
-                        background: item.bg,
-                        border: `1px solid ${item.border}`
-                      }}>
-                        <div style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '10px',
-                          background: item.iconBg,
+                    ].map((item, idx) => {
+                      const IconComp = item.Icon;
+                      return (
+                        <div key={idx} style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.1rem',
-                          flexShrink: 0,
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.04)'
+                          gap: '14px',
+                          padding: '12px 14px',
+                          borderRadius: '16px',
+                          background: item.cardBg,
+                          border: `1px solid ${item.cardBorder}`,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
                         }}>
-                          {item.icon}
+                          <div style={{
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '12px',
+                            background: item.iconBg,
+                            border: `1px solid ${item.iconBorder}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <IconComp size={18} color={item.color} />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                              {item.title}
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.35, fontWeight: 500 }}>
+                              {item.desc}
+                            </span>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                            {item.title}
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.35, fontWeight: 500 }}>
-                            {item.desc}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
+
+                  {/* Cost & Billing Transparency Hero Card */}
+                  {(() => {
+                    const isExempt = profile?.exempt_from_direct_billing === true;
+                    const opt = schoolData?.student_billing_option;
+
+                    // Option 1: School covers all costs OR student is exempt
+                    const isSchoolCovered = isExempt || !opt || opt === 'school_covered' || opt === 'sammelzahler' || opt === 'school_pays' || opt === 'option1' || opt === 'both';
+                    
+                    if (isSchoolCovered) {
+                      return (
+                        <div style={{
+                          margin: '0 24px 12px 24px',
+                          padding: '14px 16px',
+                          borderRadius: '18px',
+                          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                          border: '1.5px solid #bbf7d0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          boxShadow: '0 2px 8px rgba(52, 168, 83, 0.08)'
+                        }}>
+                          <div style={{
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '12px',
+                            background: '#ffffff',
+                            border: '1px solid #bbf7d0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                            flexShrink: 0
+                          }}>
+                            🎁
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#14532d' }}>
+                                100% Kostenlos für dich!
+                              </span>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, background: '#16a34a', color: '#ffffff', padding: '2px 7px', borderRadius: '100px', textTransform: 'uppercase' }}>
+                                Übernommen
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.76rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
+                              Deine Musikschule übernimmt alle Aktivierungsgebühren für deinen Campus-Zugang.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Option 2: Partial direct billing (0,40 € / Mo -> 4,80 € / Jahr)
+                    const isPartial = opt === 'student_partial';
+                    const monthlyPrice = isPartial ? '0,40 €' : '0,49 €';
+                    const annualPrice = isPartial ? '4,80 €' : '5,88 €';
+
+                    return (
+                      <div style={{
+                        margin: '0 24px 12px 24px',
+                        padding: '14px 16px',
+                        borderRadius: '18px',
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        border: '1.5px solid #cbd5e1',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            💳 Aktivierungs-Beitrag
+                          </span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '100px' }}>
+                            Transparente Abrechnung
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
+                            {monthlyPrice} <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>/ Monat</span>
+                          </span>
+                          <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
+                            ({annualPrice} / Jahr als Einmalbeitrag)
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.35, fontWeight: 500 }}>
+                          {isPartial 
+                            ? 'Deine Musikschule bezuschusst deinen Zugang. Der Aktivierungsbeitrag wird als Einmalzahlung für das Schuljahr abgerechnet.' 
+                            : 'Direktabrechnung für deinen vollen Campus-Zugang. Der Aktivierungsbeitrag wird als Einmalzahlung für das Schuljahr abgerechnet.'}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Footer Actions */}
                   <div style={{
@@ -7105,53 +7302,60 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     background: '#ffffff',
                     borderRadius: '0 0 28px 28px'
                   }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowActivationInfoModal(false);
-                        setPinPurpose('unlock_app');
-                        setPageState('pin_required');
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '14px',
-                        borderRadius: '14px',
-                        background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontWeight: 800,
-                        fontSize: '0.92rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
-                      }}
-                    >
-                      <Lock size={16} color="#ffffff" />
-                      <span>Jetzt Code / PIN eingeben</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        alert('Wende dich einfach an dein Sekretariat oder deinen Lehrer, um den Vollzugriff für dein Profil freischalten zu lassen!');
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '14px',
-                        background: '#f1f5f9',
-                        color: '#334155',
-                        border: '1px solid #cbd5e1',
-                        fontWeight: 750,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      📩 Bei der Musikschule anfragen
-                    </button>
+                    {profile?.is_campus_active ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowActivationInfoModal(false);
+                          setPinPurpose('unlock_app');
+                          setPageState('pin_required');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '14px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '0.92rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                        }}
+                      >
+                        <Lock size={16} color="#ffffff" />
+                        <span>Jetzt PIN eingeben & WebApp freischalten</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          alert('Wende dich einfach an dein Sekretariat oder deinen Lehrer, um den Vollzugriff für dein Profil freischalten zu lassen!');
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '14px',
+                          borderRadius: '14px',
+                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '0.92rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)'
+                        }}
+                      >
+                        <span>📩 Bei der Musikschule anfragen</span>
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -7216,8 +7420,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           transition: 'transform 0.15s ease'
                         }}
                       >
-                        <Lock size={12} color="#ffffff" />
-                        <span>Vollzugriff</span>
+                        {profile.is_campus_active ? (
+                          <>
+                            <Lock size={12} color="#ffffff" />
+                            <span>Vollzugriff</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={12} color="#ffffff" />
+                            <span>Campus aktivieren</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -7443,8 +7656,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           transition: 'transform 0.15s ease'
                         }}
                       >
-                        <Lock size={12} color="#ffffff" />
-                        <span>Vollzugriff</span>
+                        {profile.is_campus_active ? (
+                          <>
+                            <Lock size={12} color="#ffffff" />
+                            <span>Vollzugriff</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={12} color="#ffffff" />
+                            <span>Campus aktivieren</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -8160,7 +8382,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
             } catch (e) {}
 
-            const isCanceled = activeChatOcc.status === 'canceled_by_student' || activeChatOcc.status === 'cancelled' || activeChatOcc.status === 'teacher_sick' || activeChatOcc.status === 'canceled_by_teacher_sick';
+            let stammterminText: string | null = null;
+            if (activeChatOcc) {
+              let rawOrig = activeChatOcc.original_date || activeChatOcc.rescheduled_from;
+              if (!rawOrig && activeChatOcc.notes) {
+                const match = activeChatOcc.notes.match(/(\d{4}-\d{2}-\d{2})/);
+                if (match) rawOrig = match[1];
+              }
+              if (rawOrig && rawOrig !== activeChatOcc.date) {
+                try {
+                  const clean = rawOrig.split('T')[0];
+                  const parts = clean.split('-').map(Number);
+                  let origDate: Date;
+                  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+                    origDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                  } else {
+                    origDate = new Date(rawOrig);
+                  }
+                  if (!isNaN(origDate.getTime())) {
+                    const origDayName = origDate.toLocaleDateString('de-DE', { weekday: 'long' });
+                    const origDateFormatted = origDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+                    stammterminText = `${origDayName}, ${origDateFormatted}`;
+                  }
+                } catch (e) {}
+              }
+            }
 
             return (
               <div
@@ -8194,23 +8440,36 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 >
                   {/* Header */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                    background: stammterminText ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' : 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
                     padding: '24px',
                     color: '#ffffff',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: '12px'
                   }}>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>💬</span> {titleText}
                       </h3>
-                      <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
-                        Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
-                      </p>
+                      
+                      {stammterminText ? (
+                        <div style={{ margin: '6px 0', color: 'rgba(255, 255, 255, 0.95)', fontSize: '0.76rem', fontWeight: 600, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ textDecoration: 'line-through', opacity: 0.85, fontSize: '0.72rem' }}>
+                            📍 Stammtermin (Original): {stammterminText}
+                          </div>
+                          <div style={{ fontWeight: 850, fontSize: '0.82rem' }}>
+                            ➔ Verschoben auf: {new Date(activeChatOcc.date).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
+                          Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                        </p>
+                      )}
 
-                      {/* Badges */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                      {/* Badges & Schedule Button */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
                         <span style={{
                           padding: '4px 10px',
                           borderRadius: '8px',
@@ -8227,6 +8486,39 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           <ShieldCheck size={13} color="#ffffff" />
                           <span>100% DSGVO-konformer Schulchat</span>
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof window !== 'undefined') {
+                              if (activeChatOcc?.date) {
+                                localStorage.setItem('campus_calendar_target_date', activeChatOcc.date);
+                              }
+                              setActiveChatOcc(null);
+                              setActiveTab('lessons');
+                              localStorage.setItem('campus_calendar_target_date', activeChatOcc.date);
+                              localStorage.setItem('campus_active_tab', 'schedule');
+                              localStorage.setItem('groovelab_active_tab', 'schedule');
+                            }
+                          }}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '8px',
+                            background: '#ffffff',
+                            color: stammterminText ? '#b45309' : '#15803d',
+                            fontSize: '0.68rem',
+                            fontWeight: 850,
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          <Calendar size={12} color={stammterminText ? '#b45309' : '#15803d'} />
+                          <span>Im Stundenplan anzeigen</span>
+                        </button>
                       </div>
                     </div>
                     <button
@@ -8308,6 +8600,77 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     )}
                     <div ref={chatMessagesEndRef} />
                   </div>
+
+                  {/* Music Pedagogical Quick Reply Chips for Student */}
+                  {!isFrozen && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      overflowX: 'auto',
+                      padding: '10px 24px 4px 24px',
+                      background: '#fafbfc',
+                      borderTop: '1px solid #f1f5f9',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none'
+                    }}>
+                      {/* 1-Click Direct Emoji Reaction Buttons */}
+                      <div style={{ display: 'flex', gap: '4px', paddingRight: '6px', borderRight: '1px solid #e2e8f0' }}>
+                        {['👍', '🎵', '👏', '🙏'].map((emoji, idx) => (
+                          <button
+                            key={`student-emoji-${idx}`}
+                            type="button"
+                            onClick={() => sendDirectChatMessage(emoji)}
+                            style={{
+                              padding: '4px 9px',
+                              borderRadius: '100px',
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              fontSize: '0.88rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                              flexShrink: 0
+                            }}
+                            className="hover-scale"
+                            title={`Schnell-Reaktion ${emoji} senden`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Student Authentic Text Phrases */}
+                      {[
+                        { label: 'Vielen Dank!', text: 'Vielen Dank!' },
+                        { label: 'Alles klar, danke!', text: 'Alles klar, danke!' },
+                        { label: 'Termin passt!', text: 'Der Termin passt für mich!' },
+                        { label: 'Bin gleich da', text: 'Ich bin gleich da!' },
+                        { label: 'Werde fleißig üben', text: 'Danke, ich werde fleißig üben!' }
+                      ].map((phrase, idx) => (
+                        <button
+                          key={`student-phrase-${idx}`}
+                          type="button"
+                          onClick={() => setChatTypedMessage(phrase.text)}
+                          style={{
+                            padding: '5px 12px',
+                            borderRadius: '100px',
+                            background: '#ffffff',
+                            border: '1px solid #bbf7d0',
+                            color: '#15803d',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                            flexShrink: 0
+                          }}
+                          className="hover-scale"
+                        >
+                          {phrase.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <form onSubmit={handleSendChatMessage} style={{
                     padding: '16px 24px',

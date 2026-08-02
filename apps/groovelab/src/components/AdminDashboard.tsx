@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -8844,10 +8844,8 @@ export function AdminDashboard({
                                             : (isExternal
                                               ? '1.5px dashed #ef4444'
                                               : (isSchedule 
-                                                ? (isOwnBooking 
-                                                  ? (isGroovelabBlock ? '1px solid #eab308' : '1px solid #2d9248') 
-                                                  : (isGroovelabBlock ? '1.5px solid #eab308' : '1px solid rgba(52, 168, 83, 0.3)'))
-                                                : (isBookingConfirmed ? '2px solid #a855f7' : '2px dashed #a855f7'))),
+                                                ? (isGroovelabBlock ? '1px solid rgba(180, 83, 9, 0.4)' : (isOwnBooking ? '1px solid #2d9248' : '1px solid rgba(52, 168, 83, 0.3)'))
+                                                : (isBookingConfirmed ? '1px solid rgba(147, 51, 234, 0.25)' : '2px dashed #a855f7'))),
                                         borderLeft: b.isPreview 
                                           ? '2.2px dashed #7c3aed' 
                                           : b.isDuringHoliday
@@ -9084,50 +9082,56 @@ export function AdminDashboard({
                                           </>
                                         ) : (
                                           <>
-                                            {/* Other Teachers' Schedule Blocks (Classic Layout) */}
+                                            {/* Other Teachers' Schedule Blocks / GrooveLab Block Layout */}
                                             <div style={{
                                               display: 'flex',
                                               flexDirection: 'column',
                                               justifyContent: 'space-between',
                                               height: '100%',
                                               boxSizing: 'border-box',
-                                              width: '100%'
+                                              width: '100%',
+                                              padding: isGroovelabBlock ? '6px 8px' : 0
                                             }}>
                                               <div>
                                                 <div style={{
-                                                  fontSize: '0.64rem',
+                                                  fontSize: '0.62rem',
                                                   fontWeight: 850,
-                                                  color: isGroovelabBlock ? '#09090b' : '#1e7a44',
-                                                  display: 'flex',
+                                                  color: isGroovelabBlock ? '#78350f' : '#1e7a44',
+                                                  background: isGroovelabBlock ? 'rgba(120, 53, 15, 0.12)' : 'transparent',
+                                                  padding: isGroovelabBlock ? '2px 7px' : 0,
+                                                  borderRadius: isGroovelabBlock ? '100px' : 0,
+                                                  display: 'inline-flex',
                                                   alignItems: 'center',
                                                   gap: '4px',
-                                                  marginBottom: '2px'
+                                                  marginBottom: '4px',
+                                                  letterSpacing: '-0.01em'
                                                 }}>
-                                                  <Clock size={10} strokeWidth={2.5} color={isGroovelabBlock ? '#09090b' : '#1e7a44'} />
+                                                  <Clock size={10} strokeWidth={2.5} color={isGroovelabBlock ? '#78350f' : '#1e7a44'} />
                                                   {b.startTime} - {b.endTime}
                                                 </div>
                                                 <div style={{
-                                                  fontSize: '0.72rem',
+                                                  fontSize: '0.74rem',
                                                   fontWeight: 900,
-                                                  color: '#09090b',
+                                                  color: isGroovelabBlock ? '#451a03' : '#09090b',
                                                   whiteSpace: 'nowrap',
                                                   overflow: 'hidden',
                                                   textOverflow: 'ellipsis',
-                                                  marginBottom: '2px'
+                                                  marginBottom: '2px',
+                                                  letterSpacing: '-0.01em'
                                                 }}>
-                                                  {b.teacherName || 'Lehrkraft'}
+                                                  {isGroovelabBlock ? 'GrooveLab' : (b.teacherName || 'Lehrkraft')}
                                                 </div>
                                                 <div style={{
                                                   fontSize: '0.62rem',
                                                   fontWeight: 750,
-                                                  color: isGroovelabBlock ? '#09090b' : '#1e7a44',
-                                                  opacity: isGroovelabBlock ? 0.8 : 0.9
+                                                  color: isGroovelabBlock ? '#92400e' : '#1e7a44',
+                                                  opacity: 0.95
                                                 }}>
                                                   {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
                                                 </div>
                                               </div>
 
-                                              {/* Lock Icon at bottom right for other teachers */}
+                                              {/* Lock Icon at bottom right for schedule blocks */}
                                               <div 
                                                 title="Regulärer Unterrichtsblock"
                                                 style={{
@@ -9166,30 +9170,46 @@ export function AdminDashboard({
                                              {b.teacherName || 'Lehrkraft'}
                                            </div>
 
+                                           {/* Apple Glassmorphic Confirmation Status Badge */}
+                                            <div style={{ marginTop: 'auto', paddingTop: '4px', display: 'flex', justifyContent: 'flex-start' }}>
+                                              <span style={{
+                                                fontSize: '0.60rem',
+                                                fontWeight: 800,
+                                                padding: '2px 7px',
+                                                borderRadius: '100px',
+                                                background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.14)' : 'rgba(234, 179, 8, 0.14)',
+                                                backdropFilter: 'blur(8px)',
+                                                WebkitBackdropFilter: 'blur(8px)',
+                                                border: isBookingConfirmed ? '1px solid rgba(34, 197, 94, 0.28)' : '1px solid rgba(234, 179, 8, 0.28)',
+                                                color: isBookingConfirmed ? '#15803d' : '#9a3412',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '3px',
+                                                boxShadow: isBookingConfirmed ? '0 2px 6px rgba(34, 197, 94, 0.1)' : '0 2px 6px rgba(234, 179, 8, 0.1)',
+                                                whiteSpace: 'nowrap',
+                                                letterSpacing: '-0.01em'
+                                              }}>
+                                                {b.isPreview ? (
+                                                  <><span>⏳</span> Vorschau</>
+                                                ) : isBookingConfirmed ? (
+                                                  <>
+                                                    <CheckCircle2 size={11} strokeWidth={2.6} style={{ color: '#16a34a' }} />
+                                                    <span>Bestätigt</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <span>⏳</span> Unbestätigt
+                                                  </>
+                                                )}
+                                              </span>
+                                            </div>
+
                                            {/* Purpose (Only visible for the teacher who booked the room) */}
                                            {(isOwnBooking || b.isPreview) && b.purpose && b.purpose.trim() && (
                                              <div style={{ fontSize: '0.64rem', color: '#6b21a8', fontWeight: 750, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                {b.purpose}
                                              </div>
                                            )}
-
-                                           {/* Confirmation status badge at bottom footer */}
-                                           <div style={{ marginTop: 'auto', paddingTop: '4px' }}>
-                                             <span style={{
-                                               fontSize: '0.58rem',
-                                               fontWeight: 900,
-                                               padding: '1px 5px',
-                                               borderRadius: '4px',
-                                               background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.18)',
-                                               color: isBookingConfirmed ? '#15803d' : '#a16207',
-                                               display: 'inline-flex',
-                                               alignItems: 'center',
-                                               gap: '2px',
-                                               whiteSpace: 'nowrap'
-                                             }}>
-                                               {b.isPreview ? '⏳ Vorschau' : (isBookingConfirmed ? '✅ Bestätigt' : '⏳ Unbestätigt')}
-                                             </span>
-                                           </div>
                                          </>
                                        )}
                                     </div>
@@ -9348,18 +9368,32 @@ export function AdminDashboard({
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                             <span style={{
-                              fontSize: '0.62rem',
-                              fontWeight: 900,
-                              padding: '2px 7px',
-                              borderRadius: '6px',
-                              background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.18)',
-                              color: isBookingConfirmed ? '#15803d' : '#a16207',
+                              fontSize: '0.64rem',
+                              fontWeight: 800,
+                              padding: '3px 9px',
+                              borderRadius: '100px',
+                              background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.14)' : 'rgba(234, 179, 8, 0.14)',
+                              backdropFilter: 'blur(8px)',
+                              WebkitBackdropFilter: 'blur(8px)',
+                              border: isBookingConfirmed ? '1px solid rgba(34, 197, 94, 0.28)' : '1px solid rgba(234, 179, 8, 0.28)',
+                              color: isBookingConfirmed ? '#15803d' : '#9a3412',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '3px',
-                              whiteSpace: 'nowrap'
+                              gap: '4px',
+                              boxShadow: isBookingConfirmed ? '0 2px 6px rgba(34, 197, 94, 0.12)' : '0 2px 6px rgba(234, 179, 8, 0.1)',
+                              whiteSpace: 'nowrap',
+                              letterSpacing: '-0.01em'
                             }}>
-                              {isBookingConfirmed ? '✅ Bestätigt' : '⏳ Unbestätigt'}
+                              {isBookingConfirmed ? (
+                                <>
+                                  <CheckCircle2 size={11} strokeWidth={2.6} style={{ color: '#16a34a' }} />
+                                  <span>Bestätigt</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>⏳</span> Unbestätigt
+                                </>
+                              )}
                             </span>
 
                             <button
