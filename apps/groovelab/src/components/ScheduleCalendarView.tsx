@@ -1899,15 +1899,6 @@ export function ScheduleCalendarView({
                 vacant_student_id: occ.student_id
               };
             }
-            // All regular appointments render in clean scheduled (green) Stammtermin across all weeks
-            if (occ.status === 'pending_reschedule' || !occ.status) {
-              return {
-                ...occ,
-                status: 'scheduled',
-                student_acknowledged: true,
-                teacher_acknowledged: true
-              };
-            }
             return occ;
           });
 
