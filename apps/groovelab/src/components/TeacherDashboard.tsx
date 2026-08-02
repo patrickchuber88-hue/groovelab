@@ -9033,7 +9033,7 @@ export function TeacherDashboard({
                   {/* Header with Title & Time Window Filter */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <AlertCircle size={18} color="#eab308" />
+                      <AlertCircle size={18} color="#475569" />
                       <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         Terminänderungen
                       </h3>
@@ -9099,7 +9099,7 @@ export function TeacherDashboard({
                       if (isCancelled) {
                         cardBg = '#fef2f2';
                         dateHeaderBg = '#ef4444';
-                        label = b.isGroup ? 'Ausfall (Gruppe)' : 'Ausfall';
+                        label = 'Ausfall';
                         labelBg = '#ef4444';
                         labelTextColor = '#ffffff';
                         textColor = '#991b1b';
@@ -9109,7 +9109,7 @@ export function TeacherDashboard({
                       } else if (isRescheduled) {
                         cardBg = '#fefce8';
                         dateHeaderBg = '#eab308';
-                        label = b.isGroup ? 'Verschoben (Gruppe)' : 'Verschoben';
+                        label = 'Verschoben';
                         labelBg = '#eab308';
                         labelTextColor = '#ffffff';
                         textColor = '#854d0e';
@@ -9127,6 +9127,17 @@ export function TeacherDashboard({
                         commentButtonBg = '#ffffff';
                         commentButtonColor = '#7c3aed';
                       }
+
+                      const rName = b.roomName || b.rooms?.name || 'Raum';
+                      const displayStudentName = (() => {
+                        if (!b.studentName) return null;
+                        if (b.studentName.includes('&')) {
+                          const parts = b.studentName.split('&');
+                          const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
+                          return '👥 ' + firstNames.join(', ');
+                        }
+                        return b.studentName;
+                      })();
 
                       return (
                         <div 
@@ -9168,10 +9179,9 @@ export function TeacherDashboard({
 
                           {/* Content Block */}
                           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                <span>{dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr</span>
-                                <span style={{ opacity: 0.6, fontWeight: 600 }}>• {b.roomName || b.rooms?.name || 'Raum'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
                               </div>
 
                               <span style={{ 
@@ -9190,18 +9200,9 @@ export function TeacherDashboard({
                               </span>
                             </div>
 
-                            {b.studentName && (
-                              <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {(() => {
-                                  if (b.studentName.includes('&')) {
-                                    const parts = b.studentName.split('&');
-                                    const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                                    return '👥 ' + firstNames.join(', ');
-                                  }
-                                  return b.studentName;
-                                })()}
-                              </div>
-                            )}
+                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {displayStudentName ? `${displayStudentName} • ${rName}` : rName}
+                            </div>
                           </div>
 
                           {/* Shoutbox Chat Button */}
@@ -9298,7 +9299,7 @@ export function TeacherDashboard({
                   marginBottom: '20px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                    <Calendar size={18} color="#8b5cf6" />
+                    <Calendar size={18} color="#475569" />
                     <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Meine Buchungen</h3>
                   </div>
 
@@ -9344,6 +9345,17 @@ export function TeacherDashboard({
                         subTextColor = '#6d28d9';
                       }
 
+                      const rName = b.roomName || b.rooms?.name || 'Raum';
+                      const displayStudentName = (() => {
+                        if (!b.studentName) return null;
+                        if (b.studentName.includes('&')) {
+                          const parts = b.studentName.split('&');
+                          const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
+                          return '👥 ' + firstNames.join(', ');
+                        }
+                        return b.studentName;
+                      })();
+
                       return (
                         <div 
                           key={b.id} 
@@ -9384,11 +9396,11 @@ export function TeacherDashboard({
 
                           {/* Content details block */}
                           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', width: '100%' }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: textColor, display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                <span>{dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr</span>
-                                <span style={{ opacity: 0.6, fontWeight: 600 }}>• {b.roomName || b.rooms?.name || 'Raum'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
                               </div>
+
                               <span style={{ 
                                 fontSize: '0.55rem', 
                                 fontWeight: 900, 
@@ -9405,18 +9417,9 @@ export function TeacherDashboard({
                               </span>
                             </div>
 
-                            {b.studentName && (
-                              <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {(() => {
-                                  if (b.studentName.includes('&')) {
-                                    const parts = b.studentName.split('&');
-                                    const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                                    return firstNames.join(' & ');
-                                  }
-                                  return b.studentName;
-                                })()}
-                              </div>
-                            )}
+                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {displayStudentName ? `${displayStudentName} • ${rName}` : rName}
+                            </div>
                           </div>
 
                           {/* Deletion button */}
