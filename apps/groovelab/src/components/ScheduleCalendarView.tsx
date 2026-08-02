@@ -5736,10 +5736,6 @@ export function ScheduleCalendarView({
                                         ) : null;
                                       })()}
                                     </span>
-                                    
-                                    {isGroup && (
-                                      <Users size={10} style={{ color: finalColors.text, opacity: 0.7, flexShrink: 0 }} />
-                                    )}
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
@@ -5959,9 +5955,6 @@ export function ScheduleCalendarView({
                                         ) : null;
                                       })()}
                                     </span>
-                                    {isGroup && (
-                                      <Users size={12} style={{ color: finalColors.text, opacity: 0.7 }} />
-                                    )}
                                   </div>
 
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
