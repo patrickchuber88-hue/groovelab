@@ -1167,6 +1167,7 @@ export function TeacherDashboard({
   const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [hoveredCopilotSlotId, setHoveredCopilotSlotId] = useState<string | null>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentLetter, setStudentLetter] = useState<string | null>(null);
@@ -2750,6 +2751,12 @@ export function TeacherDashboard({
     return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
   }, [holidays]);
 
+  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [myChangedAppointments, setMyChangedAppointments] = useState<any[]>([]);
+  const [showAllChangedAppointments, setShowAllChangedAppointments] = useState<boolean>(false);
+  const [showAllBookings, setShowAllBookings] = useState<boolean>(false);
+  const [scheduleChangesTimeWindow, setScheduleChangesTimeWindow] = useState<'7days' | 'all'>('7days');
+
   const briefingData = useMemo(() => {
     if (!rawBriefingData) return null;
     if (isTodayHoliday) {
@@ -2758,14 +2765,104 @@ export function TeacherDashboard({
         timeline: []
       };
     }
-    return rawBriefingData;
-  }, [rawBriefingData, isTodayHoliday]);
 
-  const [myBookings, setMyBookings] = useState<any[]>([]);
-  const [myChangedAppointments, setMyChangedAppointments] = useState<any[]>([]);
-  const [showAllChangedAppointments, setShowAllChangedAppointments] = useState<boolean>(false);
-  const [showAllBookings, setShowAllBookings] = useState<boolean>(false);
-  const [scheduleChangesTimeWindow, setScheduleChangesTimeWindow] = useState<'7days' | 'all'>('7days');
+    const simNow = getSimulatedNow();
+    const getLocalYYYYMMDD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalYYYYMMDD(simNow);
+
+    const updatedTimeline = (rawBriefingData.timeline || []).map((s: any) => ({ ...s }));
+    const allRelevantChanges = [...(myChangedAppointments || []), ...(myBookings || [])];
+
+    allRelevantChanges.forEach((item: any) => {
+      if (!item) return;
+
+      let normDate = item.date || '';
+      if (normDate.includes('.')) {
+        const parts = normDate.split('.');
+        if (parts.length === 3) {
+          normDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+
+      let normOrigDate = item.original_date || '';
+      if (normOrigDate.includes('.')) {
+        const parts = normOrigDate.split('.');
+        if (parts.length === 3) {
+          normOrigDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+
+      const itemTime = item.startTime || item.start_time || item.timeSlot || item.time_slot;
+      const formattedItemTime = itemTime ? itemTime.substring(0, 5) : null;
+      const rawName = item.studentName || item.student_name || item.name || item.purpose || '';
+      const cleanName = rawName.replace(/^Unterricht:\s*/i, '').trim();
+      const itemStudentFirstName = cleanName.split(' ')[0].toLowerCase();
+      const itemStudentId = item.student_id || item.studentId || item.student?.id;
+
+      const findIdx = () => {
+        return updatedTimeline.findIndex((t: any) => {
+          if (item.scheduleId && String(t.scheduleId) === String(item.scheduleId)) return true;
+          if (item.id && (String(t.id) === String(item.id) || String(t.scheduleId) === String(item.id))) return true;
+          if (itemStudentId && t.student?.id && String(t.student.id) === String(itemStudentId)) return true;
+          if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht' && t.student?.name && t.student.name.toLowerCase().includes(itemStudentFirstName)) return true;
+          return false;
+        });
+      };
+
+      if (normOrigDate === todayStr && normDate !== todayStr) {
+        const existingIdx = findIdx();
+        if (existingIdx !== -1) {
+          updatedTimeline[existingIdx].status = 'rescheduled_away';
+        }
+      } else if (normDate === todayStr && formattedItemTime) {
+        const existingIdx = findIdx();
+        if (existingIdx !== -1) {
+          updatedTimeline[existingIdx] = {
+            ...updatedTimeline[existingIdx],
+            timeSlot: formattedItemTime,
+            status: item.status || updatedTimeline[existingIdx].status,
+            room: item.roomName || item.room || updatedTimeline[existingIdx].room,
+            isRescheduledPending: Boolean(item.is_rescheduled || item.isRescheduled || item.status === 'pending_reschedule' || item.status === 'rescheduled_confirmed' || item.status === 'changed')
+          };
+        } else if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
+          updatedTimeline.push({
+            id: item.id || `changed-${Math.random()}`,
+            scheduleId: item.scheduleId || item.id,
+            date: todayStr,
+            timeSlot: formattedItemTime,
+            duration: item.duration || 45,
+            status: item.status || 'approved',
+            room: item.roomName || item.room || 'Hauptraum',
+            instrument: item.instrument || 'Klavier',
+            student_acknowledged: true,
+            isRescheduledPending: Boolean(item.is_rescheduled || item.isRescheduled || item.status === 'pending_reschedule' || item.status === 'rescheduled_confirmed' || item.status === 'changed'),
+            student: {
+              id: itemStudentId || `temp-${itemStudentFirstName}`,
+              name: cleanName || 'Schüler',
+              first_name: cleanName.split(' ')[0],
+              last_name: cleanName.split(' ').slice(1).join(' '),
+              isAppUser: false,
+              isAnalogStickerUser: false,
+              birthDate: null,
+              streakFlame: 0
+            }
+          });
+        }
+      }
+    });
+
+    updatedTimeline.sort((a: any, b: any) => (a.timeSlot || '').localeCompare(b.timeSlot || ''));
+
+    return {
+      ...rawBriefingData,
+      timeline: updatedTimeline
+    };
+  }, [rawBriefingData, isTodayHoliday, myChangedAppointments, myBookings]);
 
   const visibleChangedAppointments = useMemo(() => {
     if (!myChangedAppointments || myChangedAppointments.length === 0) return [];
@@ -3923,7 +4020,7 @@ export function TeacherDashboard({
           const todayStr = new Date().toLocaleDateString('sv-SE');
 
           // Fetch occurrences for today for fallback
-          const { data: occurrences } = await supabase
+          const { data: dbOccurrences } = await supabase
             .from('schedule_occurrences')
             .select(`
               id,
@@ -3953,6 +4050,47 @@ export function TeacherDashboard({
             .eq('school_id', teacherProfile.school_id)
             .or(`date.eq.${todayStr},original_date.eq.${todayStr}`);
 
+          // Also collect local occurrences from localStorage
+          let localOccursForToday: any[] = [];
+          try {
+            const pendingSaved = typeof window !== 'undefined' ? ((userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
+            if (pendingSaved) {
+              const parsedPending = JSON.parse(pendingSaved);
+              Object.values(parsedPending).forEach((item: any) => {
+                if (item && (item.date === todayStr || item.original_date === todayStr)) {
+                  const itemTeacherId = item.teacher_id || item.teacherId;
+                  if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
+                    localOccursForToday.push(item);
+                  }
+                }
+              });
+            }
+            const latestSaved = typeof window !== 'undefined' ? (userId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + userId) : null) : null;
+            if (latestSaved) {
+              const parsedLatest = JSON.parse(latestSaved);
+              if (Array.isArray(parsedLatest)) {
+                parsedLatest.forEach((item: any) => {
+                  if (item && (item.date === todayStr || item.original_date === todayStr)) {
+                    const itemTeacherId = item.teacher_id || item.teacherId;
+                    if (!itemTeacherId || String(itemTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
+                      localOccursForToday.push(item);
+                    }
+                  }
+                });
+              }
+            }
+          } catch (e) {}
+
+          const combinedOccurrences = [...(dbOccurrences || [])];
+          localOccursForToday.forEach((loc: any) => {
+            const existingIdx = combinedOccurrences.findIndex(o => String(o.id) === String(loc.id));
+            if (existingIdx >= 0) {
+              combinedOccurrences[existingIdx] = { ...combinedOccurrences[existingIdx], ...loc };
+            } else {
+              combinedOccurrences.push(loc);
+            }
+          });
+
           // Format regular schedules
           const timeline = (slots || []).map((slot: any) => {
             const student = slot.student;
@@ -3974,6 +4112,8 @@ export function TeacherDashboard({
               student: student ? {
                 id: student.id,
                 name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
+                first_name: student.first_name,
+                last_name: student.last_name,
                 isAppUser: student.is_app_user ?? false,
                 isAnalogStickerUser,
                 birthDate: student.birth_date,
@@ -3983,42 +4123,57 @@ export function TeacherDashboard({
           });
 
           // Merge with occurrences for today
-          if (occurrences && occurrences.length > 0) {
-            occurrences.forEach((occ: any) => {
+          if (combinedOccurrences && combinedOccurrences.length > 0) {
+            combinedOccurrences.forEach((occ: any) => {
               const student = occ.student;
               const avatar = student?.avatars?.[0] || null;
               const isAnalogStickerUser = !student?.is_app_user || avatar?.avatar_style === 'Standard_Silhouette';
-              const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
-              const occStudentId = occ.student?.id || occ.student_id;
+              const formattedTime = occ.start_time ? occ.start_time.substring(0, 5) : (occ.startTime ? occ.startTime.substring(0, 5) : '00:00');
+              const occStudentId = occ.student?.id || occ.student_id || occ.studentId;
+              const occStudentFirstName = (occ.student?.first_name || occ.studentName || occ.student_name || '').split(' ')[0].toLowerCase();
+
+              const findMatchingTimelineIdx = () => {
+                return timeline.findIndex((t: any) => {
+                  if (occ.schedule_id && String(t.scheduleId) === String(occ.schedule_id)) return true;
+                  if (occStudentId && t.student?.id && String(t.student.id) === String(occStudentId)) return true;
+                  if (occStudentFirstName && t.student?.name && t.student.name.toLowerCase().startsWith(occStudentFirstName)) return true;
+                  return false;
+                });
+              };
+
               if (occ.original_date === todayStr && occ.date !== todayStr) {
                 // Rescheduled AWAY from today -> mark as rescheduled_away
-                const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
+                const existingIdx = findMatchingTimelineIdx();
                 if (existingIdx !== -1) {
                   timeline[existingIdx].status = 'rescheduled_away';
                 }
               } else if (occ.date === todayStr) {
                 // Rescheduled TO today or updated today -> update or insert into today's timeline
-                const existingIdx = timeline.findIndex((t: any) => t.student?.id === occStudentId);
+                const existingIdx = findMatchingTimelineIdx();
+                const existingItem = existingIdx !== -1 ? timeline[existingIdx] : null;
+
                 const mappedItem = {
                   id: occ.id,
                   scheduleId: occ.schedule_id || occ.id,
                   date: occ.date,
                   timeSlot: formattedTime,
-                  duration: occ.schedules?.duration || 30,
+                  duration: occ.schedules?.duration || occ.duration || existingItem?.duration || 30,
                   status: occ.status,
-                  roomId: occ.schedules?.rooms?.id || null,
-                  room: occ.schedules?.rooms?.name || 'Hauptraum',
-                  instrument: occ.schedules?.instrument || student?.instrument || 'Klavier',
-                  student_acknowledged: occ.student_acknowledged,
+                  roomId: occ.schedules?.rooms?.id || occ.room_id || existingItem?.roomId || null,
+                  room: occ.schedules?.rooms?.name || occ.roomName || occ.room_name || existingItem?.room || 'Hauptraum',
+                  instrument: occ.schedules?.instrument || occ.instrument || existingItem?.instrument || student?.instrument || 'Klavier',
+                  student_acknowledged: occ.student_acknowledged ?? occ.studentAcknowledged ?? true,
                   original_date: occ.original_date,
                   student: student ? {
                     id: student.id,
                     name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
+                    first_name: student.first_name,
+                    last_name: student.last_name,
                     isAppUser: student.is_app_user ?? false,
                     isAnalogStickerUser,
                     birthDate: student.birth_date,
                     streakFlame: avatar?.streak_flame || 0
-                  } : null
+                  } : (existingItem?.student || null)
                 };
 
                 if (occ.status === 'cancelled') {
@@ -7344,7 +7499,9 @@ export function TeacherDashboard({
                                                 </div>
                                               );
                                             })}
-                                            {prep.prevWeekNotes && prep.prevWeekNotes.map((note: string, idx: number) => {
+                                            {prep.prevWeekNotes && prep.prevWeekNotes
+                                              .filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:") && !note.startsWith("LATENCY_CALIBRATION:") && !note.startsWith("SYSTEM:"))
+                                              .map((note: string, idx: number) => {
                                               const isLoop = note.startsWith("LOOP:");
                                               const isAudio = note.startsWith("AUDIO:");
                                               if (isLoop) {
@@ -7454,7 +7611,9 @@ export function TeacherDashboard({
                                                 </div>
                                               );
                                             })}
-                                            {prep.currentWeekNotes && prep.currentWeekNotes.map((note: string, idx: number) => {
+                                            {prep.currentWeekNotes && prep.currentWeekNotes
+                                              .filter((note: string) => !note.startsWith("STICKER:") && !note.startsWith("LATENCY:") && !note.startsWith("LATENCY_CALIBRATION:") && !note.startsWith("SYSTEM:"))
+                                              .map((note: string, idx: number) => {
                                               const isLoop = note.startsWith("LOOP:");
                                               const isAudio = note.startsWith("AUDIO:");
                                               if (isLoop) {
@@ -7922,11 +8081,11 @@ export function TeacherDashboard({
                             <button
                               type="button"
                               onClick={() => toggleRealNames()}
-                              title={showRealNames ? "Vollständige Namen anzeigen" : "Nachnamen schützen (kürzen)"}
+                              title={showRealNames ? "Vollständige Nachnamen anzeigen" : "Nachnamen maskieren (Datenschutz)"}
                               style={{
                                 border: 'none',
-                                background: showRealNames ? '#fee2e2' : '#f1f5f9',
-                                color: showRealNames ? '#ef4444' : '#64748b',
+                                background: showRealNames ? '#f1f5f9' : '#e6f4ea',
+                                color: showRealNames ? '#64748b' : '#34a853',
                                 width: '28px',
                                 height: '28px',
                                 borderRadius: '50%',
@@ -7937,7 +8096,7 @@ export function TeacherDashboard({
                                 transition: 'all 0.2s'
                               }}
                             >
-                              {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
+                              {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
                             </button>
                           </div>
                         </div>
@@ -8454,11 +8613,13 @@ export function TeacherDashboard({
                                           whiteSpace: 'nowrap'
                                         }}>
                                           {isBirthday ? '🎂 ' : ''}{(() => {
-                                            if (showRealNames) {
-                                              const found = allStudents.find(s => s.id === slot.student.id);
-                                              if (found) return `${found.first_name} ${found.last_name}`;
+                                            const found = allStudents.find(s => s.id === slot.student?.id);
+                                            const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
+                                            const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
+                                            if (fn || ln) {
+                                              return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
                                             }
-                                            return slot.student.name;
+                                            return slot.student?.name || 'Schüler';
                                           })()}
                                         </span>
                                       ) : (
@@ -8507,11 +8668,13 @@ export function TeacherDashboard({
                                                 }}
                                               >
                                                 {isBirthday ? '🎂 ' : ''}{(() => {
-                                                  if (showRealNames) {
-                                                    const found = allStudents.find(s => s.id === stud.id);
-                                                    if (found) return `${found.first_name} ${found.last_name}`;
+                                                  const found = allStudents.find(s => s.id === stud.id);
+                                                  const fn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+                                                  const ln = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                                                  if (fn || ln) {
+                                                    return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
                                                   }
-                                                  return `${stud.name.split(' ')[0]} ${stud.name.split(' ').slice(1).map((n: string) => n[0] + '.').join(' ')}`;
+                                                  return stud.name;
                                                 })()}
                                                 <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>
                                                   {ack ? '✓' : '🕒'}
