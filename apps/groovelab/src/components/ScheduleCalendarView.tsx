@@ -5383,21 +5383,26 @@ export function ScheduleCalendarView({
                   }
 
                   const hasPendingEdit = Boolean(pendingChanges && (pendingChanges[occ.id] || Object.values(pendingChanges).some((p: any) => p.id === occ.id)));
-                  const isActualMove = hasPendingEdit || (isTimeOrDayMoved && (!isAtMasterSlot || Boolean(occ.original_date && occ.original_date !== occ.date)));
-
-                  const isRescheduled = !isBreak && !isVacant && !isSick && (
-                    hasPendingEdit ||
-                    (isActualMove && occ.status === 'pending_reschedule') ||
-                    (isActualMove && occ.status === 'rescheduled_confirmed')
+                  const isMovedFromMaster = Boolean(
+                    (masterDayOfWeek !== null && masterAssignedTime !== null && (masterDayOfWeek !== occDayOfWeek || masterAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5))) ||
+                    (occ.original_date && occ.original_date !== occ.date) ||
+                    (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
                   );
-                  const isResetPending = false;
- 
-                  const isConfirmedReschedule = !hasPendingEdit && isRescheduled && (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true);
 
+                  // 1. Gelb gestrichelt = Verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
                   const isWaiting = !isBreak && !isVacant && !isSick && (
                     hasPendingEdit ||
-                    (isActualMove && !isConfirmedReschedule && (occ.status === 'pending_reschedule' || occ.student_acknowledged === false))
+                    (isMovedFromMaster && (occ.status === 'pending_reschedule' || occ.student_acknowledged === false))
                   );
+
+                  // 2. Vollton Gelb = Termin verschoben und durch Schüler bestätigt
+                  const isConfirmedReschedule = !isBreak && !isVacant && !isSick && !hasPendingEdit && isMovedFromMaster && (
+                    occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true
+                  );
+
+                  // 3. Vollton Grün = Stammtermin
+                  const isRescheduled = isWaiting || isConfirmedReschedule;
+                  const isResetPending = false;
 
                   const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
 
@@ -5415,21 +5420,7 @@ export function ScheduleCalendarView({
                       finalColors.text = '#991b1b';
                     }
                   } else if (!isBreak && !isVacant) {
-                    if (isGroup) {
-                      if (isWaiting) {
-                        cardBackground = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#38bdf8';
-                        finalColors.text = '#0369a1';
-                      } else if (isConfirmedReschedule) {
-                        cardBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                        finalColors.border = '#0284c7';
-                        finalColors.text = '#0369a1';
-                      } else {
-                        cardBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                        finalColors.border = '#0284c7';
-                        finalColors.text = '#0369a1';
-                      }
-                    } else if (isGroovelab) {
+                    if (isGroovelab) {
                       if (isWaiting) {
                         cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
                         finalColors.border = '#eab308';
@@ -5440,16 +5431,19 @@ export function ScheduleCalendarView({
                         finalColors.text = '#713f12';
                       }
                     } else {
-                      // Campus: yellow-dashed for pending / green-dashed for confirmed / solid green for regular
+                      // Campus module color definitions:
                       if (isWaiting) {
+                        // Gelb gestrichelt = verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
                         cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
                         finalColors.border = '#eab308';
                         finalColors.text = '#854d0e';
                       } else if (isConfirmedReschedule) {
-                        cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fefce8 100%)';
+                        // Vollton Gelb = Termin verschoben und durch Schüler bestätigt
+                        cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
                         finalColors.border = '#eab308';
                         finalColors.text = '#854d0e';
                       } else {
+                        // Vollton Grün = Unveränderter Stammtermin aus dem Stundenplan-Designer
                         cardBackground = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
                         finalColors.border = '#34a853';
                         finalColors.text = '#34a853';
