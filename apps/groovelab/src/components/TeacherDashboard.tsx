@@ -9166,23 +9166,23 @@ export function TeacherDashboard({
 
 
 
-              {myChangedAppointments.length > 0 && (
-                <div style={{ 
-                  background: '#ffffff', 
-                  borderRadius: '24px', 
-                  padding: '20px', 
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                  marginBottom: '20px'
-                }}>
-                  {/* Header with Title & Time Window Filter */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <AlertCircle size={18} color="#475569" />
-                      <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Terminänderungen
-                      </h3>
-                    </div>
-                    
+              <div style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px', 
+                padding: '20px', 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                marginBottom: '20px'
+              }}>
+                {/* Header with Title & Time Window Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertCircle size={18} color="#475569" />
+                    <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Terminänderungen
+                    </h3>
+                  </div>
+                  
+                  {myChangedAppointments.length > 0 && (
                     <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '2px' }}>
                       <button
                         onClick={() => setScheduleChangesTimeWindow('7days')}
@@ -9219,22 +9219,31 @@ export function TeacherDashboard({
                         Alle
                       </button>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  {/* List of Compact Item Rows */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {visibleChangedAppointments.length === 0 ? (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '12px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                        Keine Terminänderungen in den nächsten 7 Tagen.
-                        <button
-                          onClick={() => setScheduleChangesTimeWindow('all')}
-                          style={{ display: 'block', margin: '6px auto 0 auto', border: 'none', background: 'none', color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
-                        >
-                          Alle {myChangedAppointments.length} Änderungen anzeigen
-                        </button>
+                {/* List of Compact Item Rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {myChangedAppointments.length === 0 ? (
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '16px 14px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CheckCircle size={18} strokeWidth={2.5} />
                       </div>
-                    ) : (
-                      (showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
+                      <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', fontStyle: 'normal' }}>Keine bevorstehenden Terminänderungen</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'normal' }}>Alle Unterrichtstermine finden regulär nach Stundenplan statt.</div>
+                    </div>
+                  ) : visibleChangedAppointments.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '12px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                      Keine Terminänderungen in den nächsten 7 Tagen.
+                      <button
+                        onClick={() => setScheduleChangesTimeWindow('all')}
+                        style={{ display: 'block', margin: '6px auto 0 auto', border: 'none', background: 'none', color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
+                      >
+                        Alle {myChangedAppointments.length} Änderungen anzeigen
+                      </button>
+                    </div>
+                  ) : (
+                    (showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
                       const dateObj = new Date(b.date);
                       const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
                       const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
@@ -9562,7 +9571,6 @@ export function TeacherDashboard({
                     </button>
                   )}
                 </div>
-              )}
 
               {myBookings.length > 0 && (
                 <div style={{ 

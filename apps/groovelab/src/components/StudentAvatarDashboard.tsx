@@ -4,7 +4,7 @@ import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
-  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, School, Calendar, Check, Target, MessageSquare, Send,
+  Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
   Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
@@ -11569,16 +11569,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date)
                   )
                 );
-                if (appointmentChanges.length === 0) return null;
-                
                 return (
-                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: '1.5px dashed #f59e0b' }}>
+                  <div style={{ background: '#ffffff', borderRadius: '24px', padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: appointmentChanges.length > 0 ? '1.5px dashed #f59e0b' : '1px solid #e2e8f0', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                      <Calendar size={16} color="#f59e0b" />
-                      <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Terminänderungen</h3>
+                      <Calendar size={16} color={appointmentChanges.length > 0 ? '#f59e0b' : '#475569'} />
+                      <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Terminänderungen</h3>
                     </div>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {appointmentChanges.length === 0 ? (
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '16px 14px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <CheckCircle size={18} strokeWidth={2.5} />
+                        </div>
+                        <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', fontStyle: 'normal' }}>Keine bevorstehenden Terminänderungen</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'normal' }}>Alle deine Unterrichtstermine finden regulär statt.</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {appointmentChanges.map(occ => {
                         const d = new Date(occ.date);
                         const isReschedule = occ.status === 'pending_reschedule';
@@ -11715,6 +11722,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         );
                       })}
                     </div>
+                    )}
                   </div>
                 );
               })()}
