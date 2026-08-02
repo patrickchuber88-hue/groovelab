@@ -5383,18 +5383,12 @@ export function ScheduleCalendarView({
                   }
 
                   const hasPendingEdit = Boolean(pendingChanges && (pendingChanges[occ.id] || Object.values(pendingChanges).some((p: any) => p.id === occ.id)));
-                  const isActualMove = hasPendingEdit || isTimeOrDayMoved ||
-                    Boolean(occ.original_date && occ.original_date !== occ.date) ||
-                    Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
+                  const isActualMove = hasPendingEdit || (isTimeOrDayMoved && (!isAtMasterSlot || Boolean(occ.original_date && occ.original_date !== occ.date)));
 
                   const isRescheduled = !isBreak && !isVacant && !isSick && (
                     hasPendingEdit ||
-                    (!isAtMasterSlot && (
-                      isActualMove ||
-                      (isRoomOverridden && occ.status !== 'scheduled') ||
-                      occ.status === 'pending_reschedule' ||
-                      occ.status === 'rescheduled_confirmed'
-                    ))
+                    (isActualMove && occ.status === 'pending_reschedule') ||
+                    (isActualMove && occ.status === 'rescheduled_confirmed')
                   );
                   const isResetPending = false;
  
@@ -5402,7 +5396,7 @@ export function ScheduleCalendarView({
 
                   const isWaiting = !isBreak && !isVacant && !isSick && (
                     hasPendingEdit ||
-                    (!isAtMasterSlot && isActualMove && !isConfirmedReschedule)
+                    (isActualMove && !isConfirmedReschedule && (occ.status === 'pending_reschedule' || occ.student_acknowledged === false))
                   );
 
                   const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
