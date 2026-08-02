@@ -5296,11 +5296,13 @@ export function ScheduleCalendarView({
                   let masterAssignedTime: string | null = null;
                   const occFn = (occ.student?.first_name || occ.student_first_name || '').trim().toLowerCase();
                   const occLn = (occ.student?.last_name || occ.student_last_name || '').trim().toLowerCase();
+                  const occFullName = (occ.student?.first_name ? `${occ.student.first_name} ${occ.student.last_name || ''}` : (occ.student_first_name || occ.first_name || occ.name || occ.student?.name || '')).trim().toLowerCase();
 
                   // 1. Check current Stundenplan-Designer boards template FIRST (primary UI master)
                   if (boards && boards.length > 0) {
                     for (const board of boards) {
                       const studentInBoard = board.students?.find((s: any) => {
+                        // Direct ID check
                         if (occ.student_id) {
                           if (
                             s.id === occ.student_id ||
@@ -5310,15 +5312,22 @@ export function ScheduleCalendarView({
                             s.db_id === occ.student_id
                           ) return true;
                         }
+
+                        // Full name / Group title comparison (e.g. "Dominik & Estelle" or "Jack H.")
+                        const sFullName = (s.name || s.studentName || s.fullName || `${s.first_name || s.firstName || ''} ${s.last_name || s.lastName || ''}`).trim().toLowerCase();
+                        if (sFullName && occFullName) {
+                          if (sFullName === occFullName || sFullName.includes(occFullName) || occFullName.includes(sFullName)) {
+                            return true;
+                          }
+                        }
+
+                        // First / Last name fuzzy comparison
                         let sFn = (s.first_name || s.firstName || '').trim().toLowerCase();
                         let sLn = (s.last_name || s.lastName || '').trim().toLowerCase();
-                        if (!sFn) {
-                          const full = (s.name || s.studentName || s.fullName || '').trim();
-                          if (full) {
-                            const parts = full.split(' ');
-                            sFn = (parts[0] || '').toLowerCase();
-                            sLn = (parts.slice(1).join(' ') || '').toLowerCase();
-                          }
+                        if (!sFn && sFullName) {
+                          const parts = sFullName.split(' ');
+                          sFn = (parts[0] || '').toLowerCase();
+                          sLn = (parts.slice(1).join(' ') || '').toLowerCase();
                         }
                         if (sFn && occFn && (sFn === occFn || occFn.includes(sFn) || sFn.includes(occFn))) {
                           if (!sLn || !occLn || sLn === occLn || sLn.startsWith(occLn[0]) || occLn.startsWith(sLn[0])) {
@@ -5493,9 +5502,11 @@ export function ScheduleCalendarView({
                   const firstGroupId = occurrencesInGroup[0]?.student?.group_id;
                   const isGruppenunterricht = isGroup && occurrencesInGroup.length >= 2 && !!firstGroupId && occurrencesInGroup.every(o => o.student?.group_id === firstGroupId);
                   const isEnsemble = isGroup && !isGruppenunterricht;
+                  const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
+                  const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
                   const displayNames = isGroup 
-                    ? occurrencesInGroup.map(o => o.student?.first_name ? o.student.first_name.trim() : '').filter(Boolean).join(', ')
-                    : `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim();
+                    ? occurrencesInGroup.map(o => `${o.student?.first_name || o.student_first_name || o.first_name || ''} ${maskLastName(o.student?.last_name || o.student_last_name || o.last_name || '', showRealNames)}`.trim()).filter(Boolean).join(' & ')
+                    : `${fn} ${maskLastName(ln, showRealNames)}`.trim();
 
                   if (isGap) return null;
 
