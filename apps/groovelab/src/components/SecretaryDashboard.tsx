@@ -2421,7 +2421,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [roomFormQm, setRoomFormQm] = useState<number | string>(0);
   const [roomFormIsCampusActive, setRoomFormIsCampusActive] = useState(true);
   const [roomFormIsGroovelabActive, setRoomFormIsGroovelabActive] = useState(false);
-  const [roomFormFloor, setRoomFormFloor] = useState('Allgemein');
+  const [roomFormFloor, setRoomFormFloor] = useState('EG');
   const [roomSaving, setRoomSaving] = useState(false);
   const [roomFormUnsuitableInstruments, setRoomFormUnsuitableInstruments] = useState<string[]>([]);
   const [roomFormRoomInstruments, setRoomFormRoomInstruments] = useState<Array<{ name: string, model: string }>>([]);
@@ -3669,6 +3669,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       if (buildingsData) setBuildings(buildingsData);
 
       const mappedRooms = (roomsData || []).map(r => {
+        const localBuildingId = (() => {
+          try {
+            const map = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
+            return map[r.id] || null;
+          } catch { return null; }
+        })();
         const localUnsuitable = (() => {
           try {
             const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
@@ -3690,6 +3696,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         return {
           ...r,
+          building_id: r.building_id || localBuildingId,
           equipment: r.allowed_instruments || [],
           unsuitable_instruments: r.unsuitable_instruments || localUnsuitable,
           room_instruments: r.room_instruments || localInstruments,
@@ -3910,7 +3917,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               groovelabBlocks.push({
                 id: rKey,
                 teacherId: 'groovelab',
-                teacherName: 'Groove Lab',
+                teacherName: 'GrooveLab',
                 instrument: 'Plattform',
                 dayOfWeek: d,
                 startTime: dayHours.start || '14:00',
@@ -3925,7 +3932,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             groovelabBlocks.push({
               id: key,
               teacherId: 'groovelab',
-              teacherName: 'Groove Lab',
+              teacherName: 'GrooveLab',
               instrument: 'Plattform',
               dayOfWeek: d,
               startTime: dayHours.start || '14:00',
@@ -10867,6 +10874,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           mappings[editingRoom.id] = roomFormFloor;
           localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
 
+          const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
+          bMappings[editingRoom.id] = roomFormBuildingId || null;
+          localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
+
           const unsuitable = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
           unsuitable[editingRoom.id] = roomFormUnsuitableInstruments;
           localStorage.setItem(`groovelab_room_unsuitable_mappings_${schoolId}`, JSON.stringify(unsuitable));
@@ -10908,7 +10919,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             max_students: finalMaxStudents,
             qm: finalQm,
             is_campus_active: roomFormIsCampusActive,
-            is_groovelab_active: roomFormIsGroovelabActive
+            is_groovelab_active: roomFormIsGroovelabActive,
+            building_id: roomFormBuildingId || null
           }).eq('id', editingRoom.id);
           error = retryError;
         }
@@ -10929,7 +10941,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               floor: roomFormFloor,
               unsuitable_instruments: roomFormUnsuitableInstruments,
               room_instruments: roomFormRoomInstruments,
-              sonstiges: roomFormSonstiges
+              sonstiges: roomFormSonstiges,
+              building_id: roomFormBuildingId || null
             }
           : r));
       } else {
@@ -10964,7 +10977,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             qm: finalQm,
             sort_order: rooms.length,
             is_campus_active: roomFormIsCampusActive,
-            is_groovelab_active: roomFormIsGroovelabActive
+            is_groovelab_active: roomFormIsGroovelabActive,
+            building_id: roomFormBuildingId || null
           };
           const { data: retryData, error: retryError } = await supabase.from('rooms').insert(insertPayloadWithoutNewFields).select().single();
           data = retryData;
@@ -10978,6 +10992,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             const mappings = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
             mappings[data.id] = roomFormFloor;
             localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(mappings));
+
+            const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
+            bMappings[data.id] = roomFormBuildingId || null;
+            localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
 
             const unsuitable = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
             unsuitable[data.id] = roomFormUnsuitableInstruments;
@@ -11119,8 +11137,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     let failCount = 0;
     const errors: string[] = [];
 
-    // Smarte-Auto-Zuweisung: If a floor is active/selected, assign that floor. Otherwise default to 'Allgemein'
-    const assignedFloor = roomFilterFloor !== 'All' ? roomFilterFloor : 'Allgemein';
+    // Smarte-Auto-Zuweisung: If a floor is active/selected, assign that floor. Otherwise default to 'EG'
+    const assignedFloor = roomFilterFloor !== 'All' ? roomFilterFloor : 'EG';
     const insertedRooms: any[] = [];
 
     for (const line of lines) {
@@ -11234,8 +11252,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       setRoomFormQm(room.qm || 0);
       setRoomFormIsCampusActive(room.is_campus_active !== false);
       setRoomFormIsGroovelabActive(!!room.is_groovelab_active);
-      setRoomFormFloor(room.floor || 'Allgemein');
-      setRoomFormBuildingId(room.building_id || '');
+      setRoomFormFloor((room.floor && room.floor !== 'Allgemein') ? room.floor : 'EG');
+
+      const localBuilding = (() => {
+        try {
+          const map = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
+          return map[room.id] || '';
+        } catch { return ''; }
+      })();
+      setRoomFormBuildingId(room.building_id || localBuilding || '');
 
       const localUnsuitable = (() => {
         try {
@@ -11270,7 +11295,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       setRoomFormQm(0);
       setRoomFormIsCampusActive(true);
       setRoomFormIsGroovelabActive(false);
-      setRoomFormFloor('Allgemein');
+      setRoomFormFloor('EG');
       setRoomFormUnsuitableInstruments([]);
       setRoomFormRoomInstruments([]);
       setRoomFormSonstiges('');
@@ -24886,7 +24911,18 @@ status: status,
           // Local floor mappings fallback if schema cache is missing the floor column
           const localFloorMappings = (() => {
             try {
-              return JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+              const maps = JSON.parse(localStorage.getItem(`groovelab_room_floor_mappings_${schoolId}`) || '{}');
+              let changed = false;
+              Object.keys(maps).forEach(k => {
+                if (maps[k] === 'Allgemein') {
+                  maps[k] = 'EG';
+                  changed = true;
+                }
+              });
+              if (changed) {
+                localStorage.setItem(`groovelab_room_floor_mappings_${schoolId}`, JSON.stringify(maps));
+              }
+              return maps;
             } catch {
               return {};
             }
@@ -24894,8 +24930,6 @@ status: status,
 
           // Reference all rooms directly without deduplicating by name, so rooms with same names in different buildings are not hidden
           const uniqueRooms = rooms;
-
-
 
           // Rooms belonging to the selected building
           const buildingRooms = uniqueRooms.filter((r: any) => {
@@ -24910,7 +24944,8 @@ status: status,
             const query = roomSearchQuery.toLowerCase().trim();
             const matchesSearch = !query || name.includes(query);
             
-            const floorName = r.floor || localFloorMappings[r.id] || 'Allgemein';
+            const fRaw = r.floor || localFloorMappings[r.id];
+            const floorName = (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
             const matchesFloor = roomFilterFloor === 'All' || floorName === roomFilterFloor;
             
             let matchesStatus = true;
@@ -24930,10 +24965,9 @@ status: status,
             return numA - numB;
           });
 
-          // Sort helper for floors: Allgemein is top (9999), EG is 0, OGs are positive, UGs are negative
+          // Sort helper for floors: EG is standard top (100), OGs are positive, UGs are negative
           const getFloorWeight = (f: string) => {
-            if (f === 'Allgemein') return 9999;
-            if (f === 'EG') return 0;
+            if (f === 'EG') return 100;
             const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
             if (ogMatch) return parseInt(ogMatch[1]);
             const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
@@ -24946,12 +24980,14 @@ status: status,
             acc[curr.id] = curr;
             return acc;
           }, {});
-          // Unique floors computed from all unique rooms plus addedFloors, always including 'Allgemein' and 'EG'
+          // Unique floors computed from all unique rooms plus addedFloors, always including 'EG'
           const allFloorsList = Array.from(new Set([
-            'Allgemein', 
             'EG',
-            ...buildingRooms.map(r => r.floor || localFloorMappings[r.id] || 'Allgemein'), 
-            ...addedFloors
+            ...buildingRooms.map(r => {
+              const fRaw = r.floor || localFloorMappings[r.id];
+              return (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
+            }), 
+            ...addedFloors.filter((f: string) => f !== 'Allgemein')
           ])).sort((a, b) => getFloorWeight(b) - getFloorWeight(a));
 
           return (
@@ -25505,6 +25541,11 @@ status: status,
                                 if (roomId) {
                                   const previousRooms = rooms;
                                   setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: null } : r));
+                                  try {
+                                    const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
+                                    bMappings[roomId] = null;
+                                    localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
+                                  } catch (err) { console.error(err); }
                                   const { error } = await supabase.from('rooms').update({ building_id: null }).eq('id', roomId);
                                   if (error) {
                                     setRooms(previousRooms);
@@ -25570,6 +25611,11 @@ status: status,
                                 if (roomId) {
                                   const previousRooms = rooms;
                                   setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: b.id } : r));
+                                  try {
+                                    const bMappings = JSON.parse(localStorage.getItem(`groovelab_room_building_mappings_${schoolId}`) || '{}');
+                                    bMappings[roomId] = b.id;
+                                    localStorage.setItem(`groovelab_room_building_mappings_${schoolId}`, JSON.stringify(bMappings));
+                                  } catch (err) { console.error(err); }
                                   const { error } = await supabase.from('rooms').update({ building_id: b.id }).eq('id', roomId);
                                   if (error) {
                                     setRooms(previousRooms);
@@ -26101,7 +26147,11 @@ status: status,
                         {allFloorsList.map((flName: string) => {
                           const isActive = roomFilterFloor === flName;
                           const isHovered = dragHoveredFloor === flName;
-                          const floorRoomCount = uniqueRooms.filter(r => (r.floor || localFloorMappings[r.id] || 'Allgemein') === flName).length;
+                          const floorRoomCount = uniqueRooms.filter(r => {
+                            const fRaw = r.floor || localFloorMappings[r.id];
+                            const fName = (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
+                            return fName === flName;
+                          }).length;
                           const avatarInitials = flName.substring(0, 2).toUpperCase();
                           const colorSet = getFloorColor(flName);
 
@@ -26182,14 +26232,14 @@ status: status,
                                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     {flName}
-                                    {flName !== 'Allgemein' && flName !== 'EG' && addedFloors.includes(flName) && (
+                                    {flName !== 'EG' && addedFloors.includes(flName) && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          if (confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „Allgemein“ gesetzt.`)) {
-                                            // Reset rooms on this floor to Allgemein
-                                            supabase.from('rooms').update({ floor: 'Allgemein' }).eq('floor', flName).then(() => {
-                                              setRooms(prev => prev.map(r => (r.floor || 'Allgemein') === flName ? { ...r, floor: 'Allgemein' } : r));
+                                          if (confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „EG“ gesetzt.`)) {
+                                            // Reset rooms on this floor to EG
+                                            supabase.from('rooms').update({ floor: 'EG' }).eq('floor', flName).then(() => {
+                                              setRooms(prev => prev.map(r => (r.floor || 'EG') === flName ? { ...r, floor: 'EG' } : r));
                                               const updated = addedFloors.filter(f => f !== flName);
                                               setAddedFloors(updated);
                                               localStorage.setItem(`groovelab_added_floors_${schoolId}`, JSON.stringify(updated));
@@ -26205,7 +26255,7 @@ status: status,
                                     )}
                                   </span>
                                   <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
-                                    {flName === 'Allgemein' ? 'Standard-Zuweisung' : 'Stockwerk'}
+                                    {flName === 'EG' ? 'Erdgeschoss / Standard' : 'Stockwerk'}
                                   </span>
                                 </div>
                               </div>
@@ -30382,14 +30432,18 @@ status: status,
                 }
                 try {
                   await supabase.from('activation_days').delete().eq('student_id', s.id);
-                  await supabase.from('users').update({ 
+                  let userResetPayload: any = { 
                     onboarding_pin: null, 
-                    pin: null, 
                     personal_pin: null,
                     parent_pin: null,
                     is_pin_activated: false,
                     status: 'offen' 
-                  }).eq('id', s.id);
+                  };
+                  let { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', s.id);
+                  if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
+                    delete userResetPayload.onboarding_pin;
+                    await supabase.from('users').update(userResetPayload).eq('id', s.id);
+                  }
                   await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', s.id);
                   await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', s.id);
                   fetchDashboardData();

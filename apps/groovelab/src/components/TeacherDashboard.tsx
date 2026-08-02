@@ -2771,7 +2771,8 @@ export function TeacherDashboard({
     if (!myChangedAppointments || myChangedAppointments.length === 0) return [];
     if (scheduleChangesTimeWindow === 'all') return myChangedAppointments;
     
-    const today = new Date();
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const today = simStr ? new Date(simStr + 'T00:00:00') : new Date();
     today.setHours(0, 0, 0, 0);
     const sevenDaysLater = new Date(today);
     sevenDaysLater.setDate(today.getDate() + 7);
@@ -2781,8 +2782,30 @@ export function TeacherDashboard({
       const day = String(d.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     };
+    const todayStr = getLocalYYYYMMDD(today);
     const maxDateStr = getLocalYYYYMMDD(sevenDaysLater);
-    return myChangedAppointments.filter((b: any) => b.date <= maxDateStr);
+    return myChangedAppointments.filter((b: any) => {
+      if (!b) return false;
+      let normDate = b.date || '';
+      if (normDate.includes('.')) {
+        const parts = normDate.split('.');
+        if (parts.length === 3) {
+          normDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+      let normOrigDate = b.original_date || '';
+      if (normOrigDate.includes('.')) {
+        const parts = normOrigDate.split('.');
+        if (parts.length === 3) {
+          normOrigDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+
+      const isNewDateInWindow = Boolean(normDate && normDate >= todayStr && normDate <= maxDateStr);
+      const isOrigDateInWindow = Boolean(normOrigDate && normOrigDate >= todayStr && normOrigDate <= maxDateStr);
+
+      return isNewDateInWindow || isOrigDateInWindow;
+    });
   }, [myChangedAppointments, scheduleChangesTimeWindow]);
 
   // Helper to check if today is student's birthday
@@ -2977,9 +3000,16 @@ export function TeacherDashboard({
             date,
             original_date,
             start_time,
+            original_start_time,
             status,
+            room_id,
+            teacher_id,
+            student_id,
+            student_acknowledged,
             schedules (
               duration,
+              room_id,
+              teacher_id,
               rooms (id, name)
             ),
             student:users!schedule_occurrences_student_id_fkey (
@@ -2987,13 +3017,71 @@ export function TeacherDashboard({
               first_name,
               last_name
             )
-          `)
-          .eq('teacher_id', userId)
-          .in('status', ['pending_reschedule', 'rescheduled_confirmed', 'cancelled']);
+          `);
 
-        const mappedOccurs = (occurs || []).map((occ: any) => {
+        let localOccurs: any[] = [];
+        try {
+          const pendingSaved = typeof window !== 'undefined' ? ((userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes')) : null;
+          if (pendingSaved) {
+            const parsedPending = JSON.parse(pendingSaved);
+            Object.values(parsedPending).forEach((item: any) => {
+              if (item && item.date) {
+                const itemTeacherId = item.teacher_id || item.teacherId;
+                if (itemTeacherId && String(itemTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return;
+                localOccurs.push({
+                  ...item,
+                  is_rescheduled: true,
+                  is_moved: true,
+                  status: item.status || 'pending_reschedule'
+                });
+              }
+            });
+          }
+          const latestSaved = typeof window !== 'undefined' ? (userId ? localStorage.getItem('groovelab_calendar_active_occurrences_' + userId) : null) : null;
+          if (latestSaved) {
+            const parsedLatest = JSON.parse(latestSaved);
+            if (Array.isArray(parsedLatest)) {
+              parsedLatest.forEach((item: any) => {
+                if (item && item.date) {
+                  const itemTeacherId = item.teacher_id || item.teacherId;
+                  if (itemTeacherId && String(itemTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return;
+                  const isItemChanged = Boolean(
+                    item.is_rescheduled || item.isRescheduled || item.is_moved || item.isMoved ||
+                    (item.status && item.status !== 'scheduled') ||
+                    (item.original_date && item.original_date !== item.date) ||
+                    (item.original_start_time && item.start_time && item.original_start_time.substring(0, 5) !== item.start_time.substring(0, 5))
+                  );
+                  if (isItemChanged && !localOccurs.some(lo => String(lo.id) === String(item.id))) {
+                    localOccurs.push({
+                      ...item,
+                      is_rescheduled: true,
+                      is_moved: true
+                    });
+                  }
+                }
+              });
+            }
+          }
+        } catch (e) {}
+
+        const combinedRawOccurs = [...(occurs || [])];
+        localOccurs.forEach((loc: any) => {
+          if (!loc || !loc.date) return;
+          const locTeacherId = loc.teacher_id || loc.teacherId;
+          if (locTeacherId && String(locTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return;
+
+          const existingIdx = combinedRawOccurs.findIndex(o => String(o.id) === String(loc.id));
+          if (existingIdx >= 0) {
+            combinedRawOccurs[existingIdx] = { ...combinedRawOccurs[existingIdx], ...loc };
+          } else {
+            combinedRawOccurs.push(loc);
+          }
+        });
+
+        const mappedOccurs = combinedRawOccurs.map((occ: any) => {
           const startTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '00:00';
-          const durationMin = occ.schedules?.duration || 45;
+          const origStartTimeStr = occ.original_start_time ? occ.original_start_time.substring(0, 5) : null;
+          const durationMin = occ.schedules?.duration || occ.duration || 45;
           const [shStr, smStr] = startTimeStr.split(':');
           const sh = parseInt(shStr) || 0;
           const sm = parseInt(smStr) || 0;
@@ -3002,19 +3090,48 @@ export function TeacherDashboard({
           const em = totalMin % 60;
           const endTimeStr = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
           
+          let rName = occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.roomName || occ.room_name;
+          const rId = occ.room_id || occ.schedules?.room_id || occ.schedules?.rooms?.id;
+          if ((!rName || rName === 'Raum') && rId && rooms && rooms.length > 0) {
+            const foundRoom = rooms.find((r: any) => String(r.id) === String(rId));
+            if (foundRoom) rName = foundRoom.name;
+          }
+
+          const studentDisplayName = (() => {
+            if (occ.student) {
+              const fn = occ.student.first_name || occ.student.firstName || '';
+              const ln = occ.student.last_name || occ.student.lastName || '';
+              const full = `${fn} ${maskLastName(ln, showRealNames)}`.trim();
+              if (full) return full;
+            }
+            if (occ.student_name || occ.studentName || occ.name) {
+              return occ.student_name || occ.studentName || occ.name;
+            }
+            if (occ.student_id && occ.student_id !== 'vacant' && !occ.student_id.startsWith('break-')) {
+              return 'Schüler';
+            }
+            return null;
+          })();
+
           return {
             id: occ.id,
-            roomId: occ.schedules?.rooms?.id,
-            roomName: occ.schedules?.rooms?.name || 'Raum',
+            roomId: rId,
+            roomName: (rName && rName !== 'Raum') ? rName : '',
             date: occ.date,
             original_date: occ.original_date,
             startTime: startTimeStr,
+            original_start_time: origStartTimeStr,
             endTime: endTimeStr,
-            purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Unterricht',
-            teacherId: userId,
+            purpose: studentDisplayName ? `Unterricht: ${studentDisplayName}` : 'Unterricht',
+            teacherId: occ.teacher_id || occ.teacherId || userId,
             status: occ.status,
             isSchedule: true,
-            studentName: occ.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : null
+            studentName: studentDisplayName,
+            student_acknowledged: occ.student_acknowledged,
+            studentAcknowledged: occ.studentAcknowledged,
+            is_rescheduled: occ.is_rescheduled || occ.isRescheduled,
+            is_moved: occ.is_moved || occ.isMoved,
+            isGroup: occ.isGroup || (studentDisplayName && studentDisplayName.includes('&'))
           };
         });
 
@@ -3025,7 +3142,8 @@ export function TeacherDashboard({
           return `${year}-${month}-${day}`;
         };
 
-        const today = new Date();
+        const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+        const today = simStr ? new Date(simStr + 'T00:00:00') : new Date();
         today.setHours(0, 0, 0, 0);
         const todayStr = getLocalYYYYMMDD(today);
         
@@ -3034,19 +3152,43 @@ export function TeacherDashboard({
         const twoWeeksLaterStr = getLocalYYYYMMDD(twoWeeksLater);
 
         const filteredBookings = allBookings.filter((b: any) => {
-          if (b.teacherId !== userId) return false;
+          const bTeacherId = b.teacherId || b.teacher_id;
+          if (bTeacherId && String(bTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return false;
           if (!b.date) return false;
           return b.date >= todayStr && b.date <= twoWeeksLaterStr;
         });
 
         const filteredOccurs = mappedOccurs.filter((b: any) => {
-          if (b.teacherId !== userId) return false;
+          const bTeacherId = b.teacherId || b.teacher_id;
+          if (bTeacherId && String(bTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) return false;
           if (!b.date) return false;
-          if (!b.studentName) return false;
-          // Only classify as a real reschedule if original_date differs from date or status is pending_reschedule/cancelled
-          const isRealReschedule = (b.original_date && b.original_date !== b.date) || b.status === 'pending_reschedule' || b.status === 'cancelled';
+          if (b.student_id === 'vacant' || (typeof b.student_id === 'string' && b.student_id.startsWith('break-'))) return false;
+          
+          const isDateMoved = Boolean(b.original_date && b.original_date !== b.date);
+          const isTimeMoved = Boolean(b.original_start_time && b.startTime && b.original_start_time.substring(0, 5) !== b.startTime.substring(0, 5));
+          const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status));
+          const isExplicitChange = Boolean(b.is_rescheduled || b.isRescheduled || b.is_changed || b.isChanged || b.is_moved || b.isMoved);
+
+          const isRealReschedule = isDateMoved || isTimeMoved || isChangedStatus || isExplicitChange;
           if (!isRealReschedule) return false;
-          return b.date >= todayStr && b.date <= twoWeeksLaterStr;
+
+          let normDate = b.date || '';
+          if (normDate.includes('.')) {
+            const parts = normDate.split('.');
+            if (parts.length === 3) {
+              normDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+          }
+
+          let normOrigDate = b.original_date || '';
+          if (normOrigDate.includes('.')) {
+            const parts = normOrigDate.split('.');
+            if (parts.length === 3) {
+              normOrigDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+          }
+
+          return (normDate && normDate >= todayStr) || (normOrigDate && normOrigDate >= todayStr);
         });
 
         // Group together same date, time, status, and room changes (representing an Ensemble)
@@ -3101,9 +3243,11 @@ export function TeacherDashboard({
     loadMyBookings();
     window.addEventListener('storage', loadMyBookings);
     window.addEventListener('refresh-bookings', loadMyBookings);
+    window.addEventListener('groovelab_schedule_changed', loadMyBookings);
     return () => {
       window.removeEventListener('storage', loadMyBookings);
       window.removeEventListener('refresh-bookings', loadMyBookings);
+      window.removeEventListener('groovelab_schedule_changed', loadMyBookings);
     };
   }, [userId, ticker]);
 
@@ -9022,7 +9166,7 @@ export function TeacherDashboard({
 
 
 
-              {visibleChangedAppointments.length > 0 && (
+              {myChangedAppointments.length > 0 && (
                 <div style={{ 
                   background: '#ffffff', 
                   borderRadius: '24px', 
@@ -9079,62 +9223,170 @@ export function TeacherDashboard({
 
                   {/* List of Compact Item Rows */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
+                    {visibleChangedAppointments.length === 0 ? (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '12px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                        Keine Terminänderungen in den nächsten 7 Tagen.
+                        <button
+                          onClick={() => setScheduleChangesTimeWindow('all')}
+                          style={{ display: 'block', margin: '6px auto 0 auto', border: 'none', background: 'none', color: '#3b82f6', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700 }}
+                        >
+                          Alle {myChangedAppointments.length} Änderungen anzeigen
+                        </button>
+                      </div>
+                    ) : (
+                      (showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
                       const dateObj = new Date(b.date);
-                      const isCancelled = b.status === 'cancelled';
-                      const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
-                      const isPending = b.status === 'pending';
+                      const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
+                      const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
+                        Boolean(b.original_date && b.original_date !== b.date) ||
+                        Boolean(b.original_start_time && b.startTime && b.original_start_time !== b.startTime);
+                      const isConfirmed = b.status === 'rescheduled_confirmed' || b.student_acknowledged === true || b.studentAcknowledged === true;
+                      const isPending = b.status === 'pending' && !isRescheduled;
 
-                      // Determine compact colors & tags based on status
+                      const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
+
+                      // Determine compact colors & icon tags based on status, confirmation & lesson type (Group vs Single)
                       let cardBg = '#f8fafc';
+                      let cardBorder = '1px solid #e2e8f0';
                       let dateHeaderBg = '#34a853';
-                      let label = 'Gebucht';
-                      let labelBg = 'rgba(52, 168, 83, 0.12)';
-                      let labelTextColor = '#166534';
+                      let iconSymbol = '✓';
+                      let iconBg = '#dcfce7';
+                      let iconColor = '#166534';
+                      let iconBorder = '1px solid #86efac';
                       let textColor = '#0f172a';
                       let subTextColor = '#64748b';
                       let commentButtonBg = '#ffffff';
                       let commentButtonColor = '#34a853';
 
+                      const rName = b.room_override_name || b.roomOverrideName || ((b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : (b.room || b.raum || '')));
+                      const defaultRoomName = b.schedules?.rooms?.name || b.schedules?.room?.name || b.original_room_name || b.originalRoomName || b.template_room_name;
+                      const isRoomChanged = Boolean(
+                        b.room_override_id || 
+                        b.roomOverrideId || 
+                        b.room_override_name || 
+                        b.roomOverrideName || 
+                        b.is_room_changed || 
+                        b.isRoomChanged || 
+                        b.is_room_booking || 
+                        b.isRoomBooking || 
+                        (defaultRoomName && rName && defaultRoomName !== rName) || 
+                        (b.original_room_id && b.roomId && String(b.original_room_id) !== String(b.roomId)) ||
+                        (b.original_room_id && b.room_id && String(b.original_room_id) !== String(b.room_id))
+                      );
+
                       if (isCancelled) {
-                        cardBg = '#fef2f2';
                         dateHeaderBg = '#ef4444';
-                        label = 'Ausfall';
-                        labelBg = '#ef4444';
-                        labelTextColor = '#ffffff';
+                        iconSymbol = '✕';
+                        iconBg = '#fee2e2';
+                        iconColor = '#991b1b';
+                        iconBorder = '1px solid #fca5a5';
                         textColor = '#991b1b';
                         subTextColor = '#b91c1c';
                         commentButtonBg = '#ffffff';
                         commentButtonColor = '#ef4444';
-                      } else if (isRescheduled) {
-                        cardBg = '#fefce8';
-                        dateHeaderBg = '#eab308';
-                        label = 'Verschoben';
-                        labelBg = '#eab308';
-                        labelTextColor = '#ffffff';
-                        textColor = '#854d0e';
-                        subTextColor = '#a16207';
+
+                        if (isConfirmed) {
+                          cardBg = '#fee2e2';
+                          cardBorder = '1.5px solid #ef4444';
+                        } else {
+                          cardBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+                          cardBorder = '1.5px dashed #ef4444';
+                        }
+                      } else if (isRoomChanged) {
+                        // Lila Theme für Raumbuchungen / Raumwechsel
+                        dateHeaderBg = '#7c3aed';
+                        textColor = '#6b21a8';
+                        subTextColor = '#7c3aed';
                         commentButtonBg = '#ffffff';
-                        commentButtonColor = '#ca8a04';
+                        commentButtonColor = '#7c3aed';
+
+                        if (isConfirmed) {
+                          cardBg = '#faf5ff';
+                          cardBorder = '1.5px solid #7c3aed';
+                          iconSymbol = '✓';
+                          iconBg = '#f3e8ff';
+                          iconColor = '#6b21a8';
+                          iconBorder = '1px solid #ddd6fe';
+                        } else {
+                          cardBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
+                          cardBorder = '1.5px dashed #7c3aed';
+                          iconSymbol = '⏳';
+                          iconBg = '#f3e8ff';
+                          iconColor = '#7c3aed';
+                          iconBorder = '1px solid #ddd6fe';
+                        }
+                      } else if (isRescheduled) {
+                        if (isGroup) {
+                          // Gruppentermine: Signature Blue Palette
+                          dateHeaderBg = '#0284c7';
+                          textColor = '#0369a1';
+                          subTextColor = '#0284c7';
+                          commentButtonBg = '#ffffff';
+                          commentButtonColor = '#0284c7';
+
+                          if (isConfirmed) {
+                            // Bestätigte Gruppen-Verschiebung: Vollton Blau
+                            cardBg = '#f0f9ff';
+                            cardBorder = '1.5px solid #0284c7';
+                            iconSymbol = '✓';
+                            iconBg = '#dcfce7';
+                            iconColor = '#15803d';
+                            iconBorder = '1px solid #86efac';
+                          } else {
+                            // Unbestätigte Gruppen-Verschiebung: Blau gestreift / gestrichelt
+                            cardBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+                            cardBorder = '1.5px dashed #0284c7';
+                            iconSymbol = '⏳';
+                            iconBg = '#e0f2fe';
+                            iconColor = '#0284c7';
+                            iconBorder = '1px solid #bae6fd';
+                          }
+                        } else {
+                          // Einzeltermine: Gelb Palette
+                          dateHeaderBg = '#eab308';
+                          textColor = '#854d0e';
+                          subTextColor = '#a16207';
+                          commentButtonBg = '#ffffff';
+                          commentButtonColor = '#ca8a04';
+
+                          if (isConfirmed) {
+                            // Bestätigte Einzeltermin-Verschiebung: Vollton Gelb
+                            cardBg = '#fffbeb';
+                            cardBorder = '1.5px solid #eab308';
+                            iconSymbol = '✓';
+                            iconBg = '#dcfce7';
+                            iconColor = '#15803d';
+                            iconBorder = '1px solid #86efac';
+                          } else {
+                            // Unbestätigte Einzeltermin-Verschiebung: Gelb gestreift / gestrichelt
+                            cardBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                            cardBorder = '1.5px dashed #eab308';
+                            iconSymbol = '⏳';
+                            iconBg = '#fef3c7';
+                            iconColor = '#b45309';
+                            iconBorder = '1px solid #fde68a';
+                          }
+                        }
                       } else if (isPending) {
                         cardBg = '#f5f3ff';
+                        cardBorder = '1px solid #ddd6fe';
                         dateHeaderBg = '#8b5cf6';
-                        label = 'Reserviert';
-                        labelBg = '#8b5cf6';
-                        labelTextColor = '#ffffff';
+                        iconSymbol = '⏳';
+                        iconBg = '#ede9fe';
+                        iconColor = '#6d28d9';
+                        iconBorder = '1px solid #c4b5fd';
                         textColor = '#5b21b6';
                         subTextColor = '#6d28d9';
                         commentButtonBg = '#ffffff';
                         commentButtonColor = '#7c3aed';
                       }
 
-                      const rName = b.roomName || b.rooms?.name || 'Raum';
                       const displayStudentName = (() => {
                         if (!b.studentName) return null;
                         if (b.studentName.includes('&')) {
                           const parts = b.studentName.split('&');
                           const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                          return '👥 ' + firstNames.join(', ');
+                          return firstNames.join(', ');
                         }
                         return b.studentName;
                       })();
@@ -9151,7 +9403,7 @@ export function TeacherDashboard({
                             borderRadius: '12px', 
                             padding: '8px 12px', 
                             cursor: 'pointer',
-                            border: `1px solid ${isCancelled ? '#fca5a5' : (isRescheduled ? '#fde047' : '#e2e8f0')}`,
+                            border: cardBorder,
                             transition: 'all 0.15s ease',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                           }}
@@ -9184,24 +9436,52 @@ export function TeacherDashboard({
                                 {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
                               </div>
 
-                              <span style={{ 
-                                fontSize: '0.55rem', 
-                                fontWeight: 900, 
-                                background: labelBg, 
-                                color: labelTextColor, 
-                                padding: '2px 6px', 
-                                borderRadius: '4px', 
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.02em',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0
-                              }}>
-                                {label}
+                              <span 
+                                title={isCancelled ? 'Ausfall' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt')}
+                                style={{ 
+                                  fontSize: '0.72rem', 
+                                  fontWeight: 900, 
+                                  background: iconBg, 
+                                  color: iconColor, 
+                                  border: iconBorder,
+                                  padding: '1px 5px', 
+                                  borderRadius: '4px', 
+                                  lineHeight: 1,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}
+                              >
+                                {iconSymbol}
                               </span>
                             </div>
 
-                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {displayStudentName ? `${displayStudentName} • ${rName}` : rName}
+                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
+                              <span>{displayStudentName ? displayStudentName : ''}</span>
+                              {rName && (() => {
+                                if (isRoomChanged) {
+                                  return (
+                                    <span style={{
+                                      fontSize: '0.66rem',
+                                      fontWeight: 800,
+                                      background: '#f3e8ff',
+                                      color: '#7c3aed',
+                                      border: '1px solid #ddd6fe',
+                                      padding: '0.5px 5px',
+                                      borderRadius: '5px'
+                                    }} title={`Raum geändert zu ${rName}`}>
+                                      • {rName}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b' }}>
+                                    • {rName}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </div>
 
@@ -9210,24 +9490,18 @@ export function TeacherDashboard({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (b.teacherId) {
-                                  const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                                  const dayLabel = DAYS_DE[dateObj.getDay()];
-                                  const formattedDate = dateObj.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                                  const chatLabel = `${dayLabel} (${formattedDate}), ${b.startTime} Uhr (${label})`;
-                                  
-                                  if ((window as any).openShoutbox) {
-                                    (window as any).openShoutbox({
-                                      teacherId: b.teacherId,
-                                      date: b.date,
-                                      start_time: b.startTime,
-                                      label: chatLabel,
-                                      occurrenceId: b.id
-                                    });
+                                setActiveChatOcc({
+                                  ...b,
+                                  id: b.id || b.ids?.[0],
+                                  date: b.date,
+                                  start_time: b.startTime || b.start_time,
+                                  student_id: b.student_id || b.studentId || b.id,
+                                  student: {
+                                    first_name: displayStudentName || b.studentName || 'Schüler'
                                   }
-                                }
+                                });
                               }}
-                              title="Shoutbox öffnen"
+                              title="Termingekoppelte Shoutbox öffnen"
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -9249,7 +9523,7 @@ export function TeacherDashboard({
                           )}
                         </div>
                       );
-                    })}
+                    }))}
                   </div>
 
                   {/* Toggle Button for More Changes */}
@@ -9345,13 +9619,14 @@ export function TeacherDashboard({
                         subTextColor = '#6d28d9';
                       }
 
-                      const rName = b.roomName || b.rooms?.name || 'Raum';
+                      const rName = (b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : '');
+                      const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
                       const displayStudentName = (() => {
                         if (!b.studentName) return null;
                         if (b.studentName.includes('&')) {
                           const parts = b.studentName.split('&');
                           const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                          return '👥 ' + firstNames.join(', ');
+                          return firstNames.join(', ');
                         }
                         return b.studentName;
                       })();
@@ -9417,8 +9692,12 @@ export function TeacherDashboard({
                               </span>
                             </div>
 
-                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {displayStudentName ? `${displayStudentName} • ${rName}` : rName}
+                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
+                              <span>
+                                {displayStudentName ? displayStudentName : ''}
+                                {displayStudentName && rName ? ` • ${rName}` : rName}
+                              </span>
                             </div>
                           </div>
 
@@ -14727,6 +15006,82 @@ export function TeacherDashboard({
           isFrozen = Date.now() > lessonDateTime.getTime() + 48 * 60 * 60 * 1000;
         } catch (e) {}
 
+        const isGroupOcc = Boolean(activeChatOcc.isGroup || (activeChatOcc.student?.first_name && activeChatOcc.student?.first_name.includes('&')) || (activeChatOcc.studentName && activeChatOcc.studentName.includes('&')));
+        const isCancelledOcc = Boolean(activeChatOcc.status && ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(activeChatOcc.status));
+        const isRescheduledOcc = Boolean((activeChatOcc.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(activeChatOcc.status)) ||
+          Boolean(activeChatOcc.original_date && activeChatOcc.original_date !== activeChatOcc.date) ||
+          Boolean(activeChatOcc.original_start_time && activeChatOcc.start_time && activeChatOcc.original_start_time.substring(0, 5) !== activeChatOcc.start_time.substring(0, 5)));
+        const isConfirmedOcc = Boolean(activeChatOcc.status === 'rescheduled_confirmed' || activeChatOcc.student_acknowledged === true || activeChatOcc.studentAcknowledged === true);
+
+        let headerBackground = 'linear-gradient(135deg, #34a853 0%, #137333 100%)';
+        let headerBorder = 'none';
+        let headerTextColor = '#ffffff';
+        let headerSubColor = 'rgba(255, 255, 255, 0.95)';
+        let headerBadgeBg = 'rgba(255, 255, 255, 0.22)';
+        let headerBadgeColor = '#ffffff';
+        let headerBadgeBorder = '1px solid rgba(255, 255, 255, 0.3)';
+        let statusBadgeText = '✓ Regulärer Termin';
+
+        if (isCancelledOcc) {
+          headerBackground = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+          headerBorder = '2px dashed #ef4444';
+          headerTextColor = '#991b1b';
+          headerSubColor = '#ef4444';
+          headerBadgeBg = '#fee2e2';
+          headerBadgeColor = '#dc2626';
+          headerBadgeBorder = '1px solid #fca5a5';
+          statusBadgeText = '✕ Ausfall / Absage';
+        } else if (isGroupOcc) {
+          if (isRescheduledOcc && !isConfirmedOcc) {
+            headerBackground = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+            headerBorder = '2px dashed #0284c7';
+            headerTextColor = '#0369a1';
+            headerSubColor = '#0284c7';
+            headerBadgeBg = '#e0f2fe';
+            headerBadgeColor = '#0284c7';
+            headerBadgeBorder = '1px solid #bae6fd';
+            statusBadgeText = '⏳ Gruppentermin Verschoben (Unbestätigt)';
+          } else if (isRescheduledOcc && isConfirmedOcc) {
+            headerBackground = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+            headerBorder = '2px solid #0284c7';
+            headerTextColor = '#0369a1';
+            headerSubColor = '#0284c7';
+            headerBadgeBg = '#dcfce7';
+            headerBadgeColor = '#15803d';
+            headerBadgeBorder = '1px solid #86efac';
+            statusBadgeText = '✓ Gruppentermin Verschoben (Bestätigt)';
+          } else {
+            headerBackground = 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)';
+            headerBorder = 'none';
+            headerTextColor = '#ffffff';
+            headerSubColor = 'rgba(255, 255, 255, 0.95)';
+            headerBadgeBg = 'rgba(255, 255, 255, 0.22)';
+            headerBadgeColor = '#ffffff';
+            headerBadgeBorder = '1px solid rgba(255, 255, 255, 0.3)';
+            statusBadgeText = '👥 Gruppentermin';
+          }
+        } else if (isRescheduledOcc) {
+          if (!isConfirmedOcc) {
+            headerBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+            headerBorder = '2px dashed #eab308';
+            headerTextColor = '#854d0e';
+            headerSubColor = '#b45309';
+            headerBadgeBg = '#fef3c7';
+            headerBadgeColor = '#b45309';
+            headerBadgeBorder = '1px solid #fde68a';
+            statusBadgeText = '⏳ Einzeltermin Verschoben (Unbestätigt)';
+          } else {
+            headerBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+            headerBorder = '2px solid #eab308';
+            headerTextColor = '#854d0e';
+            headerSubColor = '#b45309';
+            headerBadgeBg = '#dcfce7';
+            headerBadgeColor = '#15803d';
+            headerBadgeBorder = '1px solid #86efac';
+            statusBadgeText = '✓ Einzeltermin Verschoben (Bestätigt)';
+          }
+        }
+
         return (
           <div
             onClick={() => setActiveChatOcc(null)}
@@ -14761,40 +15116,59 @@ export function TeacherDashboard({
             >
               {/* Header */}
               <div style={{
-                background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                background: headerBackground,
+                borderBottom: headerBorder,
                 padding: '20px 24px',
-                color: '#ffffff',
+                color: headerTextColor,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between'
+                justifyContent: 'space-between',
+                transition: 'all 0.2s ease'
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: headerTextColor, display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       <span>💬</span> {titleText}
                     </h3>
                   </div>
-                  <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
-                    Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time.substring(0, 5)} Uhr
+                  <p style={{ margin: '4px 0 6px 0', color: headerSubColor, fontSize: '0.75rem', fontWeight: 600 }}>
+                    Termin am {new Date(activeChatOcc.date).toLocaleDateString('de-DE')} um {activeChatOcc.start_time ? activeChatOcc.start_time.substring(0, 5) : '00:00'} Uhr
                   </p>
                   
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                     <span style={{
                       padding: '4px 10px',
                       borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      color: '#ffffff',
+                      background: headerBadgeBg,
+                      color: headerBadgeColor,
                       fontSize: '0.68rem',
                       fontWeight: 800,
                       backdropFilter: 'blur(4px)',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      border: headerBadgeBorder
                     }}>
-                      <ShieldCheck size={13} color="#ffffff" />
-                      <span>100% DSGVO-konformer Schulchat</span>
+                      <span>{statusBadgeText}</span>
+                    </span>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      background: headerBadgeBg,
+                      color: headerBadgeColor,
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      backdropFilter: 'blur(4px)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      whiteSpace: 'nowrap',
+                      border: headerBadgeBorder
+                    }}>
+                      <ShieldCheck size={13} color={headerBadgeColor} />
+                      <span>DSGVO-konform</span>
                     </span>
                   </div>
                 </div>
@@ -14803,8 +15177,9 @@ export function TeacherDashboard({
                   type="button"
                   onClick={() => setActiveChatOcc(null)}
                   style={{
-                    border: 'none',
-                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: headerBadgeBorder,
+                    background: headerBadgeBg,
+                    color: headerBadgeColor,
                     borderRadius: '50%',
                     width: '32px',
                     height: '32px',
@@ -14812,14 +15187,11 @@ export function TeacherDashboard({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#ffffff',
                     transition: 'all 0.2s',
                     alignSelf: 'flex-start'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
                 >
-                  <X size={16} />
+                  <X size={18} color={headerBadgeColor} />
                 </button>
               </div>
 

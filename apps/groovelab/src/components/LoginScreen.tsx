@@ -7737,15 +7737,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (authQrToken) {
                     sessionStorage.setItem('groovelab_qr_token', authQrToken);
                   }
-                   const { error } = await supabase
+                  let userUpdatePayload: any = {
+                    personal_pin: pinSetupInput,
+                    parent_pin: pinSetupInput,
+                    onboarding_pin: pinSetupInput,
+                    is_pin_activated: true
+                  };
+                  let { error } = await supabase
                     .from('users')
-                    .update({
-                      personal_pin: pinSetupInput,
-                      parent_pin: pinSetupInput,
-                      onboarding_pin: pinSetupInput,
-                      is_pin_activated: true
-                    })
+                    .update(userUpdatePayload)
                     .eq('id', pinSetupUser.id);
+
+                  if (error && error.message?.includes('onboarding_pin')) {
+                    delete userUpdatePayload.onboarding_pin;
+                    const fallbackRes = await supabase
+                      .from('users')
+                      .update(userUpdatePayload)
+                      .eq('id', pinSetupUser.id);
+                    error = fallbackRes.error;
+                  }
 
                   try {
                     await supabase.from('students').update({

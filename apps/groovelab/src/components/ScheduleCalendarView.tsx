@@ -5729,10 +5729,32 @@ export function ScheduleCalendarView({
                                           const rObj = rooms.find(r => r.name?.includes('4')) || rooms[0];
                                           if (rObj) rName = rObj.name;
                                         }
+                                        const defaultRoomName = occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.original_room_name || occ.originalRoomName || occ.template_room_name;
+                                        const isRoomChanged = Boolean(
+                                          occ.room_override_id || 
+                                          occ.roomOverrideId || 
+                                          occ.room_override_name || 
+                                          occ.roomOverrideName || 
+                                          occ.is_room_changed || 
+                                          occ.isRoomChanged || 
+                                          occ.is_room_booking || 
+                                          occ.isRoomBooking || 
+                                          (defaultRoomName && rName && defaultRoomName !== rName) || 
+                                          (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
+                                        );
                                         return rName ? (
-                                          <span style={{ fontWeight: 600, opacity: 0.75, fontSize: '0.62rem', whiteSpace: 'nowrap' }}>
-                                            ({rName})
-                                          </span>
+                                           <span style={{ 
+                                             fontWeight: isRoomChanged ? 800 : 600, 
+                                             color: isRoomChanged ? '#7c3aed' : '#64748b',
+                                             background: isRoomChanged ? '#f3e8ff' : 'transparent',
+                                             border: isRoomChanged ? '1px solid #ddd6fe' : 'none',
+                                             padding: isRoomChanged ? '0.5px 4px' : '0',
+                                             borderRadius: isRoomChanged ? '4px' : '0',
+                                             fontSize: '0.62rem', 
+                                             whiteSpace: 'nowrap' 
+                                           }} title={isRoomChanged ? `Raum geändert zu ${rName}` : undefined}>
+                                             ({rName})
+                                           </span>
                                         ) : null;
                                       })()}
                                     </span>
@@ -5812,7 +5834,7 @@ export function ScheduleCalendarView({
                                            }} 
                                            title={isConfirmed ? 'Termin ist bestätigt' : 'Klicken, um die Rückmeldung als gelesen & grün zu markieren'}
                                          >
-                                           <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
+                                           <span>{isConfirmed ? 'Bestätigt' : 'Unbestätigt'}</span>
                                          </span>
                                        );
                                      })()}
@@ -6020,7 +6042,7 @@ export function ScheduleCalendarView({
                                            flexShrink: 0
                                          }} 
                                        >
-                                         <span>{isConfirmed ? '✓ Bestätigt' : '⏳ Unbestätigt'}</span>
+                                         <span>{isConfirmed ? 'Bestätigt' : 'Unbestätigt'}</span>
                                        </span>
                                      );
                                    })()}

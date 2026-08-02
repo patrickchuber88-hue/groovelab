@@ -2327,16 +2327,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         profile.parent_pin = pinInput;
         profile.is_pin_activated = true;
 
-        const { error: updateErr } = await supabase
+        let userUpdatePayload: any = {
+          personal_pin: pinInput,
+          parent_pin: pinInput,
+          onboarding_pin: pinInput,
+          is_pin_activated: true,
+          status: 'aktiv'
+        };
+        let { error: updateErr } = await supabase
           .from('users')
-          .update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
-            is_pin_activated: true,
-            status: 'aktiv'
-          })
+          .update(userUpdatePayload)
           .eq('id', profile.id);
+
+        if (updateErr && updateErr.message?.includes('onboarding_pin')) {
+          delete userUpdatePayload.onboarding_pin;
+          const fallbackRes = await supabase
+            .from('users')
+            .update(userUpdatePayload)
+            .eq('id', profile.id);
+          updateErr = fallbackRes.error;
+        }
 
         if (updateErr) {
           console.error('[QRLanding] user update error:', updateErr);

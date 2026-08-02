@@ -2,13 +2,13 @@
 export const GROOVELAB_THEME = {
   name: 'GrooveLab',
   moduleKey: 'groovelab',
-  primaryColor: '#eab308',
-  primaryHover: '#ca8a04',
+  primaryColor: '#facc15',
+  primaryHover: '#eab308',
   bgLight: '#fefce8',
-  bgSoft: '#fef9c3',
-  borderColor: 'rgba(234, 179, 8, 0.2)',
-  badgeBg: '#fef9c3',
-  badgeText: '#854d0e',
-  tabActiveBg: '#eab308',
-  tabActiveText: '#ffffff'
+  bgSoft: '#fef08a',
+  borderColor: 'rgba(250, 204, 21, 0.3)',
+  badgeBg: '#fef08a',
+  badgeText: '#09090b',
+  tabActiveBg: '#facc15',
+  tabActiveText: '#09090b'
 } as const;

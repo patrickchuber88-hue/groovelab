@@ -2690,9 +2690,9 @@ export function AdminDashboard({
                 ? `${capitalizeName(db.profiles.first_name)} ${capitalizeName(db.profiles.last_name)}`.trim()
                 : 'Lehrer';
               
-              const teacherName = isStaff ? 'Schule' : creatorName;
+              const teacherName = creatorName || (isStaff ? 'Schule' : 'Lehrkraft');
               const dbTitle = db.title || 'Unterricht';
-              const purpose = isStaff && (dbTitle === 'Unterricht' || dbTitle.startsWith('Unterricht:') || dbTitle === 'Eigennutzung') ? creatorName : dbTitle;
+              const purpose = dbTitle;
 
               return {
                 id: db.id,
@@ -6355,8 +6355,10 @@ export function AdminDashboard({
     };
 
     // Helper to extract unique floors for this school's rooms
-    const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor || 'Allgemein'))).sort((a, b) => {
-      const order = ['ug', 'eg', 'og', 'allgemein'];
+    const uniqueFloors = Array.from(new Set(rooms.map(r => {
+      const f = r.floor;
+      return (!f || f === 'Allgemein') ? 'EG' : f;
+    }))).sort((a, b) => {
       const getIndex = (f: string) => {
         const lf = f.toLowerCase();
         if (lf.includes('ug')) return 0;
@@ -6639,8 +6641,8 @@ export function AdminDashboard({
               room_id: targetRoomId,
               day_of_week: DAYS_MAP[d],
               teacher_id: 'groovelab',
-              teacher: { first_name: 'Groove', last_name: 'Lab' },
-              teacher_name: 'Groove Lab',
+              teacher: { first_name: 'GrooveLab', last_name: '' },
+              teacher_name: 'GrooveLab',
               purpose: 'GrooveLab Plattform',
               time_slot: startTimeStr,
               start_time: startTimeStr,
@@ -8228,7 +8230,7 @@ export function AdminDashboard({
                             >
                               <span>{r.name}</span>
                               <span style={{ fontSize: '0.62rem', color: '#8e8e93', textTransform: 'uppercase', alignSelf: 'center' }}>
-                                {r.floor === 'Allgemein' ? 'Standard' : r.floor}
+                                {(!r.floor || r.floor === 'Allgemein') ? 'EG' : r.floor}
                               </span>
                             </div>
                           ))}
@@ -8278,7 +8280,7 @@ export function AdminDashboard({
                             boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
                           }}
                         >
-                          {floor === 'Allgemein' ? 'Standard' : floor}
+                          {floor}
                         </button>
                       );
                     })}
@@ -8379,6 +8381,7 @@ export function AdminDashboard({
                 {roomsToRender.map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
                   const occupiedNow = isRoomOccupiedNow(room.id);
+                  const isGroovelabRoom = (room as any).is_groovelab || (room as any).is_groovelab_active || room.name?.toLowerCase().includes('groovelab');
                   return (
                     <div
                       key={room.id}
@@ -8724,47 +8727,55 @@ export function AdminDashboard({
                                     right: 0, 
                                     height: '2px', 
                                     background: '#ff453a', 
-                                    zIndex: 10,
-                                    pointerEvents: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center'
-                                  }}>
-                                    <div className="pulsing-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff453a', marginLeft: '-4px', boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' }} />
-                                  </div>
+                                    boxShadow: '0 0 6px rgba(255, 69, 58, 0.6)' 
+                                  }} />
                                 )}
 
-
-
                                 {slotBookings.map((b: any, bIdx: number) => {
+                                  const isSchedule = b.isSchedule;
+                                  const isGroovelabBlock = b.teacherId === 'groovelab' || 
+                                                           (b as any).is_groovelab || (b as any).isGroovelab ||
+                                                           (b.purpose && b.purpose.toLowerCase().includes('groovelab')) ||
+                                                           (b.purpose && b.purpose.toLowerCase().includes('groove lab')) ||
+                                                           (b.teacherName && b.teacherName.toLowerCase().includes('groovelab')) ||
+                                                           (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
+                                                           (b.subject_name && b.subject_name.toLowerCase().includes('groovelab')) ||
+                                                           (b.subject && b.subject.toLowerCase().includes('groovelab'));
+                                  const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
                                   const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
                                   const isExternal = b.isBlockedSlot || (b.purpose && b.purpose.startsWith('[EXTERN]'));
                                   const isOwnBooking = b.teacherId === userId || (admin && b.teacherName && b.teacherName.trim().toLowerCase() === `${admin.first_name || ''} ${admin.last_name || ''}`.trim().toLowerCase());
                                   const canDelete = (isOwnBooking && !isExternal) || isStaff;
                                   const colWidth = 100;
                                   const colLeft = 0;
-                                  const isSchedule = b.isSchedule;
-                                  const isGroovelabBlock = b.teacherId === 'groovelab' || 
-                                                            (b.purpose && b.purpose.toLowerCase().includes('groovelab')) ||
-                                                            (b.teacherName && b.teacherName.toLowerCase().includes('groove lab')) ||
-                                                            (selectedRoom && selectedRoom.name && selectedRoom.name.toLowerCase().includes('groovelab'));
-
-                                  // Apple Calendar Color Schemes
                                   let bg = 'rgba(175, 82, 222, 0.08)';
                                   let textColor = '#6d28d9';
                                   let leftAccentColor = '#af52de';
 
                                   if (b.isPreview) {
-                                    bg = 'rgba(0, 122, 255, 0.04)';
-                                    textColor = '#007aff';
-                                    leftAccentColor = '#007aff';
-                                  } else if (isSchedule) {
-                                    bg = 'rgba(52, 168, 83, 0.08)';
-                                    textColor = '#1e7a44';
-                                    leftAccentColor = '#34a853';
+                                    bg = '#faf5ff';
+                                    textColor = '#7c3aed';
+                                    leftAccentColor = '#7c3aed';
+                                   } else if (isSchedule) {
+                                     if (isGroovelabBlock) {
+                                       bg = '#facc15';
+                                       textColor = '#09090b';
+                                       leftAccentColor = '#000000';
+                                     } else if (isOwnBooking) {
+                                       bg = '#34a853';
+                                       textColor = '#ffffff';
+                                       leftAccentColor = '#34a853';
+                                     } else {
+                                       bg = 'rgba(52, 168, 83, 0.08)';
+                                       textColor = '#1e7a44';
+                                       leftAccentColor = '#34a853';
+                                     }
                                   } else {
-                                    bg = 'rgba(175, 82, 222, 0.08)';
-                                    textColor = '#6d28d9';
-                                    leftAccentColor = '#af52de';
+                                    bg = isBookingConfirmed 
+                                      ? '#fae8ff' 
+                                      : 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
+                                    textColor = '#7e22ce';
+                                    leftAccentColor = isBookingConfirmed ? '#9333ea' : '#a855f7';
                                   }
 
                                   const [shStr, smStr] = b.startTime.split(':');
@@ -8787,11 +8798,15 @@ export function AdminDashboard({
                                         e.stopPropagation();
                                         setSelectedBooking(b);
                                         if (!b.isSchedule) {
-                                          // Always populate form for own manual bookings
+                                          // Always populate form for own manual bookings or staff
                                           setBookingDate(b.date);
                                           setBookingStartTime(b.startTime);
                                           setBookingEndTime(b.endTime);
-                                          setBookingPurpose(b.purpose || '');
+                                          if (isOwnBooking || isStaff) {
+                                            setBookingPurpose(b.purpose || '');
+                                          } else {
+                                            setBookingPurpose('');
+                                          }
                                           setIsDateFilterActive(true);
                                           setShowMyBookingsOnly(false);
                                         } else if (b.teacherId === userId) {
@@ -8813,31 +8828,37 @@ export function AdminDashboard({
                                       onDragEnd={() => {
                                         setDragOverCell(null);
                                       }}
-                                      title={b.isPreview ? `Vorschau: ${b.purpose} (${b.startTime} - ${b.endTime})` : b.isDuringHoliday ? `${b.purpose} (${b.startTime} - ${b.endTime}) – Ferienzeit` : `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}`}
+                                      title={b.isPreview ? `Vorschau (${b.startTime} - ${b.endTime})` : b.isDuringHoliday ? `${isOwnBooking && b.purpose ? b.purpose + ' ' : ''}(${b.startTime} - ${b.endTime}) – Ferienzeit` : (isOwnBooking && b.purpose ? `${b.purpose} (${b.startTime} - ${b.endTime}) - ${b.teacherName}` : `${b.teacherName || 'Raumbuchung'} (${b.startTime} - ${b.endTime})`)}
                                       style={{
                                         background: b.isPreview 
-                                          ? '#f0f9ff' 
+                                          ? '#faf5ff' 
                                           : b.isDuringHoliday
                                             ? 'repeating-linear-gradient(45deg, #f0fdf4, #f0fdf4 4px, #dcfce7 4px, #dcfce7 8px)'
                                             : (isExternal
                                               ? '#fef2f2'
                                               : bg),
                                         border: b.isPreview 
-                                          ? '2.2px dashed #0284c7' 
+                                          ? '2.2px dashed #7c3aed' 
                                           : b.isDuringHoliday
                                             ? '1.5px dashed #34a85370'
                                             : (isExternal
                                               ? '1.5px dashed #ef4444'
-                                              : `1px solid ${leftAccentColor}30`),
+                                              : (isSchedule 
+                                                ? (isOwnBooking 
+                                                  ? (isGroovelabBlock ? '1px solid #eab308' : '1px solid #2d9248') 
+                                                  : (isGroovelabBlock ? '1.5px solid #eab308' : '1px solid rgba(52, 168, 83, 0.3)'))
+                                                : (isBookingConfirmed ? '2px solid #a855f7' : '2px dashed #a855f7'))),
                                         borderLeft: b.isPreview 
-                                          ? '2.2px dashed #0284c7' 
+                                          ? '2.2px dashed #7c3aed' 
                                           : b.isDuringHoliday
                                             ? '3.5px dashed #34a85370'
                                             : (isExternal
                                               ? '3.5px dashed #ef4444'
-                                              : `3.5px solid ${leftAccentColor}`),
+                                              : (isSchedule 
+                                                ? `4px solid ${leftAccentColor}`
+                                                : (isBookingConfirmed ? '4px solid #9333ea' : '3.5px dashed #a855f7'))),
                                         borderRadius: '10px',
-                                        padding: '8px 10px',
+                                        padding: isSchedule && isOwnBooking ? 0 : (isOwnBooking ? '6px 6px' : '8px 10px'),
                                         fontSize: '0.72rem',
                                         fontWeight: 800,
                                         color: b.isDuringHoliday ? '#34a853aa' : textColor,
@@ -8910,8 +8931,8 @@ export function AdminDashboard({
                                             width: '18px',
                                             height: '18px',
                                             borderRadius: '6px',
-                                            background: 'rgba(2, 132, 199, 0.12)',
-                                            color: '#0284c7',
+                                            background: 'rgba(124, 58, 237, 0.12)',
+                                            color: '#7c3aed',
                                             border: 'none',
                                             display: 'flex',
                                             alignItems: 'center',
@@ -8922,12 +8943,12 @@ export function AdminDashboard({
                                             transition: 'all 0.2s'
                                           }}
                                           onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = '#0284c7';
+                                            e.currentTarget.style.background = '#7c3aed';
                                             e.currentTarget.style.color = '#ffffff';
                                           }}
                                           onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(2, 132, 199, 0.12)';
-                                            e.currentTarget.style.color = '#0284c7';
+                                            e.currentTarget.style.background = 'rgba(124, 58, 237, 0.12)';
+                                            e.currentTarget.style.color = '#7c3aed';
                                           }}
                                           title="Vorschau schließen"
                                         >
@@ -8992,41 +9013,185 @@ export function AdminDashboard({
                                           </div>
                                         </>
                                       ) : isSchedule ? (
-                                        <>
-                                          {/* Time range with GraduationCap icon */}
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', marginBottom: '3px', fontWeight: 800, color: leftAccentColor }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                              <GraduationCap size={13} strokeWidth={2.2} />
-                                              {b.startTime} - {b.endTime}
-                                            </span>
-                                          </div>
-                                          {/* Teacher Name */}
-                                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', fontWeight: 900, fontSize: '0.78rem', color: '#1c1c1e', letterSpacing: '-0.01em', marginTop: '1px' }}>
-                                            {b.teacherName}
-                                          </div>
-                                          {/* Subtitle: Regulärer Unterricht or Ferienzeit hint */}
-                                          <div style={{ fontSize: '0.64rem', fontWeight: 700, opacity: 0.85, marginTop: '2px', color: b.isDuringHoliday ? '#34a853' : textColor }}>
-                                            {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <>
-                                          {/* Time range with User icon */}
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', marginBottom: '3px', fontWeight: 800, color: leftAccentColor }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                              <User size={13} strokeWidth={2.2} />
-                                              {b.startTime} - {b.endTime}{b.isPreview && ' (Vorschau)'}
-                                            </span>
-                                          </div>
+                                        isOwnBooking ? (
+                                          <>
+                                            {/* Integrated Flush White Header Bar for Own Schedules */}
+                                            <div style={{
+                                              background: '#ffffff',
+                                              padding: '6px 8px',
+                                              borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+                                              width: '100%',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '2px',
+                                              boxSizing: 'border-box'
+                                            }}>
+                                              <div style={{
+                                                 fontSize: '0.64rem',
+                                                 fontWeight: 800,
+                                                 color: isGroovelabBlock ? '#09090b' : '#34a853',
+                                                 display: 'flex',
+                                                 alignItems: 'center',
+                                                 gap: '4px'
+                                               }}>
+                                                 <Clock size={10} strokeWidth={2.5} />
+                                                 {b.startTime} - {b.endTime}
+                                               </div>
+                                               <div style={{
+                                                 fontSize: '0.74rem',
+                                                 fontWeight: 900,
+                                                 color: '#1c1c1e',
+                                                 whiteSpace: 'nowrap',
+                                                 overflow: 'hidden',
+                                                 textOverflow: 'ellipsis'
+                                               }}>
+                                                 {(!b.teacherName || b.teacherName === 'Patrick H.' || b.teacherName === 'Patrick H') ? 'Patrick Huber' : b.teacherName}
+                                               </div>
+                                             </div>
 
-                                          {/* Purpose */}
-                                          {durationHrs >= 1.0 && b.purpose && b.purpose.trim().toLowerCase() !== 'eigennutzung' && (
-                                            <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                              {b.isPreview ? 'Vorschau' : b.purpose}
+                                             {/* Subtitle & Lock Icon at the very bottom */}
+                                             <div style={{
+                                               padding: '6px 8px',
+                                               display: 'flex',
+                                               flexDirection: 'column',
+                                               justifyContent: 'space-between',
+                                               flex: 1,
+                                               boxSizing: 'border-box',
+                                               width: '100%'
+                                             }}>
+                                               <div style={{
+                                                 fontSize: '0.64rem',
+                                                 fontWeight: 800,
+                                                 color: '#ffffff'
+                                               }}>
+                                                 {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
+                                               </div>
+
+                                               {/* Lock Icon at the bottom right */}
+                                               <div 
+                                                 title="Regulärer Unterrichtsblock"
+                                                 style={{
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   justifyContent: 'flex-end',
+                                                   marginTop: 'auto',
+                                                   paddingTop: '4px'
+                                                 }}
+                                               >
+                                                 <Lock size={12} color="#ffffff" strokeWidth={2.5} />
+                                               </div>
+                                             </div>
+                                          </>
+                                        ) : (
+                                          <>
+                                            {/* Other Teachers' Schedule Blocks (Classic Layout) */}
+                                            <div style={{
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              justifyContent: 'space-between',
+                                              height: '100%',
+                                              boxSizing: 'border-box',
+                                              width: '100%'
+                                            }}>
+                                              <div>
+                                                <div style={{
+                                                  fontSize: '0.64rem',
+                                                  fontWeight: 850,
+                                                  color: isGroovelabBlock ? '#09090b' : '#1e7a44',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: '4px',
+                                                  marginBottom: '2px'
+                                                }}>
+                                                  <Clock size={10} strokeWidth={2.5} color={isGroovelabBlock ? '#09090b' : '#1e7a44'} />
+                                                  {b.startTime} - {b.endTime}
+                                                </div>
+                                                <div style={{
+                                                  fontSize: '0.72rem',
+                                                  fontWeight: 900,
+                                                  color: '#09090b',
+                                                  whiteSpace: 'nowrap',
+                                                  overflow: 'hidden',
+                                                  textOverflow: 'ellipsis',
+                                                  marginBottom: '2px'
+                                                }}>
+                                                  {b.teacherName || 'Lehrkraft'}
+                                                </div>
+                                                <div style={{
+                                                  fontSize: '0.62rem',
+                                                  fontWeight: 750,
+                                                  color: isGroovelabBlock ? '#09090b' : '#1e7a44',
+                                                  opacity: isGroovelabBlock ? 0.8 : 0.9
+                                                }}>
+                                                  {b.isDuringHoliday ? '🌴 Regulärer Unterricht (Ferien)' : 'Regulärer Unterricht'}
+                                                </div>
+                                              </div>
+
+                                              {/* Lock Icon at bottom right for other teachers */}
+                                              <div 
+                                                title="Regulärer Unterrichtsblock"
+                                                style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'flex-end',
+                                                  marginTop: 'auto',
+                                                  paddingTop: '2px'
+                                                }}
+                                              >
+                                                <Lock size={11} color={isGroovelabBlock ? '#eab308' : '#34a853'} strokeWidth={2.5} />
+                                              </div>
                                             </div>
-                                          )}
-                                        </>
-                                      )}
+                                          </>
+                                        )
+                                       ) : (
+                                         <>
+                                           {/* Time range with User icon */}
+                                           <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.66rem', marginBottom: '2px', fontWeight: 800, color: leftAccentColor, paddingRight: (canDelete || b.isPreview) ? '24px' : 0 }}>
+                                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                               <User size={13} strokeWidth={2.2} />
+                                               {b.startTime} - {b.endTime}
+                                             </span>
+                                           </div>
+
+                                           {/* Person/Teacher Name */}
+                                           <div style={{
+                                             fontSize: '0.72rem',
+                                             fontWeight: 900,
+                                             color: '#1c1c1e',
+                                             whiteSpace: 'nowrap',
+                                             overflow: 'hidden',
+                                             textOverflow: 'ellipsis',
+                                             marginBottom: '2px'
+                                           }}>
+                                             {b.teacherName || 'Lehrkraft'}
+                                           </div>
+
+                                           {/* Purpose (Only visible for the teacher who booked the room) */}
+                                           {(isOwnBooking || b.isPreview) && b.purpose && b.purpose.trim() && (
+                                             <div style={{ fontSize: '0.64rem', color: '#6b21a8', fontWeight: 750, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                               {b.purpose}
+                                             </div>
+                                           )}
+
+                                           {/* Confirmation status badge at bottom footer */}
+                                           <div style={{ marginTop: 'auto', paddingTop: '4px' }}>
+                                             <span style={{
+                                               fontSize: '0.58rem',
+                                               fontWeight: 900,
+                                               padding: '1px 5px',
+                                               borderRadius: '4px',
+                                               background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.18)',
+                                               color: isBookingConfirmed ? '#15803d' : '#a16207',
+                                               display: 'inline-flex',
+                                               alignItems: 'center',
+                                               gap: '2px',
+                                               whiteSpace: 'nowrap'
+                                             }}>
+                                               {b.isPreview ? '⏳ Vorschau' : (isBookingConfirmed ? '✅ Bestätigt' : '⏳ Unbestätigt')}
+                                             </span>
+                                           </div>
+                                         </>
+                                       )}
                                     </div>
                                   );
                                 })}
@@ -9124,79 +9289,104 @@ export function AdminDashboard({
                       Du hast noch keine Buchungen vorgenommen.
                     </div>
                   ) : (
-                    myBookings.map((b: any) => (
-                      <div
-                        key={b.id}
-                        onClick={() => {
-                          setBookingDate(b.date);
-                          setSelectedFloor('Alle');
-                          setSelectedCampusRoomId(b.roomId);
-                          setSelectedBooking(b);
-                          setBookingStartTime(b.startTime);
-                          setBookingEndTime(b.endTime);
-                          setBookingPurpose(b.purpose || '');
-                          setIsDateFilterActive(false);
-                          setShowMyBookingsOnly(false);
-                        }}
-                        style={{
-                          padding: '12px 14px',
-                          background: '#f6f0ff',
-                          border: '1.5px solid #af52de20',
-                          borderRadius: '14px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          cursor: 'pointer',
-                          transition: 'transform 0.15s ease, border-color 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#af52de60';
-                          e.currentTarget.style.transform = 'translateY(-1px)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#af52de20';
-                          e.currentTarget.style.transform = 'none';
-                        }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
-                            {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
-                          </span>
-                          <div style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
-                            {b.teacherName === 'Schule' ? (
-                              <>
-                                <strong style={{ fontWeight: 900 }}>Schule</strong> • {b.roomName}
-                              </>
-                            ) : b.roomName}
-                          </div>
-                          {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
-                            <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
-                              {b.purpose.replace(/^Unterricht:\s*/i, '')}
-                            </div>
-                          )}
-                        </div>
+                    myBookings.map((b: any) => {
+                      const isBookingConfirmed = b.status === 'approved' || b.status === 'confirmed' || b.isApproved === true || b.is_confirmed === true;
 
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleCancelBooking(b.ids || b.id); }}
-                          style={{
-                            background: '#ff453a15',
-                            color: '#ff453a',
-                            border: 'none',
-                            borderRadius: '10px',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'background 0.2s'
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => {
+                            setBookingDate(b.date);
+                            setSelectedFloor('Alle');
+                            setSelectedCampusRoomId(b.roomId);
+                            setSelectedBooking(b);
+                            setBookingStartTime(b.startTime);
+                            setBookingEndTime(b.endTime);
+                            setBookingPurpose(b.purpose || '');
+                            setIsDateFilterActive(false);
+                            setShowMyBookingsOnly(false);
                           }}
-                          title="Buchung stornieren"
+                          style={{
+                            padding: '12px 14px',
+                            background: isBookingConfirmed 
+                              ? '#fae8ff' 
+                              : 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)',
+                            border: isBookingConfirmed ? '2px solid #a855f7' : '2px dashed #a855f7',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            transition: 'transform 0.15s ease, border-color 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#9333ea';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#a855f7';
+                            e.currentTarget.style.transform = 'none';
+                          }}
                         >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                            <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a' }}>
+                              {new Date(b.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} • {b.startTime} - {b.endTime}
+                            </span>
+                            <div style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
+                              {b.teacherName === 'Schule' ? (
+                                <>
+                                  <strong style={{ fontWeight: 900 }}>Schule</strong> • {b.roomName}
+                                </>
+                              ) : b.roomName}
+                            </div>
+                            {b.purpose && b.purpose.toLowerCase() !== 'unterricht' && (
+                              <div style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600, marginTop: '1px' }}>
+                                {b.purpose.replace(/^Unterricht:\s*/i, '')}
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                            <span style={{
+                              fontSize: '0.62rem',
+                              fontWeight: 900,
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              background: isBookingConfirmed ? 'rgba(34, 197, 94, 0.15)' : 'rgba(234, 179, 8, 0.18)',
+                              color: isBookingConfirmed ? '#15803d' : '#a16207',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {isBookingConfirmed ? '✅ Bestätigt' : '⏳ Unbestätigt'}
+                            </span>
+
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCancelBooking(b.ids || b.id); }}
+                              style={{
+                                background: '#ff453a15',
+                                color: '#ff453a',
+                                border: 'none',
+                                borderRadius: '10px',
+                                width: '32px',
+                                height: '32px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#ff453a30'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = '#ff453a15'}
+                              title="Buchung stornieren"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -10515,7 +10705,7 @@ export function AdminDashboard({
                   }} 
                   style={{ 
                     background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                    color: '#1e293b', 
+                    color: (activePlatform as string) === 'groovelab' ? '#1e293b' : '#ffffff', 
                     border: 'none', 
                     padding: '6px 12px', 
                     borderRadius: '10px', 
@@ -11101,7 +11291,7 @@ export function AdminDashboard({
                     }} 
                     style={{ 
                       background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
-                      color: '#1e293b', 
+                      color: '#ffffff', 
                       border: 'none', 
                       padding: '6px 12px', 
                       borderRadius: '10px', 

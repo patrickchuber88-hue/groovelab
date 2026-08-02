@@ -76,16 +76,26 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           sessionStorage.setItem('groovelab_qr_token', authQrToken);
         }
 
-        const { error } = await supabase
+        let userUpdatePayload: any = {
+          personal_pin: pinInput,
+          parent_pin: pinInput,
+          onboarding_pin: pinInput,
+          is_pin_activated: true,
+          is_campus_active: true
+        };
+        let { error } = await supabase
           .from('users')
-          .update({
-            personal_pin: pinInput,
-            parent_pin: pinInput,
-            onboarding_pin: pinInput,
-            is_pin_activated: true,
-            is_campus_active: true
-          })
+          .update(userUpdatePayload)
           .eq('id', user.id);
+
+        if (error && error.message?.includes('onboarding_pin')) {
+          delete userUpdatePayload.onboarding_pin;
+          const fallbackRes = await supabase
+            .from('users')
+            .update(userUpdatePayload)
+            .eq('id', user.id);
+          error = fallbackRes.error;
+        }
 
         try {
           await supabase.from('students').update({

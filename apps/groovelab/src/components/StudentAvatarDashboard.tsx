@@ -13687,15 +13687,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             setPinFormError('');
 
                             try {
-                              const { error } = await supabase
+                              let userUpdatePayload: any = {
+                                personal_pin: pinFormNew,
+                                parent_pin: pinFormNew,
+                                onboarding_pin: pinFormNew,
+                                is_pin_activated: true
+                              };
+                              let { error } = await supabase
                                 .from('users')
-                                .update({
-                                  personal_pin: pinFormNew,
-                                  parent_pin: pinFormNew,
-                                  onboarding_pin: pinFormNew,
-                                  is_pin_activated: true
-                                })
+                                .update(userUpdatePayload)
                                 .eq('id', studentId);
+
+                              if (error && error.message?.includes('onboarding_pin')) {
+                                delete userUpdatePayload.onboarding_pin;
+                                const fallbackRes = await supabase
+                                  .from('users')
+                                  .update(userUpdatePayload)
+                                  .eq('id', studentId);
+                                error = fallbackRes.error;
+                              }
 
                               try {
                                 await supabase.from('students').update({

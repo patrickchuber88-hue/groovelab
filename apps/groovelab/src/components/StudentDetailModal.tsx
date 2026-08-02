@@ -242,14 +242,18 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
     try {
       await supabase.from('activation_days').delete().eq('student_id', student.id);
-      await supabase.from('users').update({ 
+      let userResetPayload: any = { 
         onboarding_pin: null, 
-        pin: null, 
         personal_pin: null,
         parent_pin: null,
         is_pin_activated: false,
         status: 'offen'
-      }).eq('id', student.id);
+      };
+      let { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
+      if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
+        delete userResetPayload.onboarding_pin;
+        await supabase.from('users').update(userResetPayload).eq('id', student.id);
+      }
       await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
       await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
 

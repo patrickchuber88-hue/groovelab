@@ -2699,8 +2699,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (role === 'student') {
         scheduleQuery = scheduleQuery.eq('student_id', userId);
+      } else if (role === 'teacher') {
+        scheduleQuery = scheduleQuery.eq('teacher_id', userId);
       } else if (effectiveSchoolId) {
-        scheduleQuery = scheduleQuery.or(`teacher_id.eq.${userId},school_id.eq.${effectiveSchoolId}`);
+        scheduleQuery = scheduleQuery.eq('school_id', effectiveSchoolId);
       }
 
       let { data: schedules } = await scheduleQuery;
@@ -2736,8 +2738,10 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       if (role === 'student') {
         occurrenceQuery = occurrenceQuery.eq('student_id', userId);
+      } else if (role === 'teacher') {
+        occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
       } else if (effectiveSchoolId) {
-        occurrenceQuery = occurrenceQuery.or(`teacher_id.eq.${userId},school_id.eq.${effectiveSchoolId}`);
+        occurrenceQuery = occurrenceQuery.eq('school_id', effectiveSchoolId);
       }
 
       let { data: occurrencesData } = await occurrenceQuery;
@@ -2745,16 +2749,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
       // Merge active occurrences and pending changes directly from Stundenplan tab (localStorage)
       try {
-        const activeCalStr = localStorage.getItem(`groovelab_calendar_active_occurrences_${userId}`) || localStorage.getItem('groovelab_calendar_active_occurrences_latest');
+        const activeCalStr = userId ? localStorage.getItem(`groovelab_calendar_active_occurrences_${userId}`) : null;
         if (activeCalStr) {
           const activeCalList = JSON.parse(activeCalStr);
           if (Array.isArray(activeCalList) && activeCalList.length > 0) {
             activeCalList.forEach((aOcc: any) => {
               if (aOcc && aOcc.id && !aOcc.id.startsWith('vacant-')) {
+                const occTeacherId = aOcc.teacher_id || aOcc.teacherId;
+                if (role === 'teacher' && occTeacherId && String(occTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) {
+                  return;
+                }
                 const idx = occurrences.findIndex((o: any) => o.id === aOcc.id);
                 if (idx >= 0) {
                   occurrences[idx] = { ...occurrences[idx], ...aOcc };
-                } else {
+                } else if (role !== 'teacher' || !occTeacherId || String(occTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
                   occurrences.push(aOcc);
                 }
               }
@@ -2762,18 +2770,30 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           }
         }
 
-        const pendingStr = localStorage.getItem('groovelab_pending_schedule_changes');
+        const pendingStr = (userId ? localStorage.getItem(`groovelab_pending_schedule_changes_${userId}`) : null) || localStorage.getItem('groovelab_pending_schedule_changes');
         if (pendingStr) {
           const pendingMap = JSON.parse(pendingStr);
           Object.values(pendingMap).forEach((pOcc: any) => {
             if (pOcc && pOcc.id) {
+              const occTeacherId = pOcc.teacher_id || pOcc.teacherId;
+              if (role === 'teacher' && occTeacherId && String(occTeacherId).replace(/^teacher-/i, '') !== String(userId).replace(/^teacher-/i, '')) {
+                return;
+              }
               const idx = occurrences.findIndex((o: any) => o.id === pOcc.id);
               if (idx >= 0) {
                 occurrences[idx] = { ...occurrences[idx], ...pOcc, is_moved: true, status: pOcc.status || 'pending_reschedule' };
-              } else {
+              } else if (role !== 'teacher' || !occTeacherId || String(occTeacherId).replace(/^teacher-/i, '') === String(userId).replace(/^teacher-/i, '')) {
                 occurrences.push({ ...pOcc, is_moved: true, status: pOcc.status || 'pending_reschedule' });
               }
             }
+          });
+        }
+
+        if (role === 'teacher' && userId) {
+          const cleanUserId = String(userId).replace(/^teacher-/i, '');
+          occurrences = occurrences.filter((o: any) => {
+            const tId = o.teacher_id || o.teacherId;
+            return !tId || String(tId).replace(/^teacher-/i, '') === cleanUserId;
           });
         }
       } catch (e) {}
@@ -3247,57 +3267,6 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
             });
           }
         });
-      }
-
-      if (allMergedOccurrences.length === 0) {
-        try {
-          const { data: dbStudents } = await supabase
-            .from('users')
-            .select('id, first_name, last_name, instrument')
-            .eq('role', 'student')
-            .limit(10);
-
-          const sampleStudents = (dbStudents && dbStudents.length > 0)
-            ? dbStudents
-            : [
-                { id: 'demo-student-1', first_name: 'Max', last_name: 'M.', instrument: 'Gitarre' },
-                { id: 'demo-student-2', first_name: 'Anna', last_name: 'S.', instrument: 'Klavier' },
-                { id: 'demo-student-3', first_name: 'Leon', last_name: 'B.', instrument: 'Schlagzeug' }
-              ];
-
-          sampleStudents.forEach((st: any, idx: number) => {
-            const dayOfWeek = (idx % 5) + 1;
-            const timeSlot = `${14 + (idx % 4)}:00:00`;
-            const current = new Date(schoolYearStart);
-            while (current <= schoolYearEnd) {
-              const currentDay = current.getDay() || 7;
-              const diff = dayOfWeek - currentDay;
-              const targetDate = new Date(current);
-              targetDate.setDate(current.getDate() + diff);
-
-              if (targetDate >= schoolYearStart && targetDate <= schoolYearEnd) {
-                const yyyy = targetDate.getFullYear();
-                const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-                const dd = String(targetDate.getDate()).padStart(2, '0');
-                const dateStr = `${yyyy}-${mm}-${dd}`;
-
-                allMergedOccurrences.push({
-                  id: `fallback-occ-${st.id}-${dateStr}`,
-                  schedule_id: `fallback-sched-${st.id}`,
-                  student_id: st.id,
-                  teacher_id: userId,
-                  date: dateStr,
-                  start_time: timeSlot,
-                  duration: 30,
-                  status: 'scheduled',
-                  is_virtual: true,
-                  student: st
-                });
-              }
-              current.setDate(current.getDate() + 7);
-            }
-          });
-        } catch (e) {}
       }
 
       // Sort chronologically
@@ -5105,6 +5074,22 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       }
                                     });
 
+                                    const roomCounts = new Map<string, number>();
+                                    groupedSlotItems.forEach(it => {
+                                      const rm = it.room_override_name || it.roomOverrideName || it.schedules?.rooms?.name || it.schedules?.room?.name || it.roomName || it.room_name || it.room || it.raum;
+                                      if (rm && rm !== 'Raum') {
+                                        roomCounts.set(rm, (roomCounts.get(rm) || 0) + 1);
+                                      }
+                                    });
+                                    let dominantRoomName = '';
+                                    let maxRoomCount = 0;
+                                    roomCounts.forEach((count, rm) => {
+                                      if (count > maxRoomCount) {
+                                        maxRoomCount = count;
+                                        dominantRoomName = rm;
+                                      }
+                                    });
+
                                     return groupedSlotItems.map(occ => {
                                       const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
                                       const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
@@ -5128,36 +5113,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                          (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
                                          (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
                                       
-                                      let rowBg = '#ffffff';
-                                      let rowBorder = '1px solid #e2e8f0';
-                                      let textColor = '#0f172a';
-                                      let subColor = '#64748b';
-
-                                      const isGroupOcc = occ.isGroupOcc || (occ.students && occ.students.length > 1) || (occ.group_occurrences && occ.group_occurrences.length > 1) || !!occ.group_id;
-
-                                      if (isCanceled) {
-                                        rowBg = '#fef2f2';
-                                        rowBorder = '2px dashed #ef4444';
-                                        textColor = '#991b1b';
-                                        subColor = '#ef4444';
-                                      } else if (isRescheduled) {
-                                        rowBg = '#fefce8';
-                                        rowBorder = '2px dashed #eab308';
-                                        textColor = '#854d0e';
-                                        subColor = '#d97706';
-                                      } else if (isGroupOcc) {
-                                        rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                                        rowBorder = '2px solid #0284c7';
-                                        textColor = '#0369a1';
-                                        subColor = '#0284c7';
-                                      } else if (isPendingReview) {
-                                        rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                                        rowBorder = '1px dashed #eab308';
-                                        textColor = '#713f12';
-                                        subColor = '#ca8a04';
-                                      }
-
-                                      const groupFirstNames = isGroupOcc && (occ.students || occ.group_occurrences)
+                                      const groupFirstNames = (occ.students || occ.group_occurrences)
                                         ? (occ.students || occ.group_occurrences).map((s: any) => (s.first_name || s.student?.first_name || '').trim()).filter(Boolean).join(', ')
                                         : null;
 
@@ -5169,6 +5125,123 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             const initial = ln ? `${ln[0].toUpperCase()}.` : '';
                                             return initial ? `${fn} ${initial}` : fn;
                                           })());
+                                      const isGroupOcc = Boolean(
+                                        occ.isGroupOcc || occ.isGroup || occ.is_group ||
+                                        (occ.students && occ.students.length > 1) ||
+                                        (occ.group_occurrences && occ.group_occurrences.length > 1) ||
+                                        !!occ.group_id ||
+                                        (opponentName && (opponentName.includes(',') || opponentName.includes('&')))
+                                      );
+
+                                      const isConfirmedOcc = Boolean(
+                                        occ.status === 'rescheduled_confirmed' ||
+                                        occ.student_acknowledged === true ||
+                                        occ.studentAcknowledged === true
+                                      );
+
+                                      const rName = occ.room_override_name || occ.roomOverrideName || occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.roomName || occ.room_name || occ.room || occ.raum;
+                                      const defaultRoomName = occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.original_room_name || occ.originalRoomName || occ.template_room_name || (maxRoomCount > 1 ? dominantRoomName : null);
+                                      const isRoomChanged = Boolean(
+                                        occ.room_override_id || 
+                                        occ.roomOverrideId || 
+                                        occ.room_override_name || 
+                                        occ.roomOverrideName || 
+                                        occ.is_room_changed || 
+                                        occ.isRoomChanged || 
+                                        occ.is_room_booking || 
+                                        occ.isRoomBooking || 
+                                        (defaultRoomName && rName && defaultRoomName !== rName) || 
+                                        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
+                                      );
+
+                                      let dateBlockBg = '#f8fafc';
+                                      let dateBlockBorder = '1px solid rgba(0,0,0,0.03)';
+                                      let rowBg = '#ffffff';
+                                      let rowBorder = '1px solid #e2e8f0';
+                                      let textColor = '#0f172a';
+                                      let subColor = '#64748b';
+
+                                      if (isCanceled) {
+                                        textColor = '#991b1b';
+                                        subColor = '#ef4444';
+                                        dateBlockBg = '#fee2e2';
+                                        
+                                        if (isConfirmedOcc) {
+                                          rowBg = '#fee2e2';
+                                          rowBorder = '2px solid #ef4444';
+                                          dateBlockBorder = '1.5px solid #ef4444';
+                                        } else {
+                                          rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+                                          rowBorder = '2px dashed #ef4444';
+                                          dateBlockBorder = '1.5px dashed #ef4444';
+                                        }
+                                      } else if (isRoomChanged) {
+                                        // LILA THEME FÜR RAUMBUCHUNGEN / RAUMWECHSEL (Identisch zum Stundenplan-Board!)
+                                        textColor = '#6b21a8';
+                                        subColor = '#7c3aed';
+                                        dateBlockBg = '#f3e8ff';
+
+                                        if (isConfirmedOcc) {
+                                          rowBg = 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)';
+                                          rowBorder = '2px solid #7c3aed';
+                                          dateBlockBorder = '1.5px solid #7c3aed';
+                                        } else {
+                                          rowBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
+                                          rowBorder = '2px dashed #7c3aed';
+                                          dateBlockBorder = '1.5px dashed #7c3aed';
+                                        }
+                                      } else if (isGroupOcc) {
+                                        textColor = '#0369a1';
+                                        subColor = '#0284c7';
+                                        dateBlockBg = '#e0f2fe';
+
+                                        if (isCanceled) {
+                                          if (isConfirmedOcc) {
+                                            rowBg = '#f0f9ff';
+                                            rowBorder = '2px solid #0284c7';
+                                            dateBlockBorder = '1.5px solid #0284c7';
+                                          } else {
+                                            rowBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+                                            rowBorder = '2px dashed #0284c7';
+                                            dateBlockBorder = '1.5px dashed #0284c7';
+                                          }
+                                        } else if (isRescheduled) {
+                                          if (isConfirmedOcc) {
+                                            rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                                            rowBorder = '2px solid #0284c7';
+                                            dateBlockBorder = '1.5px solid #0284c7';
+                                          } else {
+                                            rowBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
+                                            rowBorder = '2px dashed #0284c7';
+                                            dateBlockBorder = '1.5px dashed #0284c7';
+                                          }
+                                        } else {
+                                          rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                                          rowBorder = '2px solid #0284c7';
+                                          dateBlockBorder = '1.5px solid #0284c7';
+                                        }
+                                      } else if (isRescheduled) {
+                                        textColor = '#854d0e';
+                                        subColor = '#d97706';
+                                        dateBlockBg = '#fef3c7';
+
+                                        if (isConfirmedOcc) {
+                                          rowBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                                          rowBorder = '2px solid #eab308';
+                                          dateBlockBorder = '1.5px solid #eab308';
+                                        } else {
+                                          rowBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                                          rowBorder = '2px dashed #eab308';
+                                          dateBlockBorder = '1.5px dashed #eab308';
+                                        }
+                                      } else if (isPendingReview) {
+                                        rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
+                                        rowBorder = '1px dashed #eab308';
+                                        textColor = '#713f12';
+                                        subColor = '#ca8a04';
+                                        dateBlockBg = '#fefebc';
+                                        dateBlockBorder = '1px dashed #eab308';
+                                      }
 
                                     return (
                                       <div 
@@ -5196,12 +5269,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             flexDirection: 'column',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            background: isCanceled ? '#fee2e2' : isRescheduled ? '#fef3c7' : isPendingReview ? '#fefebc' : '#f8fafc',
+                                            background: dateBlockBg,
                                             borderRadius: '6px',
                                             padding: '2px',
                                             width: '34px',
                                             height: '34px',
-                                            border: isCanceled ? '1.5px dashed #ef4444' : isRescheduled ? '1.5px dashed #eab308' : '1px solid rgba(0,0,0,0.03)',
+                                            border: dateBlockBorder,
                                             flexShrink: 0
                                           }}>
                                             <span style={{ fontSize: '7px', fontWeight: 900, textTransform: 'uppercase', color: subColor }}>
@@ -5226,6 +5299,38 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                               }}>
                                                 {opponentName}
                                               </span>
+
+                                              {(() => {
+                                                if (!rName || rName === 'Raum') return null;
+                                                
+                                                if (isRoomChanged) {
+                                                  return (
+                                                    <span style={{
+                                                      fontSize: '9.5px',
+                                                      fontWeight: 800,
+                                                      background: '#f3e8ff',
+                                                      color: '#7c3aed',
+                                                      border: '1px solid #ddd6fe',
+                                                      padding: '1px 6px',
+                                                      borderRadius: '6px',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px'
+                                                    }} title={`Raum geändert zu ${rName}`}>
+                                                      • {rName}
+                                                    </span>
+                                                  );
+                                                }
+                                                return (
+                                                  <span style={{
+                                                    fontSize: '11px',
+                                                    fontWeight: 600,
+                                                    color: subColor
+                                                  }}>
+                                                    • {rName}
+                                                  </span>
+                                                );
+                                              })()}
                                               {isPendingReview && (
                                                 <span style={{
                                                   fontSize: '7px',
@@ -5247,9 +5352,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                 <span style={{
                                                   fontSize: '7.5px',
                                                   fontWeight: 800,
-                                                  background: '#fef3c7',
-                                                  color: '#b45309',
-                                                  border: '1.5px dashed #eab308',
+                                                  background: isGroupOcc ? '#e0f2fe' : '#fef3c7',
+                                                  color: isGroupOcc ? '#0369a1' : '#b45309',
+                                                  border: isGroupOcc ? '1.5px dashed #0284c7' : '1.5px dashed #eab308',
                                                   padding: '1px 5px',
                                                   borderRadius: '5px',
                                                   textTransform: 'uppercase'
