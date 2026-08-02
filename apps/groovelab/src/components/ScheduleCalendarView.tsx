@@ -5386,21 +5386,11 @@ export function ScheduleCalendarView({
                     Boolean(occ.original_date && occ.original_date !== occ.date) ||
                     Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
 
-                  const isRescheduled = !isBreak && !isVacant && !isSick && !isAtMasterSlot && (
-                    isActualMove ||
-                    (isRoomOverridden && occ.status !== 'scheduled') ||
-                    (occ.status === 'rescheduled_confirmed' && isActualMove) ||
-                    (occ.status === 'pending_reschedule' && isActualMove)
-                  );
+                  const isRescheduled = false;
                   const isResetPending = false;
  
-                  const isConfirmedReschedule = isRescheduled && (occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true);
-
-                  const isWaiting = !isBreak && !isVacant && !isSick && !isAtMasterSlot && isActualMove && !isConfirmedReschedule && (
-                    isGroup 
-                      ? occurrencesInGroup.some(o => o.status === 'pending_reschedule' || (o.student_acknowledged === false && Boolean(o.original_date)))
-                      : (occ.status === 'pending_reschedule' || isTimeOrDayMoved || (occ.student_acknowledged === false && Boolean(occ.original_date)))
-                  );
+                  const isConfirmedReschedule = false;
+                  const isWaiting = false;
 
                   const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
 
