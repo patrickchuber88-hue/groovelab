@@ -2545,6 +2545,7 @@ export function ScheduleCalendarView({
       });
       return next;
     });
+    setPendingChanges({});
     
     try {
       localStorage.removeItem('groovelab_pending_schedule_changes');
@@ -5749,7 +5750,20 @@ export function ScheduleCalendarView({
                                            e.stopPropagation();
                                            if (isConfirmed) return;
                                            try {
-                                             if (!occ.id.startsWith('mock-')) {
+                                             if (occ.id.startsWith('mock-')) {
+                                               await supabase.from('schedule_occurrences').upsert({
+                                                 date: occ.date,
+                                                 original_date: occ.date,
+                                                 start_time: occ.start_time,
+                                                 original_start_time: occ.start_time,
+                                                 duration: occ.duration || 45,
+                                                 teacher_id: userId,
+                                                 student_id: occ.student_id === 'vacant' ? null : occ.student_id,
+                                                 status: 'scheduled',
+                                                 teacher_acknowledged: true,
+                                                 student_acknowledged: true
+                                               });
+                                             } else {
                                                await supabase.from('schedule_occurrences').update({
                                                  teacher_acknowledged: true,
                                                  student_acknowledged: true,
@@ -5766,7 +5780,7 @@ export function ScheduleCalendarView({
                                                }
                                              }));
                                              await loadOccurrences();
-                                             await showAlert('Rückmeldung als gelesen & bestätigt markiert.');
+                                             await showAlert('Rückmeldung für diesen Termin als gelesen & bestätigt markiert (jetzt grün).');
                                            } catch (err) {
                                              console.error('Error confirming occurrence:', err);
                                            }
