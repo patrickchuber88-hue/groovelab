@@ -8,7 +8,7 @@ import {
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon,
   LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
-  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database
+  School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity
 } from 'lucide-react';
 import { TeacherDashboard } from './TeacherDashboard';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
@@ -1320,6 +1320,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState<boolean>(false);
   const [showOwnQrModal, setShowOwnQrModal] = useState<boolean>(false);
+  const [qrModalUser, setQrModalUser] = useState<any | null>(null);
+  const [copiedQrLink, setCopiedQrLink] = useState<boolean>(false);
+
 
   // Visual Live Lab states & refs
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
@@ -2339,6 +2342,66 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [approvalToast, setApprovalToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showUnassignedWarning, setShowUnassignedWarning] = useState<boolean>(false);
   const approvalDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isApprovingAllSchedules, setIsApprovingAllSchedules] = useState<boolean>(false);
+  const [showOnlyPendingReviews, setShowOnlyPendingReviews] = useState<boolean>(false);
+
+  const handleApproveAllPendingSchedules = async () => {
+    if (pendingSchedules.length === 0) return;
+    setIsApprovingAllSchedules(true);
+    try {
+      const pendingIds = pendingSchedules.map(s => s.id);
+      
+      // Targeted notifications to affected students
+      const dayNamesMap: Record<number, string> = { 1: 'Montag', 2: 'Dienstag', 3: 'Mittwoch', 4: 'Donnerstag', 5: 'Freitag', 6: 'Samstag', 7: 'Sonntag' };
+      pendingSchedules.forEach(item => {
+        if (item.student_id && item.student_id !== 'vacant') {
+          const studentName = item.student_name || 'Schüler';
+          const timeSlot = item.time_slot ? item.time_slot.substring(0, 5) : '';
+          const dayName = dayNamesMap[item.day_of_week] || 'Unterrichtstag';
+          
+          const studentTitle = '✅ Neuer Unterrichtstermin zugeteilt';
+          const studentMsg = `Hallo ${studentName.split(' ')[0]}, dein neuer Unterrichtstermin wurde offiziell freigegeben: ${dayName} um ${timeSlot} Uhr.`;
+          
+          supabase.from('notifications')
+            .insert({ user_id: item.student_id, title: studentTitle, message: studentMsg, metadata: { type: 'schedule_approved', day_of_week: item.day_of_week } })
+            .select('id').single()
+            .then(async ({ data: notif }: any) => {
+              if (notif?.id) {
+                try {
+                  await supabase.functions.invoke('send-push', { body: { userId: item.student_id, title: studentTitle, body: studentMsg, url: '/', notificationId: notif.id } });
+                } catch {
+                  // Silence push errors
+                }
+              }
+            });
+        }
+      });
+
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: 'approved' })
+        .in('id', pendingIds);
+
+      if (error) throw error;
+
+      setPendingSchedules([]);
+      setShowOnlyPendingReviews(false);
+      setApprovalToast({
+        message: `Erfolgreich: Alle ${pendingIds.length} Stundenpläne wurden freigegeben und betroffene Nutzer benachrichtigt!`,
+        type: 'success'
+      });
+      setTimeout(() => setApprovalToast(null), 4000);
+    } catch (err) {
+      console.error('Error approving all pending schedules:', err);
+      setApprovalToast({
+        message: 'Fehler beim Freigeben der Stundenpläne.',
+        type: 'error'
+      });
+      setTimeout(() => setApprovalToast(null), 4000);
+    } finally {
+      setIsApprovingAllSchedules(false);
+    }
+  };
 
 
   // Dynamic centering auto-scroll when dragging schedule blocks (high performance requestAnimationFrame)
@@ -10827,6 +10890,82 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     setDraggedPlanDay(null);
   };
 
+  // ── Download Teacher Schedule Report ──────────────────────────────────
+  const handleDownloadTeacherSchedule = (tId: string, teacherName: string, instrument: string) => {
+    const cleanTId = tId ? tId.replace(/^teacher-/i, '') : '';
+    const teacherAllocations = matrixAllocations.filter(p => {
+      const cleanPId = p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '';
+      return p.teacherId === tId || (cleanPId && cleanPId === cleanTId);
+    });
+
+    const daysMap: Record<number, string> = {
+      1: 'Montag',
+      2: 'Dienstag',
+      3: 'Mittwoch',
+      4: 'Donnerstag',
+      5: 'Freitag',
+      6: 'Samstag',
+      7: 'Sonntag'
+    };
+
+    let content = `=======================================================\n`;
+    content += `CAMPUS-GROOVELAB UNTERRICHTSZEITEN & WOCHENPLAN\n`;
+    content += `=======================================================\n`;
+    content += `Lehrkraft:   ${teacherName}\n`;
+    content += `Instrument:  ${instrument || 'Allgemein'}\n`;
+    content += `Erstellt am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}\n`;
+    content += `=======================================================\n\n`;
+
+    let totalSlotsCount = 0;
+
+    for (let d = 1; d <= 7; d++) {
+      const dayName = daysMap[d];
+      const dayAllocations = teacherAllocations
+        .filter(p => p.dayOfWeek === d)
+        .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+      content += `--- ${dayName.toUpperCase()} ---\n`;
+      if (dayAllocations.length === 0) {
+        content += `  Kein Unterricht eingetragen\n\n`;
+      } else {
+        dayAllocations.forEach(plan => {
+          totalSlotsCount++;
+          const roomName = plan.roomId 
+            ? (rooms.find(r => r.id === plan.roomId)?.name || 'Raum ' + plan.roomId) 
+            : '⚠️ Noch kein Raum zugewiesen';
+          content += `  ⏱ ${plan.startTime} - ${plan.endTime} Uhr\n`;
+          content += `     Raum:       ${roomName}\n`;
+          content += `     Instrument: ${plan.instrument || instrument || 'Unterricht'}\n`;
+
+          if (plan.slots && Array.isArray(plan.slots) && plan.slots.length > 0) {
+            content += `     Schüler/Einheiten (${plan.slots.length}):\n`;
+            plan.slots.forEach((s: any, idx: number) => {
+              const studentName = s.student_name || s.name || `Schüler ${idx + 1}`;
+              const timeInfo = s.time_slot ? ` (${s.time_slot}${s.duration ? `, ${s.duration} Min.` : ''})` : '';
+              content += `       • ${studentName}${timeInfo}\n`;
+            });
+          }
+          content += `\n`;
+        });
+      }
+    }
+
+    content += `=======================================================\n`;
+    content += `GESAMTÜBERSICHT: ${totalSlotsCount} Unterrichtsblock/Blöcke in der Woche\n`;
+    content += `=======================================================\n`;
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = teacherName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.download = `Unterrichtszeiten_${safeName}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // ── Räume CRUD ──────────────────────────────────────────────────────────
   const handleExportPlanPDF = async () => {
     const element = document.getElementById('belegungsplan-table-container');
@@ -17613,11 +17752,112 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {campusSubTab === 'schedules' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
 
+                  {/* Pending Schedules Review Banner (Apple SF Style with High-Tech Cyan Röntgen Aesthetic) */}
+                  {pendingSchedules.length > 0 && (
+                    <div style={{
+                      background: '#f0f9ff',
+                      border: '1px solid rgba(2, 132, 199, 0.25)',
+                      borderLeft: '4px solid #0284c7',
+                      borderRadius: '16px',
+                      padding: '16px 22px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 4px 16px rgba(2, 132, 199, 0.08)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Activity size={22} style={{ color: '#0284c7' }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>{pendingSchedules.length} ausstehende Stundenplan-Freigaben zur Review</span>
+                            <span style={{ fontSize: '0.66rem', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                              Prüfung erforderlich
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#0284c7', marginTop: '2px', fontWeight: 550 }}>
+                            Lehrkräfte haben neue oder geänderte Stundenpläne eingereicht.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextState = !showOnlyPendingReviews;
+                            setShowOnlyPendingReviews(nextState);
+                            setApprovalToast({
+                              message: nextState 
+                                ? `Röntgen-Modus aktiv: Ausstehende Stundenpläne werden im High-Tech Cyan Fokus hervorgehoben` 
+                                : 'Röntgen-Modus beendet',
+                              type: 'success'
+                            });
+                            setTimeout(() => setApprovalToast(null), 3500);
+                          }}
+                          style={{
+                            background: showOnlyPendingReviews ? '#0284c7' : 'rgba(2, 132, 199, 0.1)',
+                            color: showOnlyPendingReviews ? '#ffffff' : '#0284c7',
+                            border: '1px solid rgba(2, 132, 199, 0.3)',
+                            padding: '8px 16px',
+                            borderRadius: '10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.18s ease',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: showOnlyPendingReviews ? '0 4px 14px rgba(2, 132, 199, 0.3)' : 'none'
+                          }}
+                        >
+                          <Eye size={14} />
+                          <span>{showOnlyPendingReviews ? 'Röntgen-Modus beenden' : `Röntgen-Modus (${pendingSchedules.length})`}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleApproveAllPendingSchedules}
+                          disabled={isApprovingAllSchedules}
+                          style={{
+                            background: '#34a853',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '8px 18px',
+                            borderRadius: '10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(52, 168, 83, 0.2)',
+                            transition: 'all 0.18s ease',
+                          }}
+                        >
+                          {isApprovingAllSchedules ? (
+                            <>
+                              <Clock size={14} className="animate-spin" />
+                              <span>Wende Freigaben an...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={14} />
+                              <span>Alle {pendingSchedules.length} jetzt freigeben</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Action Toolbar */}
                   <div style={{ background: 'white', borderRadius: '24px', padding: '20px 24px', border: '1px solid rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🎓 Campus Raum-Koordinationsboard
+                        <GraduationCap size={20} style={{ color: '#34a853' }} />
+                        <span>Campus Raum-Koordinationsboard</span>
                       </h3>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 550 }}>
                         {schedulesRoomsViewMode === 'live' 
@@ -18091,12 +18331,29 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
                                         {unassigned.map(plan => {
                                           const isGL = plan.teacherId === 'groovelab';
-                                          const cardBg = isGL ? '#fffbeb' : '#e6f4ea';
-                                          const cardBorder = isGL ? '1px solid #fde68a' : '1px solid #a7f3d0';
-                                          const cardBorderLeft = isGL ? '4px solid #f59e0b' : '4px solid #34a853';
+                                          const isExplicitPending = plan.status === 'ready_for_admin_review' || plan.status === 'pending';
+                                          const isTeacherPending = !isGL && pendingSchedules.some(s => {
+                                            const cleanSTeacher = s.teacher_id ? s.teacher_id.replace(/^teacher-/i, '') : '';
+                                            const cleanPlanTeacher = plan.teacherId ? plan.teacherId.replace(/^teacher-/i, '') : '';
+                                            return s.id === plan.id || (cleanSTeacher && cleanSTeacher === cleanPlanTeacher);
+                                          });
+                                          const isPendingBlock = isExplicitPending || isTeacherPending;
+
+                                          let cardBg = isGL ? '#fffbeb' : '#e6f4ea';
+                                          let cardBorder = isGL ? '1px solid #fde68a' : '1px solid #a7f3d0';
+                                          let cardBorderLeft = isGL ? '4px solid #f59e0b' : '4px solid #34a853';
                                           const titleColor = isGL ? '#92400e' : '#0f172a';
                                           const instColor = isGL ? '#b45309' : '#64748b';
                                           const timeColor = isGL ? '#d97706' : '#34a853';
+
+                                          if (showOnlyPendingReviews && isPendingBlock) {
+                                            cardBorder = '2px solid #0284c7';
+                                            cardBorderLeft = '4px solid #0284c7';
+                                            cardBg = '#f0f9ff';
+                                          }
+
+                                          const blockOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
+                                          const blockShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(2, 132, 199, 0.25)' : (isGL ? '0 4px 8px rgba(245, 158, 11, 0.06)' : '0 4px 8px rgba(52, 168, 83, 0.06)');
 
                                           return (
                                             <div
@@ -18106,6 +18363,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                               onDragEnd={() => {
                                                 setDraggedPlanId(null);
                                                 setDraggedPlanDay(null);
+                                              }}
+                                              onMouseEnter={(e) => {
+                                                if (showOnlyPendingReviews && !isPendingBlock) {
+                                                  e.currentTarget.style.opacity = '1';
+                                                }
+                                              }}
+                                              onMouseLeave={(e) => {
+                                                if (showOnlyPendingReviews && !isPendingBlock) {
+                                                  e.currentTarget.style.opacity = '0.25';
+                                                }
                                               }}
                                               onClick={(e) => {
                                                 setSelectedDayPlan(plan);
@@ -18123,7 +18390,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 display: 'flex',
                                                 flexDirection: 'column',
                                                 gap: '2px',
-                                                boxShadow: isGL ? '0 4px 8px rgba(245, 158, 11, 0.06)' : '0 4px 8px rgba(52, 168, 83, 0.06)',
+                                                boxShadow: blockShadow,
+                                                opacity: blockOpacity,
+                                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                                                 userSelect: 'none',
                                                 WebkitUserSelect: 'none'
                                               }}
@@ -18131,23 +18400,29 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                               <span style={{ fontSize: '0.73rem', fontWeight: 800, color: titleColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(plan)}</span>
                                               <span style={{ fontSize: '0.6rem', fontWeight: 700, color: instColor }}>{plan.instrument}</span>
                                               <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: timeColor }}>⏱ {plan.startTime}–{plan.endTime}</span>
-                                            {(() => {
-                                              // Only validate for GrooveLab slots
-                                              const isGroovelabPlan = plan.teacherId === 'groovelab';
-                                              if (!isGroovelabPlan) return null;
+                                              {(() => {
+                                                // Only validate for GrooveLab slots
+                                                const isGroovelabPlan = plan.teacherId === 'groovelab';
+                                                if (!isGroovelabPlan) return null;
 
-                                              const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                                              const dayHours = openingHours?.[dayKeys[dayNum]];
-                                              if (!dayHours) return null;
-                                              
-                                              if (dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
-                                                return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
-                                              }
-                                              return null;
-                                            })()}
-                                          </div>
-                                        );
-                                      })}
+                                                const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                                                const dayHours = openingHours?.[dayKeys[dayNum]];
+                                                if (!dayHours) return null;
+                                                
+                                                if (dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
+                                                  return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+                                                }
+                                                return null;
+                                              })()}
+                                              {isPendingBlock && (
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                  <Activity size={10} style={{ color: '#0284c7' }} />
+                                                  <span>Review</span>
+                                                </span>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     )}
                                   </td>
@@ -18155,8 +18430,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               })}
                             </tr>
 
-                            {/* ── Room rows ── */}
-                            {rooms.filter(room => room.is_campus_active !== false).map((room, rIdx) => {
+                            {/* ── Room rows (All rooms visible in X-Ray mode) ── */}
+                            {rooms
+                              .filter(room => room.is_campus_active !== false)
+                              .map((room, rIdx) => {
                               // Smart instrument compatibility check for visual highlighting
                               const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
                               
@@ -18194,8 +18471,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                     const isCellHovered = dragOverCell.roomId === room.id && dragOverCell.day === dayNum;
                                     const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
-                                    const isGLPlan = isGroovelabPlan(draggedPlan);
-                                    const isGLRoom = isGroovelabRoom(room);
 
                                     let hasDragOverlap = false;
                                     if (draggedPlan && cellPlans.length > 0) {
@@ -18219,7 +18494,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           cellBg = 'rgba(245, 158, 11, 0.07)';
                                         }
                                       } else {
-                                        // Highlight column target zones as a clean soft aligned grid
                                         borderStyle = '1px solid rgba(52, 168, 83, 0.2)';
                                         cellBg = 'rgba(52, 168, 83, 0.015)';
                                       }
@@ -18257,18 +18531,34 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         }}>
                                           {cellPlans.map(plan => {
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
-                                            
-                                            // Dynamic instrument-based pastel coloring replaced with uniform green (except GrooveLab)
                                             const isGroovelabPlan = plan.teacherId === 'groovelab';
-                                            const themeBg = isGroovelabPlan ? '#fefce8' : 'rgba(230, 244, 234, 0.45)';
+
+                                            const isExplicitPending = plan.status === 'ready_for_admin_review' || plan.status === 'pending';
+                                            const isTeacherPending = !isGroovelabPlan && pendingSchedules.some(s => {
+                                              const cleanSTeacher = s.teacher_id ? s.teacher_id.replace(/^teacher-/i, '') : '';
+                                              const cleanPlanTeacher = plan.teacherId ? plan.teacherId.replace(/^teacher-/i, '') : '';
+                                              return s.id === plan.id || (cleanSTeacher && cleanSTeacher === cleanPlanTeacher);
+                                            });
+                                            const isPendingBlock = isExplicitPending || isTeacherPending;
+
+                                            let themeBg = isGroovelabPlan ? '#fefce8' : 'rgba(230, 244, 234, 0.45)';
                                             let themeBorder = isGroovelabPlan ? '1px solid #fef08a' : '1px solid #e2e8f0';
-                                            const themeBorderLeft = isGroovelabPlan ? '4px solid #facc15' : '4px solid #34a853';
+                                            let themeBorderLeft = isGroovelabPlan ? '4px solid #facc15' : '4px solid #34a853';
                                             const themeText = '#0f172a';
                                             const timeText = isGroovelabPlan ? '#eab308' : '#34a853';
 
                                             if (hasOverlap) {
                                               themeBorder = isGroovelabPlan ? '2px dashed #facc15' : '2px dashed #34a853';
                                             }
+
+                                            if (showOnlyPendingReviews && isPendingBlock) {
+                                              themeBorder = '2px solid #0284c7';
+                                              themeBorderLeft = '4px solid #0284c7';
+                                              themeBg = '#f0f9ff';
+                                            }
+
+                                            const planOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
+                                            const planShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(2, 132, 199, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)';
 
                                             return (
                                               <div
@@ -18279,8 +18569,33 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                   setDraggedPlanId(null);
                                                   setDraggedPlanDay(null);
                                                 }}
+                                                onMouseEnter={(e) => {
+                                                  if (showOnlyPendingReviews && !isPendingBlock) {
+                                                    e.currentTarget.style.opacity = '1';
+                                                  }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  if (showOnlyPendingReviews && !isPendingBlock) {
+                                                    e.currentTarget.style.opacity = '0.25';
+                                                  }
+                                                }}
                                                 onClick={() => setSelectedDayPlan(plan)}
-                                                style={{ background: themeBg, border: themeBorder, borderLeft: themeBorderLeft, borderRadius: '10px', padding: '7px 9px', cursor: 'grab', display: 'flex', flexDirection: 'column', gap: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', transition: 'all 0.15s', userSelect: 'none', WebkitUserSelect: 'none' }}
+                                                style={{
+                                                  background: themeBg,
+                                                  border: themeBorder,
+                                                  borderLeft: themeBorderLeft,
+                                                  borderRadius: '10px',
+                                                  padding: '7px 9px',
+                                                  cursor: 'grab',
+                                                  display: 'flex',
+                                                  flexDirection: 'column',
+                                                  gap: '2px',
+                                                  boxShadow: planShadow,
+                                                  opacity: planOpacity,
+                                                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                                  userSelect: 'none',
+                                                  WebkitUserSelect: 'none'
+                                                }}
                                               >
                                                 <div style={{ pointerEvents: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
                                                   <span style={{ fontSize: '0.73rem', fontWeight: 800, color: themeText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -18293,8 +18608,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                   ⏱ {plan.startTime}–{plan.endTime}
                                                 </span>
                                                 {(() => {
-                                                  // Only validate for GrooveLab slots
-                                                  const isGroovelabPlan = plan.teacherId === 'groovelab';
                                                   if (!isGroovelabPlan) return null;
 
                                                   const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -18305,6 +18618,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                   }
                                                   return null;
                                                 })()}
+                                                {isPendingBlock && (
+                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                    <Activity size={10} style={{ color: '#0284c7' }} />
+                                                    <span>Review</span>
+                                                  </span>
+                                                )}
                                               </div>
                                             );
                                           })}
@@ -19890,9 +20209,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         Offene Zuteilungen ({matrixAllocations.filter(p => !p.roomId).length} Tage offen)
                       </h4>
 
-                      {/* Compact Search Filter for 50+ Teachers */}
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={13} style={{ position: 'absolute', left: '10px', color: '#8e8e93', pointerEvents: 'none' }} />
+                      {/* Apple-Style Search Filter for Teachers */}
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '12px', color: '#8e8e93', pointerEvents: 'none' }} />
                         <input
                           type="text"
                           placeholder="Lehrkraft filtern..."
@@ -19900,17 +20219,54 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           onChange={(e) => setSidebarTeacherSearch(e.target.value)}
                           style={{
                             width: '100%',
-                            padding: '7px 10px 7px 28px',
-                            fontSize: '0.74rem',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(0, 0, 0, 0.1)',
-                            background: 'rgba(120, 120, 128, 0.04)',
+                            padding: '8px 32px 8px 34px',
+                            fontSize: '0.78rem',
+                            fontWeight: 500,
+                            background: 'rgba(118, 118, 128, 0.08)',
                             color: '#1c1c1e',
+                            border: '1px solid rgba(0, 0, 0, 0.06)',
+                            borderRadius: '10px',
                             outline: 'none',
                             boxSizing: 'border-box',
-                            fontFamily: 'inherit'
+                            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                            transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = '#ffffff';
+                            e.target.style.borderColor = '#34a853';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(52, 168, 83, 0.15), inset 0 1px 2px rgba(0,0,0,0.02)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = 'rgba(118, 118, 128, 0.08)';
+                            e.target.style.borderColor = 'rgba(0, 0, 0, 0.06)';
+                            e.target.style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.03)';
                           }}
                         />
+                        {sidebarTeacherSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setSidebarTeacherSearch('')}
+                            style={{
+                              position: 'absolute',
+                              right: '10px',
+                              background: 'rgba(142, 142, 147, 0.25)',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '16px',
+                              height: '16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#1c1c1e',
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                            title="Suche zurücksetzen"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
                       </div>
 
                       {/* Group and render submissions */}
@@ -19918,7 +20274,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         const unassigned = matrixAllocations.filter(p => !p.roomId);
                         
                         // Group by teacher
-                        const grouped: Record<string, { teacherName: string, instrument: string, blocks: any[], isUnsubmitted: boolean }> = {};
+                        const grouped: Record<string, { teacherName: string, instrument: string, blocks: any[], isUnsubmitted: boolean, hasPending: boolean, pendingCount: number }> = {};
                         
                         // 1. Initialize with all active teachers (Campus, Bypass, and Coaches)
                         const allTeachersList: any[] = [];
@@ -19939,11 +20295,31 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         });
 
                         allTeachersList.forEach(t => {
+                          const cleanTId = t.id ? t.id.replace(/^teacher-/i, '') : '';
+                          const teacherPendingBlocks = matrixAllocations.filter(p => {
+                            const cleanPId = p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '';
+                            const isMatch = p.teacherId === t.id || (cleanPId && cleanPId === cleanTId);
+                            if (!isMatch) return false;
+
+                            const isExpPending = p.status === 'ready_for_admin_review' || p.status === 'pending';
+                            const isTPending = pendingSchedules.some(s => {
+                              const cleanSTeacher = s.teacher_id ? s.teacher_id.replace(/^teacher-/i, '') : '';
+                              return s.id === p.id || (cleanSTeacher && cleanSTeacher === cleanPId);
+                            });
+                            return isExpPending || isTPending;
+                          });
+
+                          const isUnsubmitted = !!unsubmittedTeachers[t.id];
+                          // Only set hasPending to true if teacher has actual submitted pending blocks awaiting approval!
+                          const hasPending = teacherPendingBlocks.length > 0;
+
                           grouped[t.id] = {
                             teacherName: `${t.firstName} ${t.lastName}`,
                             instrument: t.instrument || 'Lehrkraft',
                             blocks: [],
-                            isUnsubmitted: !!unsubmittedTeachers[t.id]
+                            isUnsubmitted,
+                            hasPending,
+                            pendingCount: teacherPendingBlocks.length
                           };
                         });
 
@@ -19954,16 +20330,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               teacherName: p.teacherName,
                               instrument: p.instrument,
                               blocks: [],
-                              isUnsubmitted: !!unsubmittedTeachers[p.teacherId]
+                              isUnsubmitted: !!unsubmittedTeachers[p.teacherId],
+                              hasPending: false,
+                              pendingCount: 0
                             };
                           }
                           grouped[p.teacherId].blocks.push(p);
                         });
 
                         // Filter by search query
-                        const filteredTeachers = Object.entries(grouped).filter(([_, data]) => 
-                          data.teacherName.toLowerCase().includes(sidebarTeacherSearch.toLowerCase().trim())
-                        );
+                        let filteredTeachers = Object.entries(grouped).filter(([tId, data]) => {
+                          const matchesSearch = data.teacherName.toLowerCase().includes(sidebarTeacherSearch.toLowerCase().trim());
+                          return matchesSearch;
+                        });
+
+                        // In Röntgen-Modus: Sort teachers with pending reviews to the VERY TOP!
+                        if (showOnlyPendingReviews) {
+                          filteredTeachers.sort(([, a], [, b]) => {
+                            if (a.hasPending && !b.hasPending) return -1;
+                            if (!a.hasPending && b.hasPending) return 1;
+                            return b.pendingCount - a.pendingCount;
+                          });
+                        }
 
                         if (filteredTeachers.length === 0) {
                           return (
@@ -20026,25 +20414,47 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             {filteredTeachers.map(([tId, data]) => {
                               const isSelected = selectedFilterTeacherId === tId;
                               const isExpanded = expandedSidebarTeacherId === tId;
+                              const isRontgenPending = showOnlyPendingReviews && data.hasPending;
+                              const isRontgenDimmed = showOnlyPendingReviews && !data.hasPending;
+
+                              let cardBorder = isSelected 
+                                ? '1px solid rgba(52, 168, 83, 0.3)' 
+                                : data.isUnsubmitted 
+                                  ? '1px solid rgba(245, 158, 11, 0.3)' 
+                                  : '1px solid rgba(0, 0, 0, 0.06)';
+
+                              let cardBorderLeft = isSelected 
+                                ? '3px solid #34a853' 
+                                : data.isUnsubmitted 
+                                  ? '3px solid #f59e0b' 
+                                  : '1px solid rgba(0, 0, 0, 0.06)';
+
+                              let cardShadow = isSelected ? '0 2px 8px rgba(52, 168, 83, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)';
+
+                              if (isRontgenPending) {
+                                cardBorder = '1.5px solid #0284c7';
+                                cardBorderLeft = '4px solid #0284c7';
+                                cardShadow = '0 4px 16px rgba(2, 132, 199, 0.25)';
+                              }
+
                               return (
                                 <div 
                                   key={tId} 
                                   style={{ 
-                                    background: '#ffffff', 
-                                    border: isSelected 
-                                      ? '1px solid rgba(52, 168, 83, 0.3)' 
-                                      : data.isUnsubmitted 
-                                        ? '1px solid rgba(245, 158, 11, 0.3)' 
-                                        : '1px solid rgba(0, 0, 0, 0.06)', 
+                                    background: isRontgenPending ? '#f0f9ff' : '#ffffff', 
+                                    border: cardBorder, 
                                     borderRadius: '10px', 
                                     overflow: 'hidden',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: isSelected ? '0 2px 8px rgba(52, 168, 83, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)',
-                                    borderLeft: isSelected 
-                                      ? '3px solid #34a853' 
-                                      : data.isUnsubmitted 
-                                        ? '3px solid #f59e0b' 
-                                        : '1px solid rgba(0, 0, 0, 0.06)'
+                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                    boxShadow: cardShadow,
+                                    borderLeft: cardBorderLeft,
+                                    opacity: isRontgenDimmed ? 0.35 : 1
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (isRontgenDimmed) e.currentTarget.style.opacity = '1';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (isRontgenDimmed) e.currentTarget.style.opacity = '0.35';
                                   }}
                                 >
                                   {/* Accordion Header */}
@@ -20059,11 +20469,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       display: 'flex', 
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
-                                      background: isSelected 
-                                        ? 'rgba(52, 168, 83, 0.04)' 
-                                        : data.isUnsubmitted 
-                                          ? 'rgba(245, 158, 11, 0.02)' 
-                                          : '#ffffff',
+                                      background: isRontgenPending
+                                        ? 'rgba(2, 132, 199, 0.06)'
+                                        : isSelected 
+                                          ? 'rgba(52, 168, 83, 0.04)' 
+                                          : data.isUnsubmitted 
+                                            ? 'rgba(245, 158, 11, 0.02)' 
+                                            : '#ffffff',
                                       borderBottom: isExpanded ? '1px solid rgba(0, 0, 0, 0.04)' : 'none'
                                     }}
                                   >
@@ -20072,48 +20484,104 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', 
                                         transition: 'transform 0.15s ease-out', 
                                         marginRight: '6px', 
-                                        color: isSelected 
-                                          ? '#34a853' 
-                                          : data.isUnsubmitted 
-                                            ? '#d97706' 
-                                            : '#8e8e93' 
+                                        color: isRontgenPending
+                                          ? '#0284c7'
+                                          : isSelected 
+                                            ? '#34a853' 
+                                            : data.isUnsubmitted 
+                                              ? '#d97706' 
+                                              : '#8e8e93' 
                                       }} />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                                         <span style={{ 
                                           fontSize: '0.74rem', 
-                                          fontWeight: 600, 
-                                          color: isSelected 
-                                            ? '#34a853' 
-                                            : data.isUnsubmitted 
-                                              ? '#d97706' 
-                                              : '#1c1c1e' 
+                                          fontWeight: 700, 
+                                          color: isRontgenPending
+                                            ? '#0369a1'
+                                            : isSelected 
+                                              ? '#34a853' 
+                                              : data.isUnsubmitted 
+                                                ? '#d97706' 
+                                                : '#1c1c1e' 
                                         }}>{data.teacherName}</span>
                                         <span style={{ fontSize: '0.62rem', color: '#8e8e93', fontWeight: 500 }}>{data.instrument}</span>
                                       </div>
                                     </div>
-                                    {data.isUnsubmitted ? (
-                                      <span style={{ 
-                                        fontSize: '0.66rem', 
-                                        background: 'rgba(245, 158, 11, 0.12)', 
-                                        color: '#d97706', 
-                                        fontWeight: 700, 
-                                        padding: '2px 6px', 
-                                        borderRadius: '6px' 
-                                      }}>
-                                        Entwurf
-                                      </span>
-                                    ) : (
-                                      <span style={{ 
-                                        fontSize: '0.66rem', 
-                                        background: isSelected ? 'rgba(52, 168, 83, 0.12)' : 'rgba(120, 120, 128, 0.08)', 
-                                        color: isSelected ? '#34a853' : '#8e8e93', 
-                                        fontWeight: 700, 
-                                        padding: '1px 5px', 
-                                        borderRadius: '6px' 
-                                      }}>
-                                        {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
-                                      </span>
-                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      {isRontgenPending && (
+                                        <span style={{
+                                          fontSize: '0.62rem',
+                                          background: '#e0f2fe',
+                                          color: '#0369a1',
+                                          border: '1px solid #bae6fd',
+                                          fontWeight: 800,
+                                          padding: '2px 6px',
+                                          borderRadius: '6px',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px'
+                                        }}>
+                                          <Activity size={10} style={{ color: '#0284c7' }} />
+                                          <span>Review</span>
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDownloadTeacherSchedule(tId, data.teacherName, data.instrument);
+                                        }}
+                                        style={{
+                                          background: 'rgba(52, 168, 83, 0.08)',
+                                          border: '1px solid rgba(52, 168, 83, 0.2)',
+                                          color: '#34a853',
+                                          borderRadius: '6px',
+                                          padding: '3px 7px',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '0.64rem',
+                                          fontWeight: 700,
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        title={`Unterrichtszeiten für ${data.teacherName} (alle Wochentage) herunterladen`}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.background = '#34a853';
+                                          e.currentTarget.style.color = '#ffffff';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.background = 'rgba(52, 168, 83, 0.08)';
+                                          e.currentTarget.style.color = '#34a853';
+                                        }}
+                                      >
+                                        <Download size={12} />
+                                        <span>Download</span>
+                                      </button>
+                                      {data.isUnsubmitted ? (
+                                        <span style={{ 
+                                          fontSize: '0.66rem', 
+                                          background: 'rgba(245, 158, 11, 0.12)', 
+                                          color: '#d97706', 
+                                          fontWeight: 700, 
+                                          padding: '2px 6px', 
+                                          borderRadius: '6px' 
+                                        }}>
+                                          Entwurf
+                                        </span>
+                                      ) : (
+                                        <span style={{ 
+                                          fontSize: '0.66rem', 
+                                          background: isSelected ? 'rgba(52, 168, 83, 0.12)' : 'rgba(120, 120, 128, 0.08)', 
+                                          color: isSelected ? '#34a853' : '#8e8e93', 
+                                          fontWeight: 700, 
+                                          padding: '1px 5px', 
+                                          borderRadius: '6px' 
+                                        }}>
+                                          {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
 
                                   {/* Collapsible content (Accordion Details) */}
@@ -29465,61 +29933,162 @@ status: status,
 
                   {/* QR Code Container */}
                   {(() => {
-                    const token = manageTeacher.teacherQrToken || '';
+                    const token = manageTeacher.teacherQrToken || manageTeacher.teacher_qr_token || manageTeacher.qr_token || manageTeacher.qrToken || manageTeacher.ausweisNummer || manageTeacher.ausweis_nummer || manageTeacher.id || '';
                     const isUserActive = manageTeacher.isActive || manageTeacher.is_active;
-                    const link = token ? (token.startsWith('http') ? token : `${window.location.origin}/qr/${token}`) : '';
-                    const label = isUserActive ? 'Login-QR-Code' : 'Aktivierungs-QR-Code';
-                    return link ? (
+                    const link = token.startsWith('http') ? token : `${window.location.origin}/qr/${token}`;
+                    const label = isUserActive ? 'Login & Ausweis QR-Code' : 'Aktivierungs-QR-Code';
+
+                    return (
                       <div style={{
-                        padding: '16px',
-                        borderRadius: '16px',
+                        padding: '18px',
+                        borderRadius: '20px',
                         background: '#f8fafc',
                         border: '1px solid #e2e8f0',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '12px',
+                        gap: '14px',
                         boxSizing: 'border-box',
-                        width: '100%'
+                        width: '100%',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
                       }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{label}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {label}
+                          </span>
+                          <span style={{ 
+                            fontSize: '0.65rem', 
+                            fontWeight: 800, 
+                            padding: '3px 9px', 
+                            borderRadius: '12px', 
+                            background: isUserActive ? '#e6f4ea' : '#fef3c7', 
+                            color: isUserActive ? '#34a853' : '#b45309' 
+                          }}>
+                            {isUserActive ? 'Aktiv' : 'Vorläufig'}
+                          </span>
+                        </div>
+
                         <div style={{ 
                           background: '#ffffff', 
-                          padding: '12px', 
-                          borderRadius: '12px', 
+                          padding: '14px', 
+                          borderRadius: '16px', 
                           display: 'inline-flex',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                          boxShadow: '0 6px 16px rgba(0,0,0,0.05)',
                           border: '1px solid #e2e8f0'
                         }}>
-                          <QRCode id="qr-code-svg" value={link} size={110} />
+                          <QRCode id="qr-code-svg" value={link} size={120} />
                         </div>
-                        <button
-                          type="button"
-                          onClick={downloadQRCode}
-                          style={{ 
-                            width: '100%', 
-                            padding: '8px 12px', 
-                            fontSize: '0.72rem', 
-                            fontWeight: 700, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center', 
-                            gap: '6px', 
-                            background: '#ffffff', 
-                            border: '1px solid #cbd5e1', 
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            color: '#475569',
-                            transition: 'all 0.15s ease',
-                            boxSizing: 'border-box'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
-                        >
-                          📥 Speichern (SVG)
-                        </button>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQrModalUser({
+                                ...manageTeacher,
+                                first_name: manageTeacher.firstName || manageTeacher.first_name,
+                                last_name: manageTeacher.lastName || manageTeacher.last_name,
+                                role: manageTeacher.role || 'teacher',
+                                qr_token: token,
+                                teacher_qr_token: token,
+                                ausweis_nummer: manageTeacher.ausweisNummer || manageTeacher.ausweis_nummer,
+                                is_campus_active: manageTeacher.isCampusActive,
+                                is_groovelab_active: manageTeacher.isGroovelabActive
+                              });
+                            }}
+                            style={{ 
+                              width: '100%', 
+                              padding: '10px 14px', 
+                              fontSize: '0.78rem', 
+                              fontWeight: 800, 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              gap: '8px', 
+                              background: '#34a853', 
+                              border: 'none', 
+                              borderRadius: '12px',
+                              cursor: 'pointer',
+                              color: '#ffffff',
+                              transition: 'all 0.2s ease',
+                              boxSizing: 'border-box',
+                              boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#2d9247';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#34a853';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            📇 Ausweis drucken / PDF Export
+                          </button>
+
+                          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                            <button
+                              type="button"
+                              onClick={downloadQRCode}
+                              style={{ 
+                                flex: 1, 
+                                padding: '8px 10px', 
+                                fontSize: '0.72rem', 
+                                fontWeight: 700, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                gap: '4px', 
+                                background: '#ffffff', 
+                                border: '1px solid #cbd5e1', 
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                color: '#475569',
+                                transition: 'all 0.15s ease',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                            >
+                              📥 SVG QR
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(link);
+                                setCopiedQrLink(true);
+                                setTimeout(() => setCopiedQrLink(false), 2000);
+                              }}
+                              style={{ 
+                                flex: 1, 
+                                padding: '8px 10px', 
+                                fontSize: '0.72rem', 
+                                fontWeight: 700, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                gap: '4px', 
+                                background: copiedQrLink ? '#e6f4ea' : '#ffffff', 
+                                border: `1px solid ${copiedQrLink ? '#34a853' : '#cbd5e1'}`, 
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                color: copiedQrLink ? '#34a853' : '#475569',
+                                transition: 'all 0.15s ease',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!copiedQrLink) e.currentTarget.style.background = '#f8fafc';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!copiedQrLink) e.currentTarget.style.background = '#ffffff';
+                              }}
+                            >
+                              {copiedQrLink ? '✓ Kopiert' : '🔗 Link'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    ) : null;
+                    );
                   })()}
                 </div>
               </div>
@@ -30332,9 +30901,16 @@ status: status,
           Entwickler-Reset (Bestellvorgang zurücksetzen)
         </button>
       )}
-      {/* Modal: QR Code anzeigen */}
-      {showOwnQrModal && currentUserProfile && (
-        <QRCodeModal user={currentUserProfile} activePlatform="secretary" onClose={() => setShowOwnQrModal(false)} />
+      {/* Modal: QR Code / Ausweis anzeigen */}
+      {(showOwnQrModal || qrModalUser) && (
+        <QRCodeModal 
+          user={qrModalUser || currentUserProfile} 
+          activePlatform={qrModalUser ? "campus" : "secretary"} 
+          onClose={() => {
+            setShowOwnQrModal(false);
+            setQrModalUser(null);
+          }} 
+        />
       )}
       {showPilotAgreementModalFromDashboard && userId && (
         <PilotOnboardingModal

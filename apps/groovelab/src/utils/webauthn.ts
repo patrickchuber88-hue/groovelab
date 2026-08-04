@@ -140,3 +140,140 @@ export const authenticateBiometrics = async (
     },
   };
 };
+
+// ─── Biometric Device Vault & Multi-Profile Management ─────────────────────────
+
+export interface BiometricVaultProfile {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  instrument?: string | null;
+  photoUrl?: string | null;
+  credentialId: string;
+  sessionToken: string;
+  createdAt: string;
+}
+
+const VAULT_STORAGE_KEY = 'gl_biometric_device_vault';
+
+/**
+ * Retrieves all registered biometric profiles on this device with schema sanitization.
+ */
+export const getStoredBiometricProfiles = (): BiometricVaultProfile[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(VAULT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // Sanitize schema to prevent crashes from corrupted profiles
+    return parsed.filter(
+      (p: any) =>
+        p &&
+        typeof p === 'object' &&
+        typeof p.userId === 'string' &&
+        typeof p.credentialId === 'string' &&
+        typeof p.firstName === 'string'
+    );
+  } catch (err) {
+    console.error('Failed to parse biometric vault:', err);
+    return [];
+  }
+};
+
+/**
+ * Saves or updates a biometric profile in the local vault.
+ */
+export const saveBiometricProfile = (profile: BiometricVaultProfile): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredBiometricProfiles();
+    const existingIndex = current.findIndex((p) => p.userId === profile.userId);
+    if (existingIndex >= 0) {
+      current[existingIndex] = profile;
+    } else {
+      current.push(profile);
+    }
+    localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(current));
+  } catch (err) {
+    console.error('Failed to save biometric profile to localStorage:', err);
+  }
+};
+
+/**
+ * Removes a biometric profile from the local vault.
+ */
+export const removeBiometricProfile = (userId: string): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getStoredBiometricProfiles();
+    const updated = current.filter((p) => p.userId !== userId);
+    localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Failed to remove biometric profile:', err);
+  }
+};
+
+/**
+ * Registers WebAuthn biometrics for a user on this device and stores it in the local vault.
+ */
+export const registerUserBiometrics = async (
+  email: string,
+  userId: string,
+  firstName: string,
+  lastName: string,
+  role: string,
+  sessionToken: string,
+  instrument?: string | null,
+  photoUrl?: string | null
+): Promise<BiometricVaultProfile> => {
+  // Generate pseudo random challenge
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  const challenge = arrayBufferToBase64url(randomBytes.buffer);
+  const credential = await registerBiometrics(email || `${userId}@campus-groovelab.de`, userId, challenge);
+
+  const profile: BiometricVaultProfile = {
+    userId,
+    email: email || '',
+    firstName,
+    lastName,
+    role,
+    instrument: instrument || null,
+    photoUrl: photoUrl || null,
+    credentialId: credential.id,
+    sessionToken,
+    createdAt: new Date().toISOString(),
+  };
+
+  saveBiometricProfile(profile);
+  return profile;
+};
+
+/**
+ * Authenticates a biometric user on this device and returns their vault profile.
+ */
+export const authenticateUserBiometrics = async (
+  targetUserId?: string
+): Promise<BiometricVaultProfile> => {
+  const profiles = getStoredBiometricProfiles();
+  if (profiles.length === 0) {
+    throw new Error('Kein biometrisches Profil auf diesem Gerät registriert.');
+  }
+
+  let selectedProfile = targetUserId
+    ? profiles.find((p) => p.userId === targetUserId)
+    : profiles[profiles.length - 1]; // Default to most recently added profile
+
+  if (!selectedProfile) {
+    throw new Error('Gewünschtes Nutzerprofil für Biometrie nicht gefunden.');
+  }
+
+  const randomBytes = crypto.getRandomValues(new Uint8Array(32));
+  const challenge = arrayBufferToBase64url(randomBytes.buffer);
+  await authenticateBiometrics(challenge, [selectedProfile.credentialId]);
+
+  return selectedProfile;
+};
+

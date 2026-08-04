@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3 } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText } from '../utils/nameHelper';
+import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
 
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
@@ -161,6 +162,46 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [showParentAgb, setShowParentAgb] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showActivationInfoModal, setShowActivationInfoModal] = useState(false);
+
+  // Biometrics Onboarding Modal State
+  const [showBiometricsModal, setShowBiometricsModal] = useState(false);
+  const [biometricsLoading, setBiometricsLoading] = useState(false);
+
+  useEffect(() => {
+    if (profile && profile.id && isWebAuthnSupported()) {
+      const existing = getStoredBiometricProfiles();
+      const alreadyRegistered = existing.some((p) => p.userId === profile.id);
+      const dismissed = localStorage.getItem(`gl_bio_dismissed_${profile.id}`) === 'true';
+      if (!alreadyRegistered && !dismissed) {
+        setShowBiometricsModal(true);
+      }
+    }
+  }, [profile]);
+
+  const handleEnableBiometrics = async () => {
+    if (!profile) return;
+    setBiometricsLoading(true);
+    try {
+      const userEmail = `${profile.first_name}.${profile.last_name}@campus-groovelab.de`;
+      await registerUserBiometrics(
+        userEmail,
+        profile.id,
+        profile.first_name,
+        profile.last_name,
+        profile.role,
+        token,
+        profile.instrument,
+        profile.photo_url
+      );
+      showToastMsg('Fingerabdruck erfolgreich für dieses Gerät verknüpft!', 'success');
+      setShowBiometricsModal(false);
+    } catch (err: any) {
+      console.error('Biometrics registration error:', err);
+      showToastMsg('Biometrie-Einrichtung abgebrochen: ' + (err.message || ''), 'error');
+    } finally {
+      setBiometricsLoading(false);
+    }
+  };
 
   const handleVollzugriffClick = () => {
     if (profile?.is_campus_active) {
@@ -472,6 +513,110 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
           </div>
         )}
+      </div>,
+      document.body
+    );
+  };
+
+  const renderBiometricsModal = () => {
+    if (!showBiometricsModal || !profile) return null;
+
+    return createPortal(
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          padding: '28px 24px',
+          maxWidth: '400px',
+          width: '100%',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '20px',
+            background: '#e6f4ea',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 16px rgba(52, 168, 83, 0.15)'
+          }}>
+            <Fingerprint size={36} color="#34a853" />
+          </div>
+
+          <div>
+            <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
+              Schnell-Login per Fingerabdruck
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569', lineHeight: '1.4' }}>
+              Möchtest du <strong>{profile.first_name}</strong> auf diesem Gerät verknüpfen, um dich in Zukunft direkt per Fingerabdruck oder FaceID einzuloggen?
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '8px' }}>
+            <button
+              type="button"
+              onClick={handleEnableBiometrics}
+              disabled={biometricsLoading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '16px',
+                background: '#34a853',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.3)'
+              }}
+            >
+              <Fingerprint size={20} />
+              <span>{biometricsLoading ? 'Einrichten...' : 'Fingerabdruck aktivieren'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (profile) localStorage.setItem(`gl_bio_dismissed_${profile.id}`, 'true');
+                setShowBiometricsModal(false);
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '16px',
+                background: '#f1f5f9',
+                color: '#64748b',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer'
+              }}
+            >
+              Später
+            </button>
+          </div>
+        </div>
       </div>,
       document.body
     );
@@ -5287,6 +5432,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             {/* PWA Install Prompt Card */}
             {renderPWAInstallCard()}
+            {renderBiometricsModal()}
 
             {/* Activation callout or Notice */}
             {activationError && (

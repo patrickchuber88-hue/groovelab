@@ -4293,7 +4293,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         <ScheduleCalendarView 
           schoolId={schoolId} 
           userId={selectedTeacherId} 
-          boards={drafts.find(d => d.id === submittedDraftId)?.boards || boards} 
+          boards={drafts.find(d => d.id === submittedDraftId)?.boards || drafts.find(d => d.id === activeDraftId)?.boards || boards} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           teachers={teachers}

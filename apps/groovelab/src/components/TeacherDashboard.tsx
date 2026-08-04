@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send } from 'lucide-react';
 import { TeacherDetailModal } from './TeacherDetailModal';
 import { StudentDetailModal } from './StudentDetailModal';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
@@ -3263,7 +3264,7 @@ export function TeacherDashboard({
           
           const isDateMoved = Boolean(b.original_date && b.original_date !== b.date);
           const isTimeMoved = Boolean(b.original_start_time && b.startTime && b.original_start_time.substring(0, 5) !== b.startTime.substring(0, 5));
-          const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status));
+          const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'changed'].includes(b.status));
           const isExplicitChange = Boolean(b.is_rescheduled || b.isRescheduled || b.is_changed || b.isChanged || b.is_moved || b.isMoved);
 
           const isRealReschedule = isDateMoved || isTimeMoved || isChangedStatus || isExplicitChange;
@@ -7768,40 +7769,15 @@ export function TeacherDashboard({
                               "Schönen Feierabend! Zeit für frische Luft, gutes Essen und eine wohlverdiente Auszeit vom Schulalltag."
                             ];
 
-                            // 10 Seeded Quotes and 10 Musician Jokes
-                            const materials = [
-                              // Quotes (10)
-                              { type: 'quote', text: "Die Musik drückt das aus, was nicht gesagt werden kann und worüber zu schweigen unmöglich ist.", author: "Victor Hugo" },
-                              { type: 'quote', text: "Ohne Musik wäre das Leben ein Irrtum.", author: "Friedrich Nietzsche" },
-                              { type: 'quote', text: "Musik ist die gemeinsame Sprache der Menschheit.", author: "Henry Wadsworth Longfellow" },
-                              { type: 'quote', text: "Wo die Sprache aufhört, fängt die Musik an.", author: "E.T.A. Hoffmann" },
-                              { type: 'quote', text: "Musik wäscht den Staub des Alltags von der Seele.", author: "Berthold Auerbach" },
-                              { type: 'quote', text: "Musik ist die beste Medizin, die es gibt.", author: "Unbekannt" },
-                              { type: 'quote', text: "Im Wesen der Musik liegt es, Freude zu bereiten.", author: "Aristoteles" },
-                              { type: 'quote', text: "Musik sagt mehr als tausend Worte.", author: "Sprichwort" },
-                              { type: 'quote', text: "Wo man singt, da lass dich ruhig nieder, böse Menschen haben keine Lieder.", author: "Johann Gottfried Seume" },
-                              { type: 'quote', text: "Die Musik ist die Sprache der Leidenschaft.", author: "Richard Wagner" },
-                              
-                              // Facts (10)
-                              { type: 'fact', text: "Wusstest du, dass die tiefste jemals gemessene Orgelpfeife einen Ton von 8 Hz erzeugt? Dieser ist für den Menschen unhörbar, kann aber als Vibration wahrgenommen werden.", author: "Orgel-Fakt" },
-                              { type: 'fact', text: "Wolfgang Amadeus Mozart vollendete in seinem kurzen Leben von 35 Jahren über 600 Kompositionen – das entspricht etwa 240 Stunden reiner Musik.", author: "Mozart-Fakt" },
-                              { type: 'fact', text: "In der Barockmusik galt die Quarte (Intervall von vier Tonschritten) in zweistimmigen Sätzen noch als Dissonanz und musste regelgerecht aufgelöst werden.", author: "Musiktheorie-Fakt" },
-                              { type: 'fact', text: "Der Tritonus-Akkord wurde im Mittelalter wegen seiner extremen Dissonanz als 'Diabolus in Musica' (Teufel in der Musik) bezeichnet und streng vermieden.", author: "Musikgeschichte-Fakt" },
-                              { type: 'fact', text: "Das älteste spielbare Musikinstrument der Welt ist eine Knochenflöte aus einer Höhle in Slowenien. Ihr Alter wird auf rund 43.000 Jahre geschätzt.", author: "Archäologie-Fakt" },
-                              { type: 'fact', text: "Ludwig van Beethoven komponierte seine berühmte 9. Sinfonie, einschließlich der weltbekannten 'Ode an die Freude', als er bereits vollständig gehörlos war.", author: "Beethoven-Fakt" },
-                              { type: 'fact', text: "Das 'Wohltemperierte Klavier' von J. S. Bach bewies, dass man dank der wohltemperierten Stimmung in allen 24 Dur- und Molltonarten wohlklingend spielen kann.", author: "Musiktheorie-Fakt" },
-                              { type: 'fact', text: "Das Wort 'Klavier' leitet sich vom lateinischen 'clavis' (Schlüssel) ab und bezeichnete ursprünglich ganz allgemein die Tasten eines Tasteninstruments.", author: "Etymologie-Fakt" },
-                              { type: 'fact', text: "Pjotr Iljitsch Tschaikowski vertonte den Sieg über Napoleon in seiner 'Ouvertüre 1812' unter Einsatz von echten Kanonenschüssen als Rhythmusinstrument.", author: "Musikgeschichte-Fakt" },
-                              { type: 'fact', text: "Der Begriff 'A cappella' bedeutete ursprünglich 'nach Kapellart' und bezeichnete Gesangsstücke, die ohne eigenständige Instrumentenbegleitung aufgeführt wurden.", author: "Musikgeschichte-Fakt" }
-                            ];
+                            // Centralized Music Quotes & Facts tailored for teachers
+                            const teacherMaterials = getQuotesForAudience('teacher');
 
                             const today = getSimulatedNow();
                             const dateSeed = today.getDate() + today.getMonth() * 31 + today.getFullYear();
                             const dailyWishIndex = dateSeed % wishes.length;
-                            const dailyItemIndex = (dateSeed * 7 + 13) % materials.length;
 
                             const dailyWish = wishes[dailyWishIndex];
-                            const dailyItem = materials[dailyItemIndex];
+                            const dailyItem = getDailyQuote(dateSeed, 'teacher');
 
                             if (widgetState === 'WEEKEND') {
                               return (

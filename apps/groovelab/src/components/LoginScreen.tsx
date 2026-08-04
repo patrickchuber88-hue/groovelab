@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
@@ -559,6 +559,49 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [isCameraActive, setIsCameraActive] = useState(true);
   const [cameraHasError, setCameraHasError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+
+  // Biometric Vault States
+  const [biometricProfiles, setBiometricProfiles] = useState<BiometricVaultProfile[]>([]);
+  const [selectedBiometricUser, setSelectedBiometricUser] = useState<BiometricVaultProfile | null>(null);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricError, setBiometricError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isWebAuthnSupported()) {
+      const profiles = getStoredBiometricProfiles();
+      setBiometricProfiles(profiles);
+      if (profiles.length > 0) {
+        setSelectedBiometricUser(profiles[profiles.length - 1]);
+      }
+    }
+  }, []);
+
+  const handleTriggerBiometricLogin = async (userId?: string) => {
+    const targetId = userId || selectedBiometricUser?.userId;
+    setBiometricLoading(true);
+    setBiometricError(null);
+    try {
+      const profile = await authenticateUserBiometrics(targetId);
+      onLogin(profile.userId);
+    } catch (err: any) {
+      console.error('Biometrics login error:', err);
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        setBiometricError('Biometrische Anmeldung fehlgeschlagen.');
+      }
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
+
+  const handleRemoveBiometricUser = (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeBiometricProfile(userId);
+    const updated = getStoredBiometricProfiles();
+    setBiometricProfiles(updated);
+    if (selectedBiometricUser?.userId === userId) {
+      setSelectedBiometricUser(updated.length > 0 ? updated[updated.length - 1] : null);
+    }
+  };
 
   // Onboarding States
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -2727,6 +2770,26 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       });
 
       if (error) throw error;
+
+      // Save to local Biometric Device Vault for instant Quick-Login persistence
+      saveBiometricProfile({
+        userId: verifiedStudentDetails.id,
+        email,
+        firstName: verifiedStudentDetails.first_name,
+        lastName: verifiedStudentDetails.last_name,
+        role: 'student',
+        instrument: (verifiedStudentDetails as any).instrument || null,
+        photoUrl: (verifiedStudentDetails as any).avatar_url || null,
+        credentialId: result.id,
+        sessionToken: verifiedStudentDetails.id,
+        createdAt: new Date().toISOString()
+      });
+      const updatedProfiles = getStoredBiometricProfiles();
+      setBiometricProfiles(updatedProfiles);
+      if (updatedProfiles.length > 0) {
+        setSelectedBiometricUser(updatedProfiles[updatedProfiles.length - 1]);
+      }
+
       setBiometricsStatus('success');
     } catch (err: any) {
       console.error('Biometrics registration failed:', err);
@@ -3971,6 +4034,160 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         WebkitBackdropFilter: 'blur(30px)',
         transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease'
       }}>
+        {/* Biometric Quick-Login Section */}
+        {biometricProfiles.length > 0 && (
+          <div style={{
+            width: '100%',
+            marginBottom: '20px',
+            padding: '16px',
+            borderRadius: '24px',
+            background: isGroovelabKiosk ? '#ffffff' : 'rgba(255, 255, 255, 0.12)',
+            border: isGroovelabKiosk ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid rgba(52, 168, 83, 0.4)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '12px',
+                background: isGroovelabKiosk ? '#fefce8' : '#e6f4ea',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Fingerprint size={22} color={isGroovelabKiosk ? '#eab308' : '#34a853'} />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: isGroovelabKiosk ? '#0f172a' : '#ffffff' }}>
+                  Fingerabdruck-Login
+                </div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isGroovelabKiosk ? '#475569' : '#cbd5e1' }}>
+                  {selectedBiometricUser ? `${selectedBiometricUser.firstName} ${selectedBiometricUser.lastName}` : 'Auf diesem Gerät bereit'}
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Selector Chips with Avatars & Remove Button */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+              {biometricProfiles.map((p) => {
+                const isAdminOrSecretary = p.role === 'admin' || p.role === 'secretary';
+                const avatarSrc = isAdminOrSecretary
+                  ? '/campus_login_hero.png'
+                  : p.photoUrl || getInstrumentAvatarUrl(p.instrument || '');
+                const isSelected = selectedBiometricUser?.userId === p.userId;
+
+                return (
+                  <div
+                    key={p.userId}
+                    onClick={() => setSelectedBiometricUser(p)}
+                    role="button"
+                    tabIndex={0}
+                    aria-selected={isSelected}
+                    aria-label={`Profil ${p.firstName} für Fingerabdruck-Login auswählen`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 8px 4px 4px',
+                      borderRadius: '20px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      border: isSelected 
+                        ? (isGroovelabKiosk ? '2px solid #ca8a04' : '2px solid #34a853') 
+                        : '1px solid rgba(255,255,255,0.2)',
+                      background: isSelected 
+                        ? (isGroovelabKiosk ? '#fef08a' : 'rgba(52, 168, 83, 0.25)') 
+                        : (isGroovelabKiosk ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)'),
+                      color: isGroovelabKiosk ? '#0f172a' : '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <img
+                      src={avatarSrc}
+                      alt={p.firstName}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '1px solid rgba(255, 255, 255, 0.4)'
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = isAdminOrSecretary ? '/campus_login_hero.png' : '/avatar_ghost.jpg';
+                      }}
+                    />
+                    <span>{p.firstName} {p.lastName ? p.lastName.charAt(0) + '.' : ''}</span>
+                    
+                    {/* Delete / Remove Profile Icon */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemoveBiometricUser(p.userId, e)}
+                      title="Profil von diesem Gerät entfernen"
+                      aria-label="Profil entfernen"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: isGroovelabKiosk ? '#94a3b8' : 'rgba(255, 255, 255, 0.6)',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        marginLeft: '2px'
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
+                      onMouseOut={(e) => e.currentTarget.style.color = isGroovelabKiosk ? '#94a3b8' : 'rgba(255, 255, 255, 0.6)'}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleTriggerBiometricLogin()}
+              disabled={biometricLoading}
+              aria-busy={biometricLoading}
+              aria-label="Mit Fingerabdruck anmelden"
+              style={{
+                width: '100%',
+                padding: '12px 18px',
+                borderRadius: '16px',
+                background: isGroovelabKiosk ? '#eab308' : '#34a853',
+                color: isGroovelabKiosk ? '#0f172a' : '#ffffff', // WCAG AA Contrast Compliance
+                border: 'none',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: isGroovelabKiosk ? '0 4px 14px rgba(234, 179, 8, 0.4)' : '0 4px 14px rgba(52, 168, 83, 0.4)',
+                opacity: biometricLoading ? 0.8 : 1,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Fingerprint size={18} />
+              <span>{biometricLoading ? 'Biometrie wird geprüft...' : 'Mit Fingerabdruck anmelden'}</span>
+            </button>
+
+            {biometricError && (
+              <div style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600, marginTop: '2px' }}>
+                {biometricError}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
           <Tablet size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#e6f4ea' }} />
           {isGroovelabKiosk 

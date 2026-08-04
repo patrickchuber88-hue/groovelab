@@ -134,8 +134,8 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
       <img 
         src={displaySrc || '/avatar_ghost.jpg'} 
         onLoad={() => setIsLoaded(true)}
-        loading="eager"
-        decoding="sync"
+        loading="lazy"
+        decoding="async"
         crossOrigin="anonymous"
         style={{ 
           width: '100%', 

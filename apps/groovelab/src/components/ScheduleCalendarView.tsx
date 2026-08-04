@@ -2095,15 +2095,28 @@ export function ScheduleCalendarView({
                 }
               }
 
-              // Check if a saved database record already covers this student on THIS SPECIFIC DATE (or if student has a rescheduled occurrence on/from this date)
+              // Check if a saved database record already covers this student at THIS SPECIFIC SLOT TIME
+              const formattedTimeShort = formattedTime.substring(0, 5);
+              const isRecordMatchingSlotTime = (o: any) => {
+                const oStartTime = (o.start_time || '').substring(0, 5);
+                const oOrigTime = (o.original_start_time || '').substring(0, 5);
+                if (oStartTime === formattedTimeShort) return true;
+                if (oOrigTime === formattedTimeShort) return true;
+                return false;
+              };
+
               let hasDbRecordForThisSlot = false;
               if (student.isGroup && student.groupStudents) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  (o.date === dateStr || o.original_date === dateStr) && student.groupStudents.some((gs: any) => gs.id === o.student_id)
+                  (o.date === dateStr || o.original_date === dateStr) && 
+                  isRecordMatchingSlotTime(o) &&
+                  student.groupStudents.some((gs: any) => gs.id === o.student_id)
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
-                  (o.date === dateStr || o.original_date === dateStr) && matchesTemplateStudent(o, student)
+                  (o.date === dateStr || o.original_date === dateStr) && 
+                  isRecordMatchingSlotTime(o) &&
+                  matchesTemplateStudent(o, student)
                 );
               }
               
@@ -2189,7 +2202,19 @@ export function ScheduleCalendarView({
 
       fetchedData = [...fetchedData, ...projectedData];
 
-      // Strict Deduplication: DB occurrences always take precedence over projected fallback cards
+      // Helper to check if a student has an assigned master slot in boards for a given date
+      const getDesignerSlotTimeForStudent = (occ: any): string | null => {
+        if (!boards || boards.length === 0) return null;
+        const occDateObj = new Date(occ.date + 'T00:00:00');
+        const occDayOfWeek = occDateObj.getDay() || 7;
+        const boardForDay = boards.find((b: any) => b.dayOfWeek === occDayOfWeek);
+        if (!boardForDay || !boardForDay.students) return null;
+
+        const foundStudent = boardForDay.students.find((s: any) => matchesTemplateStudent(occ, s));
+        return foundStudent ? (foundStudent.assignedTime ? foundStudent.assignedTime.substring(0, 5) : null) : null;
+      };
+
+      // Strict Deduplication: DB occurrences take precedence unless they are unconfirmed phantoms at a non-matching time
       const seenKeys = new Set<string>();
       const deduplicatedData: ScheduleOccurrence[] = [];
 
@@ -2198,6 +2223,17 @@ export function ScheduleCalendarView({
         const isRealDb = !occ.id.startsWith('mock-') && !occ.id.startsWith('sched-proj-');
         
         if (isRealDb) {
+          // If this DB occurrence is unconfirmed or pending reschedule, check if student has a regular Designer master slot
+          const isUnconfirmed = occ.status === 'unconfirmed' || occ.status === 'pending_reschedule' || occ.status === 'unconfirmed_group';
+          if (isUnconfirmed) {
+            const designerTime = getDesignerSlotTimeForStudent(occ);
+            const occTime = (occ.start_time || '').substring(0, 5);
+            // If student has a regular Designer slot at a different time, suppress unconfirmed DB phantom card from main grid
+            if (designerTime && designerTime !== occTime) {
+              continue;
+            }
+          }
+
           const dbKey = `db_${occ.id}`;
           if (!seenKeys.has(dbKey)) {
             seenKeys.add(dbKey);
@@ -3961,7 +3997,7 @@ export function ScheduleCalendarView({
     return false;
   }, [scheduleStatus, hasSubmittedSchedule, cachedWeekSchedules, userId, currentUserRole]);
 
-  const isLockedForTeacher = currentUserRole === 'teacher' && !isTeacherScheduleUnlocked;
+  const isLockedForTeacher = false; // Continuous Timetable Validity Rule: Always keep current active timetable accessible
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
@@ -4574,7 +4610,6 @@ export function ScheduleCalendarView({
             );
           })}
         </svg>
-
         <style>
           {`
             @keyframes dash {
@@ -4584,6 +4619,26 @@ export function ScheduleCalendarView({
             }
           `}
         </style>
+
+        {/* Pending Revision Info Banner */}
+        {(((scheduleStatus as string) === 'ready_for_admin_review' || scheduleStatus === 'pending') || (hasSubmittedSchedule && (scheduleStatus as string) !== 'approved')) && (
+          <div style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            border: '1.5px solid #3b82f6',
+            borderRadius: '16px',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 4px 14px rgba(59, 130, 246, 0.08)',
+            marginBottom: '8px',
+          }}>
+            <div style={{ fontSize: '1.25rem' }}>ℹ️</div>
+            <div style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 650, fontFamily: 'Inter' }}>
+              <strong>Neuer Stundenplan in Prüfung:</strong> Du hast einen neuen Stundenplan eingereicht. Dieser wird aktuell vom Sekretariat geprüft. Bis zur vollständigen Zuteilung gilt weiterhin dein bisheriger Stundenplan.
+            </div>
+          </div>
+        )}
 
         <div id="tour-calendar-grid" ref={gridRef} style={{ 
           display: 'grid', 

@@ -1525,5 +1525,12 @@ select option {
   }
 }
 
+/* ── GPU Hardware Acceleration for Smooth 60 FPS Glassmorphism ── */
+.glass-accelerated, .liquid-glass, .glass-card, .glass-modal {
+  transform: translateZ(0);
+  will-change: transform, backdrop-filter;
+}
+
+
 
 

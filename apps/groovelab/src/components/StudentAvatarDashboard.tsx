@@ -9,10 +9,10 @@ import {
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
-import { CampusEventsBoard } from './CampusEventsBoard';
+const CampusEventsBoard = React.lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 import { createPortal } from 'react-dom';
 import { QRCodeModal } from './QRCodeModal';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { cleanHomeworkNotesText } from '../utils/nameHelper';
 

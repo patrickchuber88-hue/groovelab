@@ -20,16 +20,16 @@ const EnsembleDashboard = lazy(() => import('./components/EnsembleDashboard').th
 const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
 const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(module => ({ default: module.ArtistGateway })));
 
-const QRCodeModal = lazy(() => import('./components/QRCodeModal').then(module => ({ default: module.QRCodeModal })));
+import { QRCodeModal } from './components/QRCodeModal';
 const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(module => ({ default: module.QRLandingPage })));
 const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').then(module => ({ default: module.DeviceSetupScreen })));
-const TeacherDetailModal = lazy(() => import('./components/TeacherDetailModal').then(module => ({ default: module.TeacherDetailModal })));
-const StudentDetailModal = lazy(() => import('./components/StudentDetailModal').then(module => ({ default: module.StudentDetailModal })));
-const ContractEndPrompt = lazy(() => import('./components/ContractEndPrompt').then(module => ({ default: module.ContractEndPrompt })));
-const SignupWizard = lazy(() => import('./components/SignupWizard').then(module => ({ default: module.SignupWizard })));
-const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
-const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
-const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages'));
+import { TeacherDetailModal } from './components/TeacherDetailModal';
+import { StudentDetailModal } from './components/StudentDetailModal';
+import { ContractEndPrompt } from './components/ContractEndPrompt';
+import { SignupWizard } from './components/SignupWizard';
+import StudentRadarChart from './components/StudentRadarChart';
+import ConfettiModal from './components/ConfettiModal';
+import CampusDirectMessages from './components/CampusDirectMessages';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
 import { StudentOnboardingPage } from './components/StudentOnboardingPage';
@@ -1219,16 +1219,14 @@ if (kioskTokenParam) {
   localStorage.removeItem('groovelab_user_id');
   localStorage.removeItem('groovelab_location_mode');
   
-  // Strip parameters and redirect to clean up URL ONLY in standalone mode
-  if (isStandalone) {
-    params.delete('kiosk_token');
-    params.delete('station_id');
-    params.delete('kiosk_station_id');
-    params.delete('kiosk_room_id');
-    const newSearch = params.toString();
-    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-    window.location.replace(newUrl);
-  }
+  // Strip sensitive tokens from URL history universally across all browsers
+  params.delete('kiosk_token');
+  params.delete('station_id');
+  params.delete('kiosk_station_id');
+  params.delete('kiosk_room_id');
+  const newSearch = params.toString();
+  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+  window.history.replaceState({}, '', newUrl);
 }
 
 const kioskStationId = params.get('kiosk_station_id') || params.get('station_id');
