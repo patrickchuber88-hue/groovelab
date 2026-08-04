@@ -1343,4 +1343,187 @@ select option {
   -webkit-mask-image: linear-gradient(to right, #000 82%, transparent 98%);
 }
 
+/* ============================================================
+   WORLD-CLASS PWA MOBILE & IPAD RESPONSIVE UTILITIES
+   ============================================================ */
+
+/* Safe Area Inset Support across iOS and Android PWAs */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.ios-safe-top {
+  padding-top: calc(12px + var(--sat)) !important;
+}
+
+.ios-safe-bottom {
+  padding-bottom: calc(12px + var(--sab)) !important;
+}
+
+.ios-safe-dock {
+  padding-bottom: calc(64px + var(--sab)) !important;
+}
+
+/* Touch Target Standardizations (Min 44px / 48px) */
+.touch-target-min {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: manipulation !important;
+}
+
+.touch-btn-primary {
+  min-height: 48px !important;
+  padding: 12px 24px !important;
+  border-radius: var(--radius-pill) !important;
+  font-weight: 700 !important;
+  font-size: 0.95rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.touch-btn-primary:active {
+  transform: scale(0.97) !important;
+}
+
+/* Mobile Bottom Sheet Modal Engine */
+@media (max-width: 767px) {
+  .mobile-bottom-sheet {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 28px !important;
+    border-top-right-radius: 28px !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25) !important;
+    padding-bottom: calc(24px + var(--sab)) !important;
+    animation: slideUpBottomSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+}
+
+@keyframes slideUpBottomSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* Bottom Sheet Pull Handle Indicator */
+.bottom-sheet-handle {
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.18);
+  margin: 8px auto 16px auto;
+}
+
+/* Smartphone & iPad Breakpoint Adaptive Grid Layouts */
+.pwa-adaptive-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+/* Smartphone Portrait (< 640px) */
+@media (max-width: 639px) {
+  .pwa-adaptive-grid > * {
+    grid-column: span 12 !important;
+  }
+  
+  .mobile-stack {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  
+  .mobile-full-width {
+    width: 100% !important;
+  }
+
+  .mobile-hide {
+    display: none !important;
+  }
+
+  .mobile-text-center {
+    text-align: center !important;
+  }
+  
+  /* Compact cards for small screens */
+  .glass-card, .google-card {
+    padding: 14px !important;
+    border-radius: 18px !important;
+  }
+}
+
+/* Smartphone Landscape / Phablet (640px - 767px) */
+@media (min-width: 640px) and (max-width: 767px) {
+  .pwa-adaptive-grid > * {
+    grid-column: span 6 !important;
+  }
+  .pwa-adaptive-grid > .full-width-sm {
+    grid-column: span 12 !important;
+  }
+}
+
+/* iPad / Tablet Portrait (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .pwa-adaptive-grid > * {
+    grid-column: span 6 !important;
+  }
+  .pwa-adaptive-grid > .col-span-12-tablet {
+    grid-column: span 12 !important;
+  }
+  .pwa-adaptive-grid > .col-span-8-tablet {
+    grid-column: span 8 !important;
+  }
+  .pwa-adaptive-grid > .col-span-4-tablet {
+    grid-column: span 4 !important;
+  }
+
+  /* iPad Portrait optimization for dashboards */
+  .ipad-portrait-split {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+  }
+}
+
+/* iPad / Tablet Landscape (1024px - 1366px) */
+@media (min-width: 1024px) {
+  .pwa-adaptive-grid > .col-span-4-desktop {
+    grid-column: span 4 !important;
+  }
+  .pwa-adaptive-grid > .col-span-8-desktop {
+    grid-column: span 8 !important;
+  }
+  .pwa-adaptive-grid > .col-span-3-desktop {
+    grid-column: span 3 !important;
+  }
+  .pwa-adaptive-grid > .col-span-9-desktop {
+    grid-column: span 9 !important;
+  }
+
+  .ipad-landscape-cockpit {
+    display: grid !important;
+    grid-template-columns: 280px minmax(0, 1fr) !important;
+    gap: 24px !important;
+  }
+}
+
+
 

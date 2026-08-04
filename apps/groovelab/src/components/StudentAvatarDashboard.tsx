@@ -11651,6 +11651,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     (occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date)
                   )
                 );
+                if (appointmentChanges.length === 0) return null;
                 return (
                   <div style={{ background: '#ffffff', borderRadius: '24px', padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border: appointmentChanges.length > 0 ? '1.5px dashed #f59e0b' : '1px solid #e2e8f0', marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>

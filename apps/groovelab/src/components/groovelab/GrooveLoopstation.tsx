@@ -74,14 +74,36 @@ export const VolumeKnob: React.FC<VolumeKnobProps> = ({ value, onChange, disable
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled || !e.touches[0]) return;
+    startYRef.current = e.touches[0].clientY;
+    startValRef.current = value;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (!moveEvent.touches[0]) return;
+      const deltaY = startYRef.current - moveEvent.touches[0].clientY;
+      const newVal = Math.max(0, Math.min(100, startValRef.current + deltaY * 0.8));
+      onChange(newVal);
+    };
+
+    const handleTouchEnd = () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
   const rotation = -135 + (value / 100) * 270;
 
   return (
     <div
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       style={{
-        width: '32px',
-        height: '32px',
+        width: '36px',
+        height: '36px',
         borderRadius: '50%',
         background: 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
         border: '1.5px solid #475569',

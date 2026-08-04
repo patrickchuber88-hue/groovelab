@@ -62,8 +62,7 @@
 - **Consistent Agent Audit Teams**: Whenever performing a final quality check or audit on any dashboard, module, or board, always utilize the exact same team of specialized subagents/expert roles (UX Designer, Database Specialist, Security Auditor, and Lead QA Engineer) to ensure consistent analysis and coverage.
 
 ## Briefing Dashboard & Terminänderungen Rules
-- **Permanente Sichtbarkeit des Terminänderungen-Widgets**: Das `Terminänderungen`-Widget muss auf allen Briefing-Dashboards (sowohl `TeacherDashboard.tsx` als auch `StudentAvatarDashboard.tsx`) **dauerhaft gerendert werden** und darf niemals dynamisch ausgeblendet oder über `if (changes.length === 0) return null;` geschluckt werden.
-- **Empty-State Karte**: Wenn aktuell 0 Terminänderungen vorliegen, MUSS stets die edle Empty-State-Karte (`Keine bevorstehenden Terminänderungen` mit grünem Haken-Badge `CheckCircle` und Hinweistext `Alle Unterrichtstermine finden regulär nach Stundenplan statt.`) sichtbar bleiben, um maximale Transparenz und Übersichtlichkeit zu gewährleisten.
+- **Dynamische Sichtbarkeit des Terminänderungen-Widgets**: Das `Terminänderungen`-Widget auf allen Briefing-Dashboards (sowohl `TeacherDashboard.tsx` als auch `StudentAvatarDashboard.tsx`) wird nur noch gerendert, wenn aktiv kommende Terminänderungen vorliegen. Wenn keine Terminänderungen vorhanden sind (`changes.length === 0`), wird das Widget dynamisch ausgeblendet (`return null`).
 
 ## Schüler-Protokoll & Hausaufgabenheft Rules
 - **Universal Uniformity**: All changes in the Schüler-Protokoll (student protocol) must always be applied for all users. The Schüler-Protokoll/Hausaufgabenheft (homework book) layout, headers, first name display, and design selections must look identical across all modules and user accounts.

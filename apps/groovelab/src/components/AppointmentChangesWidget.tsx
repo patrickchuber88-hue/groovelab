@@ -31,6 +31,7 @@ export const AppointmentChangesWidget: React.FC<AppointmentChangesWidgetProps> =
   isTeacher = false,
 }) => {
   const hasChanges = myChangedAppointments.length > 0;
+  if (!hasChanges) return null;
   const listToRender = showAll ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3);
 
   return (

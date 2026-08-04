@@ -9329,13 +9329,14 @@ export function TeacherDashboard({
 
 
 
-              <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '20px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                marginBottom: '20px'
-              }}>
+              {myChangedAppointments.length > 0 && (
+                <div style={{ 
+                  background: '#ffffff', 
+                  borderRadius: '24px', 
+                  padding: '20px', 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                  marginBottom: '20px'
+                }}>
                 {/* Header with Title & Time Window Filter */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -9734,6 +9735,7 @@ export function TeacherDashboard({
                     </button>
                   )}
                 </div>
+              )}
 
               {myBookings.length > 0 && (
                 <div style={{ 

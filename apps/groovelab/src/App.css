@@ -1,12 +1,14 @@
 .header {
-  padding: 24px 20px;
+  padding: calc(16px + var(--sat, 0px)) 20px 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(to bottom, var(--bg-color) 60%, transparent);
+  background: linear-gradient(to bottom, var(--bg-color) 65%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .school-brand {
@@ -55,11 +57,31 @@
 }
 
 .main-content {
-  padding: 0 20px;
+  padding: 0 20px 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 24px;
   min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .header {
+    padding: calc(10px + var(--sat, 0px)) 14px 10px 14px;
+  }
+  .main-content {
+    padding: 0 12px calc(24px + var(--sab, 0px)) 12px;
+    gap: 16px;
+  }
+  .school-name {
+    font-size: 1.05rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-content {
+    padding: 0 24px 32px 24px;
+    gap: 24px;
+  }
 }
 
 /* Hero Profile */
