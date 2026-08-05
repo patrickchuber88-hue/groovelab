@@ -94,11 +94,12 @@ export const Startseite: React.FC<StartseiteProps> = ({
           .not('is_active', 'eq', false);
 
         if (!error && data && data.length > 0) {
+          const cleanData = data.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
           if (isMounted) {
-            setAllSchools(data);
+            setAllSchools(cleanData);
           }
           try {
-            localStorage.setItem('groovelab_cached_schools', JSON.stringify(data));
+            localStorage.setItem('groovelab_cached_schools', JSON.stringify(cleanData));
           } catch (e) {}
         }
       } catch (err) {
@@ -112,7 +113,8 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
   // Compute filtered search results seamlessly
   useEffect(() => {
-    const listToFilter = allSchools.length > 0 ? allSchools : FALLBACK_SCHOOLS;
+    const listToFilter = (allSchools.length > 0 ? allSchools : FALLBACK_SCHOOLS)
+      .filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
     const query = searchQuery.trim();
 
     if (!query) {

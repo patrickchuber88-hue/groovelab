@@ -81,10 +81,11 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
         const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
         if (!error && data) {
-          setSearchResults(data);
+          const cleanData = data.filter((s: any) => !s.name?.toLowerCase().includes('groove academy'));
+          setSearchResults(cleanData);
           // Cache successful school list
           try {
-            localStorage.setItem('groovelab_cached_schools', JSON.stringify(data));
+            localStorage.setItem('groovelab_cached_schools', JSON.stringify(cleanData));
           } catch (e) {}
         } else {
           throw error || new Error('No data');
@@ -100,10 +101,12 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
           }
         } catch (e) {}
         
-        const filtered = fallbackList.filter((s: any) => 
-          (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-          (s.city || '').toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const filtered = fallbackList
+          .filter((s: any) => !s.name?.toLowerCase().includes('groove academy'))
+          .filter((s: any) => 
+            (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (s.city || '').toLowerCase().includes(searchQuery.toLowerCase())
+          );
         setSearchResults(filtered);
       } finally {
         setIsSearching(false);
