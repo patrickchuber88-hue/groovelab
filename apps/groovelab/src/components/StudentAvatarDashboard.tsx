@@ -3861,6 +3861,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const wakeLockRef = useRef<any>(null);
 
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
+  const [showCustomParentInput, setShowCustomParentInput] = useState<boolean>(false);
+  const [customParentMinutes, setCustomParentMinutes] = useState<string>('');
   const [isExtraTime, setIsExtraTime] = useState(false);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointSecondsLeft, setCheckpointSecondsLeft] = useState(20);
@@ -5412,6 +5414,67 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       alert('Fehler beim Beenden der Session.');
       setSessionActive(true);
       isFinishingSessionRef.current = false;
+    }
+  };
+
+  const logParentGuidedPractice = async (minutes: number) => {
+    if (!studentId || minutes <= 0) return;
+    try {
+      const streak = avatar?.streak_flame || 0;
+      const seconds = minutes * 60;
+      const flameLevelName = getFlameLevelName(streak);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const { data: newLog, error } = await supabase
+        .from('fokus_logs')
+        .insert({
+          user_id: studentId,
+          duration_minutes: minutes,
+          duration_seconds: seconds,
+          is_extra: false,
+          flame_level: flameLevelName
+        })
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      if (newLog) {
+        setFokusLogs(prev => [newLog, ...prev]);
+      }
+
+      const { data: stats } = await supabase
+        .from('student_stats')
+        .select('*')
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+      const newFocusTotal = (stats?.total_focus_minutes || 0) + minutes;
+      const newMonthlyTotal = (stats?.monthly_focus_minutes || 0) + minutes;
+      const newXp = (stats?.current_xp || 0) + (minutes * 10);
+      const newStreak = Math.max(1, (stats?.streak_flame || 0) + 1);
+
+      await supabase
+        .from('student_stats')
+        .upsert({
+          student_id: studentId,
+          total_focus_minutes: newFocusTotal,
+          monthly_focus_minutes: newMonthlyTotal,
+          current_xp: newXp,
+          streak_flame: newStreak,
+          last_practice_date: todayStr,
+          updated_at: new Date().toISOString()
+        });
+
+      fetchStudentAndAvatar(true);
+      fetchStudentProgress(true);
+      fetchFokusLogs();
+      setShowCustomParentInput(false);
+      setCustomParentMinutes('');
+
+      alert(`🎉 Super! ${minutes} Übe-Minuten für ${studentUser?.first_name || 'dein Kind'} verbucht! Streak gehalten! 🔥`);
+    } catch (err: any) {
+      alert('Fehler beim Eintragen der Übezeit: ' + err.message);
     }
   };
 
@@ -7472,6 +7535,243 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </button>
                     </div>
                   )}
+
+                  {/* 1-Klick Übezeit Presets für "Von Eltern geführt" */}
+                  {(studentUser?.campus_usage_mode === 'eltern_geführt' || studentUser?.app_usage_mode === 'eltern_geführt') && (
+                    <div style={{
+                      width: '100%',
+                      marginTop: '16px',
+                      background: '#ffffff',
+                      border: '1.5px solid #bbf7d0',
+                      borderRadius: '24px',
+                      padding: '20px',
+                      boxSizing: 'border-box',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px',
+                      boxShadow: '0 4px 15px rgba(52, 168, 83, 0.08)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          👨‍👩‍👧 1-Klick Übezeit eintragen (Level {((avatar?.streak_flame || 0) >= 3) ? 3 : (((avatar?.streak_flame || 0) === 2) ? 2 : 1)})
+                        </span>
+                        <span style={{ fontSize: '0.68rem', background: '#f0fdf4', color: '#166534', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '10px', fontWeight: 800 }}>
+                          Eltern-Modus
+                        </span>
+                      </div>
+
+                      <p style={{ fontSize: '0.74rem', color: '#475569', margin: 0, lineHeight: 1.35 }}>
+                        Trage die geübte Zeit nach dem Spielen am Instrument mit einem Klick ein. Die Streak &amp; XP werden sofort aktualisiert!
+                      </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        {(((avatar?.streak_flame || 0) >= 3) ? [10, 15, 20] : (((avatar?.streak_flame || 0) === 2) ? [5, 10, 15] : [3, 5, 10])).map(mins => (
+                          <button
+                            key={mins}
+                            onClick={() => logParentGuidedPractice(mins)}
+                            style={{
+                              background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '14px',
+                              padding: '12px 6px',
+                              fontSize: '0.82rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              boxShadow: '0 3px 10px rgba(34, 197, 94, 0.25)'
+                            }}
+                            className="hover-scale"
+                          >
+                            {mins} Min
+                          </button>
+                        ))}
+
+                        <button
+                          onClick={() => setShowCustomParentInput(prev => !prev)}
+                          style={{
+                            background: '#f1f5f9',
+                            color: '#1e293b',
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '14px',
+                            padding: '12px 6px',
+                            fontSize: '0.74rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            textAlign: 'center'
+                          }}
+                          className="hover-scale"
+                        >
+                          ✏️ Freie
+                        </button>
+                      </div>
+
+                      {showCustomParentInput && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                          <input
+                            type="number"
+                            placeholder="Minuten eingeben..."
+                            value={customParentMinutes}
+                            onChange={e => setCustomParentMinutes(e.target.value)}
+                            style={{
+                              flex: 1,
+                              padding: '10px 14px',
+                              borderRadius: '12px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              outline: 'none'
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const mins = parseInt(customParentMinutes, 10);
+                              if (mins > 0) logParentGuidedPractice(mins);
+                            }}
+                            style={{
+                              background: '#15803d',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '12px',
+                              padding: '10px 16px',
+                              fontSize: '0.8rem',
+                              fontWeight: 800,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Verbuchen
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                    <div style={{
+                      width: '100%',
+                      background: 'rgba(52, 168, 83, 0.04)',
+                      border: '1.5px dashed rgba(52, 168, 83, 0.25)',
+                      borderRadius: '24px',
+                      padding: '24px 20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px',
+                      boxSizing: 'border-box',
+                      alignItems: 'center',
+                      textAlign: 'center'
+                    }}>
+                      <Anchor size={24} style={{ color: '#34a853' }} />
+                      <h5 style={{ margin: 0, fontWeight: 900, fontSize: '1rem', color: '#34a853' }}>
+                        Setze deinen Übe-Anker
+                      </h5>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#34a853', fontWeight: 655, lineHeight: 1.4 }}>
+                        Bevor du den Fokus-Timer starten kannst, verbinde das Üben mit einer Routine in deinem Alltag:
+                      </p>
+                      
+                      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Direkt nach:
+                          </span>
+                          <select 
+                            value={anchorTrigger}
+                            onChange={e => {
+                              setAnchorTrigger(e.target.value);
+                              if (e.target.value !== 'custom') {
+                                setCustomTriggerText('');
+                              }
+                            }}
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              color: '#0f172a',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              width: '100%'
+                            }}
+                          >
+                            <option value="den Hausaufgaben">den Hausaufgaben</option>
+                            <option value="dem Zähneputzen">dem Zähneputzen</option>
+                            <option value="dem Mittagessen">dem Mittagessen</option>
+                            <option value="der Schule">der Schule</option>
+                            <option value="dem Aufstehen">dem Aufstehen</option>
+                            <option value="custom">Eigener Text...</option>
+                          </select>
+                        </div>
+
+                        {anchorTrigger === 'custom' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              Dein eigener Text:
+                            </span>
+                            <input
+                              type="text"
+                              placeholder="z.B. dem Abendessen"
+                              value={customTriggerText}
+                              onChange={e => setCustomTriggerText(e.target.value)}
+                              style={{
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '12px',
+                                padding: '10px 14px',
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                outline: 'none',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            übe ich:
+                          </span>
+                          <div style={{
+                            background: '#e2e8f0',
+                            borderRadius: '12px',
+                            padding: '10px 14px',
+                            fontSize: '0.85rem',
+                            fontWeight: 800,
+                            color: '#475569',
+                            boxSizing: 'border-box'
+                          }}>
+                            {studentUser?.resolved_instrument || studentUser?.instrument || 'mein Instrument'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const trigger = anchorTrigger === 'custom' ? customTriggerText.trim() : anchorTrigger;
+                          if (!trigger) {
+                            alert('Bitte gib einen Text für deinen Übe-Anker ein!');
+                            return;
+                          }
+                          const instrument = studentUser?.resolved_instrument || studentUser?.instrument || 'mein Instrument';
+                          handleSavePracticeAnchor(`Direkt nach ${trigger} übe ich ${instrument}.`);
+                        }}
+                        style={{
+                          marginTop: '8px',
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '14px',
+                          borderRadius: '16px',
+                          fontWeight: 900,
+                          fontSize: '0.9rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 15px rgba(52, 168, 83, 0.2)'
+                        }}
+                      >
+                        Anker setzen & freischalten
+                      </button>
+                    </div>
 
                 </div>
               ) : (
