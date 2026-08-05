@@ -4074,6 +4074,86 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               </section>
             )}
           </div>
+
+          {/* Revisionssichere Einwilligungsprotokolle (DSGVO Art. 8 Audit Log) */}
+          <section style={{ 
+            marginTop: '20px',
+            background: '#ffffff', 
+            borderRadius: '24px', 
+            padding: '24px', 
+            border: '1.5px solid #e2e8f0',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+          }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={18} style={{ color: '#34a853' }} /> 📜 Revisionssicheres Einwilligungsprotokoll (DSGVO Art. 8)
+            </h4>
+
+            {student.parental_consent_given_at ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px 16px', borderRadius: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}></span>
+                      Eltern-Einwilligung Erteilt &amp; Verifiziert
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#475569', marginTop: '4px', fontWeight: 600 }}>
+                      Erfasst am {new Date(student.parental_consent_given_at).toLocaleString('de-DE')} • Version {student.consent_version || 'v1.0'}
+                    </div>
+                  </div>
+                  <span style={{ background: '#ffffff', color: '#15803d', border: '1px solid #86efac', padding: '4px 12px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 800 }}>
+                    {student.campus_usage_mode === 'eltern_geführt' ? '🔒 Eltern-geführt (PIN-Schutz)' : '👤 Selbstnutzer'}
+                  </span>
+                </div>
+
+                {/* Granular DSGVO Art. 8 Parent Rights Matrix */}
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b', marginBottom: '10px' }}>
+                    🔒 Elterliche Rechte-Konfiguration (DSGVO Art. 8):
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: student.parent_allow_chat !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {student.parent_allow_chat !== false ? '✓' : '✕'}
+                      </span>
+                      <span>Chat &amp; Lehrer-Kommunikation</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: student.parent_allow_timer !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {student.parent_allow_timer !== false ? '✓' : '✕'}
+                      </span>
+                      <span>Selbständiger Übe-Timer</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: student.parent_allow_leaderboard !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {student.parent_allow_leaderboard !== false ? '✓' : '✕'}
+                      </span>
+                      <span>Bestenlisten-Sichtbarkeit</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: student.parent_allow_groups !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {student.parent_allow_groups !== false ? '✓' : '✕'}
+                      </span>
+                      <span>Band- &amp; Gruppen-Chats</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: student.parent_allow_proposals !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                        {student.parent_allow_proposals !== false ? '✓' : '✕'}
+                      </span>
+                      <span>Song- &amp; Repertoirevorschläge</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: '#fffbe8', border: '1px solid #fef08a', padding: '14px 16px', borderRadius: '16px', color: '#854d0e', fontSize: '0.74rem', lineHeight: 1.45 }}>
+                ⚠️ <strong>Kein digitales Protokoll vorhanden:</strong> Es wurde bisher keine digitale Eltern-Einwilligung über die App erfasst (z. B. bei rein organisatorischem Schul-Import). Beim ersten Login des Schülers/Elternteils wird die Einwilligung automatisch abgefragt.
+              </div>
+            )}
+          </section>
         </div>
       );
     }
