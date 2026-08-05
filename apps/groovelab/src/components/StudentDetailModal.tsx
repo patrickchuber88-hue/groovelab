@@ -4105,45 +4105,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                   </span>
                 </div>
 
-                {/* Granular DSGVO Art. 8 Parent Rights Matrix */}
+                {/* Granular DSGVO Art. 8 Parent Rights Matrix (Campus Modul) */}
                 <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
                   <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b', marginBottom: '10px' }}>
-                    🔒 Elterliche Rechte-Konfiguration (DSGVO Art. 8):
+                    🔒 Elterliche Rechte-Konfiguration (DSGVO Art. 8 - Campus-Modul):
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
                     <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ color: student.parent_allow_chat !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_chat !== false ? '✓' : '✕'}
                       </span>
-                      <span>Chat &amp; Lehrer-Kommunikation</span>
+                      <span>Direktnachrichten &amp; Lehrer-Chat</span>
                     </div>
 
                     <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ color: student.parent_allow_timer !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_timer !== false ? '✓' : '✕'}
                       </span>
-                      <span>Selbständiger Übe-Timer</span>
+                      <span>Selbständiger Übe-Timer &amp; Fokus</span>
                     </div>
 
                     <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ color: student.parent_allow_leaderboard !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_leaderboard !== false ? '✓' : '✕'}
                       </span>
-                      <span>Bestenlisten-Sichtbarkeit</span>
-                    </div>
-
-                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: student.parent_allow_groups !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
-                        {student.parent_allow_groups !== false ? '✓' : '✕'}
-                      </span>
-                      <span>Band- &amp; Gruppen-Chats</span>
-                    </div>
-
-                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: student.parent_allow_proposals !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
-                        {student.parent_allow_proposals !== false ? '✓' : '✕'}
-                      </span>
-                      <span>Song- &amp; Repertoirevorschläge</span>
+                      <span>Schul-Bestenlisten-Sichtbarkeit</span>
                     </div>
                   </div>
                 </div>

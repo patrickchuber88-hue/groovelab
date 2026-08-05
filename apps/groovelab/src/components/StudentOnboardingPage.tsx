@@ -651,11 +651,11 @@ Deine Vorteile auf einen Blick:
                 </div>
               </div>
 
-              {/* Granular Parent Permission Controls (DSGVO Art. 8) */}
+              {/* Granular Parent Permission Controls (DSGVO Art. 8 - Campus Modul) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff', padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', marginTop: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
-                    🔒 Einzelne Rechte für dein Kind festlegen (DSGVO Art. 8):
+                    🔒 Einzelne Campus-Rechte für dein Kind festlegen (DSGVO Art. 8):
                   </span>
                   <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
                     {campusUsageMode === 'eltern_geführt' ? 'Geschützt' : 'Vollständig'}
@@ -665,27 +665,17 @@ Deine Vorteile auf einen Blick:
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                     <input type="checkbox" checked={parentAllowChat} onChange={e => setParentAllowChat(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>💬 Chat &amp; Lehrer-Kommunikation erlauben</span>
+                    <span>💬 Direktnachrichten &amp; Lehrer-Chat erlauben</span>
                   </label>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                     <input type="checkbox" checked={parentAllowTimer} onChange={e => setParentAllowTimer(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>⏱️ Selbständiger Übe-Timer &amp; Streaks</span>
+                    <span>⏱️ Selbständiger Übe-Timer &amp; Fokus-Sessions</span>
                   </label>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                     <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>🏆 Sichtbarkeit in Bestenlisten</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                    <input type="checkbox" checked={parentAllowGroups} onChange={e => setParentAllowGroups(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>🎸 Beitritt zu Band- &amp; Gruppen-Chats</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                    <input type="checkbox" checked={parentAllowProposals} onChange={e => setParentAllowProposals(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>🎵 Song- &amp; Repertoirevorschläge senden</span>
+                    <span>🏆 Sichtbarkeit in Schul-Übe-Bestenlisten</span>
                   </label>
                 </div>
               </div>
