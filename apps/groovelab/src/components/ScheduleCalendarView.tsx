@@ -26,7 +26,8 @@ import {
   RotateCcw,
   MoreVertical,
   ArrowLeftRight,
-  RefreshCw
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
@@ -34,6 +35,13 @@ interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
   teacher_id: string;
+  substitute_teacher_id?: string | null;
+  is_substitute?: boolean;
+  substitute_notes?: string | null;
+  substitute_teacher?: {
+    first_name: string;
+    last_name: string;
+  } | null;
   schedule_id?: string;
   date: string;
   start_time: string;
@@ -307,11 +315,108 @@ export function ScheduleCalendarView({
   const [cachedWeekEvents, setCachedWeekEvents] = useState<any[]>([]);
   const [cachedWeekRoomBookings, setCachedWeekRoomBookings] = useState<any[]>([]);
   const [cachedWeekOccurrences, setCachedWeekOccurrences] = useState<any[]>([]);
+  const [allSchoolTeachers, setAllSchoolTeachers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!schoolId) return;
+    const fetchTeachers = async () => {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, instrument, role')
+          .eq('school_id', schoolId)
+          .in('role', ['teacher', 'admin', 'secretary'])
+          .order('first_name');
+        if (data) setAllSchoolTeachers(data);
+      } catch (err) {
+        console.warn('Error fetching school teachers:', err);
+      }
+    };
+    fetchTeachers();
+  }, [schoolId]);
+
+  // Multiselect & Batch Substitution Mode states
+  const [isSubModeActive, setIsSubModeActive] = useState<boolean>(false);
+  const [selectedSubOccIds, setSelectedSubOccIds] = useState<Set<string>>(new Set());
+  const [batchSubTeacherId, setBatchSubTeacherId] = useState<string>('');
+  const [batchSubNotes, setBatchSubNotes] = useState<string>('');
+  const [isApplyingBatchSub, setIsApplyingBatchSub] = useState<boolean>(false);
+
+  const toggleOccSelection = (occId: string) => {
+    const next = new Set(selectedSubOccIds);
+    if (next.has(occId)) {
+      next.delete(occId);
+    } else {
+      next.add(occId);
+    }
+    setSelectedSubOccIds(next);
+  };
+
+  const toggleDaySelection = (dateStr: string) => {
+    const dayOccs = baseOccurrences.filter(o => 
+      o.date === dateStr && o.student_id && o.student_id !== 'vacant' && o.status !== 'cancelled' && o.id
+    );
+    if (dayOccs.length === 0) return;
+
+    const next = new Set(selectedSubOccIds);
+    const allSelected = dayOccs.every(o => o.id && next.has(o.id));
+
+    if (allSelected) {
+      dayOccs.forEach(o => o.id && next.delete(o.id));
+    } else {
+      dayOccs.forEach(o => o.id && next.add(o.id));
+    }
+
+    setSelectedSubOccIds(next);
+  };
+
+  const applyBatchSubstitution = async () => {
+    if (selectedSubOccIds.size === 0) {
+      await showAlert('Bitte wähle mindestens einen Unterrichtstermin aus.');
+      return;
+    }
+    if (!batchSubTeacherId) {
+      await showAlert('Bitte wähle einen Vertretungslehrer aus oder wähle "Vertretung aufheben".');
+      return;
+    }
+
+    setIsApplyingBatchSub(true);
+    try {
+      const isClearingSub = batchSubTeacherId === 'CLEAR';
+      const subTeacherIdToSave = isClearingSub ? null : batchSubTeacherId;
+      const isSub = !isClearingSub;
+
+      for (const occId of Array.from(selectedSubOccIds)) {
+        await persistOccurrenceDirectly(occId, {
+          substitute_teacher_id: subTeacherIdToSave,
+          is_substitute: isSub,
+          substitute_notes: batchSubNotes || null
+        });
+      }
+
+      await loadOccurrences();
+      await showAlert(isClearingSub 
+        ? `Vertretung für ${selectedSubOccIds.size} Termin(e) erfolgreich aufgehoben.`
+        : `Vertretung für ${selectedSubOccIds.size} Termin(e) erfolgreich zugewiesen!`
+      );
+
+      setSelectedSubOccIds(new Set());
+      setBatchSubTeacherId('');
+      setBatchSubNotes('');
+      setIsSubModeActive(false);
+    } catch (err) {
+      console.error('Error applying batch substitution:', err);
+      await showAlert('Fehler beim Zuweisen der Vertretung.');
+    } finally {
+      setIsApplyingBatchSub(false);
+    }
+  };
+
   const scrollIntervalRef = useRef<any>(null);
   const teacherScheduleLimitsRef = useRef<Record<number, { min: number; max: number }>>({});
   const autoScrollSpeedRef = useRef<number>(0);
   const autoScrollContainerRef = useRef<HTMLElement | null>(null);
-  const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null, duration?: number } | null>(null);
+  const [editOccState, setEditOccState] = useState<{ id: string, date: string, start_time: string, room_id: string | null, duration?: number, substitute_teacher_id?: string | null, substitute_notes?: string | null } | null>(null);
   
   // Integrated Lesson Record states
   const [activeModalTab, setActiveModalTab] = useState<'protocol' | 'details'>('protocol');
@@ -1343,16 +1448,25 @@ export function ScheduleCalendarView({
             ? change.room_override_id 
             : (originalOcc ? originalOcc.room_override_id : null);
           
+          const updatePayload: any = {
+            date: change.date,
+            start_time: change.start_time,
+            status: change.status || 'pending_reschedule',
+            original_date: origDateStr,
+            student_id: targetStudentId,
+            duration: targetDuration,
+            room_override_id: targetRoomOverride
+          };
+          if (change.substitute_teacher_id !== undefined) {
+            updatePayload.substitute_teacher_id = change.substitute_teacher_id;
+            updatePayload.is_substitute = !!change.substitute_teacher_id;
+          }
+          if (change.substitute_notes !== undefined) {
+            updatePayload.substitute_notes = change.substitute_notes;
+          }
+
           const { error } = await supabase.from('schedule_occurrences')
-            .update({
-              date: change.date,
-              start_time: change.start_time,
-              status: change.status || 'pending_reschedule',
-              original_date: origDateStr,
-              student_id: targetStudentId,
-              duration: targetDuration,
-              room_override_id: targetRoomOverride
-            })
+            .update(updatePayload)
             .eq('id', change.id);
           
           if (error) throw error;
@@ -1863,8 +1977,8 @@ export function ScheduleCalendarView({
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument)').eq('teacher_id', userId).eq('school_id', schoolId),
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').eq('teacher_id', userId).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time'),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, substitute_teacher_id, is_substitute, substitute_notes').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, substitute_teacher_id, is_substitute, substitute_notes, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id), substitute_teacher:users!schedule_occurrences_substitute_teacher_id_fkey(first_name, last_name)').or(`teacher_id.eq.${userId},substitute_teacher_id.eq.${userId}`).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time'),
           supabase.from('students').select('id, user_id, teacher_id').eq('school_id', schoolId),
           supabase.from('users').select('id, teacher_id, first_name, last_name').eq('school_id', schoolId).eq('role', 'student')
         ]);
@@ -3577,7 +3691,10 @@ export function ScheduleCalendarView({
         // 2. Persist occurrence
         await persistOccurrenceDirectly(occ.id, { 
           status: statusUpdate as any, 
-          notes: notesUpdate 
+          notes: notesUpdate,
+          substitute_teacher_id: editOccState.substitute_teacher_id || null,
+          is_substitute: !!editOccState.substitute_teacher_id,
+          substitute_notes: editOccState.substitute_notes || null
         });
 
         // 3. Save progress matrix is now handled directly inside the MeisterwerkDocumentationModal to prevent status overwrites.
@@ -3686,7 +3803,10 @@ export function ScheduleCalendarView({
           status: 'pending_reschedule',
           schedules: updatedSchedules,
           template_room_id: templateRoomId,
-          duration: editOccState.duration !== undefined ? editOccState.duration : o.duration
+          duration: editOccState.duration !== undefined ? editOccState.duration : o.duration,
+          substitute_teacher_id: editOccState.substitute_teacher_id || null,
+          is_substitute: !!editOccState.substitute_teacher_id,
+          substitute_notes: editOccState.substitute_notes || null
         };
       });
 
@@ -4084,15 +4204,26 @@ export function ScheduleCalendarView({
         flexDirection: 'column',
         gap: '10px'
       }}>
-        {/* Row 1: Title & Main Navigation */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', width: '100%', gap: '10px' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {/* ROW 1: Primäre Steuerung & Haupt-Module (Navigations- & Ansichts-Ebene) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px', flexWrap: 'wrap' }}>
+          {/* Left: KW-Anzeige & Lehrer-Auswahl */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              background: lightBg,
+              color: brandColor,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
               <CalendarIcon size={16} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                   KW {weekNumber}
                 </h2>
                 <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
@@ -4129,7 +4260,7 @@ export function ScheduleCalendarView({
             </div>
           </div>
 
-          {/* Center: Tab switch */}
+          {/* Center: Main Tabs & Grid Snap */}
           {activeTab && setActiveTab && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
@@ -4200,7 +4331,7 @@ export function ScheduleCalendarView({
                 </select>
               </div>
 
-              {/* Offene Ersatztermine Navigation Capsule - Visible in EVERY calendar week */}
+              {/* Offene Ersatztermine Navigation Capsule */}
               {allOpenReschedules && allOpenReschedules.length > 0 && (
                 <div style={{
                   display: 'flex',
@@ -4306,17 +4437,74 @@ export function ScheduleCalendarView({
             </div>
           )}
 
-          {/* Right: Spacer for centering */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }} />
+          {/* Right: Date Navigation & View Mode Switcher */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="apple-btn-group">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('day');
+                  if (focusedDayOffset === null) setFocusedDayOffset(0);
+                }}
+                className={`apple-btn ${viewMode === 'day' ? 'active' : ''}`}
+                style={viewMode === 'day' ? { color: textAccentColor } : {}}
+              >
+                Tag
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('week');
+                  setFocusedDayOffset(null);
+                }}
+                className={`apple-btn ${viewMode === 'week' ? 'active' : ''}`}
+                style={viewMode === 'week' ? { color: textAccentColor } : {}}
+              >
+                Woche
+              </button>
+            </div>
+
+            <div className="apple-btn-group">
+              <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
+              <button onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen">Heute</button>
+              <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
+              
+              <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
+
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type="date"
+                  value={toLocalYYYYMMDD(currentDate)}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setCurrentDate(new Date(e.target.value));
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    opacity: 0,
+                    width: '100%',
+                    height: '100%',
+                    cursor: 'pointer',
+                    zIndex: 2
+                  }}
+                />
+                <button className="apple-btn" style={{ pointerEvents: 'none' }}>
+                  <CalendarIcon size={13} />
+                  <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Divider line */}
-        <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
+        {/* Divider line between Row 1 and Row 2 */}
+        <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '4px -4px' }} />
 
-        {/* Row 2: Röntgen Filter & Utilities */}
+        {/* ROW 2: Aktions- & Werkzeugleiste (Toolbar Row) */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
-          {/* Left: Röntgen selector */}
-          <div id="tour-calendar-xray" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Left: Röntgen selector & View filters */}
+          <div id="tour-calendar-xray" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
@@ -4371,34 +4559,39 @@ export function ScheduleCalendarView({
             </div>
           </div>
 
-          {/* Right: Actions */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Unified Segmented Control for View & Actions */}
-            <div id="tour-calendar-actions" className="apple-btn-group">
-              {/* Namen / Datenschutz Toggle */}
+          {/* Center / Highlight: Feature Toggles & Vertretung zuweisen */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="apple-btn-group">
+              {/* Vertretungs-Aktionsmodus Button */}
               <button
                 type="button"
-                onClick={() => toggleRealNames()}
-                className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                style={{ color: showRealNames ? '#ea4335' : undefined }}
-                title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
+                onClick={() => {
+                  const nextActive = !isSubModeActive;
+                  setIsSubModeActive(nextActive);
+                  if (!nextActive) {
+                    setSelectedSubOccIds(new Set());
+                  }
+                }}
+                className={`apple-btn ${isSubModeActive ? 'active' : ''}`}
+                style={isSubModeActive ? { color: '#4f46e5', background: '#e0e7ff', borderColor: '#c7d2fe', fontWeight: 800 } : {}}
+                title="Aktiviert den Mehrfach-Auswahlmodus für Vertretungen"
               >
-                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
+                <UserCheck size={13} style={{ color: isSubModeActive ? '#4f46e5' : undefined }} />
+                <span>Vertretung</span>
+                {selectedSubOccIds.size > 0 && (
+                  <span style={{
+                    background: isSubModeActive ? '#4f46e5' : '#6366f1',
+                    color: '#ffffff',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    padding: '1px 6px',
+                    borderRadius: '8px',
+                    marginLeft: '2px'
+                  }}>
+                    {selectedSubOccIds.size}
+                  </span>
+                )}
               </button>
-
-              {/* Group A: Ansicht & Filter */}
-              <button
-                type="button"
-                onClick={() => setShowWeekend(prev => !prev)}
-                className={`apple-btn ${isWeekendVisible ? 'active' : ''}`}
-                style={isWeekendVisible ? { color: textAccentColor } : {}}
-                title={isWeekendVisible ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
-              >
-                <CalendarIcon size={13} />
-                <span>Wochenende</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => {
@@ -4413,9 +4606,33 @@ export function ScheduleCalendarView({
                 <span>Gruppen</span>
               </button>
 
-              <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
+              <button
+                type="button"
+                onClick={() => toggleRealNames()}
+                className={`apple-btn ${showRealNames ? 'active' : ''}`}
+                style={{ color: showRealNames ? '#ea4335' : undefined }}
+                title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
+              >
+                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
+              </button>
 
-              {/* Group B: Wochen-Aktionen */}
+              <button
+                type="button"
+                onClick={() => setShowWeekend(prev => !prev)}
+                className={`apple-btn ${isWeekendVisible ? 'active' : ''}`}
+                style={isWeekendVisible ? { color: textAccentColor } : {}}
+                title={isWeekendVisible ? 'Wochenende ausblenden' : 'Wochenende einblenden'}
+              >
+                <CalendarIcon size={13} />
+                <span>Wochenende</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Draft & Copy Actions */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div id="tour-calendar-actions" className="apple-btn-group">
               <button
                 onClick={handleCopyWeek}
                 className="apple-btn"
@@ -4435,8 +4652,6 @@ export function ScheduleCalendarView({
                 <span>Einfügen</span>
               </button>
 
-              <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
-
               <button
                 onClick={handleResetWeek}
                 className="apple-btn"
@@ -4448,7 +4663,7 @@ export function ScheduleCalendarView({
               </button>
             </div>
 
-            {/* Merge Selected Action (Floating outside groups since it's a primary CTA) */}
+            {/* Primary Action Buttons (Merge & Save) */}
             {isGroupModeActive && selectedForGroup.length >= 2 && (
               <button
                 type="button"
@@ -4466,7 +4681,6 @@ export function ScheduleCalendarView({
               </button>
             )}
 
-            {/* Save Pending Changes Action (Floating primary CTA) */}
             {Object.keys(pendingChanges).length > 0 && (
               <button 
                 onClick={savePendingChanges}
@@ -4482,65 +4696,6 @@ export function ScheduleCalendarView({
                 <span>Speichern & Schüler informieren ({Object.keys(pendingChanges).length})</span>
               </button>
             )}
-
-            {/* View Mode Switcher */}
-            <div className="apple-btn-group">
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('day');
-                  if (focusedDayOffset === null) setFocusedDayOffset(0);
-                }}
-                className={`apple-btn ${viewMode === 'day' ? 'active' : ''}`}
-                style={viewMode === 'day' ? { color: textAccentColor } : {}}
-              >
-                Tag
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('week');
-                  setFocusedDayOffset(null);
-                }}
-                className={`apple-btn ${viewMode === 'week' ? 'active' : ''}`}
-                style={viewMode === 'week' ? { color: textAccentColor } : {}}
-              >
-                Woche
-              </button>
-            </div>
-
-            {/* Group C: Navigation & Datum */}
-            <div className="apple-btn-group">
-              <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
-              <button onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen">Heute</button>
-              <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
-              
-              <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
-
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input 
-                  type="date"
-                  value={toLocalYYYYMMDD(currentDate)}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setCurrentDate(new Date(e.target.value));
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    opacity: 0,
-                    width: '100%',
-                    height: '100%',
-                    cursor: 'pointer',
-                    zIndex: 2
-                  }}
-                />
-                <button className="apple-btn" style={{ pointerEvents: 'none' }}>
-                  <CalendarIcon size={13} />
-                  <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -4760,7 +4915,13 @@ export function ScheduleCalendarView({
               }}
             >
               <div 
-                onClick={() => setFocusedDayOffset(focusedDayOffset === offset ? null : offset)}
+                onClick={() => {
+                  if (isSubModeActive) {
+                    toggleDaySelection(dateStr);
+                  } else {
+                    setFocusedDayOffset(focusedDayOffset === offset ? null : offset);
+                  }
+                }}
                 style={{
                   textAlign: 'center',
                   paddingBottom: '8px',
@@ -4772,15 +4933,35 @@ export function ScheduleCalendarView({
                   cursor: 'pointer',
                   borderRadius: '12px',
                   padding: '6px',
+                  background: isSubModeActive ? 'rgba(99, 102, 241, 0.06)' : 'transparent',
+                  border: isSubModeActive ? '1px dashed #6366f1' : '1px solid transparent',
                   transition: 'background 0.2s',
                   userSelect: 'none',
                   position: 'relative'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.03)'}
-                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                title={focusedDayOffset === offset ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
+                onMouseOver={e => e.currentTarget.style.background = isSubModeActive ? 'rgba(99, 102, 241, 0.12)' : 'rgba(0,0,0,0.03)'}
+                onMouseOut={e => e.currentTarget.style.background = isSubModeActive ? 'rgba(99, 102, 241, 0.06)' : 'transparent'}
+                title={isSubModeActive ? "Klick: Alle Termine dieses Tages für Vertretung selektieren/abwählen" : (focusedDayOffset === offset ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)")}
               >
-                {focusedDayOffset === offset && (
+                {isSubModeActive && (() => {
+                  const validDayOccs = baseOccurrences.filter(o => o.date === dateStr && o.student_id && o.student_id !== 'vacant' && o.status !== 'cancelled' && o.id);
+                  const isDayFullySelected = validDayOccs.length > 0 && validDayOccs.every(o => o.id && selectedSubOccIds.has(o.id));
+                  return (
+                    <div style={{
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      color: isDayFullySelected ? '#ffffff' : '#4f46e5',
+                      background: isDayFullySelected ? '#4f46e5' : '#e0e7ff',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      marginBottom: '4px'
+                    }}>
+                      {isDayFullySelected ? '✓ Tag selektiert' : '⚡ Tag selektieren'}
+                    </div>
+                  );
+                })()}
+
+                {focusedDayOffset === offset && !isSubModeActive && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -5581,6 +5762,21 @@ export function ScheduleCalendarView({
                       finalColors.text = '#5b21b6';
                     }
                   }
+
+                  // Vertretung (Option 1: Indigo/Purple Theme für Hauptlehrer & Vertretung)
+                  const isSubstitutedCard = Boolean(!isBreak && !isVacant && !isSick && !isCancelled && (occ.substitute_teacher_id || occ.is_substitute));
+                  if (isSubstitutedCard) {
+                    cardBackground = 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)';
+                    finalColors.border = '#6366f1';
+                    finalColors.text = '#3730a3';
+                  }
+
+                  // Multiselect Vertretungs-Modus Hinzufügen
+                  const isSelectedForSubCard = Boolean(isSubModeActive && occ.id && selectedSubOccIds.has(occ.id));
+                  if (isSelectedForSubCard) {
+                    cardBackground = 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)';
+                    finalColors.border = '#4f46e5';
+                  }
                   
                   // Color side-by-side overlapping cards RED (conflict indicator)
                   const isParallelConflict = layout && (layout.totalCols || 1) > 1 && (layout.colIndex || 0) >= 1;
@@ -5638,6 +5834,11 @@ export function ScheduleCalendarView({
                           setHoveredTooltip(null);
                         }}
                         onClick={async () => {
+                          if (isSubModeActive) {
+                            if (isBreak || isVacant || !occ.id) return;
+                            toggleOccSelection(occ.id);
+                            return;
+                          }
                           if (isGroupModeActive) {
                             if (isBreak || isVacant) return;
                             setSelectedForGroup(prev => {
@@ -5977,6 +6178,19 @@ export function ScheduleCalendarView({
                                     }
                                   </span>
                                 </div>
+
+                                {/* Vertretung & Selection Badge */}
+                                {isSelectedForSubCard && (
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#4f46e5', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', marginTop: '2px' }}>
+                                    ✓ Selektiert
+                                  </div>
+                                )}
+
+                                {!isSelectedForSubCard && (occ.substitute_teacher_id || occ.is_substitute) && (
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #c7d2fe', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Vertretung: {occ.substitute_teacher?.first_name || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)?.first_name || 'Dozent'}
+                                  </div>
+                                )}
                               </div>
                             );
                           }
@@ -6824,7 +7038,7 @@ return (
                                 fontWeight: 800,
                                 border: '1px solid #bbf7d0'
                               }}>
-                                🎸 {occ.student.instrument || 'Gitarre'}
+                                {(occ.student?.instrument && occ.student.instrument !== 'Musiker') ? occ.student.instrument : (occ.instrument && occ.instrument !== 'Musiker' ? occ.instrument : 'Unterrichtsfach')}
                               </span>
                               <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
                                 • {editOccState.duration || 45} Min Lektion
@@ -7070,7 +7284,69 @@ return (
                       )}
                     </div>
 
-                    {/* Compact Pedagogy Summary Box */}
+                    {/* Vertretungslehrer Card (Ausfall-Management) */}
+                    <div style={{
+                      background: '#f8fafc',
+                      borderRadius: '14px',
+                      padding: '12px 14px',
+                      marginBottom: '16px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <label style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                          <UserCheck size={12} style={{ color: '#6366f1' }} />
+                          <span>Vertretungslehrer festlegen</span>
+                        </label>
+                        {editOccState.substitute_teacher_id && (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px' }}>
+                            Vertretung aktiv
+                          </span>
+                        )}
+                      </div>
+
+                      <select
+                        value={editOccState.substitute_teacher_id || ''}
+                        onChange={e => setEditOccState({ ...editOccState, substitute_teacher_id: e.target.value || null })}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(0,0,0,0.12)',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          color: '#1d1d1f',
+                          background: '#ffffff',
+                          boxSizing: 'border-box',
+                          marginBottom: editOccState.substitute_teacher_id ? '8px' : '0'
+                        }}
+                      >
+                        <option value="">-- Keine Vertretung (Regulärer Dozent) --</option>
+                        {(((teachers && teachers.length > 0) ? teachers : allSchoolTeachers) || []).map((t: any) => (
+                          <option key={t.id} value={t.id}>
+                            {t.first_name} {t.last_name || ''} {t.instrument ? `(${t.instrument})` : ''}
+                          </option>
+                        ))}
+                      </select>
+
+                      {editOccState.substitute_teacher_id && (
+                        <input
+                          type="text"
+                          placeholder="Hinweis für Vertretungslehrer (z.B. Stück auf S. 12 weiterüben)..."
+                          value={editOccState.substitute_notes || ''}
+                          onChange={e => setEditOccState({ ...editOccState, substitute_notes: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(0,0,0,0.12)',
+                            fontSize: '0.8rem',
+                            color: '#1d1d1f',
+                            boxSizing: 'border-box',
+                            marginTop: '6px'
+                          }}
+                        />
+                      )}
+                    </div>
                     {occ && occ.student && !isEnsembleOcc && (
                       <div style={{
                         background: '#f8fafc',
@@ -7194,7 +7470,7 @@ return (
                         </button>
                       )}
                     </div>
-                    
+
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
                         onClick={() => setEditOccState(null)} 
@@ -8010,6 +8286,125 @@ return (
         </div>
       );
     })()}
+
+    {isSubModeActive && (
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 99999,
+        background: '#0f172a',
+        color: '#ffffff',
+        borderRadius: '20px',
+        padding: '12px 20px',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '14px',
+        maxWidth: '92vw',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(16px)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            background: '#6366f1',
+            color: '#ffffff',
+            fontWeight: 800,
+            fontSize: '0.78rem',
+            padding: '4px 10px',
+            borderRadius: '12px'
+          }}>
+            {selectedSubOccIds.size} Termine gewählt
+          </span>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#94a3b8' }}>
+            Vertretung zuweisen:
+          </span>
+        </div>
+
+        <select
+          value={batchSubTeacherId}
+          onChange={e => setBatchSubTeacherId(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            color: '#ffffff',
+            background: '#1e293b',
+            outline: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          <option value="">-- Vertretungslehrer wählen --</option>
+          <option value="CLEAR">❌ Vertretung aufheben (Zurück zum Stammlehrer)</option>
+          {(((teachers && teachers.length > 0) ? teachers : allSchoolTeachers) || []).map((t: any) => (
+            <option key={t.id} value={t.id}>
+              {t.first_name} {t.last_name || ''} {t.instrument ? `(${t.instrument})` : ''}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          placeholder="Hinweis für Vertretungslehrer..."
+          value={batchSubNotes}
+          onChange={e => setBatchSubNotes(e.target.value)}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.2)',
+            fontSize: '0.82rem',
+            color: '#ffffff',
+            background: '#1e293b',
+            outline: 'none',
+            width: '200px'
+          }}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={applyBatchSubstitution}
+            disabled={isApplyingBatchSub || selectedSubOccIds.size === 0 || !batchSubTeacherId}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: 'none',
+              background: selectedSubOccIds.size > 0 && batchSubTeacherId ? '#6366f1' : '#475569',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              cursor: selectedSubOccIds.size > 0 && batchSubTeacherId ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s'
+            }}
+          >
+            {isApplyingBatchSub ? 'Speichere...' : 'Vertretung anwenden'}
+          </button>
+
+          <button
+            onClick={() => {
+              setIsSubModeActive(false);
+              setSelectedSubOccIds(new Set());
+              setBatchSubTeacherId('');
+              setBatchSubNotes('');
+            }}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '10px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: 'transparent',
+              color: '#94a3b8',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              cursor: 'pointer'
+            }}
+          >
+            Beenden
+          </button>
+        </div>
+      </div>
+    )}
 
     </div>
   );

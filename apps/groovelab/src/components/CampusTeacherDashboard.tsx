@@ -629,7 +629,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
     const { data: allOccurs } = await supabase
       .from('schedule_occurrences')
-      .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+      .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), substitute_teacher:users!schedule_occurrences_substitute_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
       .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
 
     const staticBookings = mappedAllSchedData;
@@ -637,7 +637,9 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
     // Group dynamic bookings by teacher, room, and day of week to filter and merge
     const dynamicGroups: { [key: string]: any[] } = {};
     (allOccurs || []).forEach(occ => {
-      if (occ.teacher_id && approvedTeachers.has(occ.teacher_id)) {
+      const isMyTeacher = occ.teacher_id && approvedTeachers.has(occ.teacher_id);
+      const isMySub = occ.substitute_teacher_id && approvedTeachers.has(occ.substitute_teacher_id);
+      if (isMyTeacher || isMySub) {
         if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
           return;
         }

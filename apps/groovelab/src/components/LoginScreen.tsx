@@ -6549,16 +6549,31 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   .maybeSingle();
 
                 if (!user) {
-                  // 2. Auto-provision dedicated Master Admin if missing
-                  console.log('[Bypass] Auto-creating Master Admin profile...');
-                  const masterId = '99999999-9999-9999-9999-999999999999';
-                  const { data: createdMaster, error: createErr } = await supabase
+                  // 2. Search for any existing admin user (e.g. Patrick Huber)
+                  const { data: adminUser } = await supabase
                     .from('users')
-                    .insert({
+                    .select('id, role, is_master_admin, school_id, first_name, last_name')
+                    .or('role.eq.admin,first_name.ilike.%Patrick%,last_name.ilike.%Huber%')
+                    .limit(1)
+                    .maybeSingle();
+
+                  if (adminUser) {
+                    user = adminUser;
+                    await supabase.from('users').update({ is_master_admin: true }).eq('id', adminUser.id);
+                  }
+                }
+
+                if (!user) {
+                  // 3. Fallback Provisioning for Patrick Huber (Master Admin)
+                  console.log('[Bypass] Auto-creating Patrick Huber Master Admin profile...');
+                  const masterId = '99999999-9999-9999-9999-999999999999';
+                  const { data: createdMaster } = await supabase
+                    .from('users')
+                    .upsert({
                       id: masterId,
                       school_id: schoolData.id,
-                      first_name: 'Master',
-                      last_name: 'Admin',
+                      first_name: 'Patrick',
+                      last_name: 'Huber',
                       role: 'admin',
                       roles: ['admin'],
                       is_master_admin: true,
@@ -6571,19 +6586,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     .select('id, role, is_master_admin, school_id, first_name, last_name')
                     .maybeSingle();
 
-                  if (!createErr && createdMaster) {
-                    user = createdMaster;
-                  }
+                  user = createdMaster || {
+                    id: masterId,
+                    first_name: 'Patrick',
+                    last_name: 'Huber',
+                    role: 'admin',
+                    is_master_admin: true,
+                    school_id: schoolData.id
+                  };
                 }
 
                 if (user) {
                   console.log('[Bypass] Master Admin logged in:', user.id);
                   sessionStorage.setItem('groovelab_user_id', user.id);
                   localStorage.setItem('groovelab_user_id', user.id);
+                  sessionStorage.setItem('groovelab_is_master_admin', 'true');
                   sessionStorage.removeItem('groovelab_qr_token');
                   onLogin(user.id, true);
-                } else {
-                  alert('Kein Master-Admin-Benutzer in der Datenbank gefunden.');
                 }
               } catch (err: any) {
                 sessionStorage.removeItem('groovelab_qr_token');

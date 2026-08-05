@@ -2586,6 +2586,129 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [newSubjectCategory, setNewSubjectCategory] = useState<string>('guitar');
   const [isSubjectCsvExpanded, setIsSubjectCsvExpanded] = useState<boolean>(false);
   const [subjectCsvText, setSubjectCsvText] = useState<string>('');
+  // Leihinstrumente-Verwaltung states
+  const [rentalInstruments, setRentalInstruments] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('groovelab_rental_instruments');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      {
+        id: 'rent-1',
+        name: 'Yamaha YAS-280 Altsaxophon',
+        category: 'Blasinstrumente',
+        serial_number: 'CG-INV-2026-SAX-014',
+        condition: 'Sehr gut',
+        status: 'rented',
+        student_id: 's-1',
+        student_name: 'Max M.',
+        rental_start: '2026-02-15',
+        rental_end_due: '2026-07-31',
+        monthly_fee: 18.00,
+        deposit: 150.00,
+        deposit_status: 'paid',
+        notes: 'Inkl. Leichtkoffer, Mundstück und Tragegurt'
+      },
+      {
+        id: 'rent-2',
+        name: 'Gewa Vancore Cello 4/4',
+        category: 'Streicher',
+        serial_number: 'CG-INV-2026-CEL-008',
+        condition: 'Gebraucht',
+        status: 'rented',
+        student_id: 's-2',
+        student_name: 'Emma S.',
+        rental_start: '2026-01-10',
+        rental_end_due: '2026-07-31',
+        monthly_fee: 22.00,
+        deposit: 200.00,
+        deposit_status: 'paid',
+        notes: 'Bogen 2026 neu bespannt'
+      },
+      {
+        id: 'rent-3',
+        name: 'Roland FP-30X E-Piano',
+        category: 'Tasten',
+        serial_number: 'CG-INV-2026-PIA-003',
+        condition: 'Neu',
+        status: 'available',
+        student_id: null,
+        student_name: null,
+        rental_start: null,
+        rental_end_due: null,
+        monthly_fee: 25.00,
+        deposit: 200.00,
+        deposit_status: 'pending',
+        notes: 'Inkl. Pedaleinheit und Ständer'
+      },
+      {
+        id: 'rent-4',
+        name: 'Konzertgitarre 3/4 Ortega R121-3/4',
+        category: 'Zupfinstrumente',
+        serial_number: 'CG-INV-2026-GIT-022',
+        condition: 'Sehr gut',
+        status: 'available',
+        student_id: null,
+        student_name: null,
+        rental_start: null,
+        rental_end_due: null,
+        monthly_fee: 12.00,
+        deposit: 80.00,
+        deposit_status: 'pending',
+        notes: 'Ideal für Einsteiger (7-10 Jahre)'
+      },
+      {
+        id: 'rent-5',
+        name: 'Jupiter Querflöte JFL700E',
+        category: 'Blasinstrumente',
+        serial_number: 'CG-INV-2026-FLU-009',
+        condition: 'Reparaturbedürftig',
+        status: 'maintenance',
+        student_id: null,
+        student_name: null,
+        rental_start: null,
+        rental_end_due: null,
+        monthly_fee: 15.00,
+        deposit: 120.00,
+        deposit_status: 'pending',
+        notes: 'Polster am G#-Klappenhebel erneuern'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('groovelab_rental_instruments', JSON.stringify(rentalInstruments));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [rentalInstruments]);
+
+  const [rentalSearchQuery, setRentalSearchQuery] = useState<string>('');
+  const [rentalFilterStatus, setRentalFilterStatus] = useState<string>('All');
+  const [rentalFilterCategory, setRentalFilterCategory] = useState<string>('All');
+  const [showAddRentalModal, setShowAddRentalModal] = useState<boolean>(false);
+  const [showAssignRentalModal, setShowAssignRentalModal] = useState<any | null>(null);
+  const [showReturnRentalModal, setShowReturnRentalModal] = useState<any | null>(null);
+
+  const [newRentalName, setNewRentalName] = useState<string>('');
+  const [newRentalCategory, setNewRentalCategory] = useState<string>('Blasinstrumente');
+  const [newRentalSerial, setNewRentalSerial] = useState<string>('');
+  const [newRentalCondition, setNewRentalCondition] = useState<string>('Sehr gut');
+  const [newRentalMonthlyFee, setNewRentalMonthlyFee] = useState<string>('15.00');
+  const [newRentalDeposit, setNewRentalDeposit] = useState<string>('100.00');
+  const [newRentalNotes, setNewRentalNotes] = useState<string>('');
+
+  const [assignStudentId, setAssignStudentId] = useState<string>('');
+  const [assignStudentNameCustom, setAssignStudentNameCustom] = useState<string>('');
+  const [assignStudentSearchQuery, setAssignStudentSearchQuery] = useState<string>('');
+  const [isAssignStudentDropdownOpen, setIsAssignStudentDropdownOpen] = useState<boolean>(false);
+  const [assignDueDate, setAssignDueDate] = useState<string>('2026-07-31');
+
+  const [returnCondition, setReturnCondition] = useState<string>('Sehr gut');
+  const [returnDepositAction, setReturnDepositAction] = useState<string>('refunded');
 
   // Cooperations states
   const [cooperations, setCooperations] = useState<any[]>([]);
@@ -6528,6 +6651,839 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   Fach anlegen
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render Board for Leihinstrumente-Verwaltungssystem
+  const renderRentalInstrumentsBoard = () => {
+    const filteredInstruments = rentalInstruments.filter(item => {
+      const q = rentalSearchQuery.toLowerCase().trim();
+      const matchesSearch = !q || 
+        item.name.toLowerCase().includes(q) || 
+        item.serial_number.toLowerCase().includes(q) || 
+        (item.student_name && item.student_name.toLowerCase().includes(q));
+
+      const matchesStatus = rentalFilterStatus === 'All' || item.status === rentalFilterStatus;
+      const matchesCategory = rentalFilterCategory === 'All' || item.category === rentalFilterCategory;
+
+      return matchesSearch && matchesStatus && matchesCategory;
+    });
+
+    const totalCount = rentalInstruments.length;
+    const rentedCount = rentalInstruments.filter(i => i.status === 'rented').length;
+    const availableCount = rentalInstruments.filter(i => i.status === 'available').length;
+    const maintenanceCount = rentalInstruments.filter(i => i.status === 'maintenance').length;
+    const utilizationRate = totalCount > 0 ? Math.round((rentedCount / totalCount) * 100) : 0;
+
+    return (
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* STATS HEADER CARDS */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+          {/* Card 1: Total Fleet */}
+          <div className="google-card" style={{ padding: '16px 20px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fce8e6', color: '#ea4335', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Tag size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Gesamtbestand</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>{totalCount} Instrumente</div>
+            </div>
+          </div>
+
+          {/* Card 2: Currently Rented */}
+          <div className="google-card" style={{ padding: '16px 20px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <UserCheck size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Aktuell Verliehen</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb' }}>{rentedCount} <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>({utilizationRate}%)</span></div>
+            </div>
+          </div>
+
+          {/* Card 3: Available */}
+          <div className="google-card" style={{ padding: '16px 20px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Im Lager verfügbar</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#34a853' }}>{availableCount} bereit</div>
+            </div>
+          </div>
+
+          {/* Card 4: Maintenance */}
+          <div className="google-card" style={{ padding: '16px 20px', borderRadius: '18px', background: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Wrench size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wartung / Reparatur</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#d97706' }}>{maintenanceCount} Instrumente</div>
+            </div>
+          </div>
+        </div>
+
+        {/* MAIN BOARD CARD */}
+        <div className="google-card" style={{
+          width: '100%',
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '20px', 
+          padding: '24px',
+          borderRadius: '24px',
+          border: '1.5px solid #cbd5e1',
+          background: '#ffffff',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
+        }}>
+          {/* TITLE & ACTIONS */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Tag size={22} style={{ color: '#ea4335' }} />
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                  Leihinstrumente-Verwaltung
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Inventar-, Schülerverleih- und Kautionsübersicht für Schul-Leihinstrumente</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAddRentalModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '12px',
+                padding: '10px 18px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                background: '#ea4335',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'Urbanist',
+                boxShadow: '0 4px 12px rgba(234, 67, 53, 0.25)',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Plus size={16} />
+              <span>Neues Leihinstrument anlegen</span>
+            </button>
+          </div>
+
+          {/* SEARCH & FILTERS ROW */}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Instrument, Seriennummer oder Schüler suchen..."
+                value={rentalSearchQuery}
+                onChange={(e) => setRentalSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px 9px 34px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Category Filter */}
+            <select
+              value={rentalFilterCategory}
+              onChange={(e) => setRentalFilterCategory(e.target.value)}
+              style={{
+                padding: '9px 12px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                background: '#ffffff',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="All">Alle Kategorien</option>
+              <option value="Blasinstrumente">🎷 Blasinstrumente</option>
+              <option value="Streicher">🎻 Streicher</option>
+              <option value="Tasten">🎹 Tasten</option>
+              <option value="Zupfinstrumente">🎸 Zupfinstrumente</option>
+              <option value="Schlagzeug">🥁 Schlagzeug</option>
+              <option value="Sonstige">📦 Sonstige</option>
+            </select>
+
+            {/* Status Filter */}
+            <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '3px' }}>
+              {[
+                { id: 'All', label: 'Alle' },
+                { id: 'available', label: '🟢 Verfügbar' },
+                { id: 'rented', label: '🔵 Verliehen' },
+                { id: 'maintenance', label: '🟡 In Wartung' }
+              ].map(st => (
+                <button
+                  key={st.id}
+                  onClick={() => setRentalFilterStatus(st.id)}
+                  style={{
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    background: rentalFilterStatus === st.id ? '#ffffff' : 'transparent',
+                    color: rentalFilterStatus === st.id ? '#0f172a' : '#64748b',
+                    cursor: 'pointer',
+                    boxShadow: rentalFilterStatus === st.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* INSTRUMENTS LIST */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredInstruments.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 700 }}>
+                Keine Leihinstrumente mit diesen Filtereinstellungen gefunden.
+              </div>
+            ) : (
+              filteredInstruments.map(item => {
+                const isRented = item.status === 'rented';
+                const isAvailable = item.status === 'available';
+                const isMaintenance = item.status === 'maintenance';
+
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 18px',
+                      borderRadius: '16px',
+                      background: '#ffffff',
+                      border: isRented ? '1.5px solid #bfdbfe' : isAvailable ? '1.5px solid #bbf7d0' : '1.5px solid #fef08a',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                      flexWrap: 'wrap',
+                      gap: '14px'
+                    }}
+                  >
+                    {/* Left Info: Icon, Name, Category & Serial */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1.5', minWidth: '240px' }}>
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
+                        background: isRented ? '#eff6ff' : isAvailable ? '#e6f4ea' : '#fef3c7',
+                        color: isRented ? '#2563eb' : isAvailable ? '#34a853' : '#d97706',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Music size={20} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{item.name}</span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: '6px', fontFamily: 'monospace' }}>
+                            {item.serial_number}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          <span>📁 {item.category}</span>
+                          <span>•</span>
+                          <span>Zustand: <strong>{item.condition}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle Info: Rental Details & Pupil */}
+                    <div style={{ flex: '1.2', minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      {isRented ? (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 800, color: '#1e40af' }}>
+                            <UserCheck size={14} />
+                            <span>Verliehen an: <strong>{item.student_name || 'Schüler'}</strong></span>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                            Soll-Rückgabe: {item.rental_end_due ? new Date(item.rental_end_due).toLocaleDateString('de-DE') : 'Unbefristet'}
+                          </div>
+                        </>
+                      ) : isAvailable ? (
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle size={14} />
+                          <span>Sofort verfügbar im Musikschul-Lager</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Wrench size={14} />
+                          <span>In Wartung / Reparatur</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Financials: Fee & Deposit */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', minWidth: '110px' }}>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
+                        {item.monthly_fee ? `${item.monthly_fee.toFixed(2).replace('.', ',')} € / Mo.` : 'Kostenfrei'}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                        Kaution: {item.deposit ? `${item.deposit.toFixed(2).replace('.', ',')} €` : 'Keine'}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isAvailable && (
+                        <button
+                          onClick={() => setShowAssignRentalModal(item)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <UserPlus size={13} />
+                          <span>Ausleihen</span>
+                        </button>
+                      )}
+
+                      {isRented && (
+                        <button
+                          onClick={() => setShowReturnRentalModal(item)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '10px',
+                            background: '#e6f4ea',
+                            color: '#166534',
+                            border: '1px solid #bbf7d0',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <RefreshCw size={13} />
+                          <span>Rückgabe</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          if (confirm(`Instrument "${item.name}" wirklich aus dem Bestand löschen?`)) {
+                            setRentalInstruments(prev => prev.filter(i => i.id !== item.id));
+                          }
+                        }}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#94a3b8',
+                          cursor: 'pointer'
+                        }}
+                        title="Instrument löschen"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* MODAL 1: ADD NEW INSTRUMENT */}
+        {showAddRentalModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', width: '100%', maxWidth: '480px', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
+                  Neues Leihinstrument registrieren
+                </h3>
+                <button onClick={() => setShowAddRentalModal(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Instrumentenbezeichnung *</label>
+                  <input
+                    type="text"
+                    placeholder="z.B. Yamaha YAS-280 Altsaxophon"
+                    value={newRentalName}
+                    onChange={e => setNewRentalName(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kategorie</label>
+                    <select
+                      value={newRentalCategory}
+                      onChange={e => setNewRentalCategory(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    >
+                      <option value="Blasinstrumente">Blasinstrumente</option>
+                      <option value="Streicher">Streicher</option>
+                      <option value="Tasten">Tasten</option>
+                      <option value="Zupfinstrumente">Zupfinstrumente</option>
+                      <option value="Schlagzeug">Schlagzeug</option>
+                      <option value="Sonstige">Sonstige</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Seriennummer / Inv-Nr.</label>
+                    <input
+                      type="text"
+                      placeholder="z.B. CG-INV-2026-050"
+                      value={newRentalSerial}
+                      onChange={e => setNewRentalSerial(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Monatliche Gebühr (€)</label>
+                    <input
+                      type="number"
+                      step="0.50"
+                      value={newRentalMonthlyFee}
+                      onChange={e => setNewRentalMonthlyFee(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kaution (€)</label>
+                    <input
+                      type="number"
+                      step="10"
+                      value={newRentalDeposit}
+                      onChange={e => setNewRentalDeposit(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Zustand bei Registrierung</label>
+                  <select
+                    value={newRentalCondition}
+                    onChange={e => setNewRentalCondition(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  >
+                    <option value="Neu">Neu</option>
+                    <option value="Sehr gut">Sehr gut</option>
+                    <option value="Gebraucht">Gebraucht mit leichten Spuren</option>
+                    <option value="Reparaturbedürftig">Reparaturbedürftig</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Zubehör & Anmerkungen</label>
+                  <textarea
+                    rows={2}
+                    placeholder="z.B. Inkl. Koffer, Mundstück und Pflegeset"
+                    value={newRentalNotes}
+                    onChange={e => setNewRentalNotes(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  onClick={() => setShowAddRentalModal(false)}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 800, color: '#64748b', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={() => {
+                    if (!newRentalName.trim()) {
+                      alert('Bitte gib eine Instrumentenbezeichnung an.');
+                      return;
+                    }
+                    const newItem = {
+                      id: `rent-${Date.now()}`,
+                      name: newRentalName.trim(),
+                      category: newRentalCategory,
+                      serial_number: newRentalSerial.trim() || `CG-INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+                      condition: newRentalCondition,
+                      status: 'available',
+                      student_id: null,
+                      student_name: null,
+                      rental_start: null,
+                      rental_end_due: null,
+                      monthly_fee: parseFloat(newRentalMonthlyFee) || 0,
+                      deposit: parseFloat(newRentalDeposit) || 0,
+                      deposit_status: 'pending',
+                      notes: newRentalNotes.trim()
+                    };
+                    setRentalInstruments(prev => [newItem, ...prev]);
+                    setShowAddRentalModal(false);
+                    setNewRentalName('');
+                    setNewRentalNotes('');
+                  }}
+                  style={{ flex: 1.5, padding: '10px', borderRadius: '10px', border: 'none', background: '#ea4335', fontWeight: 800, color: '#ffffff', cursor: 'pointer' }}
+                >
+                  Speichern
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 2: ASSIGN TO STUDENT */}
+        {showAssignRentalModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', width: '100%', maxWidth: '440px', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                  Instrument an Schüler ausleihen
+                </h3>
+                <button onClick={() => setShowAssignRentalModal(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', marginBottom: '14px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{showAssignRentalModal.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Seriennummer: {showAssignRentalModal.serial_number}</div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ position: 'relative' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>
+                    Schüler suchen oder eingeben *
+                  </label>
+
+                  {/* Selected Student Chip (If a student is selected) */}
+                  {assignStudentId && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      background: '#f0fdf4',
+                      border: '1.5px solid #bbf7d0',
+                      marginBottom: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1rem' }}>🎓</span>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#166534' }}>
+                            {assignStudentNameCustom}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 600 }}>
+                            Ausgewählter Schüler für Leihvertrag
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignStudentId('');
+                          setAssignStudentNameCustom('');
+                          setAssignStudentSearchQuery('');
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#dc2626',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        ✕ Aufheben
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Intelligent Search Input */}
+                  <div style={{ position: 'relative' }}>
+                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      type="text"
+                      placeholder="Name, Instrument oder Fach eingeben..."
+                      value={assignStudentSearchQuery || (assignStudentId ? '' : assignStudentNameCustom)}
+                      onFocus={() => setIsAssignStudentDropdownOpen(true)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setAssignStudentSearchQuery(val);
+                        setAssignStudentNameCustom(val);
+                        if (assignStudentId) setAssignStudentId('');
+                        setIsAssignStudentDropdownOpen(true);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px 10px 36px',
+                        borderRadius: '10px',
+                        border: isAssignStudentDropdownOpen ? '2px solid #ea4335' : '1px solid #cbd5e1',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        outline: 'none',
+                        transition: 'all 0.2s',
+                        boxShadow: isAssignStudentDropdownOpen ? '0 0 0 3px rgba(234, 67, 53, 0.15)' : 'none'
+                      }}
+                    />
+                    {(assignStudentSearchQuery || assignStudentNameCustom) && !assignStudentId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignStudentSearchQuery('');
+                          setAssignStudentNameCustom('');
+                          setIsAssignStudentDropdownOpen(false);
+                        }}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Floating Autocomplete Dropdown List */}
+                  {isAssignStudentDropdownOpen && !assignStudentId && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        background: '#ffffff',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.08)',
+                        border: '1px solid #e2e8f0',
+                        zIndex: 99,
+                        padding: '6px'
+                      }}
+                    >
+                      {(() => {
+                        const studentList = Array.isArray(students) ? students : [];
+                        const query = (assignStudentSearchQuery || '').toLowerCase().trim();
+                        const filtered = studentList.filter((st: any) => {
+                          if (!query) return true;
+                          const fName = (st.first_name || st.firstName || '').toLowerCase();
+                          const lName = (st.last_name || st.lastName || '').toLowerCase();
+                          const inst = (st.instrument || st.subject || '').toLowerCase();
+                          const teacher = (st.teacher_name || st.teacher || '').toLowerCase();
+                          return fName.includes(query) || lName.includes(query) || inst.includes(query) || teacher.includes(query);
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div style={{ padding: '12px', textTransform: 'none', fontSize: '0.78rem', color: '#64748b', textAlign: 'center' }}>
+                              Kein Schüler gefunden. <br />
+                              <strong style={{ color: '#0f172a' }}>"{assignStudentSearchQuery}"</strong> wird als Name verwendet.
+                            </div>
+                          );
+                        }
+
+                        return filtered.slice(0, 10).map((st: any) => {
+                          const formattedName = `${st.first_name || st.firstName || ''} ${st.last_name || st.lastName ? (st.last_name || st.lastName)[0] + '.' : ''}`.trim();
+                          return (
+                            <div
+                              key={st.id}
+                              onClick={() => {
+                                setAssignStudentId(st.id);
+                                setAssignStudentNameCustom(formattedName);
+                                setAssignStudentSearchQuery('');
+                                setIsAssignStudentDropdownOpen(false);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 10px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                transition: 'background 0.15s',
+                                fontSize: '0.82rem'
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#0f172a' }}>{formattedName}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  {st.instrument || st.subject || 'Unterricht'} {st.teacher_name ? `• Lehrer: ${st.teacher_name}` : ''}
+                                </div>
+                              </div>
+                              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ea4335', background: '#fce8e6', padding: '2px 6px', borderRadius: '6px' }}>
+                                Auswählen
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Geplante Soll-Rückgabe</label>
+                  <input
+                    type="date"
+                    value={assignDueDate}
+                    onChange={e => setAssignDueDate(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  onClick={() => setShowAssignRentalModal(null)}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 800, color: '#64748b', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={() => {
+                    if (!assignStudentNameCustom.trim()) {
+                      alert('Bitte wähle oder gib einen Schülernamen ein.');
+                      return;
+                    }
+                    setRentalInstruments(prev => prev.map(item => {
+                      if (item.id === showAssignRentalModal.id) {
+                        return {
+                          ...item,
+                          status: 'rented',
+                          student_id: assignStudentId || 'custom',
+                          student_name: assignStudentNameCustom.trim(),
+                          rental_start: new Date().toISOString().substring(0, 10),
+                          rental_end_due: assignDueDate,
+                          deposit_status: 'paid'
+                        };
+                      }
+                      return item;
+                    }));
+                    setShowAssignRentalModal(null);
+                    setAssignStudentId('');
+                    setAssignStudentNameCustom('');
+                  }}
+                  style={{ flex: 1.5, padding: '10px', borderRadius: '10px', border: 'none', background: '#2563eb', fontWeight: 800, color: '#ffffff', cursor: 'pointer' }}
+                >
+                  Ausleihe bestätigen
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 3: RETURN INSTRUMENT */}
+        {showReturnRentalModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: '#ffffff', width: '100%', maxWidth: '440px', borderRadius: '24px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                  Instrumenten-Rückgabe registrieren
+                </h3>
+                <button onClick={() => setShowReturnRentalModal(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', marginBottom: '14px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{showReturnRentalModal.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700 }}>Rückgabe von: {showReturnRentalModal.student_name}</div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Zustand bei Rückgabe</label>
+                  <select
+                    value={returnCondition}
+                    onChange={e => setReturnCondition(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  >
+                    <option value="Sehr gut">Sehr gut (Keine Mängel)</option>
+                    <option value="Gebraucht">Gebraucht (normale Abnutzung)</option>
+                    <option value="Reparaturbedürftig">Reparaturbedürftig (Schaden vorhanden)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Kaution-Status</label>
+                  <select
+                    value={returnDepositAction}
+                    onChange={e => setReturnDepositAction(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 600 }}
+                  >
+                    <option value="refunded">Vollständig zurückerstattet</option>
+                    <option value="retained">Wegen Schadens einbehalten</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  onClick={() => setShowReturnRentalModal(null)}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 800, color: '#64748b', cursor: 'pointer' }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={() => {
+                    setRentalInstruments(prev => prev.map(item => {
+                      if (item.id === showReturnRentalModal.id) {
+                        return {
+                          ...item,
+                          status: returnCondition === 'Reparaturbedürftig' ? 'maintenance' : 'available',
+                          condition: returnCondition,
+                          student_id: null,
+                          student_name: null,
+                          rental_start: null,
+                          rental_end_due: null,
+                          deposit_status: returnDepositAction
+                        };
+                      }
+                      return item;
+                    }));
+                    setShowReturnRentalModal(null);
+                  }}
+                  style={{ flex: 1.5, padding: '10px', borderRadius: '10px', border: 'none', background: '#34a853', fontWeight: 800, color: '#ffffff', cursor: 'pointer' }}
+                >
+                  Rückgabe buchen
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -12800,7 +13756,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             enabledCampusSubjects && { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
             { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
             { id: 'students', label: 'Schüler', icon: Users },
-            enabledCampusCooperations && { id: 'cooperations', label: 'Kooperationen', icon: Users },
+            enabledCampusCooperations && { id: 'cooperations', label: 'Leihinstrumente', icon: Tag },
             enabledCampusRooms && { id: 'rooms', label: 'Räume', icon: DoorOpen },
             enabledCampusEvents && { id: 'events', label: 'Termine', icon: Calendar },
             enabledCampusSchedules && { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
@@ -16965,12 +17921,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                       },
                       enabledCampusCooperations && {
                         id: 'cooperations',
-                        label: 'Kooperationen',
-                        value: `${cooperations.length} Partner`,
-                        details: `${cooperations.filter(c => c.status === 'active').length} aktiv, ${cooperations.filter(c => c.status === 'pending').length} ausstehend`,
-                        icon: Users,
-                        iconBg: '#e0e7ff',
-                        iconColor: '#4f46e5',
+                        label: 'Leihinstrumente',
+                        value: `${rentalInstruments.length} Bestand`,
+                        details: `${rentalInstruments.filter(i => i.status === 'rented').length} verliehen, ${rentalInstruments.filter(i => i.status === 'available').length} auf Lager`,
+                        icon: Tag,
+                        iconBg: '#fce8e6',
+                        iconColor: '#ea4335',
                       },
                       enabledCampusRooms && {
                         id: 'rooms',
@@ -17719,8 +18675,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {/* Subtab: Schülerboard (Campus-Schülerverwaltung) */}
               {campusSubTab === 'students' && renderCompactStudentBoard()}
 
-              {/* Subtab: Kooperationen */}
-              {campusSubTab === 'cooperations' && renderCooperationsBoard()}
+              {/* Subtab: Leihinstrumente */}
+              {campusSubTab === 'cooperations' && renderRentalInstrumentsBoard()}
 
               {/* Subtab: Campus Räume */}
               {campusSubTab === 'rooms' && (

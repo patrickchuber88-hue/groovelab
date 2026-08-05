@@ -170,7 +170,9 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
     while (y < currentYear || (y === currentYear && m <= currentMonth)) {
       const monthStr = m < 10 ? `0${m}` : `${m}`;
-      const invId = `RE-${y}-${monthStr}`;
+      const numId = schoolId ? schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
+      const yy = String(y).slice(-2);
+      const invId = `RE-${numId}-${yy}${monthStr}-01`;
       
       const lastDay = new Date(y, m, 0).getDate();
       const monthName = deMonths[m];
@@ -458,7 +460,9 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         }
       });
 
-      const calculatedInvoices: Invoice[] = (schools || []).map(school => {
+      const calculatedInvoices: Invoice[] = (schools || [])
+        .filter(school => !school.name.toLowerCase().includes('groove academy'))
+        .map(school => {
         const activeCampusUsers = metricsMap[school.id] || 0;
         
         const stats = userStatsMap[school.id] || { 
@@ -627,6 +631,16 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
       });
 
       setInvoices(calculatedInvoices);
+
+      if (calculatedInvoices.length > 0) {
+        const currentValid = calculatedInvoices.some(inv => inv.schoolId === expandedSchoolId);
+        if (!expandedSchoolId || !currentValid) {
+          const topSchool = [...calculatedInvoices].sort((a, b) => b.activeStudents - a.activeStudents)[0];
+          if (topSchool) {
+            setExpandedSchoolId(topSchool.schoolId);
+          }
+        }
+      }
       setSummary({
         totalSchools: calculatedInvoices.length,
         totalActiveCampusUsers,
