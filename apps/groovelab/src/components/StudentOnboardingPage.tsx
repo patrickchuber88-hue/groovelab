@@ -586,6 +586,8 @@ Deine Vorteile auf einen Blick:
                       setCampusUsageMode('selbstnutzer');
                       setParentAllowChat(true);
                       setParentAllowTimer(true);
+                      setParentAllowLeaderboard(true);
+                      setParentAllowAudio(true);
                     }}
                     style={{
                       padding: '12px 10px',
@@ -611,6 +613,8 @@ Deine Vorteile auf einen Blick:
                       setCampusUsageMode('eltern_geführt');
                       setParentAllowChat(true);
                       setParentAllowTimer(false);
+                      setParentAllowLeaderboard(false);
+                      setParentAllowAudio(true);
                     }}
                     style={{
                       padding: '12px 10px',
