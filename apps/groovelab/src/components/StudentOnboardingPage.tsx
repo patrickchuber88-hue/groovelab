@@ -655,7 +655,7 @@ Deine Vorteile auf einen Blick:
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff', padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', marginTop: '4px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
-                    🔒 Einzelne Campus-Rechte für dein Kind festlegen (DSGVO Art. 8):
+                    🔒 Inkludierte Leistungen &amp; Datenschutz-Option (DSGVO Art. 8):
                   </span>
                   <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
                     {campusUsageMode === 'eltern_geführt' ? 'Geschützt' : 'Vollständig'}
@@ -663,20 +663,22 @@ Deine Vorteile auf einen Blick:
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                  {/* Lehrer Chat (Core feature - always active) */}
+                  {/* Core feature 1: Lehrer Chat */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#166534', fontWeight: 700, background: '#f0fdf4', padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
                     <span>💬</span>
-                    <span>Direktnachrichten &amp; Lehrer-Chat <strong>(Aktiviert)</strong></span>
+                    <span>Direktnachrichten &amp; Lehrer-Chat <strong>(Inklusive)</strong></span>
                   </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                    <input type="checkbox" checked={parentAllowTimer} onChange={e => setParentAllowTimer(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>⏱️ Selbständiger Übe-Timer &amp; Fokus-Sessions</span>
-                  </label>
+                  {/* Core feature 2: Hausaufgabenheft */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#166534', fontWeight: 700, background: '#f0fdf4', padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                    <span>📚</span>
+                    <span>Digitales Hausaufgabenheft &amp; Übe-Protokoll <strong>(Inklusive)</strong></span>
+                  </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                  {/* Optional parental privacy setting */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '2px' }}>
                     <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>🏆 Sichtbarkeit in Schul-Übe-Bestenlisten</span>
+                    <span>🏆 Sichtbarkeit in Schul-Übe-Bestenlisten erlauben</span>
                   </label>
                 </div>
               </div>
