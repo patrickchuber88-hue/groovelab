@@ -7860,14 +7860,14 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '24px',
+                      gap: '20px',
                       textAlign: 'center',
-                      padding: '40px 20px',
-                      minHeight: '270px',
+                      padding: '30px 20px',
+                      minHeight: '300px',
                       boxSizing: 'border-box'
                     }}>
                       <div style={{
-                        fontSize: '4.8rem',
+                        fontSize: '4.5rem',
                         fontWeight: 900,
                         color: '#34a853',
                         fontFamily: 'monospace, sans-serif',
@@ -7876,13 +7876,39 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       }}>
                         {preStartCountdown}
                       </div>
-                      <div>
-                        <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', margin: '0 0 10px 0', letterSpacing: '-0.02em' }}>
-                          Handy hinlegen!
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                        <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#ffffff', margin: 0, letterSpacing: '-0.02em' }}>
+                          Fokus-Modus startet...
                         </h3>
-                        <p style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.7)', fontWeight: 650, lineHeight: 1.5, margin: 0, maxWidth: '280px' }}>
-                          Nicht den Tab oder das Programm wechseln.
+                        <p style={{ fontSize: '0.8rem', color: '#a1a1aa', margin: 0, fontWeight: 600 }}>
+                          Mach dich bereit zum Spielen am Instrument!
                         </p>
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '20px',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        maxWidth: '320px',
+                        textAlign: 'left'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#e4e4e7', fontWeight: 700 }}>
+                          <span style={{ fontSize: '1rem' }}>📱</span>
+                          <span><strong>1. Handy flach hinlegen</strong> (Tisch oder Notenständer)</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#e4e4e7', fontWeight: 700 }}>
+                          <span style={{ fontSize: '1rem' }}>🌙</span>
+                          <span><strong>2. Bildschirm wird dunkel</strong> (100% reizfrei &amp; akkusparend)</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#e4e4e7', fontWeight: 700 }}>
+                          <span style={{ fontSize: '1rem' }}>🔔</span>
+                          <span><strong>3. Lausche auf die Klang-Signale</strong> für deine Meilensteine</span>
+                        </div>
                       </div>
                     </div>
                   ) : (
