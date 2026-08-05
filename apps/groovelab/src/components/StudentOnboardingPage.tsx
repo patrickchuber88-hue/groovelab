@@ -620,31 +620,31 @@ Deine Vorteile auf einen Blick:
                 </div>
               </div>
 
-              {/* 4-Stelliger Eltern-PIN Eingabe bei "Von Eltern geführt" */}
-              {campusUsageMode === 'eltern_geführt' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>
-                    4-stelligen Eltern-PIN festlegen:
-                  </label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    placeholder="z. B. 1234"
-                    value={parentPin}
-                    onChange={(e) => setParentPin(e.target.value.replace(/\D/g, ''))}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                  <p style={{ fontSize: '0.62rem', color: '#64748b', margin: 0, textAlign: 'center' }}>
-                    Dieser PIN schützt Eltern-Einstellungen &amp; Profil-Wechsel.
-                  </p>
-                </div>
-              )}
+              {/* 4-Stelliger Profil-PIN (Universal für alle Profile) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🔑</span> 4-stelligen Profil-PIN festlegen (Verpflichtend):
+                </label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  placeholder="z. B. 1234"
+                  value={parentPin}
+                  onChange={(e) => setParentPin(e.target.value.replace(/\D/g, ''))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    boxSizing: 'border-box',
+                    fontSize: '0.85rem',
+                    letterSpacing: '0.1em'
+                  }}
+                />
+                <p style={{ fontSize: '0.62rem', color: '#64748b', margin: 0, textAlign: 'center' }}>
+                  Dieser 4-stellige PIN schützt das Profil vor unbefugtem Zugriff &amp; sichert Einstellungen ab.
+                </p>
+              </div>
 
               {/* Granular Parent Permission Controls (DSGVO Art. 8) */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '2px' }}>
@@ -693,18 +693,18 @@ Deine Vorteile auf einen Blick:
               <button
                 type="button"
                 onClick={handleSaveParentalConsent}
-                disabled={!parentalConsent || savingConsent || (campusUsageMode === 'eltern_geführt' && parentPin.length !== 4)}
+                disabled={!parentalConsent || savingConsent || parentPin.length !== 4}
                 aria-label="Datenschutz- und Audio-Einwilligung speichern"
                 style={{
                   width: '100%',
-                  background: (parentalConsent && (campusUsageMode !== 'eltern_geführt' || parentPin.length === 4)) ? '#15803d' : '#94a3b8',
+                  background: (parentalConsent && parentPin.length === 4) ? '#15803d' : '#94a3b8',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '12px',
                   padding: '10px',
                   fontSize: '0.78rem',
                   fontWeight: 800,
-                  cursor: (parentalConsent && (campusUsageMode !== 'eltern_geführt' || parentPin.length === 4)) ? 'pointer' : 'not-allowed',
+                  cursor: (parentalConsent && parentPin.length === 4) ? 'pointer' : 'not-allowed',
                   transition: 'all 0.15s'
                 }}
                 className="focus-ring"
