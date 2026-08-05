@@ -5023,6 +5023,22 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             updateHeartbeat();
           }
 
+          // Acoustic Milestone Sound Triggers (0.4s - 0.8s unobtrusive chimes)
+          const streak = avatar?.streak_flame || 0;
+          if (streak >= 3) {
+            if (nextVal === 600) playMilestoneSound(1);
+            else if (nextVal === 900) playMilestoneSound(2);
+            else if (nextVal === 1200) playMilestoneSound(3);
+          } else if (streak === 2) {
+            if (nextVal === 300) playMilestoneSound(1);
+            else if (nextVal === 600) playMilestoneSound(2);
+            else if (nextVal === 900) playMilestoneSound(3);
+          } else {
+            if (nextVal === 180) playMilestoneSound(1);
+            else if (nextVal === 300) playMilestoneSound(2);
+            else if (nextVal === 600) playMilestoneSound(3);
+          }
+
           return nextVal;
         });
       } else {
@@ -5639,6 +5655,65 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       });
     } catch (e) {
       console.warn("AudioContext success chime failed:", e);
+    }
+  };
+
+  const playMilestoneSound = (tier: 1 | 2 | 3) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      const now = ctx.currentTime;
+
+      if (tier === 1) {
+        // 0.4s Soft Glass Crystal Chime (528 Hz - Sine Wave)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(528, now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      } else if (tier === 2) {
+        // 0.6s Soft 2-Note Harp Fifth (528 Hz -> 792 Hz)
+        const notes = [528, 792];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+          gain.gain.setValueAtTime(0, now + idx * 0.15);
+          gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.15 + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.15 + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.15);
+          osc.stop(now + idx * 0.15 + 0.45);
+        });
+      } else {
+        // 0.8s Major Triad Chord (528 Hz -> 660 Hz -> 792 Hz)
+        const notes = [528, 660, 792];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+          gain.gain.setValueAtTime(0, now + idx * 0.12);
+          gain.gain.linearRampToValueAtTime(0.1, now + idx * 0.12 + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.55);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.12);
+          osc.stop(now + idx * 0.12 + 0.55);
+        });
+      }
+    } catch (e) {
+      console.warn("AudioContext milestone sound failed:", e);
     }
   };
 
