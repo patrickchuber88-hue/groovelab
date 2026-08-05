@@ -615,8 +615,21 @@ Deine Vorteile auf einen Blick:
                     }}
                   >
                     👨‍👩‍👧 Von Eltern geführt
-                    <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Mit Eltern-PIN Schutz</div>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Mit elterlicher Begleitung</div>
                   </button>
+                </div>
+
+                {/* Dynamische Erklär-Card für den gewählten Modus */}
+                <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                  {campusUsageMode === 'selbstnutzer' ? (
+                    <div style={{ fontSize: '0.68rem', color: '#334155', lineHeight: 1.4 }}>
+                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Dein Kind nutzt die App eigenständig für Hausaufgaben, Übe-Timer &amp; Unterrichts-Chat.
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.68rem', color: '#334155', lineHeight: 1.4 }}>
+                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für jüngere Kinder (Grundschule) &amp; Familien-Tablets. Eltern begleiten das Lernen und behalten die Kontrolle über Benachrichtigungen &amp; Einstellungen.
+                    </div>
+                  )}
                 </div>
               </div>
 
