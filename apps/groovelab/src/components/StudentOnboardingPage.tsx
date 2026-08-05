@@ -663,10 +663,11 @@ Deine Vorteile auf einen Blick:
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                    <input type="checkbox" checked={parentAllowChat} onChange={e => setParentAllowChat(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>💬 Direktnachrichten &amp; Lehrer-Chat erlauben</span>
-                  </label>
+                  {/* Lehrer Chat (Core feature - always active) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#166534', fontWeight: 700, background: '#f0fdf4', padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                    <span>💬</span>
+                    <span>Direktnachrichten &amp; Lehrer-Chat <strong>(Aktiviert)</strong></span>
+                  </div>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
                     <input type="checkbox" checked={parentAllowTimer} onChange={e => setParentAllowTimer(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />

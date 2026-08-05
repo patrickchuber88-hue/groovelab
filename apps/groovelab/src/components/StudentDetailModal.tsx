@@ -4111,21 +4111,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                     🔒 Elterliche Rechte-Konfiguration (DSGVO Art. 8 - Campus-Modul):
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: student.parent_allow_chat !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
-                        {student.parent_allow_chat !== false ? '✓' : '✕'}
-                      </span>
-                      <span>Direktnachrichten &amp; Lehrer-Chat</span>
+                    <div style={{ fontSize: '0.72rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                      <span style={{ color: '#22c55e', fontWeight: 800 }}>✓</span>
+                      <span>Direktnachrichten &amp; Lehrer-Chat <strong>(Inklusive)</strong></span>
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <span style={{ color: student.parent_allow_timer !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_timer !== false ? '✓' : '✕'}
                       </span>
                       <span>Selbständiger Übe-Timer &amp; Fokus</span>
                     </div>
 
-                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <span style={{ color: student.parent_allow_leaderboard !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                         {student.parent_allow_leaderboard !== false ? '✓' : '✕'}
                       </span>
