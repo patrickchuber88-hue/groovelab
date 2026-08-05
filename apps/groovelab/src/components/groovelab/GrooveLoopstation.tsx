@@ -916,6 +916,38 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     tracksRef.current = tracks;
   }, [tracks]);
 
+  // Hardware Audio & Microphone Safety Guard (Art. 201 StGB / TDDDG & DSGVO Compliance)
+  useEffect(() => {
+    isComponentMountedRef.current = true;
+
+    const stopAllMicrophoneTracks = () => {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      if (calibrationStreamRef.current) {
+        calibrationStreamRef.current.getTracks().forEach(track => track.stop());
+        calibrationStreamRef.current = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopAllMicrophoneTracks();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', stopAllMicrophoneTracks);
+
+    return () => {
+      isComponentMountedRef.current = false;
+      stopAllMicrophoneTracks();
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', stopAllMicrophoneTracks);
+    };
+  }, []);
+
   const connectTrackNode = (trackId: number, gainNode: GainNode, ctx: AudioContext) => {
     let analyser = analysersRef.current[trackId];
     if (!analyser) {

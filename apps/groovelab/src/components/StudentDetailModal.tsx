@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink, MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -13,6 +13,47 @@ import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { IDBadgeCard } from './IDBadgeCard';
 
 const brandColor = 'var(--primary-color)';
+
+export const getFormattedScheduleDayTime = (day: any, timeSlot?: string) => {
+  if (day === undefined || day === null || day === '') {
+    return timeSlot ? `Unterricht: ${timeSlot}` : 'Unterrichtszeit';
+  }
+
+  const str = String(day).trim();
+  const num = parseInt(str, 10);
+  let dayName = '';
+
+  if (!isNaN(num)) {
+    const dayMap: Record<number, string> = {
+      1: 'Montag',
+      2: 'Dienstag',
+      3: 'Mittwoch',
+      4: 'Donnerstag',
+      5: 'Freitag',
+      6: 'Samstag',
+      7: 'Sonntag',
+      0: 'Sonntag'
+    };
+    dayName = dayMap[num] || `Tag ${num}`;
+  } else {
+    const lower = str.toLowerCase();
+    if (lower.includes('mon') || lower === '1') dayName = 'Montag';
+    else if (lower.includes('die') || lower.includes('tue') || lower === '2') dayName = 'Dienstag';
+    else if (lower.includes('mit') || lower.includes('wed') || lower === '3') dayName = 'Mittwoch';
+    else if (lower.includes('don') || lower.includes('thu') || lower === '4') dayName = 'Donnerstag';
+    else if (lower.includes('fre') || lower.includes('fri') || lower === '5') dayName = 'Freitag';
+    else if (lower.includes('sam') || lower.includes('sat') || lower === '6') dayName = 'Samstag';
+    else if (lower.includes('son') || lower.includes('sun') || lower === '7' || lower === '0') dayName = 'Sonntag';
+    else dayName = str.replace(/s$/i, '');
+  }
+
+  const formattedDay = `Jeden ${dayName}`;
+  const formattedTime = timeSlot 
+    ? (timeSlot.includes('Uhr') ? timeSlot : `${timeSlot} Uhr`) 
+    : '';
+
+  return formattedTime ? `${formattedDay} um ${formattedTime}` : formattedDay;
+};
 
 interface StudentDetailModalProps {
   student: any;
@@ -2530,20 +2571,37 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               {schedulesList.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {schedulesList.map((sched: any) => (
-                    <div key={sched.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
-                          {sched.day_of_week}s, {sched.time_slot}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                          Raum: {sched.rooms?.name || 'Kein Raum'} • Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
-                        </div>
+                    <div key={sched.id} style={{ 
+                      padding: '14px 16px', 
+                      background: '#f8fafc', 
+                      borderRadius: '16px', 
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px'
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={15} style={{ color: '#34a853' }} />
+                        {getFormattedScheduleDayTime(sched.day_of_week, sched.time_slot)}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={13} style={{ color: '#94a3b8' }} />
+                          {sched.rooms?.name || 'Kein Raum'}
+                        </span>
+                        <span style={{ color: '#cbd5e1' }}>•</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <User size={13} style={{ color: '#94a3b8' }} />
+                          Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>Kein aktiver Stundenplan zugeordnet.</div>
+                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', padding: '12px', background: '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
+                  Kein aktiver Stundenplan zugeordnet.
+                </div>
               )}
             </section>
           </div>
@@ -2810,20 +2868,37 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               {schedulesList.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {schedulesList.map((sched: any) => (
-                    <div key={sched.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
-                          {sched.day_of_week}s, {sched.time_slot}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-                          Raum: {sched.rooms?.name || 'Kein Raum'} • Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
-                        </div>
+                    <div key={sched.id} style={{ 
+                      padding: '14px 16px', 
+                      background: '#f8fafc', 
+                      borderRadius: '16px', 
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px'
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={15} style={{ color: '#34a853' }} />
+                        {getFormattedScheduleDayTime(sched.day_of_week, sched.time_slot)}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={13} style={{ color: '#94a3b8' }} />
+                          {sched.rooms?.name || 'Kein Raum'}
+                        </span>
+                        <span style={{ color: '#cbd5e1' }}>•</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <User size={13} style={{ color: '#94a3b8' }} />
+                          Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>Kein aktiver Stundenplan zugeordnet.</div>
+                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', padding: '12px', background: '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
+                  Kein aktiver Stundenplan zugeordnet.
+                </div>
               )}
             </section>
           </div>

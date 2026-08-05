@@ -27,9 +27,9 @@
     - *Vollständige Direktabrechnung*: Student/parent pays the full amount of 0,49 € / Mo. (annual fee: 5,88 €). School is relieved of the passive database fee (school pays 0,00 €).
     - *Teilweise Direktabrechnung*: Student/parent pays 0,40 € / Mo. (annual fee: 4,80 €). School covers the passive database fee of 0,09 € / Mo. per student.
     - *Härtefälle & Geschwisterrabatte*: Individual students can be manually marked in the student administration to exempt them from direct billing (costs remain with the school, no contribution is collected).
-- **Student Deactivation (Deaktivierung von Schülern)**:
-  - *Monatliche Abrechnung*: Bei Deaktivierung eines Schülers entfällt die Aktivierungsgebühr am Ende des laufenden Monats.
-  - *Jährliche Abrechnung (vorab bezahlt)*: Wurde der Jahresbeitrag bereits vorab entrichtet, bleiben das Profil und alle Funktionen des Schülers bis zum Ende des Schuljahres aktiv (da bereits bezahlt), und das Profil wird erst zum Schuljahreswechsel inaktiviert.
+- **Invoice Numbering Format (Rechnungsnummer-Logik)**:
+  - **B2C Student Activations (Direktabrechnung)**: Format `CG-[STUDENT_HASH_8]-[YYMM]` (e.g., `CG-F63B8EDE-2607`). Uses the platform prefix `CG-`, the first 8 uppercase hex characters of the student ID, and 2-digit year + 2-digit month. Ensures 100% GDPR compliance (no plain text names on bank statements), unique idempotency, and exact 1:1 match with the transfer reference (`Verwendungszweck`).
+  - **B2B School Invoices (Musikschul-Sammelrechnung)**: Format `RE-[SCHOOL_ID]-[YYMM]-01` (e.g., `RE-104-2607-01`). Uses regular invoice prefix `RE-`, numeric school ID, year/month, and monthly sequence number.
 
 ## Module Feature Inclusions (Leistungsumfang der Module)
 - **Verwaltungs- und Sekretariats-Nutzer**: Administrations- und Sekretariats-Benutzer (Rollen `admin` und `secretary`) sind in den Lizenzen für das **Campus-Modul** und das **GrooveLab-Modul** vollständig inklusive und verursachen keine zusätzlichen Lizenzgebühren.

@@ -13,6 +13,7 @@ const CampusEventsBoard = React.lazy(() => import('./CampusEventsBoard').then(m 
 import { createPortal } from 'react-dom';
 import { QRCodeModal } from './QRCodeModal';
 const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
+import { ALL_STICKERS } from './MeisterwerkDocumentationModal';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
 import { cleanHomeworkNotesText } from '../utils/nameHelper';
 
@@ -586,15 +587,24 @@ function MobileBriefingView({
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        background: hasMessage ? '#fef3c7' : '#dbeafe', 
-                        color: hasMessage ? '#d97706' : '#1e40af', 
+                        background: hasMessage ? '#fef3c7' : '#ffffff', 
+                        color: hasMessage ? '#d97706' : '#475569', 
                         width: '28px',
                         height: '28px',
                         borderRadius: '50%',
-                        border: 'none',
+                        border: '1px solid rgba(0, 0, 0, 0.08)',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         flexShrink: 0
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.background = hasMessage ? '#fde68a' : '#f1f5f9';
+                        e.currentTarget.style.color = hasMessage ? '#d97706' : '#1e293b';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#ffffff';
+                        e.currentTarget.style.color = hasMessage ? '#d97706' : '#475569';
                       }}
                     >
                       <MessageSquare size={12} fill={hasMessage ? 'currentColor' : 'none'} />
@@ -1264,23 +1274,24 @@ function MobileBriefingView({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9',
-                        color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569',
+                        background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#ffffff',
+                        color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#34a853',
                         width: '44px',
                         height: '44px',
                         borderRadius: '50%',
-                        border: 'none',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         marginLeft: 'auto',
                         flexShrink: 0
                       }}
                       onMouseOver={e => {
-                        e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#e2e8f0';
-                        e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#0b57d0';
+                        e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#f1f5f9';
+                        e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#1e293b';
                       }}
                       onMouseOut={e => {
-                        e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9';
+                        e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#ffffff';
                         e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569';
                       }}
                     >
@@ -2045,14 +2056,15 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px', fontSize: '0.82rem', lineHeight: 1.5 }}>
                 <div>
                   <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 800, display: 'block', marginBottom: '6px', letterSpacing: '0.05em' }}>Vertragspartner &amp; Empfänger</span>
-                  <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.9rem' }}>Eltern (als ges. Vertreter)</strong>
+                  <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.9rem' }}>Eltern / ges. Vertreter</strong>
+                  <span style={{ color: '#0f172a', fontWeight: 600, display: 'block' }}>Schüler: {studentUser.first_name || ''} {studentUser.last_name ? studentUser.last_name.charAt(0) + '.' : ''}</span>
                   <span style={{ color: '#475569', display: 'block' }}>Musikschule: {studentUser.schools?.name || 'Mitgliedschule'}</span>
-                  <span style={{ color: '#94a3b8', fontSize: '0.7rem', display: 'block', marginTop: '4px', fontStyle: 'italic' }}>Kleinbetragsrechnung gemäß § 33 UStDV</span>
                 </div>
                 <div>
                   <span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '0.65rem', fontWeight: 800, display: 'block', marginBottom: '6px', letterSpacing: '0.05em' }}>Dienstleister / Betreiber</span>
                   <strong style={{ color: '#34a853', display: 'block', fontSize: '0.9rem' }}>Campus-Groovelab</strong>
                   <strong style={{ color: '#0f172a', display: 'block', fontWeight: 700 }}>{operatorDetails.companyName}</strong>
+                  {operatorDetails.address && <span style={{ color: '#475569', display: 'block' }}>{operatorDetails.address}</span>}
                   <span style={{ color: '#475569' }}>IBAN: {operatorDetails.iban}</span><br />
                   <span style={{ color: '#475569' }}>BIC: {operatorDetails.bic}</span>
                 </div>
@@ -2098,36 +2110,40 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                     <tr>
                       <td colSpan={2}></td>
                       <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 'bold', fontSize: '0.9rem' }}>Gesamtsumme:</td>
-                      <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 900, color: '#34a853', fontSize: '1.05rem' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
+                      <td style={{ padding: '16px 0 4px 0', textAlign: 'right', fontWeight: 900, color: '#34a853', fontSize: '1.1rem' }}>{selectedInvoice.amount.toFixed(2).replace('.', ',')} €</td>
                     </tr>
                   </tbody>
                 </table>
+                <div style={{ marginTop: '12px', fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right', lineHeight: '1.4' }}>
+                  Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).<br />
+                  Kleinbetragsrechnung gemäß § 33 UStDV.
+                </div>
               </div>
 
               {/* Payment details box with Girocode QR */}
               <div style={{
-                  background: '#faf5ff',
-                  border: '1px dashed #d8b4fe',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '18px',
                   padding: '18px',
                   fontSize: '0.78rem',
-                  color: '#5b21b6',
+                  color: '#334155',
                   lineHeight: '1.6',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
                   <div>
-                    <strong style={{ color: '#4c1d95', fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>Zahlungsinformationen</strong>
+                    <strong style={{ color: '#0f172a', fontSize: '0.85rem', display: 'block', marginBottom: '6px' }}>Zahlungsinformationen</strong>
                     Überweisen Sie den Betrag bitte unter Angabe des Verwendungszwecks an folgende Bankverbindung:<br />
                     <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', marginTop: '6px', gap: '4px 12px' }}>
                       <strong>Kontoinhaber:</strong> <span>{operatorDetails.companyName}</span>
                       <strong>IBAN:</strong> <span>{operatorDetails.iban}</span>
                       <strong>BIC:</strong> <span>{operatorDetails.bic}</span>
-                      <strong>Verwendungszweck:</strong> <strong style={{ color: '#4c1d95' }}>{selectedInvoice.id}</strong>
+                      <strong>Verwendungszweck:</strong> <strong style={{ color: '#34a853' }}>{selectedInvoice.id}</strong>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'center', background: 'white', padding: '10px', borderRadius: '14px', border: '1px solid #e2e8f0', marginLeft: '16px', flexShrink: 0 }}>
+                  <div style={{ textAlign: 'center', background: 'white', padding: '10px', borderRadius: '14px', border: '1px solid #cbd5e1', marginLeft: '16px', flexShrink: 0 }}>
                     <QRCode
                       value={`BCD\n002\n1\nSCT\n${operatorDetails.bic.replace(/\s+/g, '')}\n${operatorDetails.companyName}\n${operatorDetails.iban.replace(/\s+/g, '')}\nEUR${selectedInvoice.amount.toFixed(2)}\n\n\n${selectedInvoice.id}\n`}
                       size={90}
@@ -2229,14 +2245,15 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 35px; font-size: 0.85rem;">
                             <div>
                               <span style="color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; display: block; margin-bottom: 8px;">Vertragspartner &amp; Empfänger</span>
-                              <strong style="color: #0f172a; display: block; font-size: 1rem;">Eltern (als ges. Vertreter)</strong>
-                              <span>Musikschule: ${studentUser.schools?.name || 'Mitgliedschule'}</span><br />
-                              <span style="color: #94a3b8; font-size: 0.75rem; display: block; margin-top: 4px; font-style: italic;">Kleinbetragsrechnung gemäß § 33 UStDV</span>
+                              <strong style="color: #0f172a; display: block; font-size: 1rem;">Eltern / ges. Vertreter</strong>
+                              <span style="color: #0f172a; font-weight: 600; display: block;">Schüler: ${studentUser.first_name || ''} ${studentUser.last_name ? studentUser.last_name.charAt(0) + '.' : ''}</span>
+                              <span>Musikschule: ${studentUser.schools?.name || 'Mitgliedschule'}</span>
                             </div>
                             <div>
                               <span style="color: #64748b; text-transform: uppercase; font-size: 0.7rem; font-weight: 800; display: block; margin-bottom: 8px;">Dienstleister / Betreiber</span>
                               <strong style="color: #34a853; display: block; font-size: 1rem;">Campus-Groovelab</strong>
                               <strong style="color: #0f172a; display: block; font-weight: 600;">${operatorDetails.companyName}</strong>
+                              ${operatorDetails.address ? `<span>${operatorDetails.address}</span><br />` : ''}
                               <span>IBAN: ${operatorDetails.iban}</span><br />
                               <span>BIC: ${operatorDetails.bic}</span>
                             </div>
@@ -2259,7 +2276,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                           </div>
 
                           <!-- Table -->
-                          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 40px;">
+                          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 15px;">
                             <thead>
                               <tr style="border-bottom: 2px solid #e2e8f0; text-align: left; color: #475569; font-weight: 700;">
                                 <th style="padding: 10px 0;">Leistungsbeschreibung</th>
@@ -2278,15 +2295,20 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                             </tbody>
                           </table>
 
+                          <div style="margin-bottom: 30px; font-size: 0.75rem; color: #64748b; font-style: italic; text-align: right; line-height: 1.4;">
+                            Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).<br />
+                            Kleinbetragsrechnung gemäß § 33 UStDV.
+                          </div>
+
                           <!-- Payment details & bank transfers -->
-                          <div style="background: #faf5ff; border: 1px dashed #d8b4fe; border-radius: 16px; padding: 20px; font-size: 0.8rem; color: #5b21b6; line-height: 1.6; display: flex; justify-content: space-between; align-items: center;">
+                          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; font-size: 0.8rem; color: #334155; line-height: 1.6; display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                              <strong style="color: #4c1d95; font-size: 0.9rem; display: block; margin-bottom: 8px;">Zahlungsinformationen</strong>
+                              <strong style="color: #0f172a; font-size: 0.9rem; display: block; margin-bottom: 8px;">Zahlungsinformationen</strong>
                               Überweisen Sie den Betrag bitte unter Angabe des Verwendungszwecks an folgende Bankverbindung:<br />
                               <strong>Kontoinhaber:</strong> ${operatorDetails.companyName}<br />
                               <strong>IBAN:</strong> ${operatorDetails.iban}<br />
                               <strong>BIC:</strong> ${operatorDetails.bic}<br />
-                              <strong>Verwendungszweck:</strong> <strong style="color: #4c1d95; font-size: 0.95rem;">${selectedInvoice.id}</strong>
+                              <strong>Verwendungszweck:</strong> <strong style="color: #34a853; font-size: 0.95rem;">${selectedInvoice.id}</strong>
                             </div>
                             <div style="text-align: center; background: white; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; margin-left: 20px;">
                               <div id="qrcode-canvas"></div>
@@ -6813,26 +6835,27 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
             {/* Interactive Level Roadmap Banner (Row 2 - Below KPIs) */}
             <div style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              background: 'linear-gradient(135deg, #137333 0%, #15803d 50%, #047857 100%)',
               borderRadius: '22px',
               padding: '16px 22px',
-              color: 'white',
-              boxShadow: '0 12px 30px -10px rgba(15, 23, 42, 0.3)',
+              color: '#ffffff',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 12px 30px -8px rgba(19, 115, 51, 0.35)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
+              gap: '14px',
               position: 'relative',
               overflow: 'hidden',
               boxSizing: 'border-box'
             }}>
-              {/* Ambient Background Glow */}
+              {/* Ambient Golden Background Glow */}
               <div style={{
                 position: 'absolute',
                 top: '-40px',
                 right: '-40px',
                 width: '180px',
                 height: '180px',
-                background: 'radial-gradient(circle, rgba(52, 168, 83, 0.35) 0%, rgba(0,0,0,0) 70%)',
+                background: 'radial-gradient(circle, rgba(253, 224, 71, 0.25) 0%, rgba(0,0,0,0) 70%)',
                 borderRadius: '50%',
                 pointerEvents: 'none'
               }} />
@@ -6840,17 +6863,19 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', zIndex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{
-                    width: '36px',
-                    height: '36px',
+                    width: '38px',
+                    height: '38px',
                     borderRadius: '12px',
-                    background: '#34a853',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(8px)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.4)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.1)',
                     flexShrink: 0
                   }}>
-                    <Award size={20} color="#ffffff" />
+                    <Award size={20} color="#fde047" />
                   </div>
                   <div>
                     <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -6890,12 +6915,12 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   const progressPct = isMax ? 100 : Math.min(100, Math.max(0, ((totalFocusMinutes - prevMin) / (targetMin - prevMin)) * 100));
 
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255, 255, 255, 0.08)', padding: '5px 12px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0, 0, 0, 0.2)', padding: '5px 12px', borderRadius: '999px', border: '1px solid rgba(255, 255, 255, 0.25)' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#ffffff' }}>
                         {isMax ? '🏆 Großmeister-Status!' : `${totalFocusMinutes}/${targetMin} Min. zu ${nextStickerName}`}
                       </span>
                       <div style={{ width: '60px', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '999px', overflow: 'hidden' }}>
-                        <div style={{ width: `${progressPct}%`, height: '100%', background: '#34a853', borderRadius: '999px', transition: 'width 0.5s ease' }} />
+                        <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)', borderRadius: '999px', transition: 'width 0.5s ease' }} />
                       </div>
                     </div>
                   );
@@ -6917,13 +6942,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 {/* Line connection behind nodes */}
                 <div style={{
                   position: 'absolute',
-                  top: '19px',
+                  top: '27px',
                   left: '28px',
                   right: '28px',
                   height: '3px',
-                  background: 'linear-gradient(90deg, #34a853 0%, #34a853 50%, rgba(255,255,255,0.2) 100%)',
+                  background: 'rgba(255, 255, 255, 0.2)',
                   zIndex: 0
-                }} />
+                }}>
+                  <div style={{
+                    width: `${Math.min(100, Math.max(0, (totalFocusMinutes / 2000) * 100))}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #facc15 0%, #fde047 100%)',
+                    transition: 'width 0.5s ease'
+                  }} />
+                </div>
 
                 {[
                   { stage: 1, id: 'fleiss-pionier', title: 'Fleiß-Pionier', desc: '50 Min', icon: '🐝', done: (totalFocusMinutes >= 50), current: (totalFocusMinutes < 50) },
@@ -6937,26 +6969,26 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '5px',
+                      gap: '6px',
                       zIndex: 1,
-                      minWidth: '70px'
+                      minWidth: '75px'
                     }}
                     title={`${node.title}: ${node.desc}`}
                   >
                     <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '12px',
-                      background: node.done ? 'rgba(52, 168, 83, 0.25)' : (node.current ? 'rgba(250, 204, 21, 0.12)' : 'rgba(255, 255, 255, 0.05)'),
-                      border: node.done ? '2px solid #34a853' : (node.current ? '1.5px dashed rgba(250, 204, 21, 0.6)' : '1.5px solid rgba(255, 255, 255, 0.15)'),
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '16px',
+                      background: node.done ? '#ffffff' : (node.current ? 'rgba(253, 224, 71, 0.25)' : 'rgba(255, 255, 255, 0.12)'),
+                      border: node.done ? '2.5px solid #facc15' : (node.current ? '2px dashed #fde047' : '1.5px dashed rgba(255, 255, 255, 0.3)'),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: node.done ? '0 0 12px rgba(52, 168, 83, 0.4)' : 'none',
-                      transform: node.done ? 'scale(1.05)' : 'scale(1)',
+                      boxShadow: node.done ? '0 6px 18px rgba(250, 204, 21, 0.45)' : (node.current ? '0 4px 12px rgba(253, 224, 71, 0.25)' : 'none'),
+                      transform: node.done ? 'scale(1.08)' : (node.current ? 'scale(1.04)' : 'scale(1)'),
                       transition: 'all 0.3s ease',
                       overflow: 'hidden',
-                      padding: '3px'
+                      padding: '4px'
                     }}>
                       <img
                         src={`/stickers/${node.id}.png?v=1`}
@@ -6965,15 +6997,15 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           width: '100%',
                           height: '100%',
                           objectFit: 'contain',
-                          filter: node.done ? 'none' : 'grayscale(100%) opacity(0.35)'
+                          filter: node.done ? 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))' : 'grayscale(100%) opacity(0.4)'
                         }}
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
                             const span = document.createElement('span');
-                            span.style.fontSize = '1.1rem';
-                            span.style.filter = node.done ? 'none' : 'grayscale(100%) opacity(0.35)';
+                            span.style.fontSize = '1.3rem';
+                            span.style.filter = node.done ? 'none' : 'grayscale(100%) opacity(0.4)';
                             span.innerText = node.icon;
                             parent.appendChild(span);
                           }
@@ -6981,9 +7013,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       />
                     </div>
                     <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: node.current ? 900 : 700,
-                      color: node.current ? '#facc15' : (node.done ? '#ffffff' : 'rgba(255,255,255,0.6)'),
+                      fontSize: '0.66rem',
+                      fontWeight: node.current ? 900 : 800,
+                      color: node.done ? '#ffffff' : (node.current ? '#fde047' : 'rgba(255, 255, 255, 0.7)'),
                       textAlign: 'center',
                       whiteSpace: 'nowrap'
                     }}>
@@ -8255,18 +8287,18 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   {/* 3D Sticker Showcase */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div style={{
-                      width: '72px',
-                      height: '72px',
-                      borderRadius: '20px',
-                      background: totalFocusMinutes >= targetMin ? `radial-gradient(circle, ${stickerColor}25 0%, rgba(255,255,255,0) 70%)` : '#f8fafc',
-                      border: totalFocusMinutes >= targetMin ? `2px solid ${stickerColor}` : `1.5px dashed ${stickerColor}60`,
+                      width: '90px',
+                      height: '90px',
+                      borderRadius: '22px',
+                      background: totalFocusMinutes >= targetMin ? `radial-gradient(circle, ${stickerColor}30 0%, rgba(255,255,255,0) 70%)` : '#f8fafc',
+                      border: totalFocusMinutes >= targetMin ? `2.5px solid ${stickerColor}` : `1.5px dashed ${stickerColor}60`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: totalFocusMinutes >= targetMin ? `0 8px 24px ${stickerColor}30` : 'none',
+                      boxShadow: totalFocusMinutes >= targetMin ? `0 10px 28px ${stickerColor}35` : '0 4px 12px rgba(0,0,0,0.02)',
                       flexShrink: 0,
                       overflow: 'hidden',
-                      padding: '4px'
+                      padding: '5px'
                     }}>
                       <img 
                         src={`/stickers/${stickerId}.png?v=1`} 
@@ -9618,6 +9650,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       );
                     })()}
                   </div>
+
+
                 </div>
               </div>
             </div>
@@ -10565,19 +10599,25 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               display: 'flex', 
                               alignItems: 'center', 
                               justifyContent: 'center',
-                              background: hasMessage ? '#fef3c7' : '#e0e7ff', 
-                              color: hasMessage ? '#d97706' : '#4f46e5', 
+                              background: hasMessage ? '#fef3c7' : '#ffffff', 
+                              color: hasMessage ? '#d97706' : '#475569', 
                               width: '32px',
                               height: '32px',
                               borderRadius: '50%',
-                              border: 'none',
+                              border: '1px solid #e2e8f0',
                               cursor: 'pointer',
                               transition: 'all 0.2s',
                               flexShrink: 0,
-                              boxShadow: hasMessage ? '0 4px 10px rgba(217, 119, 6, 0.1)' : '0 4px 10px rgba(79, 70, 229, 0.1)'
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
                             }}
-                            onMouseOver={e => e.currentTarget.style.background = hasMessage ? '#fde68a' : '#c7d2fe'}
-                            onMouseOut={e => e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#e0e7ff'}
+                            onMouseOver={e => {
+                              e.currentTarget.style.background = hasMessage ? '#fde68a' : '#f1f5f9';
+                              e.currentTarget.style.color = hasMessage ? '#d97706' : '#1e293b';
+                            }}
+                            onMouseOut={e => {
+                              e.currentTarget.style.background = hasMessage ? '#fef3c7' : '#ffffff';
+                              e.currentTarget.style.color = hasMessage ? '#d97706' : '#475569';
+                            }}
                           >
                             <MessageSquare size={14} fill={hasMessage ? 'currentColor' : 'none'} />
                           </button>
@@ -11610,7 +11650,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9',
+                                background: occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f8fafc',
                                 color: occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569',
                                 width: '32px',
                                 height: '32px',
@@ -11622,11 +11662,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                                 flexShrink: 0
                               }}
                               onMouseOver={e => {
-                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#e2e8f0';
-                                e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#0b57d0';
+                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fde68a' : '#f1f5f9';
+                                e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#1e293b';
                               }}
                               onMouseOut={e => {
-                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#f1f5f9';
+                                e.currentTarget.style.background = occ.id && occurrencesWithMessages.includes(occ.id) ? '#fef3c7' : '#ffffff';
                                 e.currentTarget.style.color = occ.id && occurrencesWithMessages.includes(occ.id) ? '#d97706' : '#475569';
                               }}
                             >
@@ -11659,16 +11699,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Terminänderungen</h3>
                     </div>
                     
-                    {appointmentChanges.length === 0 ? (
-                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '16px 14px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <CheckCircle size={18} strokeWidth={2.5} />
-                        </div>
-                        <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.82rem', fontStyle: 'normal' }}>Keine bevorstehenden Terminänderungen</div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'normal' }}>Alle deine Unterrichtstermine finden regulär statt.</div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {appointmentChanges.map(occ => {
                         const d = new Date(occ.date);
                         const isReschedule = occ.status === 'pending_reschedule';
@@ -11805,7 +11836,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         );
                       })}
                     </div>
-                    )}
                   </div>
                 );
               })()}
@@ -13573,9 +13603,9 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       {pushEnabled && isPremiumUser && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '20px' }}>
                           {[
-                            { k: 'changes', label: 'Terminänderungen 📅', desc: 'Verschiebungen, Ausfälle oder Lehrerwechsel', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
-                            { k: 'homework', label: 'Hausaufgaben 📝', desc: 'Neue Übe-Aufgaben oder Feedback deiner Lehrkraft', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
-                            { k: 'news', label: 'Neuigkeiten & Aktionen 🚀', desc: 'Mitteilungen der Musikschule und interessante Aktionen', val: pushNotifAllFeatures, setter: setPushNotifAllFeatures, dbKey: 'push_notif_all_features', icon: <Users size={18} /> }
+                            { k: 'changes', label: 'Terminänderungen', desc: 'Verschiebungen, Ausfälle oder Lehrerwechsel', val: pushNotifScheduleChanges, setter: setPushNotifScheduleChanges, dbKey: 'push_notif_schedule_changes', icon: <Calendar size={18} /> },
+                            { k: 'homework', label: 'Hausaufgaben', desc: 'Neue Übe-Aufgaben oder Feedback deiner Lehrkraft', val: pushNotifHomework, setter: setPushNotifHomework, dbKey: 'push_notif_homework', icon: <Pencil size={18} /> },
+                            { k: 'news', label: 'Neuigkeiten & Aktionen', desc: 'Mitteilungen der Musikschule und interessante Aktionen', val: pushNotifAllFeatures, setter: setPushNotifAllFeatures, dbKey: 'push_notif_all_features', icon: <Users size={18} /> }
                           ].map((row) => (
                             <div key={row.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}>
                               <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>

@@ -23,20 +23,33 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [walletGuide, setWalletGuide] = useState<'apple' | 'google' | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleCompleted, setScheduleCompleted] = useState(false);
-  const [usageMode, setUsageMode] = useState<'student_self' | 'parent_hybrid' | null>(null);
+  const [campusUsageMode, setCampusUsageMode] = useState<'selbstnutzer' | 'eltern_geführt'>('selbstnutzer');
+  const [parentPin, setParentPin] = useState('');
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [parentalConsent, setParentalConsent] = useState(false);
+  const [consentSaved, setConsentSaved] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
 
-  const handleSelectUsageMode = async (mode: 'student_self' | 'parent_hybrid') => {
-    setUsageMode(mode);
-    if (student?.id) {
-      try {
-        await supabase
-          .from('users')
-          .update({ usage_mode: mode })
-          .eq('id', student.id);
-      } catch (e) {
-        console.error('Error saving usage mode:', e);
-      }
+  const handleSaveParentalConsent = async () => {
+    if (!parentalConsent || !student?.id) return;
+    if (campusUsageMode === 'eltern_geführt' && parentPin.length !== 4) return;
+    try {
+      setSavingConsent(true);
+      const timestamp = new Date().toISOString();
+      await supabase
+        .from('users')
+        .update({ 
+          parental_consent_given_at: timestamp, 
+          consent_version: 'v1.0',
+          campus_usage_mode: campusUsageMode,
+          parent_pin: campusUsageMode === 'eltern_geführt' ? parentPin : null
+        })
+        .eq('id', student.id);
+      setConsentSaved(true);
+    } catch (e) {
+      console.error('Error saving parental consent:', e);
+    } finally {
+      setSavingConsent(false);
     }
   };
 
@@ -182,6 +195,12 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
 
         setStudent(userData);
         setSchool(schoolObj);
+        if (userData.parental_consent_given_at) {
+          setConsentSaved(true);
+          setParentalConsent(true);
+          if (userData.campus_usage_mode) setCampusUsageMode(userData.campus_usage_mode);
+          if (userData.parent_pin) setParentPin(userData.parent_pin);
+        }
 
         // Fetch schedule preference status
         checkScheduleStatus(userData.id);
@@ -519,6 +538,147 @@ Deine Vorteile auf einen Blick:
         gap: '14px',
         boxSizing: 'border-box'
       }}>
+
+        {/* 0. Legal Parental Consent Box (Art. 8 DSGVO & § 31 UrhG) */}
+        <div style={{
+          background: consentSaved ? '#f0fdf4' : '#fefce8',
+          border: `1.5px solid ${consentSaved ? '#bbf7d0' : '#fef08a'}`,
+          borderRadius: '18px',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.1rem' }}>{consentSaved ? '✅' : '📜'}</span>
+            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: consentSaved ? '#166534' : '#854d0e' }}>
+              {consentSaved ? 'Eltern-Einwilligung erteilt & datiert' : 'Einwilligung der Erziehungsberechtigten (Art. 8 DSGVO / § 31 UrhG)'}
+            </div>
+          </div>
+
+          {!consentSaved ? (
+            <>
+              <p style={{ fontSize: '0.74rem', color: '#475569', margin: 0, lineHeight: 1.45 }}>
+                Verpflichtend für Erziehungsberechtigte: Richten Sie das Profil Ihres Kindes ein und wählen Sie den gewünschten Campus-Nutzungsmodus.
+              </p>
+              
+              {/* Campus-Nutzungsmodus Auswahl */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
+                  Campus-Nutzungsmodus wählen:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCampusUsageMode('selbstnutzer')}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${campusUsageMode === 'selbstnutzer' ? '#34a853' : '#cbd5e1'}`,
+                      background: campusUsageMode === 'selbstnutzer' ? '#f0fdf4' : '#ffffff',
+                      color: campusUsageMode === 'selbstnutzer' ? '#166534' : '#475569',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      textAlign: 'center'
+                    }}
+                  >
+                    👦 Selbstnutzer
+                    <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Eigenständiges Üben</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCampusUsageMode('eltern_geführt')}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${campusUsageMode === 'eltern_geführt' ? '#34a853' : '#cbd5e1'}`,
+                      background: campusUsageMode === 'eltern_geführt' ? '#f0fdf4' : '#ffffff',
+                      color: campusUsageMode === 'eltern_geführt' ? '#166534' : '#475569',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      textAlign: 'center'
+                    }}
+                  >
+                    👨‍👩‍👧 Von Eltern geführt
+                    <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Mit Eltern-PIN Schutz</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4-Stelliger Eltern-PIN Eingabe bei "Von Eltern geführt" */}
+              {campusUsageMode === 'eltern_geführt' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>
+                    4-stelligen Eltern-PIN festlegen:
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    placeholder="z. B. 1234"
+                    value={parentPin}
+                    onChange={(e) => setParentPin(e.target.value.replace(/\D/g, ''))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.9rem',
+                      letterSpacing: '0.2em',
+                      textAlign: 'center',
+                      fontWeight: 800,
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <p style={{ fontSize: '0.62rem', color: '#64748b', margin: 0, textAlign: 'center' }}>
+                    Dieser PIN schützt Eltern-Einstellungen & Profil-Wechsel.
+                  </p>
+                </div>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', marginTop: '2px' }}>
+                <input
+                  type="checkbox"
+                  checked={parentalConsent}
+                  onChange={(e) => setParentalConsent(e.target.checked)}
+                  style={{ marginTop: '3px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#1e293b', fontWeight: 600, lineHeight: 1.35 }}>
+                  Ich willige als Erziehungsberechtigte(r) in die Verarbeitung der Daten meines Kindes gemäß Datenschutzerklärung ein und erteile die Zustimmung zur Speicherung & unterrichtlichen Nutzung der erstellten Audio-Loops in der Loopstation (§ 31 UrhG).
+                </span>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleSaveParentalConsent}
+                disabled={!parentalConsent || savingConsent || (campusUsageMode === 'eltern_geführt' && parentPin.length !== 4)}
+                aria-label="Datenschutz- und Audio-Einwilligung speichern"
+                style={{
+                  width: '100%',
+                  background: (parentalConsent && (campusUsageMode !== 'eltern_geführt' || parentPin.length === 4)) ? '#15803d' : '#94a3b8',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: (parentalConsent && (campusUsageMode !== 'eltern_geführt' || parentPin.length === 4)) ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.15s'
+                }}
+                className="focus-ring"
+              >
+                {savingConsent ? 'Wird gespeichert...' : 'Profil-Einrichtung & Einwilligung bestätigen'}
+              </button>
+            </>
+          ) : (
+            <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600, lineHeight: 1.4 }}>
+              Vielen Dank! Das Profil wurde als <strong>{campusUsageMode === 'eltern_geführt' ? 'Von Eltern geführt (mit PIN)' : 'Selbstnutzer'}</strong> eingerichtet. Die Rechtssichere Einwilligung für Datenverarbeitung & Audio-Loops ist hinterlegt.
+            </div>
+          )}
+        </div>
         
         {/* 1. Hero Action: Stundenplan Wunschzeiten (Nur für Campus-Modul) */}
         {isCampus && (
@@ -559,18 +719,18 @@ Deine Vorteile auf einen Blick:
         }}>
           <button
             type="button"
-            onClick={() => handleSelectUsageMode('student_self')}
+            onClick={() => setCampusUsageMode('selbstnutzer')}
             style={{
               flex: 1,
               padding: '8px',
               borderRadius: '12px',
               border: 'none',
-              background: usageMode === 'student_self' ? '#ffffff' : 'transparent',
-              color: usageMode === 'student_self' ? '#0f172a' : '#64748b',
-              fontWeight: usageMode === 'student_self' ? 800 : 600,
+              background: campusUsageMode === 'selbstnutzer' ? '#ffffff' : 'transparent',
+              color: campusUsageMode === 'selbstnutzer' ? '#0f172a' : '#64748b',
+              fontWeight: campusUsageMode === 'selbstnutzer' ? 800 : 600,
               fontSize: '0.76rem',
               cursor: 'pointer',
-              boxShadow: usageMode === 'student_self' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+              boxShadow: campusUsageMode === 'selbstnutzer' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -578,23 +738,23 @@ Deine Vorteile auf einen Blick:
               transition: 'all 0.15s'
             }}
           >
-            <span>🎓</span> Schüler
+            <span>🎓</span> Selbstnutzer
           </button>
 
           <button
             type="button"
-            onClick={() => handleSelectUsageMode('parent_hybrid')}
+            onClick={() => setCampusUsageMode('eltern_geführt')}
             style={{
               flex: 1,
               padding: '8px',
               borderRadius: '12px',
               border: 'none',
-              background: usageMode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-              color: usageMode === 'parent_hybrid' ? '#0f172a' : '#64748b',
-              fontWeight: usageMode === 'parent_hybrid' ? 800 : 600,
+              background: campusUsageMode === 'eltern_geführt' ? '#ffffff' : 'transparent',
+              color: campusUsageMode === 'eltern_geführt' ? '#0f172a' : '#64748b',
+              fontWeight: campusUsageMode === 'eltern_geführt' ? 800 : 600,
               fontSize: '0.76rem',
               cursor: 'pointer',
-              boxShadow: usageMode === 'parent_hybrid' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+              boxShadow: campusUsageMode === 'eltern_geführt' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -602,7 +762,7 @@ Deine Vorteile auf einen Blick:
               transition: 'all 0.15s'
             }}
           >
-            <span>👨‍👩‍👧‍👦</span> Eltern (Hybrid)
+            <span>👨‍👩‍👧‍👦</span> Von Eltern geführt
           </button>
         </div>
 

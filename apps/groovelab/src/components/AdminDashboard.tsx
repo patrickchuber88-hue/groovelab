@@ -20,6 +20,8 @@ import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
+import { AVVModal } from './AVVModal';
+import { PricingTransparencyWidget } from './PricingTransparencyWidget';
 
 const cleanRoomName = (name: string | null | undefined): string => {
   if (!name) return 'Unbenannter Raum';
@@ -262,6 +264,7 @@ export function AdminDashboard({
   const [teachers, setTeachers] = useState<any[]>([]);
   const [selectedTimetableStudent, setSelectedTimetableStudent] = useState<any | null>(null);
   const [allSchedulePreferences, setAllSchedulePreferences] = useState<Record<string, any[]>>({});
+  const [showAVVModal, setShowAVVModal] = useState(false);
 
   const hasTimetableOnboarding = (s: any) => {
     if (s?.timetable_assigned_at) return true;
@@ -5540,8 +5543,8 @@ export function AdminDashboard({
           )}
 
           {editingStudent && (
-            <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#e6f4ea', border: `1px solid #e6f4ea`, borderRadius: '20px' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#34a853' }}>Schüler bearbeiten</h3>
+            <form onSubmit={handleUpdateStudent} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: activePlatform === 'campus' ? '#e6f4ea' : (activePlatform === 'groovelab' ? '#fefce8' : '#fce8e6'), border: `1px solid ${brandColor}`, borderRadius: '20px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: brandColor }}>Schüler bearbeiten</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <input required placeholder="Vorname" value={editingStudent.first_name || ''} onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
                 <input required placeholder={schoolObj?.has_campus_subscription !== false ? "Nachname" : "Nachname (Initial)"} value={editingStudent.last_name || ''} onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} style={{ padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }} />
@@ -12537,6 +12540,11 @@ export function AdminDashboard({
           activePlatform={activePlatform}
         />
       )}
+      {(admin?.role?.toLowerCase() === 'admin' || admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'master_admin') && (
+        <div style={{ marginTop: '20px' }}>
+          <PricingTransparencyWidget school={schoolObj} activePlatform={activePlatform} />
+        </div>
+      )}
     </div>
   );
 
@@ -14375,6 +14383,31 @@ export function AdminDashboard({
               );
             })}
           </div>
+
+          {/* AVV Digital Sign Button */}
+          <button
+            type="button"
+            onClick={() => setShowAVVModal(true)}
+            aria-label="Auftragsverarbeitungsvertrag AVV verwalten"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: schoolObj?.avv_signed_at ? '#f0fdf4' : '#fef2f2',
+              color: schoolObj?.avv_signed_at ? '#15803d' : '#dc2626',
+              border: `1.5px solid ${schoolObj?.avv_signed_at ? '#bbf7d0' : '#fecaca'}`,
+              padding: '10px 16px',
+              borderRadius: '16px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+            className="focus-ring"
+          >
+            <span>{schoolObj?.avv_signed_at ? '✅' : '📜'}</span>
+            <span>{schoolObj?.avv_signed_at ? 'AVV unterzeichnet' : 'AVV unterzeichnen'}</span>
+          </button>
         </header>
       )}
 
@@ -14448,6 +14481,22 @@ export function AdminDashboard({
       {renderRoomLayoutModal()}
       {renderBatchiPadModal()}
       {renderLogoutDialog()}
+
+      <AVVModal
+        isOpen={showAVVModal}
+        onClose={() => setShowAVVModal(false)}
+        school={schoolObj}
+        onAVVSigned={() => {
+          if (admin && admin.schools) {
+            setAdmin({
+              ...admin,
+              schools: Array.isArray(admin.schools)
+                ? admin.schools.map((s: any) => s.id === schoolObj?.id ? { ...s, avv_signed_at: new Date().toISOString() } : s)
+                : { ...admin.schools, avv_signed_at: new Date().toISOString() }
+            });
+          }
+        }}
+      />
 
       {/* Notebook Lehrwerk Detail Modal (Bypassed - edit mode triggered inline on click) */}
       {false && selectedLehrwerkForDetail && (() => {
@@ -17570,7 +17619,7 @@ function IDGallery({ users, brandColor, onShowQR, activePlatform }: { users: any
         }
         return src;
       } else {
-        return !src || src === '/campus_login_hero.png' ? '/avatar_ghost.jpg' : src;
+        return '/campus_login_hero.png';
       }
     }
   };

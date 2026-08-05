@@ -35,6 +35,7 @@ import { getDistanceFromLatLonInM } from './utils/geo';
 import { StudentOnboardingPage } from './components/StudentOnboardingPage';
 import { DeviceOnboardingPage } from './components/DeviceOnboardingPage';
 import { ProfileSelector } from './components/ProfileSelector';
+import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -2110,12 +2111,20 @@ function App() {
             }
           }
 
+          // Register offline sync queue flusher on network restore
+          window.addEventListener('online', () => {
+            console.log('[OfflineSync] Network restored. Flushing offline queue...');
+            flushOfflineSyncQueue();
+          });
+
           // Check for updates on the server periodically (every 5 minutes)
           setInterval(() => {
-            reg.update().catch((err) => {
-              console.warn('[PWA] Service Worker update check failed:', err);
-            });
-            console.log('[PWA] Checking for updates on the server...');
+            if (navigator.onLine) {
+              reg.update().catch((err) => {
+                console.warn('[PWA] Service Worker update check failed:', err);
+              });
+              console.log('[PWA] Checking for updates on the server...');
+            }
           }, 1000 * 60 * 5);
 
           // Handle updates

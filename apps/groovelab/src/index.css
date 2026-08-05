@@ -1531,6 +1531,17 @@ select option {
   will-change: transform, backdrop-filter;
 }
 
+/* ── BFSG / WCAG 2.1 AA Focus Ring Accessibility ── */
+.focus-ring:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #34a853 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.25) !important;
+}
+
 
 
 

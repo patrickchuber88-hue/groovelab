@@ -17752,31 +17752,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {campusSubTab === 'schedules' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, sans-serif' }}>
 
-                  {/* Pending Schedules Review Banner (Apple SF Style with High-Tech Cyan Röntgen Aesthetic) */}
+                  {/* Pending Schedules Review Banner (Warm Yellow Dashed Aesthetic) */}
                   {pendingSchedules.length > 0 && (
                     <div style={{
-                      background: '#f0f9ff',
-                      border: '1px solid rgba(2, 132, 199, 0.25)',
-                      borderLeft: '4px solid #0284c7',
-                      borderRadius: '16px',
+                      background: '#fffbeb',
+                      border: '1.5px dashed #f59e0b',
+                      borderRadius: '20px',
                       padding: '16px 22px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      boxShadow: '0 4px 16px rgba(2, 132, 199, 0.08)',
+                      boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Activity size={22} style={{ color: '#0284c7' }} />
+                        <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Activity size={22} style={{ color: '#b45309' }} />
                         </div>
                         <div>
                           <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{pendingSchedules.length} ausstehende Stundenplan-Freigaben zur Review</span>
-                            <span style={{ fontSize: '0.66rem', background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                            <span style={{ fontSize: '0.66rem', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
                               Prüfung erforderlich
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.78rem', color: '#0284c7', marginTop: '2px', fontWeight: 550 }}>
+                          <div style={{ fontSize: '0.78rem', color: '#92400e', marginTop: '2px', fontWeight: 600 }}>
                             Lehrkräfte haben neue oder geänderte Stundenpläne eingereicht.
                           </div>
                         </div>
@@ -17790,16 +17789,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             setShowOnlyPendingReviews(nextState);
                             setApprovalToast({
                               message: nextState 
-                                ? `Röntgen-Modus aktiv: Ausstehende Stundenpläne werden im High-Tech Cyan Fokus hervorgehoben` 
+                                ? `Röntgen-Modus aktiv: Ausstehende Stundenpläne werden hervorgehoben` 
                                 : 'Röntgen-Modus beendet',
                               type: 'success'
                             });
                             setTimeout(() => setApprovalToast(null), 3500);
                           }}
                           style={{
-                            background: showOnlyPendingReviews ? '#0284c7' : 'rgba(2, 132, 199, 0.1)',
-                            color: showOnlyPendingReviews ? '#ffffff' : '#0284c7',
-                            border: '1px solid rgba(2, 132, 199, 0.3)',
+                            background: showOnlyPendingReviews ? '#d97706' : '#fef3c7',
+                            color: showOnlyPendingReviews ? '#ffffff' : '#b45309',
+                            border: '1px solid #fde68a',
                             padding: '8px 16px',
                             borderRadius: '10px',
                             fontSize: '0.78rem',
@@ -17809,7 +17808,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: showOnlyPendingReviews ? '0 4px 14px rgba(2, 132, 199, 0.3)' : 'none'
+                            boxShadow: showOnlyPendingReviews ? '0 4px 14px rgba(217, 119, 6, 0.3)' : 'none'
                           }}
                         >
                           <Eye size={14} />
@@ -17821,7 +17820,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                           onClick={handleApproveAllPendingSchedules}
                           disabled={isApprovingAllSchedules}
                           style={{
-                            background: '#34a853',
+                            background: 'linear-gradient(135deg, #d97706, #b45309)',
                             color: '#ffffff',
                             border: 'none',
                             padding: '8px 18px',
@@ -17832,7 +17831,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            boxShadow: '0 2px 8px rgba(52, 168, 83, 0.2)',
+                            boxShadow: '0 2px 10px rgba(217, 119, 6, 0.25)',
                             transition: 'all 0.18s ease',
                           }}
                         >
@@ -18347,13 +18346,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           const timeColor = isGL ? '#d97706' : '#34a853';
 
                                           if (showOnlyPendingReviews && isPendingBlock) {
-                                            cardBorder = '2px solid #0284c7';
-                                            cardBorderLeft = '4px solid #0284c7';
-                                            cardBg = '#f0f9ff';
+                                            cardBorder = '1.5px dashed #f59e0b';
+                                            cardBorderLeft = '4px solid #f59e0b';
+                                            cardBg = '#fffbeb';
                                           }
 
                                           const blockOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
-                                          const blockShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(2, 132, 199, 0.25)' : (isGL ? '0 4px 8px rgba(245, 158, 11, 0.06)' : '0 4px 8px rgba(52, 168, 83, 0.06)');
+                                          const blockShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(245, 158, 11, 0.22)' : (isGL ? '0 4px 8px rgba(245, 158, 11, 0.06)' : '0 4px 8px rgba(52, 168, 83, 0.06)');
 
                                           return (
                                             <div
@@ -18415,8 +18414,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                 return null;
                                               })()}
                                               {isPendingBlock && (
-                                                <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
-                                                  <Activity size={10} style={{ color: '#0284c7' }} />
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                  <Activity size={10} style={{ color: '#b45309' }} />
                                                   <span>Review</span>
                                                 </span>
                                               )}
@@ -18552,13 +18551,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                             }
 
                                             if (showOnlyPendingReviews && isPendingBlock) {
-                                              themeBorder = '2px solid #0284c7';
-                                              themeBorderLeft = '4px solid #0284c7';
-                                              themeBg = '#f0f9ff';
+                                              themeBorder = '1.5px dashed #f59e0b';
+                                              themeBorderLeft = '4px solid #f59e0b';
+                                              themeBg = '#fffbeb';
                                             }
 
                                             const planOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
-                                            const planShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(2, 132, 199, 0.25)' : '0 1px 3px rgba(0,0,0,0.02)';
+                                            const planShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(245, 158, 11, 0.22)' : '0 1px 3px rgba(0,0,0,0.02)';
 
                                             return (
                                               <div
@@ -18619,8 +18618,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                                   return null;
                                                 })()}
                                                 {isPendingBlock && (
-                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
-                                                    <Activity size={10} style={{ color: '#0284c7' }} />
+                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                    <Activity size={10} style={{ color: '#b45309' }} />
                                                     <span>Review</span>
                                                   </span>
                                                 )}
@@ -20432,16 +20431,16 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                               let cardShadow = isSelected ? '0 2px 8px rgba(52, 168, 83, 0.06)' : '0 1px 2px rgba(0,0,0,0.01)';
 
                               if (isRontgenPending) {
-                                cardBorder = '1.5px solid #0284c7';
-                                cardBorderLeft = '4px solid #0284c7';
-                                cardShadow = '0 4px 16px rgba(2, 132, 199, 0.25)';
+                                cardBorder = '1.5px dashed #f59e0b';
+                                cardBorderLeft = '4px solid #f59e0b';
+                                cardShadow = '0 4px 16px rgba(245, 158, 11, 0.22)';
                               }
 
                               return (
                                 <div 
                                   key={tId} 
                                   style={{ 
-                                    background: isRontgenPending ? '#f0f9ff' : '#ffffff', 
+                                    background: isRontgenPending ? '#fffbeb' : '#ffffff', 
                                     border: cardBorder, 
                                     borderRadius: '10px', 
                                     overflow: 'hidden',
@@ -20470,7 +20469,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       justifyContent: 'space-between', 
                                       alignItems: 'center',
                                       background: isRontgenPending
-                                        ? 'rgba(2, 132, 199, 0.06)'
+                                        ? 'rgba(245, 158, 11, 0.08)'
                                         : isSelected 
                                           ? 'rgba(52, 168, 83, 0.04)' 
                                           : data.isUnsubmitted 
@@ -20485,7 +20484,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                         transition: 'transform 0.15s ease-out', 
                                         marginRight: '6px', 
                                         color: isRontgenPending
-                                          ? '#0284c7'
+                                          ? '#d97706'
                                           : isSelected 
                                             ? '#34a853' 
                                             : data.isUnsubmitted 
@@ -20497,7 +20496,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           fontSize: '0.74rem', 
                                           fontWeight: 700, 
                                           color: isRontgenPending
-                                            ? '#0369a1'
+                                            ? '#92400e'
                                             : isSelected 
                                               ? '#34a853' 
                                               : data.isUnsubmitted 
@@ -20511,9 +20510,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                       {isRontgenPending && (
                                         <span style={{
                                           fontSize: '0.62rem',
-                                          background: '#e0f2fe',
-                                          color: '#0369a1',
-                                          border: '1px solid #bae6fd',
+                                          background: '#fef3c7',
+                                          color: '#b45309',
+                                          border: '1px solid #fde68a',
                                           fontWeight: 800,
                                           padding: '2px 6px',
                                           borderRadius: '6px',
@@ -20521,7 +20520,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                           alignItems: 'center',
                                           gap: '3px'
                                         }}>
-                                          <Activity size={10} style={{ color: '#0284c7' }} />
+                                          <Activity size={10} style={{ color: '#b45309' }} />
                                           <span>Review</span>
                                         </span>
                                       )}

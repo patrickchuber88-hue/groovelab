@@ -5398,6 +5398,26 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   </div>
                 </button>
               </div>
+
+              {/* Transparent Passive Privacy Notice */}
+              <div style={{
+                marginTop: '16px',
+                padding: '12px 14px',
+                borderRadius: '14px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}>
+                <ShieldCheck size={18} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45, fontWeight: 500 }}>
+                  <strong style={{ color: '#1e293b', fontWeight: 800, display: 'block', marginBottom: '2px' }}>
+                    Datenschutzhinweis (Kostenfreie Leseansicht)
+                  </strong>
+                  Diese Ansicht dient der Übermittlung von Hausaufgaben und Unterrichtsterminen im Rahmen des Musikschulunterrichts (Art. 6 Abs. 1 lit. b DSGVO). Es werden keine Daten an Dritte weitergegeben. Die Nutzung interaktiver Zusatzfunktionen (Audio-Loopstation & Profilfunktionen) erfolgt nach digitaler Freischaltung durch die Erziehungsberechtigten.
+                </div>
+              </div>
             </div>
 
             {/* Minimalistic Upgrade Callout Button */}
@@ -5563,6 +5583,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </div>
               )
             )}
+
+            {/* Transparent Passive Privacy Notice */}
+            <div style={{
+              margin: '12px 0',
+              padding: '12px 14px',
+              borderRadius: '16px',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              textAlign: 'left',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+            }}>
+              <ShieldCheck size={18} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.45, fontWeight: 500 }}>
+                <strong style={{ color: '#1e293b', fontWeight: 800, display: 'block', marginBottom: '2px' }}>
+                  Datenschutzhinweis (Kostenfreie Leseansicht)
+                </strong>
+                Diese Ansicht dient der Übermittlung von Hausaufgaben und Unterrichtsterminen im Rahmen des Musikschulunterrichts (Art. 6 Abs. 1 lit. b DSGVO). Es werden keine Daten an Dritte weitergegeben. Die Nutzung interaktiver Zusatzfunktionen (Audio-Loopstation & Profilfunktionen) erfolgt nach digitaler Freischaltung durch die Erziehungsberechtigten.
+              </div>
+            </div>
 
             <div style={styles.brandFooter}>
               <Music size={14} color="#34a853" />
@@ -8199,6 +8241,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             }}>
               <Shield size={12} color="#94a3b8" />
               <span>Sichere passwortlose Verbindung</span>
+            </div>
+
+            {/* Transparent Passive Privacy Notice - Apple HIG Design */}
+            <div style={{
+              margin: '4px 16px 12px 16px',
+              padding: '10px 12px',
+              borderRadius: '16px',
+              background: 'rgba(248, 250, 252, 0.75)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(226, 232, 240, 0.9)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              textAlign: 'left'
+            }}>
+              <ShieldCheck size={14} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#334155', letterSpacing: '0.01em', marginBottom: '2px' }}>
+                  Datenschutzhinweis (Kostenfreie Leseansicht)
+                </div>
+                <div style={{ fontSize: '0.62rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                  Diese Ansicht dient der Übermittlung von Hausaufgaben und Unterrichtsterminen (Art. 6 Abs. 1 lit. b DSGVO). Interaktive Zusatzfunktionen (Audio-Loopstation & Avatare) werden nach Freischaltung durch die Erziehungsberechtigten aktiviert.
+                </div>
+              </div>
             </div>
 
             {/* Bottom Spectrum Stripe */}

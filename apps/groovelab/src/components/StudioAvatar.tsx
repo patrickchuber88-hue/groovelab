@@ -69,12 +69,12 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   const role = (targetUser?.role || '').toLowerCase();
   const isTeacher = role === 'teacher' || (Array.isArray(targetUser?.roles) && targetUser.roles.includes('teacher'));
 
-  if (isTeacher && activePlat === 'campus') {
+  if ((role === 'admin' || role === 'secretary') && !isTeacher) {
+    // Pure Admin & Secretariat users MUST display the briefing chalkboard image across all modules
+    displaySrc = '/campus_login_hero.png';
+  } else if (isTeacher && activePlat === 'campus') {
     // Teachers in Campus module must ALWAYS display their Instrumenten-Avatar!
     displaySrc = getInstrumentAvatarUrl(resolvedInstrument || targetUser?.instrument);
-  } else if ((role === 'admin' || role === 'secretary') && !isTeacher) {
-    // Pure Admin & Secretariat users display the briefing chalkboard image
-    displaySrc = '/campus_login_hero.png';
   } else if (activePlat === 'groovelab') {
     const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
     const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;

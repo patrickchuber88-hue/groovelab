@@ -5,6 +5,7 @@ import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, Ar
 import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
+import { LegalTextModal } from './LegalTextModal';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -543,6 +544,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showAgb, setShowAgb] = useState(false);
   const [showParentAgb, setShowParentAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | null>(null);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
 
@@ -6629,7 +6631,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         letterSpacing: '0.05em'
       }}>
         <span 
-          onClick={() => setShowPrivacy(true)} 
+          onClick={() => setLegalModalTab('privacy')} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
           onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
@@ -6638,7 +6640,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </span>
         <span style={{ opacity: 0.3 }}>•</span>
         <span 
-          onClick={() => setShowAgb(true)} 
+          onClick={() => setLegalModalTab('terms')} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
           onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
@@ -6647,7 +6649,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </span>
         <span style={{ opacity: 0.3 }}>•</span>
         <span 
-          onClick={() => setShowImpressum(true)} 
+          onClick={() => setLegalModalTab('impressum')} 
           style={{ cursor: 'pointer', transition: 'color 0.2s' }} 
           onMouseOver={(e) => { e.currentTarget.style.color = '#34a853'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = '#34a853'; }}
@@ -8206,6 +8208,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
       )}
 
+      {/* Unified 100% Compliant Legal Text Modal */}
+      <LegalTextModal
+        isOpen={!!legalModalTab}
+        onClose={() => setLegalModalTab(null)}
+        initialTab={legalModalTab || 'impressum'}
+      />
     </div>
   );
 }
