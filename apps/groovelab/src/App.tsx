@@ -36,6 +36,7 @@ import { StudentOnboardingPage } from './components/StudentOnboardingPage';
 import { DeviceOnboardingPage } from './components/DeviceOnboardingPage';
 import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
+import { SchoolSelfOnboardingModal } from './components/SchoolSelfOnboardingModal';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -2423,6 +2424,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isSchoolPaused, setIsSchoolPaused] = useState(false);
+  const [showSchoolOnboardingModal, setShowSchoolOnboardingModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.location.search.includes('invite=school_onboarding') || window.location.search.includes('onboarding=school');
+  });
   const [user, setUserRaw] = useState<any>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -15521,6 +15526,18 @@ function App() {
           APP_INSTRUMENT_ICONS={APP_INSTRUMENT_ICONS}
         />
       </Suspense>
+      {showSchoolOnboardingModal && (
+        <SchoolSelfOnboardingModal
+          onClose={() => setShowSchoolOnboardingModal(false)}
+          onSuccess={(schoolData, userData) => {
+            setShowSchoolOnboardingModal(false);
+            if (typeof window !== 'undefined' && window.history) {
+              safeReplaceState({}, document.title, window.location.pathname);
+            }
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   </div>
 );

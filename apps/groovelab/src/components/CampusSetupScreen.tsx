@@ -382,25 +382,61 @@ export function CampusSetupScreen({
           {settingsTab === 'datenschutz' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Datenschutz &amp; Rechtliches</h3>
-                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>AVV-Status einsehen und Unterlagen zur Schüler-Einwilligung herunterladen.</p>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>Datenschutz &amp; Sicherheits-Cockpit</h3>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>Transparente Übersicht deiner aktiven Datenschutz-Standards &amp; Schutzschirme.</p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ 
-                  background: '#f8fafc', 
-                  border: '1px solid #e2e8f0', 
-                  borderRadius: '16px', 
-                  padding: '16px', 
-                  fontSize: '0.8rem',
-                  lineHeight: '1.5',
-                  color: '#475569'
-                }}>
-                  <strong style={{ display: 'block', marginBottom: '8px', color: '#1e293b', fontSize: '0.88rem' }}>Rechtssicherer Pilotbetrieb</strong>
-                  Um den gesetzlichen Anforderungen an Schulsoftware gerecht zu werden, müssen vor dem Eintragen von Schülernamen (nur Vorname + erster Buchstabe Nachname) die Einverständniserklärungen der Erziehungsberechtigten vorliegen. Nutze dafür unser vorbereitetes Infoblatt.
+                {/* Active Guarantees Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Schülernamen-Schutz</strong>
+                      <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>AKTIV</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
+                      Alle Schülernamen im Lehrer-Dashboard werden automatisch als "Vorname + 1. Buchstabe Nachname" (z. B. Max M.) gekürzt.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Hardware-Mikrofonschutz</strong>
+                      <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>AKTIV</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
+                      Die Audio-Loopstation stoppt den Mikrofonzugriff beim Verlassen des Moduls oder Reiters sofort und vollständig.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>0% Sensible Daten</strong>
+                      <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>GESCHÜTZT</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
+                      Es werden keinerlei E-Mail-Adressen, SEPA- oder Zahlungsdaten deiner Schüler im System gespeichert.
+                    </p>
+                  </div>
                 </div>
 
-                {/* Download Card */}
+                {/* Only render AVV banner if user is admin/secretary */}
+                {(admin?.role === 'admin' || admin?.role === 'secretary') && (
+                  <div style={{ 
+                    background: '#e6f4ea', 
+                    border: '1px solid #a7f3d0', 
+                    borderRadius: '16px', 
+                    padding: '16px', 
+                    fontSize: '0.76rem',
+                    color: '#34a853',
+                    lineHeight: '1.45'
+                  }}>
+                    <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#34a853' }}>Auftragsverarbeitungsvereinbarung (AVV nach Art. 28 DSGVO)</strong>
+                    Der AVV (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Freischaltung digital gezeichnet.
+                  </div>
+                )}
+
+                {/* Optional Fallback Download Card */}
                 <div style={{ 
                   background: '#fefce8', 
                   border: '1px solid #fef08a', 
@@ -409,11 +445,12 @@ export function CampusSetupScreen({
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'space-between',
-                  gap: '12px'
+                  gap: '12px',
+                  marginTop: '8px'
                 }}>
                   <div style={{ flex: 1 }}>
-                    <strong style={{ fontSize: '0.84rem', color: '#854d0e', display: 'block', marginBottom: '2px' }}>Eltern-Information &amp; Einwilligung (Vorlage)</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#a16207', display: 'block' }}>Rechtssichere Vorlage als PDF-Datei zum Ausdrucken und Unterschreiben.</span>
+                    <strong style={{ fontSize: '0.84rem', color: '#854d0e', display: 'block', marginBottom: '2px' }}>Papier-Einwilligung (Notfall-Vorlage)</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#a16207', display: 'block' }}>Für Ausnahmefälle (Eltern ohne Smartphone): Vorlage als PDF zum Ausdrucken und Unterschreiben.</span>
                   </div>
                   <button 
                     onClick={() => {
@@ -436,21 +473,8 @@ export function CampusSetupScreen({
                     }}
                     className="hover-scale"
                   >
-                    Download
+                    PDF Laden
                   </button>
-                </div>
-
-                <div style={{ 
-                  background: '#e6f4ea', 
-                  border: '1px solid #a7f3d0', 
-                  borderRadius: '16px', 
-                  padding: '16px', 
-                  fontSize: '0.76rem',
-                  color: '#34a853',
-                  lineHeight: '1.45'
-                }}>
-                  <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#34a853' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong>
-                  Der AVV nach Art. 28 DSGVO (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Pilotphasen-Freischaltung digital gezeichnet.
                 </div>
               </div>
             </div>

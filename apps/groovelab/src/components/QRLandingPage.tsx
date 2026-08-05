@@ -62,6 +62,31 @@ const getSimulatedNow = (): Date => {
   return new Date(base.getTime() + elapsed);
 };
 
+const registerProfileLocally = (userData: any) => {
+  if (typeof window === 'undefined' || !userData || !userData.id) return;
+  try {
+    const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
+    const existingIdx = registry.findIndex((p: any) => p.id === userData.id);
+    const entry = {
+      id: userData.id,
+      first_name: userData.first_name || '',
+      last_name: userData.last_name || '',
+      photo_url: userData.photo_url || userData.avatar_url || null,
+      role: userData.role || 'student',
+      school_id: userData.school_id || null,
+      qr_token: userData.qr_token || null
+    };
+    if (existingIdx !== -1) {
+      registry[existingIdx] = { ...registry[existingIdx], ...entry };
+    } else {
+      registry.push(entry);
+    }
+    localStorage.setItem('groovelab_local_profiles', JSON.stringify(registry));
+  } catch (e) {
+    console.error('[QRLandingPage] Failed to register profile locally:', e);
+  }
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface QRLandingPageProps {
   token: string;
@@ -126,6 +151,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     // CRITICAL: Clear QR token session locks so App.tsx routes to full WebApp Dashboard (e.g. Briefing Board)
     sessionStorage.removeItem('groovelab_qr_token');
     localStorage.removeItem('groovelab_last_qr_token');
+
+    // Register profile locally for Netflix family profile selector
+    registerProfileLocally(userData);
 
     localStorage.setItem('groovelab_user_id', userData.id);
     sessionStorage.setItem('groovelab_user_id', userData.id);

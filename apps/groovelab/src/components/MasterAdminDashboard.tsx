@@ -4,7 +4,7 @@ import {
   Shield, Plus, Copy, Check, Trash2, Users, Monitor, 
   MapPin, LogOut, RefreshCw, Layers, Award, Clock, Music, GraduationCap,
   Edit2, Settings, Sliders, Search, Tag, Percent,
-  Activity, Cpu, Database, AlertTriangle, HardDrive, Server
+  Activity, Cpu, Database, AlertTriangle, HardDrive, Server, Zap, Link, Key
 } from 'lucide-react';
 
 interface ServerMetric {
@@ -249,7 +249,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   useEffect(() => {
     const titles: Record<string, string> = {
-      executive: 'Executive Command Center | Campus-Groovelab',
+      executive: 'Master Cockpit | Campus-Groovelab',
       schools: 'Schulen & Tenants | Campus-Groovelab',
       briefing: 'Briefing Board | Campus-Groovelab',
       billing: 'Financial Control | Campus-Groovelab',
@@ -879,7 +879,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               </button>
 
               {[
-                { id: 'executive', label: 'Executive Dashboard', icon: <Activity size={18} />, color: '#ea4335', bg: 'rgba(234, 67, 53, 0.08)' },
+                { id: 'executive', label: 'Master Cockpit', icon: <Activity size={18} />, color: '#ea4335', bg: 'rgba(234, 67, 53, 0.08)' },
                 { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} />, color: '#059669', bg: 'rgba(16, 185, 129, 0.08)' },
                 { id: 'briefing', label: 'Briefing Board', icon: <Clock size={18} />, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.08)' },
                 { id: 'billing', label: 'Financial Control', icon: <GraduationCap size={18} />, color: '#ca8a04', bg: 'rgba(234, 179, 8, 0.08)' },
@@ -1014,7 +1014,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                    Executive Command Center
+                    Master Cockpit
                   </h2>
                   <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', color: '#64748b', fontWeight: 550 }}>
                     Echtzeit-Finanzkennzahlen, Server-Leistung und Plattform-Status auf einen Blick.
@@ -1100,82 +1100,103 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 const totalArr = totalMrr * 12;
                 const bypassedCount = validSchools.filter(s => s.subscription_bypass || s.status === 'bypass').length;
 
+                const currentYear = new Date().getFullYear();
+                const projectedYearEndRevenue = totalArr; // Annualized projection to 31.12.
+
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
                     <div style={{
                       background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       borderRadius: '20px',
-                      padding: '24px',
+                      padding: '20px',
                       color: '#ffffff',
                       boxShadow: '0 10px 25px rgba(16, 185, 129, 0.25)',
                       position: 'relative',
                       overflow: 'hidden'
                     }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.9 }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.9 }}>
                         Monatlicher Umsatz (MRR)
                       </span>
-                      <h3 style={{ fontSize: '2.4rem', fontWeight: 900, margin: '8px 0 0 0', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                      <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
                         {totalMrr.toFixed(2)} €
                       </h3>
-                      <span style={{ fontSize: '0.78rem', opacity: 0.9, marginTop: '4px', display: 'block', fontWeight: 600 }}>
-                        B2B Schul-Flatrates: {b2bMrr.toFixed(2)} € {bypassedCount > 0 ? `(${bypassedCount} Abo-Bypass aktiv)` : ''} • B2C Schüler-Zugänge: {b2cMrr.toFixed(2)} €
+                      <span style={{ fontSize: '0.72rem', opacity: 0.9, marginTop: '4px', display: 'block', fontWeight: 600 }}>
+                        B2B: {b2bMrr.toFixed(2)} € • B2C: {b2cMrr.toFixed(2)} €
                       </span>
                     </div>
 
                     <div style={{
                       background: '#ffffff',
                       borderRadius: '20px',
-                      padding: '24px',
+                      padding: '20px',
                       border: '1px solid rgba(15, 23, 42, 0.06)',
                       boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
                     }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                         Jährliche Run-Rate (ARR)
                       </span>
-                      <h3 style={{ fontSize: '2.2rem', fontWeight: 900, margin: '8px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                      <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
                         {totalArr.toFixed(2)} €
                       </h3>
-                      <span style={{ fontSize: '0.78rem', color: '#059669', fontWeight: 700, marginTop: '4px', display: 'block' }}>
-                        Hochrechnung aller Lizenzeinnahmen auf 12 Monate
+                      <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+                        Dynamischer MRR × 12 Faktor
                       </span>
                     </div>
 
                     <div style={{
                       background: '#ffffff',
                       borderRadius: '20px',
-                      padding: '24px',
+                      padding: '20px',
                       border: '1px solid rgba(15, 23, 42, 0.06)',
                       boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
                     }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        Prognose (bis 31.12.)
+                      </span>
+                      <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                        {projectedYearEndRevenue.toFixed(2)} €
+                      </h3>
+                      <span style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+                        Erwartung zum 31.12.{currentYear}
+                      </span>
+                    </div>
+
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '20px',
+                      padding: '20px',
+                      border: '1px solid rgba(15, 23, 42, 0.06)',
+                      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
+                    }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                         Aktive Musikschulen
                       </span>
-                      <h3 style={{ fontSize: '2.2rem', fontWeight: 900, margin: '8px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                      <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
                         {validSchools.length}
                       </h3>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '4px', display: 'block' }}>
-                        {bypassedCount} im Abo-Bypass (kostenfrei) • {validSchools.filter(s => s.is_paused).length} pausiert
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '4px', display: 'block' }}>
+                        {bypassedCount} Bypass • {validSchools.filter(s => s.is_paused).length} pausiert
                       </span>
                     </div>
 
                     <div style={{
                       background: '#ffffff',
                       borderRadius: '20px',
-                      padding: '24px',
+                      padding: '20px',
                       border: '1px solid rgba(15, 23, 42, 0.06)',
                       boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
                     }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                         Offene Freischaltungen
                       </span>
-                      <h3 style={{ fontSize: '2.2rem', fontWeight: 900, margin: '8px 0 0 0', color: pendingUsers.length > 0 ? '#ef4444' : '#10b981', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
+                      <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '6px 0 0 0', color: pendingUsers.length > 0 ? '#ef4444' : '#10b981', letterSpacing: '-0.04em', fontFamily: '"Outfit", sans-serif' }}>
                         {pendingUsers.length}
                       </h3>
                       <button
                         onClick={() => setActivePortalTab('briefing')}
-                        style={{ fontSize: '0.78rem', color: '#0284c7', background: 'transparent', border: 'none', padding: 0, fontWeight: 800, cursor: 'pointer', marginTop: '4px', textDecoration: 'underline' }}
+                        style={{ fontSize: '0.72rem', color: '#0284c7', background: 'transparent', border: 'none', padding: 0, fontWeight: 800, cursor: 'pointer', marginTop: '4px', textDecoration: 'underline' }}
                       >
-                        Neuanmeldungen im Briefing Board prüfen →
+                        Prüfen →
                       </button>
                     </div>
                   </div>
@@ -3499,9 +3520,87 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     border: '1px solid rgba(15, 23, 42, 0.06)',
                     boxShadow: '0 10px 30px rgba(15, 23, 42, 0.015)'
                   }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 26px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-                      <Plus size={20} color="#d97706" /> Schule provisionieren
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 24px 0', display: 'flex', alignItems: 'center', gap: '10px', color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                      <Link size={20} /> Schul-Onboarding &amp; Provisionierung
                     </h3>
+
+                    {/* Universal Self-Onboarding Link Box */}
+                    <div style={{
+                      background: 'rgba(52, 168, 83, 0.08)',
+                      border: '1px solid rgba(52, 168, 83, 0.25)',
+                      borderRadius: '18px',
+                      padding: '20px',
+                      marginBottom: '26px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Zap size={16} /> Self-Onboarding Einladungslink
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#166534', lineHeight: 1.45, fontWeight: 500 }}>
+                        Verschicke diesen Link an Schulleiter. Der Admin meldet seine Musikschule in 3 einfachen Schritten selbst an.
+                      </p>
+
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                        <input
+                          readOnly
+                          value={`${window.location.origin}/?invite=school_onboarding`}
+                          style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(52, 168, 83, 0.2)',
+                            background: '#ffffff',
+                            fontSize: '0.78rem',
+                            fontFamily: 'monospace',
+                            color: '#15803d',
+                            fontWeight: 700,
+                            outline: 'none'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/?invite=school_onboarding`);
+                            alert('Universal Schul-Einladungslink kopiert!');
+                          }}
+                          style={{
+                            background: '#15803d',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '10px 16px',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            color: '#ffffff',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 4px 12px rgba(21, 128, 61, 0.2)'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <Copy size={13} /> Kopieren
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      margin: '0 0 24px 0',
+                      color: '#94a3b8',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em'
+                    }}>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(15, 23, 42, 0.08)' }} />
+                      <span>ODER MANUELL PROVISIONIEREN</span>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(15, 23, 42, 0.08)' }} />
+                    </div>
 
                     <form onSubmit={handleCreateSchool} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                       <div>
@@ -3642,23 +3741,23 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             }
           `}} />
 
-          {/* Frosted Details Modal Frame */}
+          {/* Fullscreen Command Mask Workspace */}
           <div style={{
-            width: '100%',
-            maxWidth: '1150px',
-            height: '86vh',
+            width: '96vw',
+            maxWidth: '1680px',
+            height: '92vh',
             background: '#ffffff',
             border: '1px solid rgba(15, 23, 42, 0.08)',
-            borderRadius: '28px',
-            boxShadow: '0 24px 60px rgba(15, 23, 42, 0.08)',
+            borderRadius: '32px',
+            boxShadow: '0 30px 80px rgba(15, 23, 42, 0.16)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
             position: 'relative'
           }}>
-            {/* Modal Header */}
+            {/* Glassmorphic Command Header */}
             <div style={{
-              padding: '22px 36px',
+              padding: '20px 36px',
               borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -3666,43 +3765,59 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               background: '#f8fafc'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Circular 44px Passepartout Avatar */}
                 <div style={{
                   width: '46px',
                   height: '46px',
-                  borderRadius: '12px',
-                  background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
+                  borderRadius: '50%',
+                  background: editLogo ? '#ffffff' : 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
+                  border: '1px solid rgba(15, 23, 42, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 900,
                   color: '#ffffff',
-                  fontSize: '1rem',
+                  fontSize: '0.92rem',
                   overflow: 'hidden',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.06)'
+                  padding: editLogo ? '4px' : 0,
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)'
                 }}>
                   {editLogo ? (
-                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
                     editName.substring(0, 2).toUpperCase()
                   )}
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
                       {editName || selectedSchool.name}
                     </h3>
                     <span style={{
                       fontSize: '0.64rem',
                       fontWeight: 800,
                       textTransform: 'uppercase',
-                      padding: '2px 8px',
+                      padding: '2px 9px',
                       borderRadius: '100px',
                       background: editStatus === 'active' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                       color: editStatus === 'active' ? '#10b981' : '#dc2626',
-                      border: `1px solid ${editStatus === 'active' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                      border: `1px solid ${editStatus === 'active' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`
                     }}>
-                      {editStatus === 'active' ? 'Aktiv' : 'Inaktiv/Gesperrt'}
+                      {editStatus === 'active' ? '● Aktiv' : '● Inaktiv/Gesperrt'}
                     </span>
+                    {editSubscriptionBypass && (
+                      <span style={{
+                        fontSize: '0.64rem',
+                        fontWeight: 800,
+                        padding: '2px 9px',
+                        borderRadius: '100px',
+                        background: 'rgba(168, 85, 247, 0.14)',
+                        color: '#6b21a8',
+                        border: '1px solid rgba(168, 85, 247, 0.35)'
+                      }}>
+                        ⚡ Abo-Bypass (Kostenfrei)
+                      </span>
+                    )}
                   </div>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
                     ID: {selectedSchool.id}
@@ -3714,13 +3829,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <button
                   onClick={() => setSelectedSchool(null)}
                   style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
+                    padding: '10px 20px',
+                    borderRadius: '12px',
                     background: '#ffffff',
                     color: '#475569',
                     border: '1px solid rgba(15, 23, 42, 0.1)',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    fontSize: '0.88rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
@@ -3731,45 +3846,48 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <button
                   onClick={handleSaveSchoolDetails}
                   style={{
-                    padding: '10px 24px',
-                    borderRadius: '10px',
-                    background: editColor || '#d97706',
+                    padding: '10px 26px',
+                    borderRadius: '12px',
+                    background: '#10b981',
                     color: '#ffffff',
                     border: 'none',
-                    fontWeight: 800,
-                    fontSize: '0.85rem',
+                    fontWeight: 900,
+                    fontSize: '0.88rem',
                     cursor: 'pointer',
-                    boxShadow: `0 4px 15px ${editColor}30`,
-                    transition: 'all 0.2s'
+                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.25)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
                   }}
                   className="hover-scale-mini"
                 >
-                  Speichern
+                  <Check size={16} /> Speichern
                 </button>
               </div>
             </div>
 
-            {/* Inner Content split */}
+            {/* Master Workspace Grid */}
             <div style={{
               flex: 1,
               display: 'grid',
               gridTemplateColumns: '320px 1fr',
               overflow: 'hidden'
             }}>
-              {/* Left Column Preview */}
+              {/* Left Sidebar Column (Identity & Status) */}
               <div style={{
                 background: '#f8fafc',
                 borderRight: '1px solid rgba(15, 23, 42, 0.06)',
-                padding: '32px',
+                padding: '28px 24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '24px',
+                gap: '20px',
                 overflowY: 'auto'
               }}>
                 <div style={{
                   background: '#ffffff',
                   border: '1px solid rgba(15, 23, 42, 0.05)',
-                  borderRadius: '16px',
+                  borderRadius: '20px',
                   padding: '24px 20px',
                   textAlign: 'center',
                   display: 'flex',
@@ -3778,27 +3896,30 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   gap: '12px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
                 }}>
+                  {/* Circular 90px Passepartout Avatar (Matches Header & List Cards) */}
                   <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '16px',
-                    background: `linear-gradient(135deg, ${editColor || '#3b82f6'} 0%, ${editColor ? editColor + 'cc' : '#1d4ed8'} 100%)`,
+                    width: '90px',
+                    height: '90px',
+                    borderRadius: '50%',
+                    background: editLogo ? '#ffffff' : 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
+                    border: '1px solid rgba(15, 23, 42, 0.1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '2rem',
+                    fontSize: '1.8rem',
                     fontWeight: 900,
                     color: '#ffffff',
                     overflow: 'hidden',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+                    padding: editLogo ? '6px' : 0,
+                    boxShadow: '0 4px 14px rgba(15, 23, 42, 0.08)'
                   }}>
                     {editLogo ? (
-                      <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={editLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     ) : (
                       editName.substring(0, 2).toUpperCase()
                     )}
                   </div>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Live-Vorschau</h4>
+                  <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>Live-Vorschau</h4>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3922,7 +4043,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                   }}>
                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                      <Settings size={16} color="#d97706" /> Stammdaten &amp; Design
+                      <Settings size={16} /> Stammdaten &amp; Design
                     </h4>
 
                     <div>
@@ -3993,36 +4114,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Branding-Farbe</label>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <input 
-                          type="color" 
-                          value={editColor} 
-                          onChange={(e) => setEditColor(e.target.value)} 
-                          style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer', background: 'transparent', padding: 0 }} 
-                        />
-                        <input 
-                          type="text" 
-                          value={editColor} 
-                          onChange={(e) => setEditColor(e.target.value)} 
-                          style={{
-                            flex: 1,
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(15,23,42,0.08)',
-                            background: '#f8fafc',
-                            fontSize: '0.88rem',
-                            fontFamily: 'monospace',
-                            color: '#0f172a',
-                            fontWeight: 700,
-                            outline: 'none'
-                          }}
-                          className="premium-input"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
                       <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>Logo Bild-URL</label>
                       <input 
                         type="text" 
@@ -4057,7 +4148,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                   }}>
                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                      <Layers size={16} color="#4f46e5" /> Modul-Abonnements
+                      <Layers size={16} /> Modul-Abonnements
                     </h4>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -4067,17 +4158,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editHasCampus ? 'rgba(56, 189, 248, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editHasCampus ? 'rgba(56, 189, 248, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editHasCampus ? 'rgba(52, 168, 83, 0.12)' : '#f8fafc',
+                        border: `1px solid ${editHasCampus ? 'rgba(52, 168, 83, 0.3)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasCampus ? '#0284c7' : '#475569' }}>🎓 Campus Modul</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 800, color: editHasCampus ? '#15803d' : '#475569' }}>
+                          <GraduationCap size={16} /> Campus Modul
+                        </span>
                         <input
                           type="checkbox"
                           checked={editHasCampus}
                           onChange={(e) => setEditHasCampus(e.target.checked)}
-                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#34a853' }}
                         />
                       </label>
 
@@ -4087,17 +4180,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editHasGroovelab ? 'rgba(251, 146, 60, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editHasGroovelab ? 'rgba(251, 146, 60, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editHasGroovelab ? 'rgba(234, 179, 8, 0.15)' : '#f8fafc',
+                        border: `1px solid ${editHasGroovelab ? 'rgba(234, 179, 8, 0.35)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editHasGroovelab ? '#ea580c' : '#475569' }}>🎸 GrooveLab Modul</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 800, color: editHasGroovelab ? '#a16207' : '#475569' }}>
+                          <Music size={16} /> GrooveLab Modul
+                        </span>
                         <input
                           type="checkbox"
                           checked={editHasGroovelab}
                           onChange={(e) => setEditHasGroovelab(e.target.checked)}
-                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#eab308' }}
                         />
                       </label>
 
@@ -4107,17 +4202,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderRadius: '12px',
-                        background: editSubscriptionBypass ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc',
-                        border: `1px solid ${editSubscriptionBypass ? 'rgba(239, 68, 68, 0.2)' : 'rgba(15,23,42,0.05)'}`,
+                        background: editSubscriptionBypass ? 'rgba(168, 85, 247, 0.14)' : '#f8fafc',
+                        border: `1px solid ${editSubscriptionBypass ? 'rgba(168, 85, 247, 0.35)' : 'rgba(15,23,42,0.05)'}`,
                         cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: editSubscriptionBypass ? '#dc2626' : '#475569' }}>⚙️ Freie Aktivierung (Abo-Bypass)</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 800, color: editSubscriptionBypass ? '#6b21a8' : '#475569' }}>
+                          <Zap size={16} /> Freie Aktivierung (Abo-Bypass)
+                        </span>
                         <input
                           type="checkbox"
                           checked={editSubscriptionBypass}
                           onChange={(e) => setEditSubscriptionBypass(e.target.checked)}
-                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#a855f7' }}
                         />
                       </label>
                     </div>
@@ -4133,7 +4230,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                 }}>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    <Clock size={16} color="#d97706" /> Kapazitäten &amp; Limits
+                    <Clock size={16} /> Kapazitäten &amp; Limits
                   </h4>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -4313,7 +4410,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   boxShadow: '0 4px 15px rgba(0,0,0,0.01)'
                 }}>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    🔗 Direkt-Links &amp; Integration
+                    <Link size={16} /> Direkt-Links &amp; Integration
                   </h4>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -4411,7 +4508,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   padding: '24px'
                 }}>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '12px' }}>
-                    💼 Hauptbenutzer / School Admins
+                    <Users size={16} /> Hauptbenutzer / School Admins
                   </h4>
 
                   {schoolStats[selectedSchool.id]?.adminUsers && schoolStats[selectedSchool.id]?.adminUsers.length > 0 ? (
@@ -4535,7 +4632,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               </div>
 
               {[
-                { id: 'executive', label: 'Executive Dashboard', desc: 'MRR, ARR & Platform Status', icon: <Activity size={16} color="#ea4335" /> },
+                { id: 'executive', label: 'Master Cockpit', desc: 'MRR, ARR & Platform Status', icon: <Activity size={16} color="#ea4335" /> },
                 { id: 'schools', label: 'Schulen & Tenants', desc: 'Musikschulen verwalten & anlegen', icon: <Layers size={16} color="#059669" /> },
                 { id: 'briefing', label: 'Briefing Board', desc: 'Schüler-Aktivierungen & CG-Hashes', icon: <Clock size={16} color="#0284c7" /> },
                 { id: 'billing', label: 'Financial Control', desc: 'Rechnungen RE-... und CG-...', icon: <GraduationCap size={16} color="#ca8a04" /> },

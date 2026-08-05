@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink, MapPin } from 'lucide-react';
+import { X, Calendar, Music, Award, Star, Clock, User, Users, Sliders, GraduationCap, BookOpen, RefreshCw, Link, Eye, EyeOff, Mic, Play, Square, Download, Copy, Smartphone, Check, Pencil, ShieldCheck, Printer, LayoutDashboard, AlertTriangle, ExternalLink, MapPin, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import QRCode from 'react-qr-code';
 import { 
@@ -207,6 +207,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
   const handleTabChange = (tab: 'campus' | 'groovelab') => {
     setLocalTab(tab);
+    if (tab === 'groovelab') {
+      setActiveModalTab('groovelab');
+    } else {
+      setActiveModalTab('dashboard');
+    }
   };
 
   const [skills, setSkills] = useState<any[]>([]);
@@ -1368,63 +1373,71 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       <head>
         <title>DSGVO-Auskunft - ${firstName} ${lastName}</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&display=swap');
+          @page {
+            size: A4;
+            margin: 12mm 15mm;
+          }
           body {
-            font-family: 'Outfit', sans-serif;
-            color: #1e293b;
-            margin: 40px;
-            line-height: 1.5;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 12px;
+            line-height: 1.45;
             background: #ffffff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .header {
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            border-bottom: 1.5px solid #e2e8f0;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
           }
           .header h1 {
             margin: 0;
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: 900;
             color: #0f172a;
+            letter-spacing: -0.02em;
           }
           .header-meta {
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             color: #64748b;
-            margin-top: 8px;
+            margin-top: 6px;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
           }
           .section {
-            margin-bottom: 25px;
+            margin-bottom: 16px;
             page-break-inside: avoid;
           }
           .section-title {
-            font-size: 1.05rem;
-            font-weight: 850;
+            font-size: 0.88rem;
+            font-weight: 900;
             color: #0f172a;
-            border-bottom: 1.5px solid #f1f5f9;
-            padding-bottom: 6px;
-            margin-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
           }
           .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            gap: 12px;
           }
           .data-box {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 12px 16px;
-            font-size: 0.85rem;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.8rem;
           }
           .data-row {
             display: flex;
             justify-content: space-between;
-            padding: 6px 0;
+            align-items: center;
+            padding: 4px 0;
             border-bottom: 1px solid #f1f5f9;
           }
           .data-row:last-child {
@@ -1432,21 +1445,21 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           }
           .data-label {
             font-weight: 600;
-            color: #475569;
+            color: #64748b;
           }
           .data-value {
-            font-weight: 700;
+            font-weight: 800;
             color: #0f172a;
           }
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.8rem;
-            margin-top: 8px;
+            font-size: 0.76rem;
+            margin-top: 6px;
           }
           th, td {
             text-align: left;
-            padding: 8px 10px;
+            padding: 6px 8px;
             border-bottom: 1px solid #e2e8f0;
           }
           th {
@@ -1454,7 +1467,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             font-weight: 800;
             color: #475569;
             text-transform: uppercase;
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             letter-spacing: 0.03em;
           }
           .badge {
@@ -1473,15 +1486,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             color: #5f6368;
           }
           .footer {
-            margin-top: 40px;
+            margin-top: 20px;
             text-align: center;
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             color: #94a3b8;
             border-top: 1px solid #e2e8f0;
-            padding-top: 16px;
+            padding-top: 10px;
           }
           @media print {
-            body { margin: 20px; }
+            body { margin: 0; padding: 0; }
             .no-print { display: none; }
           }
         </style>
@@ -1501,7 +1514,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <div class="section-title">1. Schüler-Stammdaten</div>
           <div class="grid-2">
             <div class="data-box">
-              <div class="data-row"><span class="data-label">Mitglieds-ID:</span><span class="data-value">${student.id}</span></div>
+              <div class="data-row"><span class="data-label">Mitglieds-ID:</span><span class="data-value" style="font-size:0.7rem; font-family:monospace;">${student.id}</span></div>
               <div class="data-row"><span class="data-label">Vorname:</span><span class="data-value">${firstName}</span></div>
               <div class="data-row"><span class="data-label">Nachname (Klartext):</span><span class="data-value">${lastName}</span></div>
               <div class="data-row"><span class="data-label">Künstlername/Nickname:</span><span class="data-value">${student.nickname || '-'}</span></div>
@@ -1517,23 +1530,31 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
         <div class="section">
           <div class="section-title">2. Revisionssichere Einwilligungsprotokolle (DSGVO)</div>
-          ${consentLogs.length === 0 ? '<p style="font-size:0.8rem; font-style:italic; color:#64748b;">Keine expliziten Einwilligungsprotokolle vorhanden (z.B. bei rein interner Schülerdatenverwaltung ohne Login).</p>' : `
+          ${(consentLogs.length === 0 && !student.parental_consent_given_at) ? '<p style="font-size:0.76rem; font-style:italic; color:#64748b; margin:4px 0;">Keine expliziten digitalen Einwilligungsprotokolle erfasst (z. B. bei rein interner Schülerdatenverwaltung ohne Login).</p>' : `
           <table>
             <thead>
               <tr>
                 <th>Zeitpunkt (DE)</th>
                 <th>Einwilligungstyp</th>
-                <th>IP-Adresse</th>
-                <th>Browser / User-Agent</th>
+                <th>Details / Modus</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
+              ${student.parental_consent_given_at ? `
+                <tr>
+                  <td>${new Date(student.parental_consent_given_at).toLocaleString('de-DE')}</td>
+                  <td><strong>Digitale Eltern-Einwilligung (DSGVO Art. 8)</strong></td>
+                  <td>Modus: ${student.campus_usage_mode === 'eltern_geführt' ? 'Eltern-geführt (Netflix-Modus)' : 'Selbstnutzer (PIN)'} (${student.consent_version || 'v1.0'})</td>
+                  <td><span class="badge badge-active">Verifiziert</span></td>
+                </tr>
+              ` : ''}
               ${consentLogs.map((log: any) => `
                 <tr>
                   <td>${new Date(log.created_at).toLocaleString('de-DE')}</td>
                   <td><strong>${log.consent_type === 'terms_privacy' ? 'AGB &amp; Datenschutzerklärung akzeptiert' : 'Direktnachrichten / Chat freigegeben'}</strong></td>
-                  <td>${log.ip_address || 'Anonymisiert'}</td>
-                  <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${log.user_agent || 'Unbekannt'}</td>
+                  <td>IP: ${log.ip_address || 'Anonymisiert'}</td>
+                  <td><span class="badge badge-active">Erteilt</span></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1553,7 +1574,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
                 <div class="data-row"><span class="data-label">Erhaltene Sticker:</span><span class="data-value">${(studentStats?.stickers || []).length} Sticker</span></div>
                 <div class="data-row">
                   <span class="data-label">Stickernamen:</span>
-                  <span class="data-value" style="font-size:0.75rem;">
+                  <span class="data-value" style="font-size:0.72rem;">
                     ${(studentStats?.stickers || []).join(', ') || 'Keine'}
                   </span>
                 </div>
@@ -1567,10 +1588,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           <div class="grid-2">
             <div class="data-box">
               <strong>Stundenplan-Einträge:</strong>
-              ${schedulesList.length === 0 ? '<div style="margin-top:6px; color:#64748b; font-style:italic;">Keine Einträge</div>' : `
-                <div style="margin-top:6px; font-size:0.8rem; display:flex; flex-direction:column; gap:4px;">
+              ${schedulesList.length === 0 ? '<div style="margin-top:4px; color:#64748b; font-style:italic;">Keine Einträge</div>' : `
+                <div style="margin-top:4px; font-size:0.76rem; display:flex; flex-direction:column; gap:4px;">
                   ${schedulesList.map((s: any) => `
-                    <div>&bull; ${s.day_of_week} ${s.time_slot} Uhr (${s.rooms?.name || 'Kein Raum'}) bei ${s.teacher ? `${s.teacher.first_name} ${s.teacher.last_name}` : 'Lehrkraft'} [${s.status}]</div>
+                    <div>&bull; ${getFormattedScheduleDayTime(s.day_of_week, s.time_slot)} (${s.rooms?.name || 'Kein Raum'}) bei ${s.teacher ? `${s.teacher.first_name} ${s.teacher.last_name}` : 'Lehrkraft'} [${s.status}]</div>
                   `).join('')}
                 </div>
               `}
@@ -1578,15 +1599,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             <div class="data-box">
               <strong>Gruppenunterricht-Verknüpfung:</strong>
               ${groupId ? `
-                <div style="margin-top:6px; font-size:0.8rem;">
+                <div style="margin-top:4px; font-size:0.76rem;">
                   Gruppen-ID: ${groupId}<br/>
                   Verknüpfte Partner: ${groupStudents.map((s: any) => `${s.first_name} ${s.last_name}`).join(', ')}
                 </div>
-              ` : '<div style="margin-top:6px; color:#64748b; font-style:italic;">Einzelunterricht (keine Gruppenpartner)</div>'}
-              <div style="margin-top:8px; border-top:1px solid #e2e8f0; padding-top:6px;">
+              ` : '<div style="margin-top:4px; color:#64748b; font-style:italic;">Einzelunterricht (keine Gruppenpartner)</div>'}
+              <div style="margin-top:6px; border-top:1px solid #e2e8f0; padding-top:4px;">
                 <strong>Bands/Ensembles:</strong>
                 ${bands.length === 0 ? '<span style="color:#64748b; font-style:italic;"> Keine</span>' : `
-                  <div style="margin-top:4px; font-size:0.8rem;">
+                  <div style="margin-top:2px; font-size:0.76rem;">
                     ${bands.map((b: any) => `&bull; ${b.name}`).join('<br/>')}
                   </div>
                 `}
@@ -1597,7 +1618,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
         <div class="section">
           <div class="section-title">5. Hausaufgabenheft &amp; Lernfortschritt</div>
-          ${localHomework.length === 0 ? '<p style="font-size:0.8rem; font-style:italic; color:#64748b;">Kein Lernfortschritt im Hausaufgabenheft für diesen Schüler vorhanden.</p>' : `
+          ${localHomework.length === 0 ? '<p style="font-size:0.76rem; font-style:italic; color:#64748b; margin:4px 0;">Kein Lernfortschritt im Hausaufgabenheft für diesen Schüler vorhanden.</p>' : `
             <div style="display:flex; flex-direction:column; gap:12px;">
               ${localHomework.map((item: any) => {
                 const bookTitle = globalLehrwerke.find((b: any) => b.id === item.lehrwerkId)?.title || `Lehrwerk (ID: ${item.lehrwerkId})`;
@@ -2114,28 +2135,28 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
         marginBottom: '28px',
         paddingBottom: '8px'
       }}>
-        <button
-          onClick={() => setActiveModalTab('dashboard')}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            borderBottom: activeModalTab === 'dashboard' ? `3px solid ${activeColor}` : '3px solid transparent',
-            padding: '8px 16px',
-            fontSize: '0.9rem',
-            fontWeight: 700,
-            color: activeModalTab === 'dashboard' ? '#1e293b' : '#64748b',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.15s'
-          }}
-        >
-          <LayoutDashboard size={16} style={{ color: activeModalTab === 'dashboard' ? activeColor : '#64748b' }} />
-          <span>Dashboard</span>
-        </button>
-
-        {isGroovelabActive && (
+        {localTab === 'campus' ? (
+          <button
+            onClick={() => setActiveModalTab('dashboard')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderBottom: activeModalTab === 'dashboard' ? `3px solid ${activeColor}` : '3px solid transparent',
+              padding: '8px 16px',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              color: activeModalTab === 'dashboard' ? '#1e293b' : '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <LayoutDashboard size={16} style={{ color: activeModalTab === 'dashboard' ? activeColor : '#64748b' }} />
+            <span>Dashboard</span>
+          </button>
+        ) : (
           <button
             onClick={() => setActiveModalTab('groovelab')}
             style={{
@@ -2154,7 +2175,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             }}
           >
             <Music size={16} style={{ color: activeModalTab === 'groovelab' ? '#eab308' : '#64748b' }} />
-            <span>GrooveLab</span>
+            <span>Band &amp; Songs</span>
           </button>
         )}
 
@@ -2809,95 +2830,73 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             )}
           </div>
 
-          {/* Right Column: Sidebar Widgets */}
+          {/* Right Column: Skill Radar Chart & Aktive Band-Proben */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Hero Card: Digitales Hausaufgabenheft */}
-            <section style={{
-              background: 'linear-gradient(135deg, #eab308 0%, #d97706 45%, #ea4335 100%)',
-              borderRadius: '24px',
-              padding: '22px 20px',
-              color: '#ffffff',
-              boxShadow: '0 12px 30px rgba(234, 179, 8, 0.28), 0 4px 12px rgba(234, 67, 53, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
+            {/* Skill Radar Chart Card */}
+            <section style={{ 
+              background: '#ffffff', 
+              borderRadius: '24px', 
+              padding: '20px', 
+              border: '1.5px solid #fef9c3',
+              boxShadow: '0 4px 20px rgba(234, 179, 8, 0.08)',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between'
+              alignItems: 'center'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-                  <Music size={24} color="#ffffff" />
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.9 }}>GROOVELAB MODUL</span>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', margin: '2px 0 0 0', lineHeight: 1.2 }}>Band &amp; Songs</h3>
-                </div>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#d97706', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <Music size={16} style={{ color: '#eab308' }} /> Skill Radar
+              </h4>
+              
+              <div style={{ width: '100%', height: '230px', display: 'flex', justifyContent: 'center' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="65%" data={studentRadarData}>
+                    <PolarGrid stroke="#f1f5f9" />
+                    <PolarAngleAxis dataKey="instrument" tick={({ x, y, payload }) => (
+                      <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fontWeight: 800, fill: '#64748b' }}>
+                        {payload.value}
+                      </text>
+                    )} />
+                    <Radar name="XP" dataKey="xp" stroke="#eab308" fill="#facc15" fillOpacity={0.5} />
+                  </RadarChart>
+                </ResponsiveContainer>
               </div>
-              <p style={{ fontSize: '0.78rem', opacity: 0.9, margin: '0 0 18px 0', lineHeight: 1.45 }}>
-                Band-Songs, Skill-Radare, Live Lab Sessions &amp; Repertoire des Schülers direkt einsehen.
-              </p>
-              <button 
-                onClick={handleOpenHausaufgabenheft}
-                style={{ 
-                  width: '100%', 
-                  background: '#ffffff', 
-                  color: '#d97706', 
-                  border: 'none', 
-                  borderRadius: '14px', 
-                  padding: '12px 16px', 
-                  fontWeight: 900, 
-                  fontSize: '0.85rem', 
-                  cursor: 'pointer', 
-                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '8px', 
-                  transition: 'all 0.15s ease' 
-                }}
-              >
-                <BookOpen size={16} /> <span>Hausaufgabenheft öffnen</span>
-              </button>
             </section>
 
-            {/* Aktueller Unterricht Widget */}
-            <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #f1f5f9' }}>
-              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={16} /> Aktueller Unterricht
+            {/* Aktive Band-Proben Widget (GrooveLab Data Only) */}
+            <section style={{ background: '#ffffff', borderRadius: '24px', padding: '20px', border: '1.5px solid #fef9c3' }}>
+              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, textTransform: 'uppercase', color: '#eab308', letterSpacing: '0.1em', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} /> Aktive Band-Proben (GrooveLab)
               </h3>
-              {schedulesList.length > 0 ? (
+              {bands.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {schedulesList.map((sched: any) => (
-                    <div key={sched.id} style={{ 
-                      padding: '14px 16px', 
-                      background: '#f8fafc', 
-                      borderRadius: '16px', 
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px'
+                  {bands.map((b: any) => (
+                    <div key={b.id} style={{ 
                     }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Clock size={15} style={{ color: '#34a853' }} />
-                        {getFormattedScheduleDayTime(sched.day_of_week, sched.time_slot)}
+                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Users size={15} style={{ color: '#eab308' }} />
+                        {b.name}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#a16207', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={13} style={{ color: '#94a3b8' }} />
-                          {sched.rooms?.name || 'Kein Raum'}
+                          <Clock size={13} style={{ color: '#ca8a04' }} />
+                          {b.rehearsal_time || b.schedule || 'Regelmäßige Bandprobe'}
                         </span>
-                        <span style={{ color: '#cbd5e1' }}>•</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <User size={13} style={{ color: '#94a3b8' }} />
-                          Lehrer: {sched.teacher?.first_name} {sched.teacher?.last_name}
-                        </span>
+                        {b.room_name && (
+                          <>
+                            <span style={{ color: '#fef08a' }}>•</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <MapPin size={13} style={{ color: '#ca8a04' }} />
+                              {b.room_name}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic', padding: '12px', background: '#f8fafc', borderRadius: '12px', textAlign: 'center' }}>
-                  Kein aktiver Stundenplan zugeordnet.
+                <div style={{ fontSize: '0.82rem', color: '#a16207', fontStyle: 'italic', padding: '12px', background: '#fefce8', borderRadius: '12px', textAlign: 'center', border: '1px solid #fef08a' }}>
+                  Keine aktiven GrooveLab Band-Proben zugeordnet.
                 </div>
               )}
             </section>

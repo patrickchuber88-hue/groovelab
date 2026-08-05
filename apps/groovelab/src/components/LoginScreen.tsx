@@ -3928,27 +3928,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         
         {schoolData?.logo_url ? (
           <div style={{
-            maxHeight: '70px',
-            maxWidth: '240px',
+            width: '72px',
+            height: '72px',
+            borderRadius: '50%',
+            background: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '20px',
-            background: logoTheme === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            padding: '10px 24px',
-            borderRadius: '20px',
-            border: logoTheme === 'light' ? '1px solid rgba(255, 255, 255, 0.8)' : '1px solid rgba(255, 255, 255, 0.15)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+            padding: '8px',
+            border: '2px solid rgba(255, 255, 255, 0.8)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)',
+            overflow: 'hidden'
           }}>
             <img 
               src={schoolData.logo_url} 
-              alt="Logo" 
-
+              alt={schoolName || "Schul logo"} 
               style={{ 
-                maxHeight: '60px',
-                maxWidth: '100%',
+                width: '100%',
+                height: '100%',
                 objectFit: 'contain'
               }} 
             />

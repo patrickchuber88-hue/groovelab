@@ -296,12 +296,14 @@ export const LandingPage2: React.FC<LandingPage2Props> = ({
           color: #a1a1aa;
         }
         .school-logo-image {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
-          object-fit: cover;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: white;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          object-fit: contain;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: #ffffff;
+          padding: 4px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
         
         .text-gradient {

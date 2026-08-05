@@ -25,18 +25,19 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
 
   const handleProfileSelect = async (profile: any) => {
     const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-    const isGroovelabPlatform = urlParams.get('platform') === 'groovelab' || localStorage.getItem('groovelab_active_platform') === 'groovelab';
+    const activePlatform = urlParams.get('platform') || localStorage.getItem('groovelab_active_platform') || 'campus';
+    const isCampusPlatform = activePlatform === 'campus';
 
-    if (profile.role === 'student' && isGroovelabPlatform) {
+    if (profile.role === 'student') {
       setLoading(true);
       setError(null);
       try {
-        // Log in student immediately
+        // Log in student immediately (Netflix 1-click mode)
         sessionStorage.setItem('groovelab_user_id', profile.id);
         sessionStorage.setItem('groovelab_location_mode', 'home');
-        localStorage.setItem('groovelab_active_platform', 'groovelab');
+        localStorage.setItem('groovelab_active_platform', isCampusPlatform ? 'campus' : (profile.is_campus_active ? 'campus' : 'groovelab'));
 
-        // Update local cache
+        // Update local cache registry
         const registry = JSON.parse(localStorage.getItem('groovelab_local_profiles') || '[]');
         const idx = registry.findIndex((p: any) => p.id === profile.id);
         if (idx !== -1) {
@@ -51,7 +52,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({ onLoginSuccess
 
         onLoginSuccess(profile.id);
       } catch (err: any) {
-        console.error('[ProfileSelector] Groovelab direct login error:', err);
+        console.error('[ProfileSelector] Student direct login error:', err);
         setError(err.message || 'Verbindung zum Server fehlgeschlagen.');
       } finally {
         setLoading(false);
