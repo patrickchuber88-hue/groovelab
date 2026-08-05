@@ -639,11 +639,11 @@ Deine Vorteile auf einen Blick:
                 <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
                   {campusUsageMode === 'selbstnutzer' ? (
                     <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.45 }}>
-                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Alle Funktionen (Hausaufgaben, Übe-Timer, Bestenlisten &amp; Gruppen) sind aktiviert.
+                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Dein Kind nutzt die App eigenständig für Hausaufgaben, Fokus-Timer &amp; Bestenlisten.
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.45 }}>
-                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für Grundschulkinder &amp; Familien-Tablets. Bestenlisten &amp; Gruppen-Chats sind zum Schutz deines Kindes automatisch deaktiviert. Übezeit wird per 1-Klick von Eltern verbucht.
+                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für Grundschulkinder &amp; Familien-Tablets. Bestenlisten sind zum Schutz deines Kindes standardmäßig deaktiviert. Übezeit wird per 1-Klick von Eltern verbucht.
                     </div>
                   )}
                 </div>
