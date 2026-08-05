@@ -30,13 +30,13 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [consentSaved, setConsentSaved] = useState(false);
   const [savingConsent, setSavingConsent] = useState(false);
 
-  // Granular DSGVO Art. 8 Parent Rights
+  // Granular DSGVO Art. 8 Parent Rights (Privacy by Default / Opt-In)
   const [parentAllowChat, setParentAllowChat] = useState(true);
   const [parentAllowTimer, setParentAllowTimer] = useState(true);
-  const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(true);
-  const [parentAllowGroups, setParentAllowGroups] = useState(true);
+  const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(false);
+  const [parentAllowGroups, setParentAllowGroups] = useState(false);
   const [parentAllowProposals, setParentAllowProposals] = useState(true);
-  const [parentAllowAudio, setParentAllowAudio] = useState(true);
+  const [parentAllowAudio, setParentAllowAudio] = useState(false);
 
   const handleSaveParentalConsent = async () => {
     if (!parentalConsent || !student?.id) return;
@@ -586,9 +586,6 @@ Deine Vorteile auf einen Blick:
                       setCampusUsageMode('selbstnutzer');
                       setParentAllowChat(true);
                       setParentAllowTimer(true);
-                      setParentAllowLeaderboard(true);
-                      setParentAllowGroups(true);
-                      setParentAllowProposals(true);
                     }}
                     style={{
                       padding: '12px 10px',
@@ -614,9 +611,6 @@ Deine Vorteile auf einen Blick:
                       setCampusUsageMode('eltern_geführt');
                       setParentAllowChat(true);
                       setParentAllowTimer(false);
-                      setParentAllowLeaderboard(false);
-                      setParentAllowGroups(false);
-                      setParentAllowProposals(true);
                     }}
                     style={{
                       padding: '12px 10px',
