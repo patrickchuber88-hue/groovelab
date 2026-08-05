@@ -1186,7 +1186,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 }}
                 className="hover-scale"
               >
-                <span>🛡️ 13 von 13 Sicherheits-Stufen erfüllt</span>
+                <span>🛡️ 15 von 15 Sicherheits-Stufen erfüllt</span>
                 <span style={{ 
                   background: '#34a853', 
                   color: 'white', 

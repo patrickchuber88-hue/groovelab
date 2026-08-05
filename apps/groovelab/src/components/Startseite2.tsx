@@ -1188,7 +1188,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 }}
                 className="hover-scale"
               >
-                <span>🛡️ 13 von 13 Sicherheits-Stufen erfüllt</span>
+                <span>🛡️ 15 von 15 Sicherheits-Stufen erfüllt</span>
                 <span style={{ 
                   background: '#34a853', 
                   color: 'white', 
