@@ -747,63 +747,6 @@ Deine Vorteile auf einen Blick:
           </button>
         )}
 
-        {/* 2. Wer nutzt diesen Zugang? (Segmented Control) */}
-        <div style={{ 
-          background: '#f8fafc', 
-          borderRadius: '16px', 
-          padding: '4px', 
-          border: '1px solid #e2e8f0', 
-          display: 'flex', 
-          alignItems: 'center' 
-        }}>
-          <button
-            type="button"
-            onClick={() => setCampusUsageMode('selbstnutzer')}
-            style={{
-              flex: 1,
-              padding: '8px',
-              borderRadius: '12px',
-              border: 'none',
-              background: campusUsageMode === 'selbstnutzer' ? '#ffffff' : 'transparent',
-              color: campusUsageMode === 'selbstnutzer' ? '#0f172a' : '#64748b',
-              fontWeight: campusUsageMode === 'selbstnutzer' ? 800 : 600,
-              fontSize: '0.76rem',
-              cursor: 'pointer',
-              boxShadow: campusUsageMode === 'selbstnutzer' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s'
-            }}
-          >
-            <span>🎓</span> Selbstnutzer
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCampusUsageMode('eltern_geführt')}
-            style={{
-              flex: 1,
-              padding: '8px',
-              borderRadius: '12px',
-              border: 'none',
-              background: campusUsageMode === 'eltern_geführt' ? '#ffffff' : 'transparent',
-              color: campusUsageMode === 'eltern_geführt' ? '#0f172a' : '#64748b',
-              fontWeight: campusUsageMode === 'eltern_geführt' ? 800 : 600,
-              fontSize: '0.76rem',
-              cursor: 'pointer',
-              boxShadow: campusUsageMode === 'eltern_geführt' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s'
-            }}
-          >
-            <span>👨‍👩‍👧‍👦</span> Von Eltern geführt
-          </button>
-        </div>
 
         {/* 3. Export Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
