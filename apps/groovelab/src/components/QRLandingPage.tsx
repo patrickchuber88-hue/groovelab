@@ -8272,29 +8272,49 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </div>
 
             {/* Transparent Passive Privacy Notice - Apple HIG Design */}
-            <div style={{
-              margin: '4px 16px 12px 16px',
-              padding: '10px 12px',
-              borderRadius: '16px',
-              background: 'rgba(248, 250, 252, 0.75)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              border: '1px solid rgba(226, 232, 240, 0.9)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '8px',
-              textAlign: 'left'
-            }}>
-              <ShieldCheck size={14} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#334155', letterSpacing: '0.01em', marginBottom: '2px' }}>
-                  Datenschutzhinweis (Kostenfreie Leseansicht)
-                </div>
-                <div style={{ fontSize: '0.62rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
-                  Diese Ansicht dient der Übermittlung von Hausaufgaben und Unterrichtsterminen (Art. 6 Abs. 1 lit. b DSGVO). Interaktive Zusatzfunktionen (Audio-Loopstation & Avatare) werden nach Freischaltung durch die Erziehungsberechtigten aktiviert.
+            {profile.is_campus_active || profile.is_groovelab_active || profile.app_usage_mode === 'parent_hybrid' || profile.is_pin_activated ? (
+              <div style={{
+                margin: '4px 16px 12px 16px',
+                padding: '8px 12px',
+                borderRadius: '12px',
+                background: '#e6f4ea',
+                border: '1px solid #ceead6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                fontSize: '0.66rem',
+                fontWeight: 800,
+                color: '#137333'
+              }}>
+                <ShieldCheck size={14} color="#34a853" />
+                <span>Vollzugriff aktiv (Ende-zu-Ende verschlüsselt gem. DSGVO Art. 6 Abs. 1 lit. b)</span>
+              </div>
+            ) : (
+              <div style={{
+                margin: '4px 16px 12px 16px',
+                padding: '10px 12px',
+                borderRadius: '16px',
+                background: 'rgba(248, 250, 252, 0.75)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(226, 232, 240, 0.9)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                textAlign: 'left'
+              }}>
+                <ShieldCheck size={14} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#334155', letterSpacing: '0.01em', marginBottom: '2px' }}>
+                    Datenschutzhinweis (Kostenfreie Leseansicht)
+                  </div>
+                  <div style={{ fontSize: '0.62rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+                    Diese Ansicht dient der Übermittlung von Hausaufgaben und Unterrichtsterminen (Art. 6 Abs. 1 lit. b DSGVO). Interaktive Zusatzfunktionen (Audio-Loopstation &amp; Avatare) werden nach Freischaltung durch die Erziehungsberechtigten aktiviert.
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Bottom Spectrum Stripe */}
             {!timerRunning && <div style={{ height: '8px', width: '100%', background: studentSpectrumGradient, flexShrink: 0, marginTop: 'auto' }} />}

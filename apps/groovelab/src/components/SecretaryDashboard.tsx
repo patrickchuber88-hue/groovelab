@@ -24502,7 +24502,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                                   </div>
                                   <div style={{ fontSize: '0.66rem', color: '#d97706', lineHeight: '1.4', borderTop: '1px solid #fed7aa', paddingTop: '8px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <span>💡 <strong>Hinweis zu Härtefällen &amp; Geschwisterrabatten:</strong> In deiner Schülerverwaltung kannst du einzelne Schüler manuell als „Härtefall / Geschwisterrabatt“ markieren, um sie komplett von der Direktabrechnung zu befreien (die Kosten dafür verbleiben bei der Schule, es wird kein Beitrag eingetrieben).</span>
+                                    <span>💚 <strong>Solidaritäts- &amp; Härtefall-Schutz (Das 20:1 Prinzip):</strong> Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freilizenz für Härtefälle &amp; Geschwisterkinder</strong> frei (0,00 € für Eltern &amp; Schule). In deiner Schülerverwaltung kannst du begünstigte Schüler manuell als „Härtefall / Geschwisterrabatt“ freischalten.</span>
                                     <span>💡 <strong>GrooveLab-Aktivierungen:</strong> Bitte beachte, dass Aktivierungen für das GrooveLab-Modul immer vollständig von der Musikschule getragen werden und nicht über die Direktabrechnung mit Eltern/Schülern abgewickelt werden können (die Direktabrechnung ist nur für das Campus-Modul möglich).</span>
                                   </div>
                                 </div>

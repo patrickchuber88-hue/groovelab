@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Music, Calendar, ShieldCheck, Users, 
   Layers, ChevronDown, Check, ArrowRight, X, Menu, BookOpen, Sparkles
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface Startseite2Props {
   onLogin: () => void;
@@ -24,6 +25,49 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
   const [calcTeachers, setCalcTeachers] = useState<number>(8);
   const [calcBillingModel, setCalcBillingModel] = useState<'parent' | 'school'>('parent');
   const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
+
+  // Dynamic pricing state (loaded from master_billing_settings in MasterAdminDashboard)
+  const [pricing, setPricing] = useState({
+    campus: 7.99,
+    groovelab: 4.99,
+    kombi: 9.99,
+    teacher: 0.49,
+    student: 0.49
+  });
+
+  useEffect(() => {
+    const fetchGlobalPricing = async () => {
+      try {
+        const { data } = await supabase
+          .from('master_billing_settings')
+          .select('*')
+          .eq('id', 1)
+          .maybeSingle();
+
+        if (data) {
+          const c = Number(data.price_module_campus) || 7.99;
+          const g = Number(data.price_module_groovelab) || 4.99;
+          // Dynamic 20% discount formula for Kombi-Vorteil
+          const calculatedKombi = Math.round((c + g) * 0.8 * 100) / 100;
+          const k = data.price_module_kombi ? Number(data.price_module_kombi) : calculatedKombi;
+          const t = Number(data.price_user_teacher) || 0.49;
+          const s = Number(data.price_user_student) || 0.49;
+
+          setPricing({
+            campus: c,
+            groovelab: g,
+            kombi: k,
+            teacher: t,
+            student: s
+          });
+        }
+      } catch (e) {
+        console.warn('Could not fetch dynamic pricing:', e);
+      }
+    };
+
+    fetchGlobalPricing();
+  }, []);
 
   const getPaidMonthsUntilAugust = () => {
     const now = new Date();
@@ -1370,21 +1414,21 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   <span style={{ fontWeight: 800, fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Basis-Hosting</span>
                   <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>Campus-Modul</h5>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>7,99 €</span>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>{pricing.campus.toFixed(2).replace('.', ',')} €</span>
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
-                    Bereitstellung der zentralen Datenbank, des intelligenten Stundenplandesigners, der Raum-Engine sowie des Hausaufgabenhefts, Meisterwerk-Protokolls, Übe-Timers (inkl. Übungs-Streaks &amp; XP) und der Audio-Loopstation.
+                    Bereitstellung der zentralen Datenbank, des intelligenten Stundenplandesigners, der Raum-Engine sowie des Meisterwerk-Protokolls, Übe-Timers (inkl. Übungs-Streaks &amp; XP), der Audio-Loopstation und des 48h Auto-Freeze Chats.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>Hausaufgabenheft, Übe-Timer &amp; Loopstation</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Meisterwerk-Protokoll &amp; Hausaufgabenheft</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>Stundenplan-Designer &amp; Raum-Engine</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Übe-Timer, Streaks &amp; Audio-Loopstation</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
-                      <Check size={16} style={{ color: '#34a853' }} /> <span>Verwaltung &amp; Sekretariat 100% inklusive</span>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Stundenplan-Designer, Raum-Engine &amp; Chat</span>
                     </div>
                   </div>
                 </div>
@@ -1404,7 +1448,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   <span style={{ fontWeight: 800, fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Praxis-Plattform</span>
                   <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>GrooveLab-Modul</h5>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>4,99 €</span>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#0f172a' }}>{pricing.groovelab.toFixed(2).replace('.', ',')} €</span>
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
@@ -1416,6 +1460,9 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
                       <Check size={16} style={{ color: '#34a853' }} /> <span>Musiker- &amp; Band-Avatare + Skill-Radar</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#334155' }}>
+                      <Check size={16} style={{ color: '#34a853' }} /> <span>Band-Chat, Songverwaltung &amp; Song-XP</span>
                     </div>
                   </div>
                 </div>
@@ -1451,7 +1498,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   <span style={{ fontWeight: 800, fontSize: '12px', color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Kombi-Vorteil</span>
                   <h5 style={{ margin: '4px 0 16px 0', fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>Komplettpaket</h5>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#34a853' }}>9,99 €</span>
+                    <span style={{ fontSize: '36px', fontWeight: 900, color: '#34a853' }}>{pricing.kombi.toFixed(2).replace('.', ',')} €</span>
                     <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 600 }}>/ Monat</span>
                   </div>
                   <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5, margin: '0 0 24px 0', flexGrow: 1 }}>
@@ -1459,7 +1506,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(52, 168, 83, 0.05)', padding: '12px', borderRadius: '12px', marginBottom: '4px' }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px', color: '#34a853', fontWeight: 700 }}>
-                      <span>💡 Du sparst dauerhaft 2,99 € / Monat!</span>
+                      <span>💡 Du sparst dauerhaft {(pricing.campus + pricing.groovelab - pricing.kombi).toFixed(2).replace('.', ',')} € / Monat!</span>
                     </div>
                   </div>
                 </div>
@@ -1521,7 +1568,16 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span>• <strong>Vollständig:</strong> Eltern zahlen 0,49 €/Mo. Schule zahlt 0,00 € Schülergebühr.</span>
                       <span>• <strong>Teilweise:</strong> Eltern zahlen 0,40 €/Mo, Schule stützt mit 0,09 €/Mo.</span>
-                      <span>• <strong>Härtefall-Schutz:</strong> Automatisch 5% kostenfreie Freilizenzen bei Elternabrechnung für Geschwisterrabatte oder Sozialtarife.</span>
+                    </div>
+
+                    {/* Solidaritätsversprechen Highlight Box */}
+                    <div style={{ marginTop: '12px', background: '#ffffff', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', boxShadow: '0 2px 8px rgba(52, 168, 83, 0.05)' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span>💚 Das Solidaritätsversprechen deiner Musikschule: Das 20:1 Prinzip</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#334155', lineHeight: 1.45 }}>
+                        Kein Kind soll aus finanziellen Gründen vom Musiklernen ausgeschlossen werden. Bei der Eltern-Direktabrechnung schaltet das System für <strong>je 20 aktivierte Schüler-Profile automatisch 1 kostenfreie Freilizenz für Härtefälle &amp; Geschwisterkinder</strong> frei. Wer ein aktives Profil bezahlt, unterstützt so solidarisch benachteiligte Familien!
+                      </div>
                     </div>
                   </div>
 
@@ -1532,7 +1588,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     </div>
                     <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span>• <strong>Monatliche Abrechnung:</strong> Abrechnung nach exakter Live-Schüleranzahl (0,49 €/Schüler). Konten ohne Login für mehr als 2 Monate werden automatisch inaktiviert – Kosten fallen somit nur bei tatsächlicher Nutzung an.</span>
-                      <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Vorauszahlung als Jahresbeitrag bei flexibler Aktivierung einzelner Schüler unter dem Jahr.</span>
+                      <span>• <strong>Jahresbeitrag (10% Rabatt):</strong> Die Aktivierung eines Schülerprofils löst den Jahresbeitrag aus. Unterjährige Neuanmeldungen lassen sich jederzeit flexibel hinzufügen – der Beitrag wird dabei automatisiert auf die verbleibende Restlaufzeit berechnet.</span>
                       <span>• <strong>Aktivierung aller Schüler zum Schuljahresstart (September) (20% Rabatt):</strong> Einmalige, gesammelte Aktivierung aller Schüler im September für das gesamte Schuljahr.</span>
                     </div>
                   </div>
@@ -1553,7 +1609,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               textAlign: 'center'
             }}>
               <div style={{ fontSize: '13px', fontWeight: 800, color: '#b45309' }}>
-                💡 Großschulen &amp; Vereine: Ab 500 Schülern bieten wir maßgeschneiderte Volumenrabatte und dedizierte Server-Flatrates an.
+                💡 Großschulen &amp; Vereine: Unsere Server-Flatrates und fairen Rabatt-Staffeln skalieren vollautomatisch mit der Größe deiner Musikschule – 100% transparent ohne Verhandlungsaufwand.
               </div>
               <button 
                 onClick={() => onRegister()}
@@ -2009,20 +2065,20 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 
                 {[
                   {
-                    title: '1. PGP-Verschlüsselung der Namen (Art. 32 DSGVO)',
-                    desc: 'Schülervornamen werden in der Datenbank durch starke symmetrische PGP-Verschlüsselung geschützt. Selbst bei direktem Datenbankzugriff sind diese ohne den Schlüssel nach dem aktuellen Stand der Technik unlesbar.'
+                    title: '1. Verschlüsselung nach Stand der Technik (Art. 32 DSGVO)',
+                    desc: 'Sämtliche Daten werden im Transportweg mit Ende-zu-Ende TLS 1.3 und in der Datenbank ruhend mit militärischer AES-256-Bit-Verschlüsselung geschützt. Selbst bei physischem Zugriff auf die Serverinfrastruktur bleiben alle Daten ohne Autorisierung nach aktuellem Stand der Technik unlesbar.'
                   },
                   {
                     title: '2. E-Mail-Vermeidung für Schüler & Lehrer (Datenminimierung)',
                     desc: 'Zur maximalen Datensparsamkeit erheben und speichern wir für Schüler und Lehrer keinerlei E-Mail-Adressen. Die gesamte App-Funktionalität läuft ohne diese Angabe. Lediglich die Kontakt-E-Mail der Musikschule als Vertragspartner wird erfasst.'
                   },
                   {
-                    title: '3. Strikte Row-Level Security (RLS)',
-                    desc: 'Die Datenbank-Engine erzwingt auf unterster Ebene RLS-Policies. Dies stellt sicher, dass eine Musikschule systemisch bedingt nur auf die eigenen Daten zugreifen kann.'
+                    title: '3. Strikte Row-Level Security & Mandantentrennung (RLS)',
+                    desc: 'Die Datenbank-Engine erzwingt auf unterster Ebene RLS-Policies und strikte Mandantentrennung (Multi-Tenancy Isolation). Dies stellt sicher, dass eine Musikschule systemisch bedingt nur auf die eigenen Daten zugreifen kann.'
                   },
                   {
-                    title: '4. Einweg-Hashing von Passwörtern & PINs',
-                    desc: 'Weder Passwörter noch die 4-stelligen Eltern-PINs werden im Klartext gespeichert. Sie werden über kryptografische Hashes (Bcrypt & SHA-256) einweg-verschlüsselt.'
+                    title: '4. Kryptografisches Salted-Hashing von Passwörtern & PINs',
+                    desc: 'Weder Passwörter noch 4-stellige Eltern-PINs werden im Klartext gespeichert. Sie werden über kryptografische Einweg-Funktionen (Bcrypt mit dynamischem Salt) gepfeffert und irreversibel gehasht.'
                   },
                   {
                     title: '5. Brute-Force-Sperre (Lockout-Logic)',
@@ -2049,8 +2105,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     desc: 'Nutzer können sich über die biometrische Hardware ihres Endgeräts (TouchID/FaceID) einloggen. Die Verifizierung erfolgt lokal – biometrische Merkmale verlassen das Endgerät nicht.'
                   },
                   {
-                    title: '11. Automatische Inaktivitäts-Sperre (Auto-Lock)',
-                    desc: 'Auf gemeinsam genutzten Geräten in den Unterrichtsräumen (Lab-Modus) meldet die App inaktive Nutzer nach 20 Minuten automatisch ab (inkl. 30s Warn-Countdown), um unbefugten Zugriff Dritter zu verhindern.'
+                    title: '11. Intelligente 45-Minuten Live-Lab Sperre (GrooveLab)',
+                    desc: 'Auf gemeinsam genutzten Schul-iPads im Live-Lab-Bandraum schützt eine 45-minütige Inaktivitäts-Sperre (inkl. Warn-Countdown nach Ablauf der Unterrichtseinheit) die Daten der Schülergruppe. Auf privaten Geräten im Campus-Modus läuft bewusst kein Countdown, um ungestörtes Üben zu Hause zu garantieren.'
                   },
                   {
                     title: '12. Server-Standort 100% in Deutschland (ISO 27001)',
@@ -2065,8 +2121,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     desc: 'Im laufenden Betrieb auf den Dashboards werden Schülernachnamen standardmäßig auf den Anfangsbuchstaben gekürzt (z. B. „Max M.“). Erst durch eine bewusste Klick-Interaktion (Auge-Symbol) können berechtigte Lehrkräfte oder Verwaltungsmitarbeiter den vollständigen Nachnamen für ein Zeitfenster von genau 10 Sekunden einblenden. Dies verhindert das Mitlesen durch Dritte an Arbeitsplätzen und im Unterrichtsraum.'
                   },
                   {
-                    title: '15. Termingekoppelte Schul-Shoutbox & 48h-Auto-Freeze (Schulrecht-Plus)',
-                    desc: 'Direktnachrichten laufen ohne private Handynummern (kein WhatsApp-Zwang) transport- (TLS 1.3) und serververschlüsselt (AES-256) über die Schul-App. Der Chat ist strikt an den Unterrichtstermin gebunden und friert nach 48 Stunden automatisch ein (Auto-Freeze), um störende Freizeit-Nachrichten abzuwehren, die Privatsphäre der Lehrkräfte zu schützen und gleichzeitig die gesetzliche Dienstaufsichtspflicht der Musikschule zu wahren.'
+                    title: '15. Hardware-Mikrofonschutz & 48h-Auto-Freeze im Chat (Schulrecht-Plus)',
+                    desc: 'Beim Verlassen aller Übe- und Loopstation-Module stoppt die Hardware-Audio-Engine sofort sämtliche Mikrofon-Tracks (kein Weiterleuchten der Aufnahmelampe). Direktnachrichten laufen ohne private Handynummern über die Schul-App. Der Chat ist strikt an den Unterrichtstermin gebunden und friert nach 48 Stunden automatisch ein (Auto-Freeze), um die Privatsphäre der Lehrkräfte zu schützen und gleichzeitig die gesetzliche Dienstaufsichtspflicht der Musikschule zu wahren.'
                   }
                 ].map((stufe, idx) => (
                   <div key={idx} style={{

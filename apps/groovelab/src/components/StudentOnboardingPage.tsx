@@ -30,6 +30,13 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [consentSaved, setConsentSaved] = useState(false);
   const [savingConsent, setSavingConsent] = useState(false);
 
+  // Granular DSGVO Art. 8 Parent Rights
+  const [parentAllowChat, setParentAllowChat] = useState(true);
+  const [parentAllowTimer, setParentAllowTimer] = useState(true);
+  const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(true);
+  const [parentAllowGroups, setParentAllowGroups] = useState(true);
+  const [parentAllowProposals, setParentAllowProposals] = useState(true);
+
   const handleSaveParentalConsent = async () => {
     if (!parentalConsent || !student?.id) return;
     if (campusUsageMode === 'eltern_geführt' && parentPin.length !== 4) return;
@@ -42,7 +49,12 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           parental_consent_given_at: timestamp, 
           consent_version: 'v1.0',
           campus_usage_mode: campusUsageMode,
-          parent_pin: campusUsageMode === 'eltern_geführt' ? parentPin : null
+          parent_pin: campusUsageMode === 'eltern_geführt' ? parentPin : null,
+          parent_allow_chat: parentAllowChat,
+          parent_allow_timer: parentAllowTimer,
+          parent_allow_leaderboard: parentAllowLeaderboard,
+          parent_allow_groups: parentAllowGroups,
+          parent_allow_proposals: parentAllowProposals
         })
         .eq('id', student.id);
       setConsentSaved(true);
@@ -625,19 +637,46 @@ Deine Vorteile auf einen Blick:
                       padding: '8px 12px',
                       borderRadius: '8px',
                       border: '1px solid #cbd5e1',
-                      fontSize: '0.9rem',
-                      letterSpacing: '0.2em',
-                      textAlign: 'center',
-                      fontWeight: 800,
-                      outline: 'none',
                       boxSizing: 'border-box'
                     }}
                   />
                   <p style={{ fontSize: '0.62rem', color: '#64748b', margin: 0, textAlign: 'center' }}>
-                    Dieser PIN schützt Eltern-Einstellungen & Profil-Wechsel.
+                    Dieser PIN schützt Eltern-Einstellungen &amp; Profil-Wechsel.
                   </p>
                 </div>
               )}
+
+              {/* Granular Parent Permission Controls (DSGVO Art. 8) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '2px' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>
+                  🔒 Einzelne Rechte für dein Kind festlegen (DSGVO Art. 8):
+                </span>
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={parentAllowChat} onChange={e => setParentAllowChat(e.target.checked)} style={{ accentColor: '#34a853' }} />
+                  <span>Chat &amp; Lehrer-Kommunikation erlauben</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={parentAllowTimer} onChange={e => setParentAllowTimer(e.target.checked)} style={{ accentColor: '#34a853' }} />
+                  <span>Selbständiger Übe-Timer &amp; Streaks</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853' }} />
+                  <span>Sichtbarkeit in Bestenlisten</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={parentAllowGroups} onChange={e => setParentAllowGroups(e.target.checked)} style={{ accentColor: '#34a853' }} />
+                  <span>Beitritt zu Band- &amp; Gruppen-Chats</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={parentAllowProposals} onChange={e => setParentAllowProposals(e.target.checked)} style={{ accentColor: '#34a853' }} />
+                  <span>Song- &amp; Repertoirevorschläge senden</span>
+                </label>
+              </div>
 
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', marginTop: '2px' }}>
                 <input
