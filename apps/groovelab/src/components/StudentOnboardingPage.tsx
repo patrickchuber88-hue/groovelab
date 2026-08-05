@@ -579,126 +579,125 @@ Deine Vorteile auf einen Blick:
                 <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
                   Campus-Nutzungsmodus wählen:
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <button
                     type="button"
-                    onClick={() => setCampusUsageMode('selbstnutzer')}
+                    onClick={() => {
+                      setCampusUsageMode('selbstnutzer');
+                      setParentAllowChat(true);
+                      setParentAllowTimer(true);
+                      setParentAllowLeaderboard(true);
+                      setParentAllowGroups(true);
+                      setParentAllowProposals(true);
+                    }}
                     style={{
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      border: `1.5px solid ${campusUsageMode === 'selbstnutzer' ? '#34a853' : '#cbd5e1'}`,
+                      padding: '12px 10px',
+                      borderRadius: '14px',
+                      border: `2px solid ${campusUsageMode === 'selbstnutzer' ? '#34a853' : '#cbd5e1'}`,
                       background: campusUsageMode === 'selbstnutzer' ? '#f0fdf4' : '#ffffff',
                       color: campusUsageMode === 'selbstnutzer' ? '#166534' : '#475569',
-                      fontSize: '0.72rem',
+                      fontSize: '0.76rem',
                       fontWeight: 800,
                       cursor: 'pointer',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      boxShadow: campusUsageMode === 'selbstnutzer' ? '0 4px 12px rgba(52, 168, 83, 0.15)' : 'none',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                   >
                     👦 Selbstnutzer
-                    <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Eigenständiges Üben</div>
+                    <div style={{ fontSize: '0.64rem', fontWeight: 600, color: campusUsageMode === 'selbstnutzer' ? '#15803d' : '#64748b', marginTop: '2px' }}>Eigenständiges Üben</div>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setCampusUsageMode('eltern_geführt')}
+                    onClick={() => {
+                      setCampusUsageMode('eltern_geführt');
+                      setParentAllowChat(true);
+                      setParentAllowTimer(false);
+                      setParentAllowLeaderboard(false);
+                      setParentAllowGroups(false);
+                      setParentAllowProposals(true);
+                    }}
                     style={{
-                      padding: '8px 10px',
-                      borderRadius: '10px',
-                      border: `1.5px solid ${campusUsageMode === 'eltern_geführt' ? '#34a853' : '#cbd5e1'}`,
+                      padding: '12px 10px',
+                      borderRadius: '14px',
+                      border: `2px solid ${campusUsageMode === 'eltern_geführt' ? '#34a853' : '#cbd5e1'}`,
                       background: campusUsageMode === 'eltern_geführt' ? '#f0fdf4' : '#ffffff',
                       color: campusUsageMode === 'eltern_geführt' ? '#166534' : '#475569',
-                      fontSize: '0.72rem',
+                      fontSize: '0.76rem',
                       fontWeight: 800,
                       cursor: 'pointer',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      boxShadow: campusUsageMode === 'eltern_geführt' ? '0 4px 12px rgba(52, 168, 83, 0.15)' : 'none',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                     }}
                   >
                     👨‍👩‍👧 Von Eltern geführt
-                    <div style={{ fontSize: '0.62rem', fontWeight: 500, color: '#64748b', marginTop: '2px' }}>Mit elterlicher Begleitung</div>
+                    <div style={{ fontSize: '0.64rem', fontWeight: 600, color: campusUsageMode === 'eltern_geführt' ? '#15803d' : '#64748b', marginTop: '2px' }}>Mit elterlicher Begleitung</div>
                   </button>
                 </div>
 
                 {/* Dynamische Erklär-Card für den gewählten Modus */}
-                <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
                   {campusUsageMode === 'selbstnutzer' ? (
-                    <div style={{ fontSize: '0.68rem', color: '#334155', lineHeight: 1.4 }}>
-                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Dein Kind nutzt die App eigenständig für Hausaufgaben, Übe-Timer &amp; Unterrichts-Chat.
+                    <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.45 }}>
+                      💡 <strong>Modus Selbstnutzer:</strong> Ideal für Schüler ab ca. 10–12 Jahren mit eigenem Smartphone/Tablet. Alle Funktionen (Hausaufgaben, Übe-Timer, Bestenlisten &amp; Gruppen) sind aktiviert.
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.68rem', color: '#334155', lineHeight: 1.4 }}>
-                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für jüngere Kinder (Grundschule) &amp; Familien-Tablets. Eltern begleiten das Lernen und behalten die Kontrolle über Benachrichtigungen &amp; Einstellungen.
+                    <div style={{ fontSize: '0.7rem', color: '#334155', lineHeight: 1.45 }}>
+                      💡 <strong>Modus Von Eltern geführt:</strong> Ideal für Grundschulkinder &amp; Familien-Tablets. Bestenlisten &amp; Gruppen-Chats sind zum Schutz deines Kindes automatisch deaktiviert. Übezeit wird per 1-Klick von Eltern verbucht.
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* 4-Stelliger Profil-PIN (Universal für alle Profile) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#ffffff', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>🔑</span> 4-stelligen Profil-PIN festlegen (Verpflichtend):
-                </label>
-                <input
-                  type="password"
-                  maxLength={4}
-                  placeholder="z. B. 1234"
-                  value={parentPin}
-                  onChange={(e) => setParentPin(e.target.value.replace(/\D/g, ''))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    boxSizing: 'border-box',
-                    fontSize: '0.85rem',
-                    letterSpacing: '0.1em'
-                  }}
-                />
-                <p style={{ fontSize: '0.62rem', color: '#64748b', margin: 0, textAlign: 'center' }}>
-                  Dieser 4-stellige PIN schützt das Profil vor unbefugtem Zugriff &amp; sichert Einstellungen ab.
-                </p>
-              </div>
-
               {/* Granular Parent Permission Controls (DSGVO Art. 8) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', marginTop: '2px' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e293b' }}>
-                  🔒 Einzelne Rechte für dein Kind festlegen (DSGVO Art. 8):
-                </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff', padding: '14px 16px', borderRadius: '14px', border: '1px solid #cbd5e1', marginTop: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
+                    🔒 Einzelne Rechte für dein Kind festlegen (DSGVO Art. 8):
+                  </span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                    {campusUsageMode === 'eltern_geführt' ? 'Geschützt' : 'Vollständig'}
+                  </span>
+                </div>
                 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={parentAllowChat} onChange={e => setParentAllowChat(e.target.checked)} style={{ accentColor: '#34a853' }} />
-                  <span>Chat &amp; Lehrer-Kommunikation erlauben</span>
-                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <input type="checkbox" checked={parentAllowChat} onChange={e => setParentAllowChat(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
+                    <span>💬 Chat &amp; Lehrer-Kommunikation erlauben</span>
+                  </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={parentAllowTimer} onChange={e => setParentAllowTimer(e.target.checked)} style={{ accentColor: '#34a853' }} />
-                  <span>Selbständiger Übe-Timer &amp; Streaks</span>
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <input type="checkbox" checked={parentAllowTimer} onChange={e => setParentAllowTimer(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
+                    <span>⏱️ Selbständiger Übe-Timer &amp; Streaks</span>
+                  </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853' }} />
-                  <span>Sichtbarkeit in Bestenlisten</span>
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
+                    <span>🏆 Sichtbarkeit in Bestenlisten</span>
+                  </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={parentAllowGroups} onChange={e => setParentAllowGroups(e.target.checked)} style={{ accentColor: '#34a853' }} />
-                  <span>Beitritt zu Band- &amp; Gruppen-Chats</span>
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <input type="checkbox" checked={parentAllowGroups} onChange={e => setParentAllowGroups(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
+                    <span>🎸 Beitritt zu Band- &amp; Gruppen-Chats</span>
+                  </label>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.72rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={parentAllowProposals} onChange={e => setParentAllowProposals(e.target.checked)} style={{ accentColor: '#34a853' }} />
-                  <span>Song- &amp; Repertoirevorschläge senden</span>
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                    <input type="checkbox" checked={parentAllowProposals} onChange={e => setParentAllowProposals(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
+                    <span>🎵 Song- &amp; Repertoirevorschläge senden</span>
+                  </label>
+                </div>
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', marginTop: '2px' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginTop: '4px', background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <input
                   type="checkbox"
                   checked={parentalConsent}
                   onChange={(e) => setParentalConsent(e.target.checked)}
-                  style={{ marginTop: '3px', cursor: 'pointer' }}
+                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#34a853', width: '18px', height: '18px', flexShrink: 0 }}
                 />
-                <span style={{ fontSize: '0.72rem', color: '#1e293b', fontWeight: 600, lineHeight: 1.35 }}>
+                <span style={{ fontSize: '0.72rem', color: '#1e293b', fontWeight: 600, lineHeight: 1.4 }}>
                   Ich willige als Erziehungsberechtigte(r) in die Verarbeitung der Daten meines Kindes gemäß Datenschutzerklärung ein und erteile die Zustimmung zur Speicherung & unterrichtlichen Nutzung der erstellten Audio-Loops in der Loopstation (§ 31 UrhG).
                 </span>
               </label>
@@ -706,28 +705,29 @@ Deine Vorteile auf einen Blick:
               <button
                 type="button"
                 onClick={handleSaveParentalConsent}
-                disabled={!parentalConsent || savingConsent || parentPin.length !== 4}
+                disabled={!parentalConsent || savingConsent}
                 aria-label="Datenschutz- und Audio-Einwilligung speichern"
                 style={{
                   width: '100%',
-                  background: (parentalConsent && parentPin.length === 4) ? '#15803d' : '#94a3b8',
+                  background: parentalConsent ? '#15803d' : '#94a3b8',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '12px',
-                  padding: '10px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: (parentalConsent && parentPin.length === 4) ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.15s'
+                  borderRadius: '14px',
+                  padding: '14px',
+                  fontSize: '0.85rem',
+                  fontWeight: 900,
+                  cursor: parentalConsent ? 'pointer' : 'not-allowed',
+                  boxShadow: parentalConsent ? '0 4px 15px rgba(21, 128, 61, 0.25)' : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
-                className="focus-ring"
+                className="focus-ring hover-scale"
               >
                 {savingConsent ? 'Wird gespeichert...' : 'Profil-Einrichtung & Einwilligung bestätigen'}
               </button>
             </>
           ) : (
-            <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 600, lineHeight: 1.4 }}>
-              Vielen Dank! Das Profil wurde als <strong>{campusUsageMode === 'eltern_geführt' ? 'Von Eltern geführt (mit PIN)' : 'Selbstnutzer'}</strong> eingerichtet. Die Rechtssichere Einwilligung für Datenverarbeitung & Audio-Loops ist hinterlegt.
+            <div style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 700, lineHeight: 1.4, textAlign: 'center', background: '#f0fdf4', padding: '14px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+              Vielen Dank! Das Profil wurde als <strong>{campusUsageMode === 'eltern_geführt' ? 'Von Eltern geführt' : 'Selbstnutzer'}</strong> eingerichtet. Die rechtssichere Einwilligung ist hinterlegt. Der Profil-PIN wird beim ersten App-Login deines Kindes festgelegt.
             </div>
           )}
         </div>

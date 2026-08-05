@@ -3863,6 +3863,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const [fokusLogs, setFokusLogs] = useState<any[]>([]);
   const [showCustomParentInput, setShowCustomParentInput] = useState<boolean>(false);
   const [customParentMinutes, setCustomParentMinutes] = useState<string>('');
+  const [showFirstLoginPinModal, setShowFirstLoginPinModal] = useState<boolean>(false);
   const [isExtraTime, setIsExtraTime] = useState(false);
   const [showCheckpoint, setShowCheckpoint] = useState(false);
   const [checkpointSecondsLeft, setCheckpointSecondsLeft] = useState(20);
@@ -3875,6 +3876,16 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   useEffect(() => {
     isExtraTimeRef.current = isExtraTime;
   }, [isExtraTime]);
+
+  // First-Login PIN Prompt Check
+  useEffect(() => {
+    if (studentUser && studentId) {
+      const hasPinInStorage = localStorage.getItem(`groovelab_user_pin_${studentId}`);
+      if (!studentUser.personal_pin && !studentUser.parent_pin && !studentUser.is_pin_activated && !hasPinInStorage) {
+        setShowFirstLoginPinModal(true);
+      }
+    }
+  }, [studentUser, studentId]);
 
   const [preStartCountdown, setPreStartCountdown] = useState<number | null>(null);
   const preStartCountdownRef = useRef(preStartCountdown);
@@ -15034,6 +15045,180 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               </button>
             </div>
           )}
+        </div>,
+        document.body
+      )}
+
+      {/* First-Login PIN Creation Modal */}
+      {showFirstLoginPinModal && createPortal(
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          zIndex: 10005,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '30px 24px',
+            maxWidth: '380px',
+            width: '100%',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            textAlign: 'center'
+          }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+              <Shield size={32} color="#15803d" />
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0 0 6px 0' }}>Erster Login: Profil-PIN 🔑</h3>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0, lineHeight: 1.45 }}>
+                Lege jetzt deine persönliche 4-stellige Profil-PIN fest, um dein Profil &amp; deine Einstellungen abzusichern:
+              </p>
+            </div>
+
+            {pinFormError && (
+              <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700 }}>
+                {pinFormError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input
+                type="password"
+                maxLength={4}
+                pattern="[0-9]*"
+                inputMode="numeric"
+                placeholder="Neue 4-stellige PIN"
+                value={pinFormNew}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setPinFormNew(val);
+                  setPinFormError('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: '1.2rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.25em',
+                  textAlign: 'center',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+
+              <input
+                type="password"
+                maxLength={4}
+                pattern="[0-9]*"
+                inputMode="numeric"
+                placeholder="PIN wiederholen"
+                value={pinFormConfirm}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                  setPinFormConfirm(val);
+                  setPinFormError('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: '1.5px solid #cbd5e1',
+                  fontSize: '1.2rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.25em',
+                  textAlign: 'center',
+                  background: '#f8fafc',
+                  color: '#0f172a',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <button
+              disabled={isSavingPin || pinFormNew.length !== 4 || pinFormConfirm.length !== 4}
+              onClick={async () => {
+                if (pinFormNew.length !== 4) {
+                  setPinFormError('Bitte gib eine 4-stellige PIN ein.');
+                  return;
+                }
+                if (pinFormNew !== pinFormConfirm) {
+                  setPinFormError('Die PINs stimmen nicht überein.');
+                  return;
+                }
+
+                setIsSavingPin(true);
+                setPinFormError('');
+
+                try {
+                  let payload: any = {
+                    personal_pin: pinFormNew,
+                    parent_pin: pinFormNew,
+                    onboarding_pin: pinFormNew,
+                    is_pin_activated: true
+                  };
+                  let { error } = await supabase
+                    .from('users')
+                    .update(payload)
+                    .eq('id', studentId);
+
+                  if (error && error.message?.includes('onboarding_pin')) {
+                    delete payload.onboarding_pin;
+                    const res = await supabase.from('users').update(payload).eq('id', studentId);
+                    error = res.error;
+                  }
+
+                  try {
+                    await supabase.from('students').update({ personal_pin: pinFormNew, parent_pin: pinFormNew, is_pin_activated: true }).eq('id', studentId);
+                    await supabase.from('pending_students').update({ personal_pin: pinFormNew, parent_pin: pinFormNew, is_pin_activated: true }).eq('id', studentId);
+                  } catch (e) {}
+
+                  localStorage.setItem(`groovelab_user_pin_${studentId}`, pinFormNew);
+
+                  if (error) {
+                    setPinFormError('Fehler: ' + error.message);
+                  } else {
+                    setShowFirstLoginPinModal(false);
+                    setPinFormNew('');
+                    setPinFormConfirm('');
+                  }
+                } catch (err: any) {
+                  setPinFormError('Fehler: ' + (err?.message || 'Speichern fehlgeschlagen.'));
+                } finally {
+                  setIsSavingPin(false);
+                }
+              }}
+              style={{
+                padding: '14px',
+                borderRadius: '14px',
+                background: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '#15803d' : '#cbd5e1',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '0.85rem',
+                fontWeight: 900,
+                cursor: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? 'pointer' : 'not-allowed',
+                boxShadow: (pinFormNew.length === 4 && pinFormConfirm.length === 4) ? '0 4px 15px rgba(21, 128, 61, 0.25)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              {isSavingPin ? 'Wird gespeichert...' : 'PIN jetzt festlegen & Konto aktivieren'}
+            </button>
+          </div>
         </div>,
         document.body
       )}
