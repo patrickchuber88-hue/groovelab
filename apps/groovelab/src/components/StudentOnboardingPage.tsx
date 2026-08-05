@@ -36,10 +36,10 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(true);
   const [parentAllowGroups, setParentAllowGroups] = useState(true);
   const [parentAllowProposals, setParentAllowProposals] = useState(true);
+  const [parentAllowAudio, setParentAllowAudio] = useState(true);
 
   const handleSaveParentalConsent = async () => {
     if (!parentalConsent || !student?.id) return;
-    if (campusUsageMode === 'eltern_geführt' && parentPin.length !== 4) return;
     try {
       setSavingConsent(true);
       const timestamp = new Date().toISOString();
@@ -49,12 +49,12 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           parental_consent_given_at: timestamp, 
           consent_version: 'v1.0',
           campus_usage_mode: campusUsageMode,
-          parent_pin: campusUsageMode === 'eltern_geführt' ? parentPin : null,
           parent_allow_chat: parentAllowChat,
           parent_allow_timer: parentAllowTimer,
           parent_allow_leaderboard: parentAllowLeaderboard,
           parent_allow_groups: parentAllowGroups,
-          parent_allow_proposals: parentAllowProposals
+          parent_allow_proposals: parentAllowProposals,
+          parent_allow_audio: parentAllowAudio
         })
         .eq('id', student.id);
       setConsentSaved(true);
@@ -675,10 +675,16 @@ Deine Vorteile auf einen Blick:
                     <span>Digitales Hausaufgabenheft &amp; Übe-Protokoll <strong>(Inklusive)</strong></span>
                   </div>
 
-                  {/* Optional parental privacy setting */}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '2px' }}>
+                  {/* Optional parental privacy setting 1: Leaderboard */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                     <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
                     <span>🏆 Sichtbarkeit in Schul-Übe-Bestenlisten erlauben</span>
+                  </label>
+
+                  {/* Optional parental privacy setting 2: Loopstation Audio Recording */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <input type="checkbox" checked={parentAllowAudio} onChange={e => setParentAllowAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
+                    <span>🎙️ Audio-Aufnahmen &amp; Loopstation im Unterricht erlauben (§ 31 UrhG)</span>
                   </label>
                 </div>
               </div>
