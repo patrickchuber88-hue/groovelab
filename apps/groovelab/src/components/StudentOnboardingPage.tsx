@@ -30,13 +30,13 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
   const [consentSaved, setConsentSaved] = useState(false);
   const [savingConsent, setSavingConsent] = useState(false);
 
-  // Granular DSGVO Art. 8 Parent Rights (Privacy by Default / Opt-In)
+  // Granular DSGVO Art. 8 Parent Rights (Recommended Pre-selection)
   const [parentAllowChat, setParentAllowChat] = useState(true);
   const [parentAllowTimer, setParentAllowTimer] = useState(true);
-  const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(false);
-  const [parentAllowGroups, setParentAllowGroups] = useState(false);
+  const [parentAllowLeaderboard, setParentAllowLeaderboard] = useState(true);
+  const [parentAllowGroups, setParentAllowGroups] = useState(true);
   const [parentAllowProposals, setParentAllowProposals] = useState(true);
-  const [parentAllowAudio, setParentAllowAudio] = useState(false);
+  const [parentAllowAudio, setParentAllowAudio] = useState(true);
 
   const handleSaveParentalConsent = async () => {
     if (!parentalConsent || !student?.id) return;
@@ -670,28 +670,38 @@ Deine Vorteile auf einen Blick:
                   </div>
 
                   {/* Optional parental privacy setting 1: Leaderboard */}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>🏆 Sichtbarkeit in Schul-Übe-Bestenlisten erlauben</span>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="checkbox" checked={parentAllowLeaderboard} onChange={e => setParentAllowLeaderboard(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
+                      <span>🏆 Teilnahme an Schul-Übe-Bestenlisten</span>
+                    </div>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      Empfohlen
+                    </span>
                   </label>
 
                   {/* Optional parental privacy setting 2: Loopstation Audio Recording */}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <input type="checkbox" checked={parentAllowAudio} onChange={e => setParentAllowAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px' }} />
-                    <span>🎙️ Audio-Aufnahmen &amp; Loopstation im Unterricht erlauben (§ 31 UrhG)</span>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', fontSize: '0.74rem', color: '#334155', fontWeight: 650, cursor: 'pointer', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input type="checkbox" checked={parentAllowAudio} onChange={e => setParentAllowAudio(e.target.checked)} style={{ accentColor: '#34a853', width: '16px', height: '16px', flexShrink: 0 }} />
+                      <span>🎙️ Audio-Feedback &amp; Loopstation im Unterricht</span>
+                    </div>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 6px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      Empfohlen
+                    </span>
                   </label>
                 </div>
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginTop: '4px', background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginTop: '4px', background: '#f0fdf4', padding: '12px 14px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
                 <input
                   type="checkbox"
                   checked={parentalConsent}
                   onChange={(e) => setParentalConsent(e.target.checked)}
                   style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#34a853', width: '18px', height: '18px', flexShrink: 0 }}
                 />
-                <span style={{ fontSize: '0.72rem', color: '#1e293b', fontWeight: 600, lineHeight: 1.4 }}>
-                  Ich willige als Erziehungsberechtigte(r) in die Verarbeitung der Daten meines Kindes gemäß Datenschutzerklärung ein und erteile die Zustimmung zur Speicherung & unterrichtlichen Nutzung der erstellten Audio-Loops in der Loopstation (§ 31 UrhG).
+                <span style={{ fontSize: '0.72rem', color: '#14532d', fontWeight: 650, lineHeight: 1.45 }}>
+                  Ich willige als Erziehungsberechtigte(r) in die datenschutzkonforme Profilverarbeitung meines Kindes gemäß Datenschutzerklärung ein und erteile die Zustimmung zur Speicherung & unterrichtlichen Nutzung der erstellten Audio-Loops in der Loopstation (§ 31 UrhG).
                 </span>
               </label>
 
