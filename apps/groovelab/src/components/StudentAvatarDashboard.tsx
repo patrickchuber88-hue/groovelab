@@ -7398,6 +7398,56 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           </div>
                         </div>
 
+                        {/* Level-based Milestone Sound Preview */}
+                        <div style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <span>🔔</span> Audio-Meilensteine dieser Session:
+                            </span>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '2px 6px', borderRadius: '8px' }}>
+                              Level {((avatar?.streak_flame || 0) >= 3) ? 3 : (((avatar?.streak_flame || 0) === 2) ? 2 : 1)}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                            {(((avatar?.streak_flame || 0) >= 3) ? [
+                              { min: 10, sound: '🔔 1 Chime' },
+                              { min: 15, sound: '🔔🔔 Harfe' },
+                              { min: 20, sound: '🎉 Akkord' }
+                            ] : (((avatar?.streak_flame || 0) === 2) ? [
+                              { min: 5, sound: '🔔 1 Chime' },
+                              { min: 10, sound: '🔔🔔 Harfe' },
+                              { min: 15, sound: '🎉 Akkord' }
+                            ] : [
+                              { min: 3, sound: '🔔 1 Chime' },
+                              { min: 5, sound: '🔔🔔 Harfe' },
+                              { min: 10, sound: '🎉 Akkord' }
+                            ])).map((m, idx) => (
+                              <div key={idx} style={{
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '12px',
+                                padding: '6px 4px',
+                                textAlign: 'center',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#1e293b' }}>{m.min} Min</span>
+                                <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#34a853' }}>{m.sound}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
                       <button
                         onClick={async () => {
                           if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
