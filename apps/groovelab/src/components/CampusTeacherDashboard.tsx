@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Clock, 
@@ -2562,123 +2563,17 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
         )}
 
         {/* Board 3: MEIN STUNDENPLAN */}
+        {/* Board 3: MEIN STUNDENPLAN */}
         {activeBoard === 'schedule' && (
-          <div className="p-8 max-w-full w-full mx-auto space-y-6">
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-white">Wochen-Stundenplan</h1>
-            </div>
-
-            {/* Empty-state: no approved schedules yet */}
-            {!hasApprovedSchedules && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '52px 24px', borderRadius: '20px', border: '1.5px dashed #334155', background: 'rgba(15,23,42,0.6)', textAlign: 'center', gap: 14 }}>
-                <div style={{ width: 56, height: 56, borderRadius: '16px', background: 'rgba(52,168,83,0.08)', border: '1.5px solid rgba(52,168,83,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#34a853" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                </div>
-                <div>
-                  <p style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#e2e8f0' }}>Stundenplan noch nicht freigegeben</p>
-                  <p style={{ margin: '6px 0 0', fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5 }}>Die Verwaltung hat deinen Stundenplan noch nicht freigegeben.<br />Sobald er freigegeben wird, erscheinen deine Unterrichtsstunden hier automatisch.</p>
-                </div>
-              </div>
-            )}
-
-            {/* Calendar Table Grid — only shown when schedules are approved */}
-            {hasApprovedSchedules && <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/40">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/80 text-left">
-                    <th className="p-4 text-xs font-black uppercase text-slate-500 tracking-wider">Uhrzeit</th>
-                    {weekDays.map(day => (
-                      <th key={day} className="p-4 text-xs font-black uppercase text-slate-300 tracking-wider">
-                        {daysOfWeekLabels[day]}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {timeSlots.map(slot => (
-                    <tr key={slot} className="border-b border-slate-850 hover:bg-slate-900/10">
-                      <td className="p-4 font-mono text-xs font-bold text-slate-500 bg-slate-950/20">{slot}</td>
-                      {weekDays.map(day => {
-                        const scheds = weekSchedules.filter(s => s.day_of_week === day && s.time_slot === slot);
-                        // Room layout mapping - assuming teacher has slots in rooms
-                        const isBreak = breakTimes.some(b => slot >= b.start && slot < b.end);
-
-                        return (
-                          <td 
-                            key={`${day}-${slot}`} 
-                            className="p-2 min-w-[120px] relative transition-colors duration-150"
-                            style={{
-                              backgroundColor: dragOverSlotKey === `${day}-${slot}` ? 'rgba(52, 168, 83, 0.05)' : undefined
-                            }}
-                          >
-                            {isBreak ? (
-                              <div className="py-2.5 px-3 rounded-xl bg-purple-950/10 border border-purple-900/30 text-center flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1">
-                                  ☕ {slot} Pause
-                                </span>
-                              </div>
-                            ) : scheds.length > 0 ? (
-                              scheds.map(sched => (
-                                <div
-                                  key={sched.id}
-                                  draggable
-                                  onDragStart={(e) => handleDragStart(e, sched.id)}
-                                  className={`p-3 rounded-xl border cursor-grab active:cursor-grabbing select-none ${
-                                    !sched.student
-                                      ? 'bg-purple-950/20 border-purple-800/60 text-purple-300'
-                                      : sched.status === 'teacher_sick' || sched.status === 'canceled_by_teacher_sick'
-                                        ? 'bg-red-950/30 border-red-900/60 text-red-300'
-                                        : sched.status === 'pending_parent_approval'
-                                          ? 'bg-emerald-950/20 border-emerald-700/50 text-emerald-300'
-                                          : 'bg-slate-900 border-slate-800 text-white'
-                                  }`}
-                                >
-                                  <p className="text-xs font-bold truncate">
-                                    {sched.student ? `${sched.student.first_name} ${sched.student.last_name[0]}.` : `☕ ${sched.time_slot} Pause (45 Min.)`}
-                                  </p>
-                                  <p className="text-[9px] uppercase font-bold text-slate-500 tracking-wider mt-0.5">
-                                    {sched.student ? (sched.student.instrument || 'Inst') : 'Pause (45 Min.)'}
-                                  </p>
-                                  {sched.rooms?.name && (
-                                    <p className="text-[9px] font-bold text-emerald-400 mt-1">
-                                      {sched.rooms.name}
-                                    </p>
-                                  )}
-                                </div>
-                              ))
-                            ) : (
-                              // Free slots dropper zones
-                              rooms.map(room => {
-                                const trafficLightColor = draggedScheduleId ? getTrafficLight(draggedScheduleId, slot, day, room.id) : 'GREEN';
-                                
-                                return (
-                                  <div
-                                    key={room.id}
-                                    onDragOver={(e) => handleDragOverSlot(e, `${day}-${slot}`)}
-                                    onDrop={() => handleDropSlot(slot, day, room.id)}
-                                    className={`py-2 px-3 rounded-lg border border-dashed text-center text-[9px] font-bold uppercase transition duration-150 cursor-pointer ${
-                                      draggedScheduleId 
-                                        ? trafficLightColor === 'RED'
-                                          ? 'border-red-900 bg-red-950/15 text-red-500/80 cursor-not-allowed'
-                                          : trafficLightColor === 'YELLOW'
-                                            ? 'border-yellow-700/40 bg-yellow-950/10 text-yellow-500/80'
-                                            : 'border-emerald-500/40 bg-emerald-950/10 text-emerald-400'
-                                        : 'border-slate-800 hover:border-slate-700 text-slate-600 hover:text-slate-400'
-                                    }`}
-                                  >
-                                    + {room.name}
-                                  </div>
-                                );
-                              })
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>}
+          <div className="p-4 md:p-8 max-w-full w-full mx-auto space-y-6">
+            <ScheduleCalendarView 
+              schoolId={teacher?.school_id || school?.id || ''} 
+              userId={userId} 
+              selectedTeacherId={teacher?.id || userId}
+              boards={[]} 
+              activeTab="calendar" 
+              currentUserRole="teacher"
+            />
           </div>
         )}
 

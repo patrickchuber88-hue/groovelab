@@ -1401,74 +1401,61 @@ export function ScheduleCalendarView({
       for (const change of changesToSave) {
         const originalOcc = baseOccurrences.find(o => o.id === change.id);
 
-        if (change.id.startsWith('mock-')) {
-          if ((!change.student_id || change.student_id === 'vacant' || change.student_id.startsWith('vacant-') || change.student_id.startsWith('break-')) && change.status !== 'cancelled') {
-            continue;
-          }
-          const { id, student, original_start_time, schedules, template_room_id, room_override_id, room_override_name, vacant_student_id, isGroupBlock, groupOccurrences, student_acknowledged, schedule_id, ...insertData } = change as any;
-          
-          const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
-          
-          insertData.original_date = origDateStr;
-          insertData.teacher_id = insertData.teacher_id || userId;
-          insertData.status = change.status || 'pending_reschedule';
-          const parsedSchId = schedule_id || (change.id && change.id.startsWith('mock-') ? change.id.split('-')[1] : null);
-          if (parsedSchId && parsedSchId.length > 10) {
-            insertData.schedule_id = parsedSchId;
-          }
-          
-          if (isGroupBlock && groupOccurrences && groupOccurrences.length > 0) {
-            const groupInserts = groupOccurrences
-              .filter((gs: any) => gs.id && gs.id.length > 10 && !gs.id.startsWith('break-') && !gs.id.startsWith('vacant-'))
-              .map((gs: any) => ({
-                ...insertData,
-                student_id: gs.id,
-                duration: gs.duration || insertData.duration
-              }));
+        let targetStudentId = change.student_id || (originalOcc ? originalOcc.student_id : null);
+        if (!targetStudentId || targetStudentId.startsWith('mock-') || targetStudentId.startsWith('sched-proj-') || targetStudentId === 'vacant') {
+          const firstName = (change.student?.first_name || (change as any).first_name || '').trim();
+          if (firstName) {
+            const { data: matchedUsers } = await supabase
+              .from('users')
+              .select('id, first_name, last_name')
+              .eq('school_id', schoolId)
+              .eq('role', 'student')
+              .ilike('first_name', `${firstName}%`);
             
-            if (groupInserts.length > 0) {
-              const { error } = await supabase.from('schedule_occurrences').insert(groupInserts);
-              if (error) throw error;
+            if (matchedUsers && matchedUsers.length > 0) {
+              targetStudentId = matchedUsers[0].id;
             }
-          } else {
-            if (!insertData.student_id || insertData.student_id.startsWith('break-') || insertData.student_id.startsWith('vacant-') || insertData.student_id === 'vacant') {
-              continue;
-            }
-            const { error } = await supabase.from('schedule_occurrences').insert(insertData);
-            if (error) throw error;
+          }
+        }
+
+        if ((!targetStudentId || targetStudentId === 'vacant' || targetStudentId.startsWith('vacant-') || targetStudentId.startsWith('break-')) && change.status !== 'cancelled') {
+          continue;
+        }
+
+        const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
+
+        // Senior SaaS Architecture: Check if an occurrence already exists in DB for this student on this original_date
+        const { data: existingOccs } = await supabase
+          .from('schedule_occurrences')
+          .select('id')
+          .eq('student_id', targetStudentId)
+          .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
+
+        const payload: any = {
+          date: change.date,
+          original_date: origDateStr,
+          start_time: change.start_time.length === 5 ? `${change.start_time}:00` : change.start_time,
+          teacher_id: userId,
+          student_id: targetStudentId,
+          duration: change.duration || originalOcc?.duration || 30,
+          status: change.status || 'pending_reschedule',
+          student_acknowledged: false
+        };
+
+        if (existingOccs && existingOccs.length > 0) {
+          // Idempotent UPDATE: Never create duplicate records on repeated moves
+          const targetId = existingOccs[0].id;
+          const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', targetId);
+          if (error) throw error;
+
+          // Self-Healing Cleanup: Delete any historical duplicate records for this student on this date
+          if (existingOccs.length > 1) {
+            const dupIds = existingOccs.slice(1).map(e => e.id);
+            await supabase.from('schedule_occurrences').delete().in('id', dupIds);
           }
         } else {
-          const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
-          const targetStudentId = (change.student_id !== undefined && change.student_id !== null)
-            ? change.student_id
-            : (originalOcc ? originalOcc.student_id : null);
-          const targetDuration = change.duration || originalOcc?.duration || 30;
-          
-          const targetRoomOverride = change.room_override_id !== undefined 
-            ? change.room_override_id 
-            : (originalOcc ? originalOcc.room_override_id : null);
-          
-          const updatePayload: any = {
-            date: change.date,
-            start_time: change.start_time,
-            status: change.status || 'pending_reschedule',
-            original_date: origDateStr,
-            student_id: targetStudentId,
-            duration: targetDuration,
-            room_override_id: targetRoomOverride
-          };
-          if (change.substitute_teacher_id !== undefined) {
-            updatePayload.substitute_teacher_id = change.substitute_teacher_id;
-            updatePayload.is_substitute = !!change.substitute_teacher_id;
-          }
-          if (change.substitute_notes !== undefined) {
-            updatePayload.substitute_notes = change.substitute_notes;
-          }
-
-          const { error } = await supabase.from('schedule_occurrences')
-            .update(updatePayload)
-            .eq('id', change.id);
-          
+          // First-time INSERT
+          const { error } = await supabase.from('schedule_occurrences').insert(payload);
           if (error) throw error;
         }
 
@@ -1977,8 +1964,8 @@ export function ScheduleCalendarView({
           supabase.from('schedules').select('room_id, time_slot, duration, day_of_week, teacher_id, student_id, student:users!schedules_student_id_fkey(first_name, last_name, instrument)').eq('teacher_id', userId).eq('school_id', schoolId),
           supabase.from('campus_events').select('room_id, event_date, start_time, end_time, title').eq('school_id', schoolId).gte('event_date', startDateStr).lte('event_date', endDateStr).not('room_id', 'is', null),
           supabase.from('room_bookings').select('room_id, date, start_time, end_time, booked_by, user:users(first_name, last_name)').eq('school_id', schoolId).gte('date', startDateStr).lte('date', endDateStr).not('room_id', 'is', null),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, substitute_teacher_id, is_substitute, substitute_notes').or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`),
-          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, substitute_teacher_id, is_substitute, substitute_notes, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id), substitute_teacher:users!schedule_occurrences_substitute_teacher_id_fkey(first_name, last_name)').or(`teacher_id.eq.${userId},substitute_teacher_id.eq.${userId}`).or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`).order('date').order('start_time'),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id').gte('date', startDateStr).lte('date', endDateStr),
+          supabase.from('schedule_occurrences').select('id, date, start_time, original_date, duration, status, teacher_id, student_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)').gte('date', startDateStr).lte('date', endDateStr).order('date').order('start_time'),
           supabase.from('students').select('id, user_id, teacher_id').eq('school_id', schoolId),
           supabase.from('users').select('id, teacher_id, first_name, last_name').eq('school_id', schoolId).eq('role', 'student')
         ]);
@@ -2223,13 +2210,11 @@ export function ScheduleCalendarView({
               if (student.isGroup && student.groupStudents) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   (o.date === dateStr || o.original_date === dateStr) && 
-                  isRecordMatchingSlotTime(o) &&
                   student.groupStudents.some((gs: any) => gs.id === o.student_id)
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   (o.date === dateStr || o.original_date === dateStr) && 
-                  isRecordMatchingSlotTime(o) &&
                   matchesTemplateStudent(o, student)
                 );
               }
@@ -2337,8 +2322,8 @@ export function ScheduleCalendarView({
         const isRealDb = !occ.id.startsWith('mock-') && !occ.id.startsWith('sched-proj-');
         
         if (isRealDb) {
-          // If this DB occurrence is unconfirmed or pending reschedule, check if student has a regular Designer master slot
-          const isUnconfirmed = occ.status === 'unconfirmed' || occ.status === 'pending_reschedule' || occ.status === 'unconfirmed_group';
+          // If this DB occurrence is unconfirmed, check if student has a regular Designer master slot
+          const isUnconfirmed = occ.status === 'unconfirmed' || occ.status === 'unconfirmed_group';
           if (isUnconfirmed) {
             const designerTime = getDesignerSlotTimeForStudent(occ);
             const occTime = (occ.start_time || '').substring(0, 5);
@@ -2348,12 +2333,14 @@ export function ScheduleCalendarView({
             }
           }
 
+          const studId = occ.student_id || occ.student?.first_name || 'unknown';
+          const origDate = occ.original_date || occ.date;
+          const studDateKey = `stud_date_${studId}_${origDate}`;
           const dbKey = `db_${occ.id}`;
-          if (!seenKeys.has(dbKey)) {
+
+          if (!seenKeys.has(studDateKey) && !seenKeys.has(dbKey)) {
+            seenKeys.add(studDateKey);
             seenKeys.add(dbKey);
-            const studId = occ.student_id || occ.student?.first_name || 'unknown';
-            const slotKey = `slot_${studId}_${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
-            seenKeys.add(slotKey);
             deduplicatedData.push(occ);
           }
         } else {
@@ -5612,6 +5599,8 @@ export function ScheduleCalendarView({
 
                   const hasPendingEdit = Boolean(pendingChanges && (pendingChanges[occ.id] || Object.values(pendingChanges).some((p: any) => p.id === occ.id)));
                   const isMovedFromMaster = Boolean(
+                    occ.status === 'pending_reschedule' ||
+                    occ.status === 'rescheduled_confirmed' ||
                     (masterDayOfWeek !== null && masterAssignedTime !== null && (masterDayOfWeek !== occDayOfWeek || masterAssignedTime.substring(0, 5) !== occ.start_time.substring(0, 5))) ||
                     (occ.original_date && occ.original_date !== occ.date) ||
                     (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
