@@ -49,8 +49,25 @@ export const AppointmentChangeItem: React.FC<AppointmentChangeItemProps> = ({
       <div>
         <div style={{ fontSize: '0.65rem', fontWeight: 800, color: badgeColor, textTransform: 'uppercase', marginBottom: '2px' }}>{badgeText}</div>
         <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>{occ.studentName || occ.title || 'Unterrichtstermin'}</div>
-        <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px' }}>
-          📅 {formattedDateStr} {occ.startTime ? `• 🕒 ${occ.startTime.slice(0, 5)} Uhr` : ''}
+        <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+          <span>📅 {formattedDateStr} {occ.startTime ? `• 🕒 ${occ.startTime.slice(0, 5)} Uhr` : ''}</span>
+          {((occ as any).roomName || (occ as any).room_name || (occ as any).room) && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600, color: '#64748b' }}>
+              • {(occ as any).roomName || (occ as any).room_name || (occ as any).room}
+              <span 
+                title="Raumbuchung vorgenommen" 
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#7c3aed',
+                  display: 'inline-block',
+                  flexShrink: 0,
+                  boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                }} 
+              />
+            </span>
+          )}
         </div>
       </div>
 

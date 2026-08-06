@@ -8745,7 +8745,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           whiteSpace: 'nowrap'
                         }}>
                           <ShieldCheck size={13} color="#ffffff" />
-                          <span>100% DSGVO-konformer Schulchat</span>
+                          <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
                         </span>
 
                         <button

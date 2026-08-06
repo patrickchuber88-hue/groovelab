@@ -2822,26 +2822,31 @@ export function TeacherDashboard({
         }
       } else if (normDate === todayStr && formattedItemTime) {
         const existingIdx = findIdx();
+        const isFromMyBookings = myBookings.some((b: any) => String(b.id) === String(item.id) || (itemStudentId && String(b.studentId) === String(itemStudentId)));
         if (existingIdx !== -1) {
           updatedTimeline[existingIdx] = {
             ...updatedTimeline[existingIdx],
             timeSlot: formattedItemTime,
-            status: item.status || updatedTimeline[existingIdx].status,
+            status: item.status || 'pending_reschedule',
             room: item.roomName || item.room || updatedTimeline[existingIdx].room,
-            isRescheduledPending: Boolean(item.is_rescheduled || item.isRescheduled || item.status === 'pending_reschedule' || item.status === 'rescheduled_confirmed' || item.status === 'changed')
+            student_acknowledged: item.student_acknowledged ?? item.studentAcknowledged ?? false,
+            is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
+            isRescheduledPending: true
           };
         } else if (itemStudentFirstName && itemStudentFirstName !== 'schüler' && itemStudentFirstName !== 'unterricht') {
+          const isFromMyBookings = myBookings.some((b: any) => String(b.id) === String(item.id) || (itemStudentId && String(b.studentId) === String(itemStudentId)));
           updatedTimeline.push({
             id: item.id || `changed-${Math.random()}`,
             scheduleId: item.scheduleId || item.id,
             date: todayStr,
             timeSlot: formattedItemTime,
             duration: item.duration || 45,
-            status: item.status || 'approved',
+            status: item.status || 'pending_reschedule',
             room: item.roomName || item.room || 'Hauptraum',
             instrument: item.instrument || 'Klavier',
-            student_acknowledged: true,
-            isRescheduledPending: Boolean(item.is_rescheduled || item.isRescheduled || item.status === 'pending_reschedule' || item.status === 'rescheduled_confirmed' || item.status === 'changed'),
+            student_acknowledged: item.student_acknowledged ?? item.studentAcknowledged ?? false,
+            is_room_booking: Boolean(item.is_room_booking || item.isRoomBooking || item.room_override_id || item.roomOverrideId || item.is_room_changed || item.isRoomChanged || isFromMyBookings),
+            isRescheduledPending: true,
             student: {
               id: itemStudentId || `temp-${itemStudentFirstName}`,
               name: cleanName || 'Schüler',
@@ -3098,9 +3103,7 @@ export function TeacherDashboard({
             date,
             original_date,
             start_time,
-            original_start_time,
             status,
-            room_id,
             teacher_id,
             student_id,
             student_acknowledged,
@@ -3229,6 +3232,8 @@ export function TeacherDashboard({
             studentAcknowledged: occ.studentAcknowledged,
             is_rescheduled: occ.is_rescheduled || occ.isRescheduled,
             is_moved: occ.is_moved || occ.isMoved,
+            is_room_booking: Boolean(occ.is_room_booking || occ.isRoomBooking || occ.room_override_id || occ.roomOverrideId || occ.is_room_changed || occ.isRoomChanged),
+            room_override_id: occ.room_override_id || occ.roomOverrideId,
             isGroup: occ.isGroup || (studentDisplayName && studentDisplayName.includes('&'))
           };
         });
@@ -3350,14 +3355,19 @@ export function TeacherDashboard({
   }, [userId, ticker]);
 
   const handleBookingClick = (b: any) => {
-    if (b.date) localStorage.setItem('groovelab_selected_booking_date', b.date);
+    if (b.date) {
+      localStorage.setItem('campus_calendar_target_date', b.date);
+      localStorage.setItem('groovelab_selected_schedule_date', b.date);
+      localStorage.setItem('groovelab_selected_booking_date', b.date);
+      window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: b.date } }));
+    }
     const rid = b.roomId || b.rooms?.id || '';
     if (rid) localStorage.setItem('groovelab_selected_booking_room_id', rid);
     if (b.startTime) localStorage.setItem('groovelab_selected_booking_start_time', b.startTime);
     if (b.endTime) localStorage.setItem('groovelab_selected_booking_end_time', b.endTime);
     
     if (onTabChange) {
-      onTabChange('rooms');
+      onTabChange('schedule');
     }
   };
 
@@ -4163,7 +4173,7 @@ export function TeacherDashboard({
                   roomId: occ.schedules?.rooms?.id || occ.room_id || existingItem?.roomId || null,
                   room: occ.schedules?.rooms?.name || occ.roomName || occ.room_name || existingItem?.room || 'Hauptraum',
                   instrument: occ.schedules?.instrument || occ.instrument || existingItem?.instrument || student?.instrument || 'Klavier',
-                  student_acknowledged: occ.student_acknowledged ?? occ.studentAcknowledged ?? true,
+                  student_acknowledged: occ.student_acknowledged ?? occ.studentAcknowledged ?? false,
                   original_date: occ.original_date,
                   student: student ? {
                     id: student.id,
@@ -8153,7 +8163,15 @@ export function TeacherDashboard({
                             const isRescheduledAway = activeSlots.every((s: any) => s.status === 'rescheduled_away');
                             const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;
-                            const isRescheduledPending = activeSlots.some((s: any) => s.status === 'rescheduled_pending' || s.status === 'pending' || s.status === 'pending_reschedule');
+                            const isRescheduledPending = activeSlots.some((s: any) => 
+                               s.isRescheduledPending || 
+                               s.is_moved || 
+                               s.isMoved || 
+                               s.status === 'rescheduled_pending' || 
+                               s.status === 'pending' || 
+                               s.status === 'pending_reschedule' || 
+                               (s.original_date && s.original_date !== s.date)
+                             );
                             const isRescheduledConfirmed = !isRescheduledPending && activeSlots.every((s: any) => s.status === 'rescheduled_confirmed');
                             const isResetPending = activeSlots.some((s: any) => s.status === 'scheduled' && s.original_date && s.student_acknowledged === false);
                             const isResetAcknowledged = !isResetPending && activeSlots.every((s: any) => s.status === 'scheduled' && s.original_date && s.student_acknowledged === true);
@@ -8336,7 +8354,7 @@ export function TeacherDashboard({
                               slotBg = isReschAck ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
                               slotBorder = isReschAck ? '1.5px solid #fef3c7' : '2px dashed #eab308';
                               slotBorderLeft = '5px solid #fbbc05';
-                              titleColor = '#8e8e93';
+                              titleColor = '#0f172a';
                               dotComponent = isCurrentSlot ? (
                                 <div style={{
                                   width: '20px',
@@ -8598,6 +8616,12 @@ export function TeacherDashboard({
                                             return slot.student?.name || 'Schüler';
                                           })()}
                                         </span>
+                                      ) : isBreak ? (
+                                        <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                          <span>☕</span>
+                                          <span>Freies Zeitfenster</span>
+                                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
+                                        </span>
                                       ) : (
                                         <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.85rem' }}>☕️ Pause ({slot.duration || 30} Min.)</span>
                                       )}
@@ -8737,9 +8761,26 @@ export function TeacherDashboard({
                                                 fontWeight: 500, 
                                                 fontSize: '0.78rem', 
                                                 flexShrink: 0, 
-                                                whiteSpace: 'nowrap' 
+                                                whiteSpace: 'nowrap',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
                                               }}>
                                                 {slot.room || 'Groovelab'}
+                                                {Boolean(slot.is_room_booking || slot.isRoomBooking || slot.room_override_id || slot.roomOverrideId) && (
+                                                  <span 
+                                                    title="Raumbuchung vorgenommen" 
+                                                    style={{
+                                                      width: '7px',
+                                                      height: '7px',
+                                                      borderRadius: '50%',
+                                                      background: '#7c3aed',
+                                                      display: 'inline-block',
+                                                      flexShrink: 0,
+                                                      boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                                                    }} 
+                                                  />
+                                                )}
                                               </span>
                                             </>
                                           )}
@@ -9619,15 +9660,41 @@ export function TeacherDashboard({
                                       color: '#7c3aed',
                                       border: '1px solid #ddd6fe',
                                       padding: '0.5px 5px',
-                                      borderRadius: '5px'
-                                    }} title={`Raum geändert zu ${rName}`}>
+                                      borderRadius: '5px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }} title={`Raumbuchung vorgenommen: ${rName}`}>
                                       • {rName}
+                                      <span 
+                                        style={{
+                                          width: '6px',
+                                          height: '6px',
+                                          borderRadius: '50%',
+                                          background: '#7c3aed',
+                                          display: 'inline-block',
+                                          flexShrink: 0,
+                                          boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                                        }} 
+                                      />
                                     </span>
                                   );
                                 }
                                 return (
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b' }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                     • {rName}
+                                    <span 
+                                      title="Raumbuchung vorgenommen" 
+                                      style={{
+                                        width: '6px',
+                                        height: '6px',
+                                        borderRadius: '50%',
+                                        background: '#7c3aed',
+                                        display: 'inline-block',
+                                        flexShrink: 0,
+                                        boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                                      }} 
+                                    />
                                   </span>
                                 );
                               })()}
@@ -15317,7 +15384,7 @@ export function TeacherDashboard({
                       border: headerBadgeBorder
                     }}>
                       <ShieldCheck size={13} color={headerBadgeColor} />
-                      <span>DSGVO-konform</span>
+                      <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
                     </span>
                   </div>
                 </div>

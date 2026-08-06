@@ -630,8 +630,8 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
 
     const { data: allOccurs } = await supabase
       .from('schedule_occurrences')
-      .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), substitute_teacher:users!schedule_occurrences_substitute_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
-      .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},date.lte.${endDateStr})`);
+      .select('*, student:users!schedule_occurrences_student_id_fkey(*), teacher:users!schedule_occurrences_teacher_id_fkey(*), schedules!schedule_occurrences_schedule_id_fkey(*)')
+      .gte('date', startDateStr).lte('date', endDateStr);
 
     const staticBookings = mappedAllSchedData;
 

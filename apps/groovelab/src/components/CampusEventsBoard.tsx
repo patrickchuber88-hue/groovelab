@@ -2739,20 +2739,33 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         .from('schedule_occurrences')
         .select('*');
 
-      if (effectiveSchoolId) {
-        occurrenceQuery = occurrenceQuery.eq('school_id', effectiveSchoolId);
-      }
-
       if (role === 'student') {
         occurrenceQuery = occurrenceQuery.eq('student_id', userId);
       } else if (role === 'teacher') {
         occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
-      } else if (effectiveSchoolId) {
-        occurrenceQuery = occurrenceQuery.eq('school_id', effectiveSchoolId);
       }
 
       let { data: occurrencesData } = await occurrenceQuery;
       let occurrences: any[] = occurrencesData || [];
+
+      if (occurrences.length > 0) {
+        const stIds = Array.from(new Set(occurrences.map((o: any) => o.student_id).filter(Boolean)));
+        if (stIds.length > 0) {
+          const { data: stUsers } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, instrument')
+            .in('id', stIds);
+
+          if (stUsers && stUsers.length > 0) {
+            const stMap = new Map<string, any>();
+            stUsers.forEach((u: any) => stMap.set(u.id, u));
+            occurrences = occurrences.map((o: any) => ({
+              ...o,
+              student: o.student || stMap.get(o.student_id) || null
+            }));
+          }
+        }
+      }
 
       // Merge active occurrences and pending changes directly from Stundenplan tab (localStorage)
       try {
@@ -5134,10 +5147,16 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                       const opponentName = groupFirstNames || (role === 'student'
                                         ? (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name || ''}`.trim() : 'Lehrkraft')
                                         : (() => {
-                                            const fn = occ.student?.first_name || 'Schüler';
-                                            const ln = occ.student?.last_name ? occ.student.last_name.trim() : '';
-                                            const initial = ln ? `${ln[0].toUpperCase()}.` : '';
-                                            return initial ? `${fn} ${initial}` : fn;
+                                            const fn = occ.student?.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
+                                            if (fn) {
+                                              const clean = String(fn).replace(/^Unterricht:\s*/i, '').trim();
+                                              const parts = clean.split(' ');
+                                              const first = parts[0];
+                                              const last = parts.slice(1).join(' ');
+                                              const initial = last ? `${last[0].toUpperCase()}.` : '';
+                                              return initial ? `${first} ${initial}` : first;
+                                            }
+                                            return 'Schüler';
                                           })());
                                       const isGroupOcc = Boolean(
                                         occ.isGroupOcc || occ.isGroup || occ.is_group ||
@@ -5168,8 +5187,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                         occ.isExtraRoom ||
                                         occ.room_booking_required ||
                                         (defaultRoomName && rName && defaultRoomName !== rName) || 
-                                        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id)) ||
-                                        (isRescheduled && (occ.room_id || occ.room_override_name || occ.roomOverrideName))
+                                        (occ.original_room_id && occ.room_id && String(occ.original_room_id) !== String(occ.room_id))
                                       );
 
                                       let dateBlockBg = '#f8fafc';
@@ -5208,22 +5226,13 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                           rowBorder = '2px dashed #7c3aed';
                                           dateBlockBorder = '1.5px dashed #7c3aed';
                                         }
-                                      } else if (isGroupOcc) {
-                                        textColor = '#0369a1';
-                                        subColor = '#0284c7';
-                                        dateBlockBg = '#e0f2fe';
+                                      } else if (isRescheduled) {
+                                        if (isGroupOcc) {
+                                          // BLAU THEME FÜR GRUPPEN-TERMINVERSCHIEBUNGEN
+                                          textColor = '#0369a1';
+                                          subColor = '#0284c7';
+                                          dateBlockBg = '#e0f2fe';
 
-                                        if (isCanceled) {
-                                          if (isConfirmedOcc) {
-                                            rowBg = '#f0f9ff';
-                                            rowBorder = '2px solid #0284c7';
-                                            dateBlockBorder = '1.5px solid #0284c7';
-                                          } else {
-                                            rowBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
-                                            rowBorder = '2px dashed #0284c7';
-                                            dateBlockBorder = '1.5px dashed #0284c7';
-                                          }
-                                        } else if (isRescheduled) {
                                           if (isConfirmedOcc) {
                                             rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
                                             rowBorder = '2px solid #0284c7';
@@ -5234,24 +5243,28 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                             dateBlockBorder = '1.5px dashed #0284c7';
                                           }
                                         } else {
-                                          rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
-                                          rowBorder = '2px solid #0284c7';
-                                          dateBlockBorder = '1.5px solid #0284c7';
-                                        }
-                                      } else if (isRescheduled) {
-                                        textColor = '#854d0e';
-                                        subColor = '#d97706';
-                                        dateBlockBg = '#fef3c7';
+                                          // GELB THEME FÜR EINZEL-TERMINVERSCHIEBUNGEN
+                                          textColor = '#854d0e';
+                                          subColor = '#d97706';
+                                          dateBlockBg = '#fef3c7';
 
-                                        if (isConfirmedOcc) {
-                                          rowBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                                          rowBorder = '2px solid #eab308';
-                                          dateBlockBorder = '1.5px solid #eab308';
-                                        } else {
-                                          rowBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                                          rowBorder = '2px dashed #eab308';
-                                          dateBlockBorder = '1.5px dashed #eab308';
+                                          if (isConfirmedOcc) {
+                                            rowBg = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
+                                            rowBorder = '2px solid #eab308';
+                                            dateBlockBorder = '1.5px solid #eab308';
+                                          } else {
+                                            rowBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
+                                            rowBorder = '2px dashed #eab308';
+                                            dateBlockBorder = '1.5px dashed #eab308';
+                                          }
                                         }
+                                      } else if (isGroupOcc) {
+                                        textColor = '#0369a1';
+                                        subColor = '#0284c7';
+                                        dateBlockBg = '#e0f2fe';
+                                        rowBg = 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)';
+                                        rowBorder = '2px solid #0284c7';
+                                        dateBlockBorder = '1.5px solid #0284c7';
                                       } else if (isPendingReview) {
                                         rowBg = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
                                         rowBorder = '1px dashed #eab308';
@@ -5336,6 +5349,17 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                                       gap: '3px'
                                                     }} title={`Raum geändert zu ${rName}`}>
                                                       • {rName}
+                                                      <span 
+                                                        style={{
+                                                          width: '6px',
+                                                          height: '6px',
+                                                          borderRadius: '50%',
+                                                          background: '#7c3aed',
+                                                          display: 'inline-block',
+                                                          flexShrink: 0,
+                                                          boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
+                                                        }} 
+                                                      />
                                                     </span>
                                                   );
                                                 }
@@ -12616,7 +12640,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       whiteSpace: 'nowrap'
                     }}>
                       <ShieldCheck size={13} color="#ffffff" />
-                      <span>100% DSGVO-konformer Schulchat</span>
+                      <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
                     </span>
                   </div>
                 </div>

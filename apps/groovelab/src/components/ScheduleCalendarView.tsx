@@ -143,9 +143,8 @@ export function ScheduleCalendarView({
 
   const [currentDate, setCurrentDate] = useState(() => {
     if (typeof window !== 'undefined') {
-      const targetDateStr = localStorage.getItem('campus_calendar_target_date');
+      const targetDateStr = localStorage.getItem('campus_calendar_target_date') || localStorage.getItem('groovelab_selected_schedule_date');
       if (targetDateStr) {
-        localStorage.removeItem('campus_calendar_target_date');
         const clean = targetDateStr.split('T')[0];
         const parts = clean.split('-').map(Number);
         if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
@@ -155,6 +154,24 @@ export function ScheduleCalendarView({
     }
     return getSimulatedNow();
   });
+
+  useEffect(() => {
+    const handleNavDate = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      const dateStr = customEvt.detail?.date || localStorage.getItem('groovelab_selected_schedule_date') || localStorage.getItem('campus_calendar_target_date');
+      if (dateStr) {
+        const clean = dateStr.split('T')[0];
+        const parts = clean.split('-').map(Number);
+        if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          setCurrentDate(new Date(parts[0], parts[1] - 1, parts[2]));
+        }
+      }
+    };
+    window.addEventListener('groovelab_navigate_schedule_date', handleNavDate);
+    return () => {
+      window.removeEventListener('groovelab_navigate_schedule_date', handleNavDate);
+    };
+  }, []);
   const [showWeekend, setShowWeekend] = useState(false);
   const [focusedDayOffset, setFocusedDayOffset] = useState<number | null>(null);
   const [currentMinutes, setCurrentMinutes] = useState(() => {
@@ -1402,6 +1419,10 @@ export function ScheduleCalendarView({
         const originalOcc = baseOccurrences.find(o => o.id === change.id);
 
         let targetStudentId = change.student_id || (originalOcc ? originalOcc.student_id : null);
+        if (targetStudentId && typeof targetStudentId === 'string' && targetStudentId.startsWith('group-')) {
+          targetStudentId = targetStudentId.replace('group-', '');
+        }
+
         if (!targetStudentId || targetStudentId.startsWith('mock-') || targetStudentId.startsWith('sched-proj-') || targetStudentId === 'vacant') {
           const firstName = (change.student?.first_name || (change as any).first_name || '').trim();
           if (firstName) {
@@ -1424,13 +1445,6 @@ export function ScheduleCalendarView({
 
         const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
 
-        // Senior SaaS Architecture: Check if an occurrence already exists in DB for this student on this original_date
-        const { data: existingOccs } = await supabase
-          .from('schedule_occurrences')
-          .select('id')
-          .eq('student_id', targetStudentId)
-          .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
-
         const payload: any = {
           date: change.date,
           original_date: origDateStr,
@@ -1442,21 +1456,61 @@ export function ScheduleCalendarView({
           student_acknowledged: false
         };
 
-        if (existingOccs && existingOccs.length > 0) {
-          // Idempotent UPDATE: Never create duplicate records on repeated moves
-          const targetId = existingOccs[0].id;
-          const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', targetId);
-          if (error) throw error;
+        const isGroupBlock = (change as any).isGroupBlock || ((change as any).groupOccurrences && (change as any).groupOccurrences.length > 0);
 
-          // Self-Healing Cleanup: Delete any historical duplicate records for this student on this date
-          if (existingOccs.length > 1) {
-            const dupIds = existingOccs.slice(1).map(e => e.id);
-            await supabase.from('schedule_occurrences').delete().in('id', dupIds);
+        if (isGroupBlock && (change as any).groupOccurrences && (change as any).groupOccurrences.length > 0) {
+          for (const gs of (change as any).groupOccurrences) {
+            let gsStudentId = gs.id || gs.student_id;
+            if (gsStudentId && typeof gsStudentId === 'string' && gsStudentId.startsWith('group-')) {
+              gsStudentId = gsStudentId.replace('group-', '');
+            }
+            if (!gsStudentId || gsStudentId.length < 10) continue;
+
+            const { data: existingGroupOccs } = await supabase
+              .from('schedule_occurrences')
+              .select('id')
+              .eq('student_id', gsStudentId)
+              .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
+
+            const groupPayload = {
+              ...payload,
+              student_id: gsStudentId,
+              duration: gs.duration || payload.duration
+            };
+
+            if (existingGroupOccs && existingGroupOccs.length > 0) {
+              await supabase.from('schedule_occurrences').update(groupPayload).eq('id', existingGroupOccs[0].id);
+              if (existingGroupOccs.length > 1) {
+                await supabase.from('schedule_occurrences').delete().in('id', existingGroupOccs.slice(1).map(e => e.id));
+              }
+            } else {
+              await supabase.from('schedule_occurrences').insert(groupPayload);
+            }
           }
         } else {
-          // First-time INSERT
-          const { error } = await supabase.from('schedule_occurrences').insert(payload);
-          if (error) throw error;
+          // Senior SaaS Architecture: Check if an occurrence already exists in DB for this student on this original_date
+          const { data: existingOccs } = await supabase
+            .from('schedule_occurrences')
+            .select('id')
+            .eq('student_id', targetStudentId)
+            .or(`date.eq.${origDateStr},original_date.eq.${origDateStr}`);
+
+          if (existingOccs && existingOccs.length > 0) {
+            // Idempotent UPDATE: Never create duplicate records on repeated moves
+            const targetId = existingOccs[0].id;
+            const { error } = await supabase.from('schedule_occurrences').update(payload).eq('id', targetId);
+            if (error) throw error;
+
+            // Self-Healing Cleanup: Delete any historical duplicate records for this student on this date
+            if (existingOccs.length > 1) {
+              const dupIds = existingOccs.slice(1).map(e => e.id);
+              await supabase.from('schedule_occurrences').delete().in('id', dupIds);
+            }
+          } else {
+            // First-time INSERT
+            const { error } = await supabase.from('schedule_occurrences').insert(payload);
+            if (error) throw error;
+          }
         }
 
         // Sync room booking

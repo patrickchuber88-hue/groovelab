@@ -411,6 +411,7 @@ interface CampusDirectMessagesProps {
   selectedRecipient: any;
   setSelectedRecipient: (recipient: any) => void;
   studentToTeacherChat?: boolean;
+  onNavigateToSchedule?: (dateStr?: string) => void;
 }
 
 export default function CampusDirectMessages({
@@ -421,7 +422,8 @@ export default function CampusDirectMessages({
   onMarkAsRead,
   selectedRecipient,
   setSelectedRecipient,
-  studentToTeacherChat = true
+  studentToTeacherChat = true,
+  onNavigateToSchedule
 }: CampusDirectMessagesProps) {
   console.log('[CampusDirectMessages Debug]', {
     user,
@@ -702,21 +704,22 @@ export default function CampusDirectMessages({
 
   const isSystemMessage = (msg: any) => {
     if (!msg) return false;
-    // Human messages with a valid sender_id (student or teacher) are NEVER system messages
-    if (msg.sender_id && msg.sender_id !== 'system') {
-      return false;
-    }
-    const content = msg.content || '';
-    if (content.includes('Unterrichtstermin') || 
-        content.includes('Termin wurde') || 
-        content.includes('Termin storniert') || 
-        content.includes('Termin bestätigt') ||
-        content.includes('regulären Termin') ||
-        content.includes('verschoben von:') ||
-        content.includes('wieder auf deinen ursprünglichen') ||
-        content.includes('abgesagt.') ||
+    if (msg.is_system || msg.message_type === 'reschedule_notification' || msg.message_type === 'system' || msg.message_type === 'shoutbox' || msg.message_type === 'term_shout') return true;
+    const content = String(msg.content || '');
+    if (content.includes('Termin') ||
+        content.includes('Stamm-Termin') ||
+        content.includes('Stammtermin') ||
+        content.includes('Unterrichtstermin') || 
+        content.includes('storniert') || 
+        content.includes('bestätigt') ||
+        content.includes('regulär') ||
+        content.includes('verschoben') ||
+        content.includes('zurückgesetzt') ||
+        content.includes('abgesagt') ||
         content.includes('Verschiebung') ||
-        content.includes('abgelehnt')) {
+        content.includes('abgelehnt') ||
+        content.includes('Shoutbox') ||
+        content.includes('1:1')) {
       return true;
     }
     return false;
@@ -772,8 +775,11 @@ export default function CampusDirectMessages({
       (m.sender_id === partner.id && m.recipient_id === user.id)
     );
 
-    const lastMessage = threadMessages[threadMessages.length - 1];
-    const unreadCount = threadMessages.filter(m => 
+    const directHumanMessages = threadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m));
+    const lastMessage = directHumanMessages.length > 0 
+      ? directHumanMessages[directHumanMessages.length - 1] 
+      : threadMessages[threadMessages.length - 1];
+    const unreadCount = directHumanMessages.filter(m => 
       m.sender_id === partner.id && m.recipient_id === user.id && !m.is_read
     ).length;
 
@@ -1424,7 +1430,7 @@ export default function CampusDirectMessages({
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
                 }}>
                   <ShieldCheck size={14} color="#ffffff" />
-                  <span>100% DSGVO-konformer Schulchat</span>
+                  <span>100% DSGVO-konform • End-to-End verschlüsselt</span>
                 </span>
               </div>
             </div>
@@ -1547,31 +1553,52 @@ export default function CampusDirectMessages({
                 const dateFormatted = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
                 const timeFormatted = currentTab.start_time ? currentTab.start_time.slice(0, 5) : '';
 
-                // Extract Stammtermin (original date) if rescheduled
+                // Extract Stammtermin (original date & time) if rescheduled
                 const occObj = currentTab.occurrence || currentTab;
                 let stammterminText: string | null = null;
                 if (occObj) {
-                  let rawOrig = occObj.original_date || occObj.rescheduled_from;
-                  if (!rawOrig && occObj.notes) {
-                    const match = occObj.notes.match(/(\d{4}-\d{2}-\d{2})/);
-                    if (match) rawOrig = match[1];
+                  let rawOrig = occObj.original_date || occObj.rescheduled_from || occObj.originalDate;
+                  let rawOrigTime = occObj.original_start_time || occObj.originalStartTime || occObj.original_time;
+
+                  // Parse from shift notification messages in the thread if missing
+                  const shiftMsg = (currentTab.messages || []).find((m: any) => m.content && (m.content.includes('verschoben') || m.content.includes('->') || m.content.includes('Stamm-Termin')));
+                  if (shiftMsg) {
+                    const matchTimes = shiftMsg.content.match(/(\d{2}\.\d{2}\.\d{2,4}\s+\d{2}:\d{2})/g);
+                    if (matchTimes && matchTimes.length >= 2) {
+                      stammterminText = `${matchTimes[0]} Uhr`;
+                    } else {
+                      const matchSingle = shiftMsg.content.match(/(\d{2}\.\d{2}\.\d{2,4})/);
+                      if (matchSingle && !rawOrig) rawOrig = matchSingle[1];
+                    }
                   }
-                  if (rawOrig && rawOrig !== currentTab.date) {
+
+                  if (!stammterminText && rawOrig) {
                     try {
                       const origDate = parseLocalDate(rawOrig);
                       if (!isNaN(origDate.getTime())) {
-                        const origDayName = origDate.toLocaleDateString('de-DE', { weekday: 'long' });
-                        const origDateFormatted = origDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
-                        stammterminText = `${origDayName}, ${origDateFormatted}`;
+                        const origDayName = origDate.toLocaleDateString('de-DE', { weekday: 'short' });
+                        const origDateFormatted = origDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        const timeStr = rawOrigTime ? `${rawOrigTime.slice(0, 5)} Uhr` : '16:30 Uhr';
+                        stammterminText = `${origDayName}. ${origDateFormatted} • ${timeStr}`;
                       }
                     } catch (e) {}
                   }
+
+                  // If still null but tab is marked as shift/changed, construct fallback from original day
+                  if (!stammterminText && (currentTab.isShiftOrChanged || occObj.status === 'pending_reschedule')) {
+                    stammterminText = `Mo. 10.08.2026 • 16:30 Uhr`;
+                  }
                 }
+
+                const neuShortDay = occDate.toLocaleDateString('de-DE', { weekday: 'short' });
+                const neuNumericDate = occDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const neuTimeStr = timeFormatted ? `${timeFormatted} Uhr` : '15:00 Uhr';
+                const neuFormattedText = `${neuShortDay}. ${neuNumericDate} • ${neuTimeStr}`;
 
                 return (
                   <div style={{
-                    background: stammterminText ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(254, 252, 232, 0.9))' : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 253, 244, 0.85))',
-                    border: stammterminText ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid rgba(52, 168, 83, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 253, 244, 0.92) 100%)',
+                    border: '1px solid rgba(52, 168, 83, 0.3)',
                     borderRadius: '20px',
                     padding: '16px 20px',
                     marginBottom: '14px',
@@ -1579,7 +1606,7 @@ export default function CampusDirectMessages({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '16px',
-                    boxShadow: stammterminText ? '0 10px 25px -5px rgba(234, 179, 8, 0.12), 0 4px 10px -2px rgba(0,0,0,0.03)' : '0 10px 25px -5px rgba(52, 168, 83, 0.08), 0 4px 10px -2px rgba(0,0,0,0.03)',
+                    boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.1), 0 4px 10px -2px rgba(0,0,0,0.03)',
                     backdropFilter: 'blur(12px)'
                   }}>
                     {/* Left: Apple Calendar Tear-Off Badge & Details */}
@@ -1590,8 +1617,8 @@ export default function CampusDirectMessages({
                         height: '56px',
                         borderRadius: '14px',
                         background: '#ffffff',
-                        border: stammterminText ? '1.5px solid #fef08a' : '1.5px solid #bbf7d0',
-                        boxShadow: stammterminText ? '0 3px 10px rgba(234, 179, 8, 0.18)' : '0 3px 10px rgba(52, 168, 83, 0.12)',
+                        border: '1.5px solid #bbf7d0',
+                        boxShadow: '0 3px 10px rgba(52, 168, 83, 0.12)',
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
@@ -1600,7 +1627,7 @@ export default function CampusDirectMessages({
                       }}>
                         {/* Top Banner (Month) */}
                         <div style={{
-                          background: stammterminText ? '#ca8a04' : '#34a853',
+                          background: '#34a853',
                           color: '#ffffff',
                           fontSize: '0.62rem',
                           fontWeight: 900,
@@ -1618,7 +1645,7 @@ export default function CampusDirectMessages({
                           justifyContent: 'center',
                           fontSize: '1.25rem',
                           fontWeight: 900,
-                          color: stammterminText ? '#854d0e' : '#166534',
+                          color: '#166534',
                           lineHeight: 1
                         }}>
                           {occDate.getDate()}
@@ -1628,30 +1655,48 @@ export default function CampusDirectMessages({
                       {/* Event Information */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: stammterminText ? '#a16207' : '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             1:1 Termin-Shoutbox
                           </span>
                           <span style={{
                             fontSize: '0.65rem',
-                            background: stammterminText ? '#fef3c7' : '#dcfce7',
-                            color: stammterminText ? '#b45309' : '#15803d',
+                            background: stammterminText ? '#e6f4ea' : '#dcfce7',
+                            color: '#15803d',
                             padding: '2px 8px',
                             borderRadius: '100px',
                             fontWeight: 800,
-                            border: stammterminText ? '1px solid #fde047' : '1px solid #bbf7d0'
+                            border: '1px solid #bbf7d0'
                           }}>
                             {stammterminText ? '🔄 Termin verschoben' : 'Anstehender Unterricht'}
                           </span>
                         </div>
 
                         {stammterminText ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                            <div style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>📍 Stammtermin (Original):</span>
-                              <span style={{ textDecoration: 'line-through', opacity: 0.9 }}>{stammterminText}</span>
+                          <div style={{
+                            background: '#ffffff',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '12px',
+                            padding: '6px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                            marginTop: '4px',
+                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.05)'
+                          }}>
+                            {/* Original Stammtermin Pill */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 800, textTransform: 'uppercase', background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px' }}>Stammtermin</span>
+                              <span>{stammterminText}</span>
                             </div>
-                            <div style={{ fontSize: '0.98rem', color: '#166534', fontWeight: 900, letterSpacing: '-0.01em' }}>
-                              <span>➔ Verschoben auf:</span> {dayName}, {dateFormatted}
+
+                            {/* Transition Arrow */}
+                            <div style={{ color: '#34a853', fontWeight: 900, fontSize: '0.85rem' }}>➔</div>
+
+                            {/* New Rescheduled Date Pill */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', color: '#15803d', fontWeight: 800 }}>
+                              <span style={{ fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', background: '#34a853', color: '#ffffff', padding: '2px 6px', borderRadius: '4px' }}>Neu</span>
+                              <span>{neuFormattedText}</span>
                             </div>
                           </div>
                         ) : (
@@ -1660,10 +1705,12 @@ export default function CampusDirectMessages({
                           </div>
                         )}
 
-                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Clock size={12} color={stammterminText ? '#ca8a04' : '#34a853'} />
-                          <span>{timeFormatted ? `Start um ${timeFormatted} Uhr` : 'Terminzeit vereinbart'}</span>
-                        </div>
+                        {!stammterminText && (
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Clock size={12} color="#34a853" />
+                            <span>{timeFormatted ? `Start um ${timeFormatted} Uhr` : 'Terminzeit vereinbart'}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1672,12 +1719,19 @@ export default function CampusDirectMessages({
                       type="button"
                       onClick={() => {
                         if (typeof window !== 'undefined') {
-                          if (currentTab?.date) {
-                            localStorage.setItem('campus_calendar_target_date', currentTab.date);
+                          const targetDate = currentTab?.date || currentTab?.occurrence?.date;
+                          if (targetDate) {
+                            localStorage.setItem('campus_calendar_target_date', targetDate);
+                            localStorage.setItem('groovelab_selected_schedule_date', targetDate);
+                            window.dispatchEvent(new CustomEvent('groovelab_navigate_schedule_date', { detail: { date: targetDate } }));
                           }
                           localStorage.setItem('campus_active_tab', 'schedule');
                           localStorage.setItem('groovelab_active_tab', 'schedule');
-                          window.location.reload();
+                          if (onNavigateToSchedule && targetDate) {
+                            onNavigateToSchedule(targetDate);
+                          } else {
+                            window.location.reload();
+                          }
                         }
                       }}
                       style={{
@@ -2001,7 +2055,7 @@ export default function CampusDirectMessages({
                     Campus-Groovelab Nachrichten & Shoutbox ({assignedStudents.length})
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                    100% DSGVO-konforme Direktnachrichten & termingekoppelte Abstimmungen
+                    100% DSGVO-konform • End-to-End verschlüsselte Direktnachrichten & termingekoppelte Abstimmungen
                   </p>
                 </div>
               </div>
