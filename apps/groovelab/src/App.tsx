@@ -38,6 +38,8 @@ import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { SchoolSelfOnboardingModal } from './components/SchoolSelfOnboardingModal';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
+import { MobileTopHeader } from './components/ui/MobileTopHeader';
+import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -8842,6 +8844,12 @@ function App() {
       </aside>
 
       <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''}`} style={{ paddingTop: '0' }}>
+        <MobileTopHeader
+          user={user}
+          activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+          setActivePlatform={(p) => setActivePlatform(p)}
+          unreadCount={campusUnreadCount}
+        />
         <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', height: '56px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
@@ -15540,6 +15548,16 @@ function App() {
           }}
         />
       )}
+
+      {/* Fixed Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeStudentTab}
+        setActiveTab={(t) => setActiveStudentTab(t)}
+        activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+        setActivePlatform={(p) => setActivePlatform(p)}
+        userRole={user?.role}
+        unreadCount={campusUnreadCount}
+      />
     </div>
   </div>
 </DeviceSimulator>
