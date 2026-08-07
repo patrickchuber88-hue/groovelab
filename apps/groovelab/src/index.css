@@ -1505,7 +1505,12 @@ select option {
 }
 
 /* 3. iPad / Tablet Rail Mode (.sim-viewport-tablet & 769px-1024px) */
-.sim-viewport-tablet .sidebar-nav,
+.sim-viewport-tablet .sidebar-nav {
+  display: flex !important;
+  width: 80px !important;
+  min-width: 80px !important;
+}
+
 @media (min-width: 769px) and (max-width: 1024px) {
   .sidebar-nav {
     display: flex !important;
