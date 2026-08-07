@@ -3486,15 +3486,16 @@ export function TeacherDashboard({
     };
     updateTime();
     const interval = setInterval(updateTime, 10000);
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'groovelab_simulated_date' || e.key === 'groovelab_simulated_start_timestamp') {
-        updateTime();
-      }
+    const handleStorage = (e: Event) => {
+      updateTime();
+      setBriefingRefreshTicker(prev => prev + 1);
     };
     window.addEventListener('storage', handleStorage);
+    window.addEventListener('groovelab_simulated_date_changed', handleStorage);
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('groovelab_simulated_date_changed', handleStorage);
     };
   }, []);
 
@@ -3502,7 +3503,7 @@ export function TeacherDashboard({
     const today = getSimulatedNow();
     const day = today.getDay();
     return day === 0 || day === 6;
-  }, [currentTimeStr]);
+  }, [currentTimeStr, briefingRefreshTicker]);
 
   const firstLessonStartMin = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
@@ -3633,7 +3634,8 @@ export function TeacherDashboard({
 
   // Stable daily choices (hellos, subtitles) based on date-based seed
   const dailyBriefingStableChoices = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const simNow = getSimulatedNow();
+    const todayStr = simNow.toISOString().split('T')[0];
     
     // Simple hash from the date string
     let seed = 0;
@@ -3647,7 +3649,7 @@ export function TeacherDashboard({
       return x - Math.floor(x);
     };
 
-    const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+    const isWeekend = simNow.getDay() === 0 || simNow.getDay() === 6;
     const subtitles = isWeekend
       ? [
           'Wir wünschen dir ein schönes, erholsames Wochenende!',
@@ -3673,7 +3675,7 @@ export function TeacherDashboard({
     const greetingOptionIndex = Math.floor(random() * 4); // 0 = time-based, 1 = Hallo, 2 = Hi, 3 = Hey
 
     return { greetingOptionIndex, subtitle };
-  }, [userId, new Date().toDateString()]);
+  }, [userId, getSimulatedNow().toDateString(), briefingRefreshTicker]);
 
   // Dynamic greeting that adapts time greetings to the hour, but keeps others completely stable
   const dynamicGreeting = useMemo(() => {
