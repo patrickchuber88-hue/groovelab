@@ -48,8 +48,10 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
     >
       {/* Left: App Brand Title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-          Campus-Groovelab
+        <span style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <span style={{ color: '#34a853' }}>Campus</span>
+          <span style={{ color: '#64748b', margin: '0 1px' }}>-</span>
+          <span style={{ color: '#eab308' }}>Groovelab</span>
         </span>
       </div>
 

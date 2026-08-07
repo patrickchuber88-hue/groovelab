@@ -1558,18 +1558,24 @@ select option {
   padding-bottom: 110px !important;
 }
 
-/* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars on smartphones */
-.sim-viewport-mobile div[style*="maxHeight"],
-.sim-viewport-mobile div[style*="max-height"] {
+/* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars across ALL boards on smartphones */
+.sim-viewport-mobile div[style*="maxHeight"]:not(.pwa-modal-drawer),
+.sim-viewport-mobile div[style*="max-height"]:not(.pwa-modal-drawer),
+.sim-viewport-mobile div[style*="overflowY"]:not(.pwa-modal-drawer),
+.sim-viewport-mobile div[style*="overflow-y"]:not(.pwa-modal-drawer) {
   max-height: none !important;
+  height: auto !important;
   overflow-y: visible !important;
   overflow: visible !important;
 }
 
 @media (max-width: 768px) {
-  div[style*="maxHeight"],
-  div[style*="max-height"] {
+  div[style*="maxHeight"]:not(.pwa-modal-drawer),
+  div[style*="max-height"]:not(.pwa-modal-drawer),
+  div[style*="overflowY"]:not(.pwa-modal-drawer),
+  div[style*="overflow-y"]:not(.pwa-modal-drawer) {
     max-height: none !important;
+    height: auto !important;
     overflow-y: visible !important;
     overflow: visible !important;
   }
