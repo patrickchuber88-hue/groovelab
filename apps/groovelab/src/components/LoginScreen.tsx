@@ -6331,20 +6331,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   .select('id, role, school_id, first_name, last_name, qr_token')
                   .eq('school_id', schoolData.id)
                   .ilike('first_name', '%Patrick%')
-                  .or('last_name.ilike.%H%,last_name.ilike.%Huber%')
                   .limit(1)
                   .maybeSingle();
-
-                if (!user) {
-                  const { data: globalPatrick } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
-                    .ilike('first_name', '%Patrick%')
-                    .or('last_name.ilike.%H%,last_name.ilike.%Huber%')
-                    .limit(1)
-                    .maybeSingle();
-                  user = globalPatrick;
-                }
 
                 if (!user) {
                   const { data: fallbackTeacher } = await supabase
@@ -6357,8 +6345,24 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   user = fallbackTeacher;
                 }
 
+                if (!user) {
+                  const { data: newTeacher } = await supabase
+                    .from('users')
+                    .insert({
+                      school_id: schoolData.id,
+                      role: 'teacher',
+                      first_name: 'Patrick',
+                      last_name: 'Huber',
+                      instrument: 'Gitarre',
+                      is_campus_active: true
+                    })
+                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .single();
+                  user = newTeacher;
+                }
+
                 if (user) {
-                  await supabase.from('users').update({ role: 'teacher' }).eq('id', user.id);
+                  await supabase.from('users').update({ role: 'teacher', school_id: schoolData.id }).eq('id', user.id);
                   localStorage.setItem('groovelab_active_workspace', 'teacher');
                   localStorage.setItem('groovelab_active_platform', 'campus');
                   localStorage.setItem('campus_active_tab', 'live');
@@ -6412,13 +6416,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   .maybeSingle();
 
                 if (!user) {
-                  const { data: globalStudent } = await supabase
+                  const { data: newStudent } = await supabase
                     .from('users')
+                    .insert({
+                      school_id: schoolData.id,
+                      role: 'student',
+                      first_name: 'Max',
+                      last_name: 'Müller',
+                      instrument: 'Klavier',
+                      is_campus_active: true
+                    })
                     .select('id, role, school_id, first_name, last_name, qr_token')
-                    .eq('role', 'student')
-                    .limit(1)
-                    .maybeSingle();
-                  user = globalStudent;
+                    .single();
+                  user = newStudent;
                 }
 
                 if (user) {
@@ -6469,20 +6479,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   .select('id, role, school_id, first_name, last_name, qr_token')
                   .eq('school_id', schoolData.id)
                   .ilike('first_name', '%Manuel%')
-                  .or('last_name.ilike.%W%,last_name.ilike.%Wagner%')
                   .limit(1)
                   .maybeSingle();
-
-                if (!user) {
-                  const { data: globalManuel } = await supabase
-                    .from('users')
-                    .select('id, role, school_id, first_name, last_name, qr_token')
-                    .ilike('first_name', '%Manuel%')
-                    .or('last_name.ilike.%W%,last_name.ilike.%Wagner%')
-                    .limit(1)
-                    .maybeSingle();
-                  user = globalManuel;
-                }
 
                 if (!user) {
                   const { data: adminUser } = await supabase
@@ -6495,8 +6493,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   user = adminUser;
                 }
 
+                if (!user) {
+                  const { data: newAdmin } = await supabase
+                    .from('users')
+                    .insert({
+                      school_id: schoolData.id,
+                      role: 'admin',
+                      first_name: 'Manuel',
+                      last_name: 'Wagner',
+                      is_campus_active: true
+                    })
+                    .select('id, role, school_id, first_name, last_name, qr_token')
+                    .single();
+                  user = newAdmin;
+                }
+
                 if (user) {
-                  await supabase.from('users').update({ role: 'admin' }).eq('id', user.id);
+                  await supabase.from('users').update({ role: 'admin', school_id: schoolData.id }).eq('id', user.id);
                   localStorage.setItem('groovelab_active_workspace', 'secretary');
                   localStorage.setItem('groovelab_active_platform', 'campus');
                   localStorage.setItem('campus_active_tab', 'briefing');
