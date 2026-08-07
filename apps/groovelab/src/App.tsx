@@ -8850,7 +8850,7 @@ function App() {
           setActivePlatform={(p) => setActivePlatform(p)}
           unreadCount={campusUnreadCount}
         />
-        <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', height: '56px', background: 'transparent' }}>
+        <header className="header desktop-only-header" style={{ display: windowWidth <= 768 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', height: '56px', background: 'transparent' }}>
           {/* App Switcher Tabs */}
           <div style={{ 
             display: 'flex', 

@@ -29,8 +29,10 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         top: 0,
         left: 0,
         right: 0,
-        height: 'calc(56px + env(safe-area-inset-top, 0px))',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
+        height: 'auto',
+        minHeight: '52px',
+        paddingTop: 'calc(env(safe-area-inset-top, 12px) + 24px)',
+        paddingBottom: '8px',
         background: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -38,8 +40,8 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingLeft: '16px',
-        paddingRight: '16px',
+        paddingLeft: '14px',
+        paddingRight: '14px',
         zIndex: 900,
         boxSizing: 'border-box'
       }}
