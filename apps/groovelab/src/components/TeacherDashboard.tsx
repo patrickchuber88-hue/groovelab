@@ -3948,8 +3948,7 @@ export function TeacherDashboard({
                  if (pb && typeof pb === 'object' && !Array.isArray(pb) && Array.isArray(pb.drafts)) {
                    const targetDraftId = pb.submittedDraftId || pb.activeDraftId;
                    const targetDraft = pb.drafts.find((d: any) => d.id === targetDraftId) || pb.drafts[0];
-                   const isOpened = targetDraft && (targetDraft.status === 'opened' || targetDraft.status === 'approved' || targetDraft.status === 'published' || targetDraft.is_opened === true);
-                   if (isOpened && Array.isArray(targetDraft.boards)) {
+                   if (targetDraft && Array.isArray(targetDraft.boards)) {
                      boards = targetDraft.boards;
                    }
                  } else if (Array.isArray(pb)) {
@@ -3958,71 +3957,81 @@ export function TeacherDashboard({
                    boards = Object.values(pb);
                  }
 
-                 const todayBoard = boards.find((b: any) => 
-                   b.dayOfWeek === todayWeekday || 
-                   b.dayOfWeek === dayNameStr || 
-                   String(b.dayOfWeek) === String(todayWeekday)
-                 );
+                 const germanDaysMap: Record<number, string> = { 1: 'Montag', 2: 'Dienstag', 3: 'Mittwoch', 4: 'Donnerstag', 5: 'Freitag', 6: 'Samstag', 7: 'Sonntag' };
+                 const germanDayStr = germanDaysMap[todayWeekday] || 'Montag';
 
-                 if (todayBoard && Array.isArray(todayBoard.students)) {
-                   const { data: schoolStudents } = await supabase
-                     .from('users')
-                     .select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)')
-                     .eq('school_id', teacherProfile.school_id);
+                 const todayBoards = boards.filter((b: any) => {
+                   const dayVal = b.dayOfWeek ?? b.day_of_week ?? b.day;
+                   if (dayVal === undefined || dayVal === null) return false;
+                   const dStr = String(dayVal).trim().toLowerCase();
+                   return dStr === String(todayWeekday) ||
+                          dStr === String(todayWeekday - 1) ||
+                          dStr === dayNameStr.toLowerCase() ||
+                          dStr === germanDayStr.toLowerCase() ||
+                          dStr === germanDayStr.toLowerCase().substring(0, 2);
+                 });
 
-                   const boardStartStr = todayBoard.startTime || '14:00';
-                   const [bSh, bSm] = boardStartStr.split(':').map(Number);
-                   let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
+                 for (const todayBoard of todayBoards) {
+                   if (todayBoard && Array.isArray(todayBoard.students)) {
+                     const { data: schoolStudents } = await supabase
+                       .from('users')
+                       .select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)')
+                       .eq('school_id', teacherProfile.school_id);
 
-                   todayBoard.students.forEach((s: any) => {
-                     if (s.isBreak || !s.first_name) {
-                       if (s.isBreak) {
-                         currentCumulativeMin += (s.duration || 15);
+                     const boardStartStr = todayBoard.startTime || '14:00';
+                     const [bSh, bSm] = boardStartStr.split(':').map(Number);
+                     let currentCumulativeMin = (bSh || 14) * 60 + (bSm || 0);
+
+                     todayBoard.students.forEach((s: any) => {
+                       if (s.isBreak || !s.first_name) {
+                         if (s.isBreak) {
+                           currentCumulativeMin += (s.duration || 15);
+                         }
+                         return;
                        }
-                       return;
-                     }
-                     const matchedStudent = (schoolStudents || []).find((st: any) => 
-                       st.id === s.id || 
-                       (st.first_name?.trim().toLowerCase() === s.first_name?.trim().toLowerCase() && 
-                        (st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase())
-                     );
+                       const matchedStudent = (schoolStudents || []).find((st: any) => 
+                         st.id === s.id || 
+                         (st.first_name?.trim().toLowerCase() === s.first_name?.trim().toLowerCase() && 
+                          (st.last_name || '').trim().toLowerCase() === (s.last_name || '').trim().toLowerCase())
+                       );
 
-                     let studentTime = s.customStartTime || s.assignedTime || s.startTime;
-                     if (!studentTime) {
-                       const h = Math.floor(currentCumulativeMin / 60) % 24;
-                       const m = currentCumulativeMin % 60;
-                       studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                     }
-                     const studentDuration = s.duration || 45;
-                     currentCumulativeMin += studentDuration;
+                       let studentTime = s.customStartTime || s.assignedTime || s.startTime;
+                       if (!studentTime) {
+                         const h = Math.floor(currentCumulativeMin / 60) % 24;
+                         const m = currentCumulativeMin % 60;
+                         studentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                       }
+                       const studentDuration = s.duration || 45;
+                       currentCumulativeMin += studentDuration;
 
-                     slots.push({
-                       id: `board-${todayBoard.id}-${s.id}`,
-                       time_slot: studentTime,
-                       duration: studentDuration,
-                       status: 'approved',
-                       day_of_week: todayWeekday,
-                       instrument: matchedStudent?.instrument || s.instrument || 'Klavier',
-                       rooms: { id: todayBoard.roomId || null, name: todayBoard.roomName || 'Hauptraum' } as any,
-                       student: (matchedStudent ? {
-                         id: matchedStudent.id,
-                         first_name: matchedStudent.first_name,
-                         last_name: matchedStudent.last_name,
-                         is_app_user: matchedStudent.is_app_user,
-                         instrument: matchedStudent.instrument,
-                         birth_date: matchedStudent.birth_date,
-                         avatars: matchedStudent.avatars
-                       } : {
-                         id: s.id || `temp-${s.first_name}`,
-                         first_name: s.first_name,
-                         last_name: s.last_name || '',
-                         is_app_user: false,
-                         instrument: s.instrument || 'Klavier',
-                         birth_date: null,
-                         avatars: []
-                       }) as any
+                       slots.push({
+                         id: `board-${todayBoard.id}-${s.id}`,
+                         time_slot: studentTime,
+                         duration: studentDuration,
+                         status: 'approved',
+                         day_of_week: todayWeekday,
+                         instrument: matchedStudent?.instrument || s.instrument || 'Klavier',
+                         rooms: { id: todayBoard.roomId || null, name: todayBoard.roomName || 'Hauptraum' } as any,
+                         student: (matchedStudent ? {
+                           id: matchedStudent.id,
+                           first_name: matchedStudent.first_name,
+                           last_name: matchedStudent.last_name,
+                           is_app_user: matchedStudent.is_app_user,
+                           instrument: matchedStudent.instrument,
+                           birth_date: matchedStudent.birth_date,
+                           avatars: matchedStudent.avatars
+                         } : {
+                           id: s.id || `temp-${s.first_name}`,
+                           first_name: s.first_name,
+                           last_name: s.last_name || '',
+                           is_app_user: false,
+                           instrument: s.instrument || 'Klavier',
+                           birth_date: null,
+                           avatars: []
+                         }) as any
+                       });
                      });
-                   });
+                   }
                  }
                }
              } catch (e) {
