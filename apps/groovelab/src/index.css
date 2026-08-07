@@ -1536,6 +1536,27 @@ select option {
   padding-bottom: 110px !important;
 }
 
+/* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars on smartphones */
+.sim-viewport-mobile div[style*="maxHeight"],
+.sim-viewport-mobile div[style*="max-height"] {
+  max-height: none !important;
+  overflow-y: visible !important;
+  overflow: visible !important;
+}
+
+@media (max-width: 768px) {
+  div[style*="maxHeight"],
+  div[style*="max-height"] {
+    max-height: none !important;
+    overflow-y: visible !important;
+    overflow: visible !important;
+  }
+
+  .google-timeline-card {
+    padding: 10px 12px !important;
+  }
+}
+
 .cg-bottom-nav-item {
   display: flex !important;
   flex-direction: column !important;
