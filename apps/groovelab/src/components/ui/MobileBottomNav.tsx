@@ -176,7 +176,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
             {/* Platform Switcher inside Drawer */}
             <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '12px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', uppercase: 'true', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                 Modul Wechseln
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
