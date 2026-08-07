@@ -37,6 +37,7 @@ import { DeviceOnboardingPage } from './components/DeviceOnboardingPage';
 import { ProfileSelector } from './components/ProfileSelector';
 import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { SchoolSelfOnboardingModal } from './components/SchoolSelfOnboardingModal';
+import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
@@ -7868,7 +7869,8 @@ function App() {
   };
 
   return (
-    <div className="app-layout">
+    <DeviceSimulator>
+      <div className="app-layout">
       {toastMessage && (
         <div 
           style={{
@@ -15540,6 +15542,7 @@ function App() {
       )}
     </div>
   </div>
+</DeviceSimulator>
 );
 }
 
