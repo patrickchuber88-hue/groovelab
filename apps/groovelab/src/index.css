@@ -1515,7 +1515,16 @@ select option {
   z-index: 10000 !important;
 }
 
-.sim-viewport-mobile .hero-avatar-container,
+.sim-viewport-mobile .hero-avatar-container {
+  width: 60px !important;
+  height: 60px !important;
+  min-width: 60px !important;
+  border-radius: 16px !important;
+  margin: 10px 0 10px 12px !important;
+  flex-shrink: 0 !important;
+  border-right: none !important;
+}
+
 @media (max-width: 768px) {
   .hero-avatar-container {
     width: 60px !important;
