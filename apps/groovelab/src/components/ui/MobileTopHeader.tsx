@@ -150,20 +150,6 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
             </span>
           )}
         </div>
-
-        {/* Profile Avatar */}
-        <img
-          src={getAvatarSrc()}
-          alt={user?.first_name || 'User Profile'}
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: `2px solid ${activePlatform === 'campus' ? '#34a853' : '#eab308'}`,
-            boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-          }}
-        />
       </div>
     </header>
   );
