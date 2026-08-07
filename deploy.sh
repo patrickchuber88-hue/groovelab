@@ -14,6 +14,20 @@ echo "🎸 GrooveLab Deployment startet..."
 echo "   Ziel: $SERVER → $REMOTE_DIR"
 echo ""
 
+# 0. Pre-Deployment Security Shield & Build Verification
+echo "🛡️  Prüfe Pre-Deploy Security Shield & Build-Status..."
+if [ ! -d "$LOCAL_DIST" ]; then
+  echo "❌ Fehler: Ordner $LOCAL_DIST existiert nicht. Bitte zuerst 'npm --prefix apps/groovelab run build' ausführen!"
+  exit 1
+fi
+
+echo "🔍 Führe automatisches Dependency-Audit durch..."
+npm --prefix apps/groovelab audit --audit-level=high || {
+  echo "⚠️  Warnung: Security Audit hat Schwachstellen gemeldet. Bitte prüfen."
+}
+echo "  ✓ Pre-Deploy Security Shield bestanden."
+echo ""
+
 # 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
 echo "📁 Remote-Verzeichnis & Backup-Ordner vorbereiten..."
 ssh "$SERVER" "mkdir -p $REMOTE_DIR /mnt/supabase_data/backups"

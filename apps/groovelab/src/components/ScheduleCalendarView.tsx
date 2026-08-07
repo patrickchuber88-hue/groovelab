@@ -30,7 +30,8 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
-import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
+const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
 interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
@@ -7826,16 +7827,18 @@ return (
               </div>
             </div>
             {docStudent && (
-              <MeisterwerkDocumentationModal 
-                student={docStudent} 
-                onClose={() => {
-                  setDocStudent(null);
-                  if (occ?.student_id) {
-                    loadStudentHomework(occ.student_id, occ.student?.instrument);
-                  }
-                }} 
-                teacherId={userId}
-              />
+              <React.Suspense fallback={<LiquidGlassSkeleton type="modal" />}>
+                <MeisterwerkDocumentationModal 
+                  student={docStudent} 
+                  onClose={() => {
+                    setDocStudent(null);
+                    if (occ?.student_id) {
+                      loadStudentHomework(occ.student_id, occ.student?.instrument);
+                    }
+                  }} 
+                  teacherId={userId}
+                />
+              </React.Suspense>
             )}
           </div>
         );
