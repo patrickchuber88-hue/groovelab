@@ -6315,11 +6315,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       {/* Admin & Teacher Bypass Buttons for Localhost / Dev */}
       {import.meta.env.DEV && schoolData?.id && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Patrick Huber Bypass (Teacher) */}
+          {/* Severin L. Bypass (Teacher) */}
           <button
             onClick={async () => {
               try {
-                console.log('[Bypass] Attempting Patrick Huber (Lehrer) login for school:', schoolData.name, '(', schoolData.id, ')');
+                console.log('[Bypass] Attempting Severin L. (Lehrer) login for school:', schoolData.name, '(', schoolData.id, ')');
                 sessionStorage.removeItem('groovelab_is_master_admin');
 
                 if (schoolData?.groovelab_kiosk_token) {
@@ -6330,7 +6330,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   .from('users')
                   .select('id, role, school_id, first_name, last_name, qr_token')
                   .eq('school_id', schoolData.id)
-                  .ilike('first_name', '%Patrick%')
+                  .ilike('first_name', '%Severin%')
                   .limit(1)
                   .maybeSingle();
 
@@ -6351,8 +6351,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     .insert({
                       school_id: schoolData.id,
                       role: 'teacher',
-                      first_name: 'Patrick',
-                      last_name: 'Huber',
+                      first_name: 'Severin',
+                      last_name: 'L.',
                       instrument: 'Gitarre',
                       is_campus_active: true
                     })
@@ -6374,7 +6374,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   alert(`Kein Lehrer-Profil für "${schoolData.name}" gefunden.`);
                 }
               } catch (err: any) {
-                console.error('[Bypass] Error logging in as Patrick Huber:', err);
+                console.error('[Bypass] Error logging in as Severin L.:', err);
                 alert('Bypass Fehler: ' + (err?.message || err));
               }
             }}
@@ -6393,7 +6393,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🔓 BYPASS: PATRICK HUBER (LEHRER - {schoolData.name})
+            🔓 BYPASS: SEVERIN L. (LEHRER - {schoolData.name})
           </button>
 
           {/* Schüler Bypass (Student) */}
