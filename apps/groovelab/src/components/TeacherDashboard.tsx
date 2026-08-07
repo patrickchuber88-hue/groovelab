@@ -7067,7 +7067,7 @@ export function TeacherDashboard({
                               overflow: 'hidden',
                               borderRight: windowWidth < 768 ? 'none' : '1px solid rgba(0, 0, 0, 0.05)'
                             }}
-                            className="hover-scale"
+                            className="hover-scale hero-avatar-container"
                             >
                               <img 
                                 src={getInstrumentAvatarUrl(teacher?.instrument)} 
