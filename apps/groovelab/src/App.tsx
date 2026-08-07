@@ -23,6 +23,7 @@ const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(modul
 import { QRCodeModal } from './components/QRCodeModal';
 const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(module => ({ default: module.QRLandingPage })));
 const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').then(module => ({ default: module.DeviceSetupScreen })));
+import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { ContractEndPrompt } from './components/ContractEndPrompt';
@@ -13710,6 +13711,18 @@ function App() {
           </ErrorBoundary>
         )}
       </main>
+
+      {/* Mobile Native Bottom Navigation Bar (< 768px Viewports) */}
+      {windowWidth <= 768 && (
+        <MobileBottomNav
+          activeTab={activeStudentTab}
+          setActiveTab={setActiveStudentTab}
+          activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+          setActivePlatform={(p) => setActivePlatform(p)}
+          userRole={user?.role?.toLowerCase() || 'student'}
+          unreadCount={campusUnreadCount}
+        />
+      )}
 
 
 

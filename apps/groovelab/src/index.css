@@ -1708,6 +1708,23 @@ textarea:focus-visible {
     right: calc(16px + var(--safe-right));
     z-index: 900;
   }
+
+  /* iOS Safari Auto-Zoom Prevention (16px minimum font size) */
+  input, select, textarea {
+    font-size: 16px !important;
+    min-height: 48px !important;
+  }
+
+  /* Bottom Content Padding for Mobile Nav */
+  .pb-mobile-nav {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Hide Desktop Sidebar and Header on Smartphone */
+  .desktop-only-sidebar,
+  .sidebar-container-desktop {
+    display: none !important;
+  }
 }
 
 /* ------------------------------------------------------------
