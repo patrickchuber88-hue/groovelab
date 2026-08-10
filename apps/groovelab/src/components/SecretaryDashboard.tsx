@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, sanitizeBirthDateToDayOnly } from '../utils/nameHelper';
 import { 
   ShieldAlert, CheckCircle, Users, Settings, ShieldCheck, FileText,
   UserCheck, RefreshCw, Key, ChevronRight, UserX, LogOut,
@@ -5687,7 +5687,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     try {
       const teacherId = newStudentTeacherId || null;
       const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
-      const finalBirthDate = hasCampusSub ? (newStudentBirthDate ? newStudentBirthDate.trim() : null) : null;
+      const finalBirthDate = hasCampusSub ? sanitizeBirthDateToDayOnly(newStudentBirthDate) : null;
 
       // 1. Call import_student RPC (5-Tabellen anonymisiertes Onboarding)
       const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
@@ -5732,7 +5732,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     try {
       const teacherId = newStudentTeacherId || null;
       const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
-      const finalBirthDate = hasCampusSub ? (newStudentBirthDate ? newStudentBirthDate.trim() : null) : null;
+      const finalBirthDate = null;
 
       // 1. Call import_student RPC
       const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
@@ -5899,7 +5899,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         try {
           const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
-          const finalBirthDate = hasCampusSub ? (birthDate || '01.01.2000') : null;
+          const finalBirthDate = hasCampusSub ? sanitizeBirthDateToDayOnly(birthDate) : null;
 
           const { data, error: rpcError } = await supabase.rpc('import_student', {
             first_name: firstName,
@@ -14332,29 +14332,93 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             const activeStudentsCount = students.filter(s => s.is_pin_activated).length;
             const activationRate = totalStudentsCount > 0 ? Math.round((activeStudentsCount / totalStudentsCount) * 100) : 0;
 
-            // 4. Systemische Termin-Konflikte (Overlap checkers)
+            // 4. Systemische Termin-Konflikte (Overlap checkers - Refined & Human-Friendly)
             const scheduleConflicts = (() => {
-              const list: { type: 'room' | 'teacher'; key: string; message: string }[] = [];
+              interface ScheduleConflictItem {
+                id: string;
+                type: 'room' | 'teacher';
+                dayOfWeek: number;
+                dayLabel: string;
+                startTime: string;
+                endTime: string;
+                summarySentence: string;
+                teacherId: string;
+                teacherNameA: string;
+                teacherNameB?: string;
+                studentsA: string;
+                studentsB: string;
+                roomId?: string;
+                roomNameA?: string;
+                roomNameB?: string;
+                timeA: string;
+                timeB: string;
+              }
+
+              const getStudentNames = (block: any) => {
+                if (!block || !Array.isArray(block.slots) || block.slots.length === 0) {
+                  return '';
+                }
+                const names = block.slots
+                  .map((s: any) => s.student_name || (s.student_id ? (userMap[s.student_id] || '') : ''))
+                  .filter((n: string) => n && n !== 'Pause');
+                return names.length > 0 ? names.join(', ') : '';
+              };
+
+              const getTeacherName = (block: any) => {
+                if (!block || block.teacherId === 'groovelab' || block.id?.startsWith('groovelab_')) return '';
+                return block.teacherName || (block.teacherId ? (userMap[block.teacherId] || '') : '') || '';
+              };
+
+              const isRealBlock = (block: any) => {
+                if (!block) return false;
+                if (block.teacherId === 'groovelab' || block.id?.startsWith('groovelab_')) return false;
+                const students = getStudentNames(block);
+                return students.length > 0;
+              };
+
+              const list: ScheduleConflictItem[] = [];
               
               // Room conflicts
               const byRoomDay: Record<string, any[]> = {};
-              matrixAllocations.filter(p => p.roomId).forEach(p => {
-                const k = `${p.roomId}_${p.dayOfWeek}`;
-                if (!byRoomDay[k]) byRoomDay[k] = [];
-                byRoomDay[k].push(p);
-              });
+              matrixAllocations
+                .filter(p => p.roomId && isRealBlock(p))
+                .forEach(p => {
+                  const k = `${p.roomId}_${p.dayOfWeek}`;
+                  if (!byRoomDay[k]) byRoomDay[k] = [];
+                  byRoomDay[k].push(p);
+                });
+
               Object.entries(byRoomDay).forEach(([k, group]) => {
                 if (group.length > 1) {
                   group.forEach((p, i) => {
                     group.forEach((q, j) => {
                       if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
-                        const roomName = roomMap[p.roomId] || 'Unbekannter Raum';
+                        const roomName = roomMap[p.roomId] || 'Raum';
                         const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
                         const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
+                        const teacherA = getTeacherName(p) || 'Lehrkraft A';
+                        const teacherB = getTeacherName(q) || 'Lehrkraft B';
+                        const studsA = getStudentNames(p) || 'Schüler';
+                        const studsB = getStudentNames(q) || 'Schüler';
+
                         list.push({
+                          id: `room_${p.id}_${q.id}`,
                           type: 'room',
-                          key: `${p.id}_${q.id}`,
-                          message: `Raum-Kollision in "${roomName}" (${dayLabel}): ${userMap[p.teacherId] || 'Lehrer'} / ${userMap[p.studentId] || 'Schüler'} (${p.startTime}-${p.endTime}) überlappt mit ${userMap[q.teacherId] || 'Lehrer'} / ${userMap[q.studentId] || 'Schüler'} (${q.startTime}-${q.endTime}).`
+                          dayOfWeek: p.dayOfWeek,
+                          dayLabel,
+                          startTime: p.startTime < q.startTime ? p.startTime : q.startTime,
+                          endTime: p.endTime > q.endTime ? p.endTime : q.endTime,
+                          summarySentence: `Der Raum "${roomName}" ist am ${dayLabel} um ${p.startTime} Uhr doppelt belegt.`,
+                          teacherId: p.teacherId,
+                          teacherNameA: teacherA,
+                          teacherNameB: teacherB,
+                          studentsA: studsA,
+                          studentsB: studsB,
+                          roomId: p.roomId,
+                          roomNameA: roomName,
+                          roomNameB: roomName,
+                          timeA: `${p.startTime}-${p.endTime}`,
+                          timeB: `${q.startTime}-${q.endTime}`
                         });
                       }
                     });
@@ -14364,25 +14428,46 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
               // Teacher conflicts
               const byTeacherDay: Record<string, any[]> = {};
-              matrixAllocations.forEach(p => {
-                if (p.teacherId) {
-                  const k = `${p.teacherId}_${p.dayOfWeek}`;
-                  if (!byTeacherDay[k]) byTeacherDay[k] = [];
-                  byTeacherDay[k].push(p);
-                }
-              });
+              matrixAllocations
+                .filter(p => isRealBlock(p))
+                .forEach(p => {
+                  if (p.teacherId && p.teacherId !== 'groovelab') {
+                    const k = `${p.teacherId}_${p.dayOfWeek}`;
+                    if (!byTeacherDay[k]) byTeacherDay[k] = [];
+                    byTeacherDay[k].push(p);
+                  }
+                });
+
               Object.entries(byTeacherDay).forEach(([k, group]) => {
                 if (group.length > 1) {
                   group.forEach((p, i) => {
                     group.forEach((q, j) => {
                       if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
-                        const teacherName = userMap[p.teacherId] || 'Lehrkraft';
+                        const teacherName = getTeacherName(p) || 'Lehrkraft';
                         const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
                         const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
+                        const studsA = getStudentNames(p) || 'Schüler';
+                        const studsB = getStudentNames(q) || 'Schüler';
+                        const rNameA = p.roomId ? (roomMap[p.roomId] || 'Raum') : 'Ohne Raumzuweisung';
+                        const rNameB = q.roomId ? (roomMap[q.roomId] || 'Raum') : 'Ohne Raumzuweisung';
+
                         list.push({
+                          id: `teacher_${p.id}_${q.id}`,
                           type: 'teacher',
-                          key: `${p.id}_${q.id}`,
-                          message: `Lehrer-Kollision für ${teacherName} (${dayLabel}): ${userMap[p.studentId] || 'Schüler'} (${p.startTime}-${p.endTime}) überlappt mit ${userMap[q.studentId] || 'Schüler'} (${q.startTime}-${q.endTime}).`
+                          dayOfWeek: p.dayOfWeek,
+                          dayLabel,
+                          startTime: p.startTime < q.startTime ? p.startTime : q.startTime,
+                          endTime: p.endTime > q.endTime ? p.endTime : q.endTime,
+                          summarySentence: `${teacherName} ist am ${dayLabel} um ${p.startTime} Uhr zeitgleich an 2 Terminen gebucht.`,
+                          teacherId: p.teacherId,
+                          teacherNameA: teacherName,
+                          studentsA: studsA,
+                          studentsB: studsB,
+                          roomId: p.roomId,
+                          roomNameA: rNameA,
+                          roomNameB: rNameB,
+                          timeA: `${p.startTime}-${p.endTime}`,
+                          timeB: `${q.startTime}-${q.endTime}`
                         });
                       }
                     });
@@ -14995,50 +15080,287 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     )}
                   </div>
 
-                  {/* WIDGET: Systemische Terminkonflikte (Only shown if conflicts exist) */}
-                  {scheduleConflicts.length > 0 && (
-                    <div style={{
-                      background: '#ffffff',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                      border: '1px solid rgba(0, 0, 0, 0.05)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ background: '#fef3c7', color: '#d97706', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <ShieldAlert size={16} />
+                  {/* WIDGET: Systemische Terminkonflikte (Apple / Enterprise SaaS Level) */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: scheduleConflicts.length > 0 ? '1px solid rgba(234, 67, 53, 0.18)' : '1px solid rgba(0, 0, 0, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '18px'
+                  }}>
+                    {/* Widget Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          background: scheduleConflicts.length > 0 ? '#fff1f2' : '#e6f4ea',
+                          color: scheduleConflicts.length > 0 ? '#ea4335' : '#34a853',
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: scheduleConflicts.length > 0 ? '0 2px 8px rgba(234, 67, 53, 0.15)' : 'none',
+                          flexShrink: 0
+                        }}>
+                          {scheduleConflicts.length > 0 ? <ShieldAlert size={20} color="#ea4335" /> : <CheckCircle size={20} color="#34a853" />}
                         </div>
                         <div>
-                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
                             System-Kollisionsprüfer
                           </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                            Prüfung auf Überschneidungen
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Automatisierte Überschneidungskontrolle
                           </span>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {scheduleConflicts.map((conflict, idx) => (
-                          <div key={idx} style={{
-                            background: 'rgba(245, 158, 11, 0.04)',
-                            border: '1px solid rgba(245, 158, 11, 0.1)',
-                            color: '#92400e',
-                            borderRadius: '16px',
-                            padding: '12px 16px',
+                      {scheduleConflicts.length > 0 ? (
+                        <div style={{
+                          background: '#fff1f2',
+                          border: '1px solid #fecdd3',
+                          color: '#be123c',
+                          borderRadius: '20px',
+                          padding: '5px 12px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            background: '#ea4335',
+                            boxShadow: '0 0 0 3px rgba(234, 67, 53, 0.2)',
+                            display: 'inline-block'
+                          }} />
+                          {scheduleConflicts.length} {scheduleConflicts.length === 1 ? 'Kollision' : 'Kollisionen'} aktiv
+                        </div>
+                      ) : (
+                        <div style={{
+                          background: '#e6f4ea',
+                          border: '1px solid #a7f3d0',
+                          color: '#047857',
+                          borderRadius: '20px',
+                          padding: '5px 12px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            background: '#34a853',
+                            boxShadow: '0 0 0 3px rgba(52, 168, 83, 0.2)',
+                            display: 'inline-block'
+                          }} />
+                          System optimal
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content Body */}
+                    {scheduleConflicts.length === 0 ? (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        borderRadius: '16px',
+                        padding: '16px 20px',
+                        border: '1px dashed #cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '14px'
+                      }}>
+                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', flexShrink: 0 }}>
+                          <CheckCircle size={22} color="#34a853" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a' }}>
+                            Keine Terminüberschneidungen vorhanden
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', fontWeight: 500 }}>
+                            Alle Lehrkräfte- und Raumbelegungen im Campus-Groovelab Stundenplan sind 100% überschneidungsfrei.
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {scheduleConflicts.map((conflict) => (
+                          <div key={conflict.id} style={{
+                            background: '#ffffff',
+                            border: '1px solid #fee2e2',
+                            borderRadius: '18px',
+                            padding: '16px',
+                            boxShadow: '0 4px 16px rgba(234, 67, 53, 0.04)',
                             display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '10px'
-                          }}>
-                            <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-                            <span style={{ fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.4 }}>
-                              {conflict.message}
-                            </span>
+                            flexDirection: 'column',
+                            gap: '12px',
+                            transition: 'all 0.2s ease-in-out'
+                          }} className="hover-scale">
+                            
+                            {/* Top Bar inside Card */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                {/* Type Badge */}
+                                <span style={{
+                                  background: conflict.type === 'room' ? '#fff1f2' : '#fef3c7',
+                                  color: conflict.type === 'room' ? '#b91c1c' : '#b45309',
+                                  border: conflict.type === 'room' ? '1px solid #fecdd3' : '1px solid #fde68a',
+                                  padding: '3px 10px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em'
+                                }}>
+                                  {conflict.type === 'room' ? 'Raum-Kollision' : 'Lehrer-Kollision'}
+                                </span>
+
+                                {/* Day Badge */}
+                                <span style={{
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0',
+                                  color: '#334155',
+                                  padding: '3px 10px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}>
+                                  <Calendar size={12} color="#64748b" />
+                                  {conflict.dayLabel}
+                                </span>
+
+                                {/* Window Time Pill */}
+                                <span style={{
+                                  background: '#f1f5f9',
+                                  border: '1px solid #cbd5e1',
+                                  color: '#1e293b',
+                                  padding: '3px 10px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}>
+                                  <Clock size={12} color="#64748b" />
+                                  {conflict.startTime} – {conflict.endTime}
+                                </span>
+                              </div>
+
+                              <ShieldAlert size={16} color="#ea4335" />
+                            </div>
+
+                            {/* Human Story Sentence */}
+                            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.35 }}>
+                              ⚠️ {conflict.summarySentence}
+                            </div>
+
+                            {/* Comparison Boxes */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff5f5', borderRadius: '14px', padding: '12px 14px' }}>
+                              {conflict.type === 'teacher' ? (
+                                <>
+                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
+                                      <span>📍 Termin 1 ({conflict.timeA} Uhr)</span>
+                                      <span style={{ color: '#64748b', fontWeight: 600 }}>Raum: {conflict.roomNameA}</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                                      👥 Schüler: <span style={{ color: '#0f172a' }}>{conflict.studentsA}</span>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ea4335', textAlign: 'center', padding: '2px 0' }}>
+                                    ⚡ kollidiert zeitgleich mit:
+                                  </div>
+
+                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
+                                      <span>📍 Termin 2 ({conflict.timeB} Uhr)</span>
+                                      <span style={{ color: '#64748b', fontWeight: 600 }}>Raum: {conflict.roomNameB}</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                                      👥 Schüler: <span style={{ color: '#0f172a' }}>{conflict.studentsB}</span>
+                                    </div>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
+                                      <span>👤 Lehrkraft 1: {conflict.teacherNameA}</span>
+                                      <span style={{ color: '#64748b', fontWeight: 600 }}>⏰ {conflict.timeA} Uhr</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                                      👥 Schüler: <span style={{ color: '#0f172a' }}>{conflict.studentsA}</span>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ea4335', textAlign: 'center', padding: '2px 0' }}>
+                                    ⚡ belegt im selben Raum zeitgleich:
+                                  </div>
+
+                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
+                                      <span>👤 Lehrkraft 2: {conflict.teacherNameB}</span>
+                                      <span style={{ color: '#64748b', fontWeight: 600 }}>⏰ {conflict.timeB} Uhr</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                                      👥 Schüler: <span style={{ color: '#0f172a' }}>{conflict.studentsB}</span>
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Action Row */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', paddingTop: '4px' }}>
+                              <button
+                                onClick={() => {
+                                  setActiveTab('campus');
+                                  setCampusSubTab('schedules');
+                                  setSchedulesRoomsViewMode('designer');
+                                  if (conflict.teacherId) {
+                                    setSelectedFilterTeacherId(conflict.teacherId);
+                                    setExpandedSidebarTeacherId(conflict.teacherId);
+                                  }
+                                }}
+                                style={{
+                                  background: '#ea4335',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '10px',
+                                  padding: '8px 14px',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: '0 2px 8px rgba(234, 67, 53, 0.2)',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                <span>Im Planer fokussieren</span>
+                                <ChevronRight size={14} color="#ffffff" />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* WIDGET: Stundenplaneinreichungen */}
                   <div style={{
@@ -18693,7 +19015,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
               {/* Subtab: Termine Board */}
               {campusSubTab === 'events' && (
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
                   <CampusEventsBoard
                     userId={userId || ''}
                     role="secretary"
@@ -27309,8 +27631,9 @@ status: status,
                                     </div>
                                     
                                     <button
+                                      type="button"
                                       onClick={() => handleDeleteRoom(room.id)}
-                                      style={{ background: 'transparent', border: 'none', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '4px' }}
+                                      style={{ background: 'transparent', border: 'none', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '10px', width: '44px', height: '44px', minWidth: '44px', minHeight: '44px', touchAction: 'manipulation', flexShrink: 0 }}
                                       className="hover-scale-mini"
                                       title="Löschen"
                                     >
