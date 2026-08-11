@@ -3674,47 +3674,96 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
   const generatePDFBackup = async (boardsToSave: DayBoard[], allStudents: Student[]) => {
     const doc = new jsPDF();
-    
-    doc.setFontSize(22);
-    doc.text("Mein Stundenplan", 20, 20);
-    doc.setFontSize(10);
-    doc.setTextColor(150, 150, 150);
-    doc.text("Generiert am " + new Date().toLocaleDateString('de-DE'), 20, 28);
-    
-    let y = 40;
-    
+
+    doc.setProperties({
+      title: 'Stundenplan & Backup - Campus-Groovelab Enterprise',
+      subject: 'Stundenplan-Export und Backup-Datenblatt',
+      author: 'Campus-Groovelab Platform',
+      creator: 'Campus-Groovelab Platform'
+    });
+
+    const primaryGreen = [52, 168, 83];
+    const darkSlate = [15, 23, 42];
+    const mutedText = [100, 116, 139];
+
+    // Top Header Accent Bar
+    doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+    doc.rect(0, 0, 210, 6, 'F');
+
+    // Header Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+    doc.text('Unterrichts-Stundenplan', 20, 20);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+    doc.text(`Campus-Groovelab Enterprise • Erstellt am ${new Date().toLocaleDateString('de-DE')}`, 20, 26);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, 30, 190, 30);
+
+    let y = 38;
+
     boardsToSave.forEach(board => {
-      if (y > 270) {
+      if (y > 250) {
         doc.addPage();
+        doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+        doc.rect(0, 0, 210, 4, 'F');
         y = 20;
       }
       
       const dayName = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || 'Tag';
       
-      doc.setFontSize(14);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`${dayName} - Start: ${board.startAnchor} Uhr`, 20, y);
-      y += 8;
-      
+      // Day Board Header Card
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(20, y, 170, 8, 2, 2, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+      doc.text(`${dayName.toUpperCase()} (Unterrichtsbeginn: ${board.startAnchor} Uhr)`, 24, y + 5.5);
+      y += 12;
+
       board.students.forEach(s => {
-        if (y > 280) {
+        if (y > 270) {
           doc.addPage();
+          doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+          doc.rect(0, 0, 210, 4, 'F');
           y = 20;
         }
-        
-        doc.setFontSize(11);
+
+        doc.setFontSize(9);
         if (s.isBreak) {
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(180, 83, 9);
-          doc.text(`${s.assignedTime} - Pause (${s.duration} Min)`, 25, y);
+          doc.text(`• ${s.assignedTime || '00:00'} Uhr`, 25, y);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(146, 64, 14);
+          doc.text(`[Pause] (${s.duration} Min)`, 65, y);
         } else {
-          doc.setTextColor(71, 85, 105);
-          doc.text(`${s.assignedTime} - ${s.first_name} ${maskLastName(s.last_name, showRealNames)} (${s.instrument}, ${s.duration} Min)`, 25, y);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(51, 65, 85);
+          doc.text(`• ${s.assignedTime || '00:00'} Uhr`, 25, y);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(15, 23, 42);
+          doc.text(`${s.first_name} ${maskLastName(s.last_name, showRealNames)}`, 65, y);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(52, 168, 83);
+          doc.text(`${s.instrument} (${s.duration} Min)`, 140, y);
         }
-        y += 6;
+        y += 5.5;
       });
-      
-      y += 10;
+
+      y += 6;
     });
+
+    // Footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+    doc.text(`Erstellt über Campus-Groovelab Enterprise Platform • Stand: ${new Date().toLocaleDateString('de-DE')}`, 20, 282);
 
     const pdfArrayBuffer = doc.output('arraybuffer');
     // Safe btoa for UTF-8 (umlaute etc)
