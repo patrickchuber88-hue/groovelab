@@ -40,7 +40,6 @@ import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { SchoolSelfOnboardingModal } from './components/SchoolSelfOnboardingModal';
 import { DeviceSimulator } from './components/ui/DeviceSimulator';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
-import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import './App.css';
 
 // --- GLOBAL CAMERA KILL SWITCH ---
