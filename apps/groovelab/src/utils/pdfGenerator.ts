@@ -344,14 +344,27 @@ export const generateDSBCompliancePDF = (schoolName: string) => {
   ];
 
   toms.forEach(([label, desc]) => {
+    // Draw green [OK] badge icon (no unicode bugs)
+    doc.setFillColor(230, 244, 234);
+    doc.setDrawColor(187, 247, 208);
+    doc.roundedRect(22, y - 3.2, 6.5, 4.2, 1, 1, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(`[✓] ${label}`, 22, y);
+    doc.setFontSize(6.8);
+    doc.setTextColor(22, 101, 52);
+    doc.text('OK', 23.1, y);
+
+    // Label text in bold green
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.2);
+    doc.setTextColor(22, 101, 52);
+    doc.text(label, 30.5, y);
+
+    // Description text starting at fixed x=76mm (zero overlap)
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.2);
     doc.setTextColor(51, 65, 85);
-    doc.text(desc, 70, y);
+    doc.text(desc, 76, y);
+
     y += 5.5;
   });
 
