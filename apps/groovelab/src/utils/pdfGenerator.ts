@@ -414,27 +414,34 @@ export const generateDSBCompliancePDF = (schoolName: string) => {
   doc.setFontSize(8);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
   doc.text('Unterauftragnehmer', 23, y + 5);
-  doc.text('Dienstleistung / Funktion', 70, y + 5);
-  doc.text('Standort', 130, y + 5);
-  doc.text('Zertifizierung', 162, y + 5);
+  doc.text('Dienstleistung / Funktion', 64, y + 5);
+  doc.text('Standort', 120, y + 5);
+  doc.text('Zertifizierung', 160, y + 5);
   y += 8;
 
   const subProcessors = [
-    ['Hetzner Online GmbH', 'High-Security Rechenzentrum & Host', 'Falkenstein/Nürnberg (DE)', 'ISO 27001'],
-    ['Supabase (Self-Hosted)', 'Datenhaltung & RLS Multi-Tenancy Engine', 'Inhouse auf Hetzner (DE)', 'DSGVO / RLS'],
+    ['Hetzner Online GmbH', 'High-Security Rechenzentrum & Host', 'Falkenstein / Nürnberg', 'ISO 27001'],
+    ['Supabase (Self-Hosted)', 'Datenhaltung & RLS Engine', 'Inhouse (Hetzner DE)', 'DSGVO / RLS'],
   ];
 
   subProcessors.forEach(([name, functionDesc, location, cert]) => {
+    const safeName = doc.splitTextToSize(name, 38)[0];
+    const safeDesc = doc.splitTextToSize(functionDesc, 53)[0];
+    const safeLoc = doc.splitTextToSize(location, 36)[0];
+    const safeCert = doc.splitTextToSize(cert, 26)[0];
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(51, 65, 85);
-    doc.text(name, 23, y + 4);
+    doc.text(safeName, 23, y + 4);
+    
     doc.setFont('helvetica', 'normal');
-    doc.text(functionDesc, 70, y + 4);
-    doc.text(location, 130, y + 4);
+    doc.text(safeDesc, 64, y + 4);
+    doc.text(safeLoc, 120, y + 4);
+    
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(22, 101, 52);
-    doc.text(cert, 162, y + 4);
+    doc.text(safeCert, 160, y + 4);
     
     doc.setDrawColor(241, 245, 249);
     doc.line(20, y + 7, 190, y + 7);
