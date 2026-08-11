@@ -1760,7 +1760,6 @@ textarea:focus-visible {
   box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.25) !important;
 }
 
-<<<<<<< HEAD
 /* ── Mediathek Board Apple iOS Segmented Control Scoping ── */
 .mediathek-pill-bar {
   display: flex !important;
@@ -1779,7 +1778,10 @@ textarea:focus-visible {
     width: 100% !important;
   }
   .mediathek-col-schnelltext-desktop {
-=======
+    display: none !important;
+  }
+}
+
 /* ============================================================
    CAMPUS-GROOVELAB – RESPONSIVE MOBILE & TABLET ENGINE
    ============================================================ */
@@ -1952,12 +1954,10 @@ textarea:focus-visible {
   /* Hide Desktop Sidebar and Header on Smartphone */
   .desktop-only-sidebar,
   .sidebar-container-desktop {
->>>>>>> a8faa0168456368c3f21006632fd040ea1d313e1
     display: none !important;
   }
 }
 
-<<<<<<< HEAD
 .sim-viewport-mobile .mediathek-grid-layout,
 .sim-viewport-portrait .mediathek-grid-layout {
   grid-template-columns: 1fr !important;
@@ -2007,7 +2007,6 @@ div[style*="overflow"]::-webkit-scrollbar, div[style*="maxHeight"]::-webkit-scro
   height: 0 !important;
 }
 
-=======
 /* ------------------------------------------------------------
    TABLET / IPAD VIEWPORT (768px – 1024px)
    ------------------------------------------------------------ */
@@ -2032,8 +2031,6 @@ div[style*="overflow"]::-webkit-scrollbar, div[style*="maxHeight"]::-webkit-scro
     }
   }
 }
-
->>>>>>> a8faa0168456368c3f21006632fd040ea1d313e1
 
 
 
