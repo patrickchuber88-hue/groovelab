@@ -23,6 +23,7 @@ import { ArtistGateway } from './components/ArtistGateway';
 import { QRCodeModal } from './components/QRCodeModal';
 import { QRLandingPage } from './components/QRLandingPage';
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
+import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { ContractEndPrompt } from './components/ContractEndPrompt';
@@ -13726,6 +13727,18 @@ function App() {
           </ErrorBoundary>
         )}
       </main>
+
+      {/* Mobile Native Bottom Navigation Bar (< 768px Viewports) */}
+      {windowWidth <= 768 && (
+        <MobileBottomNav
+          activeTab={activeStudentTab}
+          setActiveTab={setActiveStudentTab}
+          activePlatform={activePlatform as 'campus' | 'groovelab' | 'admin'}
+          setActivePlatform={(p) => setActivePlatform(p)}
+          userRole={user?.role?.toLowerCase() || 'student'}
+          unreadCount={campusUnreadCount}
+        />
+      )}
 
 
 

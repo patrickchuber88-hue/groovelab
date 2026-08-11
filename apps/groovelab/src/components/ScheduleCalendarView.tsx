@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
+import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
@@ -8089,16 +8090,18 @@ return (
               )}
             </div>
             {docStudent && (
-              <MeisterwerkDocumentationModal 
-                student={docStudent} 
-                onClose={() => {
-                  setDocStudent(null);
-                  if (occ?.student_id) {
-                    loadStudentHomework(occ.student_id, occ.student?.instrument);
-                  }
-                }} 
-                teacherId={userId}
-              />
+              <React.Suspense fallback={<LiquidGlassSkeleton type="modal" />}>
+                <MeisterwerkDocumentationModal 
+                  student={docStudent} 
+                  onClose={() => {
+                    setDocStudent(null);
+                    if (occ?.student_id) {
+                      loadStudentHomework(occ.student_id, occ.student?.instrument);
+                    }
+                  }} 
+                  teacherId={userId}
+                />
+              </React.Suspense>
             )}
           </div>
         );

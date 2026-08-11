@@ -4,6 +4,15 @@ body {
 }
 
 :root {
+  /* Safe Area Insets & Touch Targets */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --touch-target-min: 48px;
+  --bottom-nav-height: calc(60px + env(safe-area-inset-bottom, 0px));
+  --mobile-header-height: calc(56px + env(safe-area-inset-top, 0px));
+
   /* Brand */
   --primary-color: #eab308;
   --brand-yellow: #eab308;
@@ -1751,6 +1760,7 @@ textarea:focus-visible {
   box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.25) !important;
 }
 
+<<<<<<< HEAD
 /* ── Mediathek Board Apple iOS Segmented Control Scoping ── */
 .mediathek-pill-bar {
   display: flex !important;
@@ -1769,10 +1779,185 @@ textarea:focus-visible {
     width: 100% !important;
   }
   .mediathek-col-schnelltext-desktop {
+=======
+/* ============================================================
+   CAMPUS-GROOVELAB – RESPONSIVE MOBILE & TABLET ENGINE
+   ============================================================ */
+
+/* Touch Target Optimization (≥ 48px) */
+.touch-target,
+.mobile-nav-btn,
+.mobile-action-btn {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.touch-target:active,
+.mobile-action-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Keyframe Animations */
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ------------------------------------------------------------
+   SMARTPHONE VIEWPORT (< 768px)
+   ------------------------------------------------------------ */
+@media (max-width: 767px) {
+  /* Layout Paddings & Safe Area Handling */
+  .pwa-mobile-body,
+  .dashboard-mobile-wrapper {
+    padding-top: var(--mobile-header-height) !important;
+    padding-bottom: calc(var(--bottom-nav-height) + 16px) !important;
+    padding-left: calc(16px + var(--safe-left)) !important;
+    padding-right: calc(16px + var(--safe-right)) !important;
+  }
+
+  /* Multi-column to 1-column Vertical Stack */
+  .responsive-grid-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  /* Mobile Fixed Top Header */
+  .cg-mobile-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--mobile-header-height);
+    padding-top: var(--safe-top);
+    padding-left: calc(16px + var(--safe-left));
+    padding-right: calc(16px + var(--safe-right));
+    background: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 950;
+  }
+
+  /* Mobile Fixed Bottom Navbar (4 Tabs + Burger Menu) */
+  .cg-mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--bottom-nav-height);
+    padding-bottom: var(--safe-bottom);
+    background: var(--glass-bg-strong);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+  }
+
+  .cg-bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  .cg-bottom-nav-item.active-campus {
+    color: var(--brand-green) !important;
+  }
+  .cg-bottom-nav-item.active-groovelab {
+    color: var(--brand-yellow) !important;
+  }
+  .cg-bottom-nav-item.active-admin {
+    color: #ea4335 !important;
+  }
+
+  /* Mobile Bottom Sheet Modal (90vh) */
+  .cg-bottom-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1200;
+    display: flex;
+    align-items: flex-end;
+    animation: fadeInOverlay 0.2s ease-out;
+  }
+
+  .cg-bottom-sheet-container {
+    width: 100%;
+    max-height: calc(90vh - var(--safe-top));
+    background: var(--surface);
+    border-top-left-radius: var(--radius-xl);
+    border-top-right-radius: var(--radius-xl);
+    padding: 12px 20px calc(24px + var(--safe-bottom)) 20px;
+    overflow-y: auto;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+    animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cg-sheet-handle {
+    width: 38px;
+    height: 5px;
+    background: var(--bg-subtle);
+    border-radius: 100px;
+    margin: 0 auto 16px auto;
+  }
+
+  /* Thumb Zone Floating Actions */
+  .cg-thumb-zone-action {
+    position: fixed;
+    bottom: calc(var(--bottom-nav-height) + 12px);
+    right: calc(16px + var(--safe-right));
+    z-index: 900;
+  }
+
+  /* iOS Safari Auto-Zoom Prevention (16px minimum font size) */
+  input, select, textarea {
+    font-size: 16px !important;
+    min-height: 48px !important;
+  }
+
+  /* Bottom Content Padding for Mobile Nav */
+  .pb-mobile-nav {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Hide Desktop Sidebar and Header on Smartphone */
+  .desktop-only-sidebar,
+  .sidebar-container-desktop {
+>>>>>>> a8faa0168456368c3f21006632fd040ea1d313e1
     display: none !important;
   }
 }
 
+<<<<<<< HEAD
 .sim-viewport-mobile .mediathek-grid-layout,
 .sim-viewport-portrait .mediathek-grid-layout {
   grid-template-columns: 1fr !important;
@@ -1822,6 +2007,33 @@ div[style*="overflow"]::-webkit-scrollbar, div[style*="maxHeight"]::-webkit-scro
   height: 0 !important;
 }
 
+=======
+/* ------------------------------------------------------------
+   TABLET / IPAD VIEWPORT (768px – 1024px)
+   ------------------------------------------------------------ */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .dashboard-mobile-wrapper {
+    padding: 24px 32px !important;
+  }
+
+  @media (orientation: landscape) {
+    .responsive-grid-matrix {
+      display: grid !important;
+      grid-template-columns: 360px minmax(0, 1fr) !important;
+      gap: 24px !important;
+    }
+  }
+
+  @media (orientation: portrait) {
+    .responsive-grid-matrix {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 20px !important;
+    }
+  }
+}
+
+>>>>>>> a8faa0168456368c3f21006632fd040ea1d313e1
 
 
 
