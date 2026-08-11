@@ -5038,7 +5038,7 @@ export function ScheduleCalendarViewDesktop({
                         textTransform: 'uppercase', 
                         letterSpacing: '0.05em' 
                       }}>
-                        {dayName}
+                        {dayName} ({dayOccurrences.filter(o => o.status !== 'cancelled' && o.student_id).length})
                       </div>
                       <div style={{
                         fontSize: '0.9rem',
