@@ -398,6 +398,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             </button>
           );
         })}
+
+        {/* Menü Drawer Button as the final item at the end of the scrollable row */}
+        <button
+          className={`cg-bottom-nav-item ${drawerOpen ? getActiveThemeClass() : ''}`}
+          onClick={() => setDrawerOpen(true)}
+        >
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Menu size={20} color="currentColor" />
+          </div>
+          <span>Menü</span>
+        </button>
       </nav>
     </>
   );
