@@ -42,6 +42,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
+  const itemRefs = React.useRef<{ [key: string]: HTMLButtonElement | null }>({});
+
+  React.useEffect(() => {
+    if (activeTab && itemRefs.current[activeTab]) {
+      itemRefs.current[activeTab]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [activeTab]);
+
   const getActiveThemeClass = () => {
     switch (activePlatform) {
       case 'campus': return 'active-campus';
@@ -351,14 +363,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         </div>
       )}
 
-      {/* Fixed Bottom Navigation Bar (5 Primary Items) */}
+      {/* Horizontal Scrollable Bottom Navigation Bar (All Menu Items in One Single Row) */}
       <nav className="cg-mobile-bottom-nav">
-        {primaryTabs.map(item => {
+        {menuItems.map(item => {
           const TabIcon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              ref={el => { itemRefs.current[item.id] = el; }}
               className={`cg-bottom-nav-item ${isActive ? getActiveThemeClass() : ''}`}
               onClick={() => setActiveTab(item.id)}
             >
@@ -385,15 +398,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             </button>
           );
         })}
-
-        {/* Menü Drawer Button */}
-        <button
-          className={`cg-bottom-nav-item ${drawerOpen ? getActiveThemeClass() : ''}`}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <Menu size={20} color="currentColor" />
-          <span>Menü</span>
-        </button>
       </nav>
     </>
   );

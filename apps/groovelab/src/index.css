@@ -1467,23 +1467,34 @@ select option {
   }
 
   .cg-mobile-bottom-nav {
-    display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
+    display: flex !important;
     align-items: center !important;
-    justify-items: center !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    scroll-behavior: smooth !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
-    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 2px) 12px !important;
     background: rgba(255, 255, 255, 0.96) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
     z-index: 1000 !important;
     box-sizing: border-box !important;
+    gap: 6px !important;
+  }
+
+  .cg-mobile-bottom-nav::-webkit-scrollbar {
+    display: none !important;
   }
 
   .main-wrapper {
@@ -1509,23 +1520,34 @@ select option {
 }
 
 .sim-viewport-mobile .cg-mobile-bottom-nav {
-  display: grid !important;
-  grid-template-columns: repeat(5, 1fr) !important;
+  display: flex !important;
   align-items: center !important;
-  justify-items: center !important;
+  justify-content: flex-start !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  white-space: nowrap !important;
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
   position: fixed !important;
   bottom: 0 !important;
   left: 0 !important;
   right: 0 !important;
   width: 100% !important;
-  height: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
-  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  height: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+  padding: 0 12px calc(env(safe-area-inset-bottom, 0px) + 2px) 12px !important;
   background: rgba(255, 255, 255, 0.96) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   border-top: 1px solid rgba(226, 232, 240, 0.8) !important;
   z-index: 10000 !important;
   box-sizing: border-box !important;
+  gap: 6px !important;
+}
+
+.sim-viewport-mobile .cg-mobile-bottom-nav::-webkit-scrollbar {
+  display: none !important;
 }
 
 .sim-viewport-mobile .hero-avatar-container {
@@ -1861,19 +1883,34 @@ textarea:focus-visible {
     left: 0;
     right: 0;
     height: var(--bottom-nav-height);
-    padding-bottom: var(--safe-bottom);
+    padding: 0 12px var(--safe-bottom) 12px;
     background: var(--glass-bg-strong);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border-top: 1px solid var(--border);
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    display: flex;
     align-items: center;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     z-index: 1000;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+    gap: 6px;
+  }
+
+  .cg-mobile-bottom-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .cg-bottom-nav-item {
+    flex: 0 0 auto !important;
+    min-width: 68px !important;
+    padding: 6px 10px !important;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1887,6 +1924,9 @@ textarea:focus-visible {
     background: none;
     border: none;
     cursor: pointer;
+    border-radius: 12px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    scroll-snap-align: center;
   }
 
   .cg-bottom-nav-item.active-campus {
