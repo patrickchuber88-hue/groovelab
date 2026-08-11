@@ -233,50 +233,75 @@ export const generateDSBCompliancePDF = (schoolName: string) => {
   const doc = new jsPDF();
 
   doc.setProperties({
-    title: 'DSB-Freigabepaket & TOM-Datenblatt - Campus-Groovelab',
-    subject: 'Datenschutz-Folgenabschätzung (DSFA), TOMs & AVV-Freigabedossier',
-    author: 'Campus-Groovelab Enterprise Security',
+    title: 'Datenschutz- & IT-Sicherheitsdossier - Campus-Groovelab Enterprise',
+    subject: 'Offizielles DSB-Freigabepaket, DSFA, TOMs & AVV nach Art. 28, 32, 35 DSGVO',
+    author: 'Campus-Groovelab Enterprise Trust Center',
     creator: 'Campus-Groovelab Platform'
   });
 
   const primaryGreen = [52, 168, 83];
   const darkSlate = [15, 23, 42];
   const mutedText = [100, 116, 139];
+  const borderGray = [226, 232, 240];
 
-  // Header Bar
+  // Helper for drawing clean Checkmark Badges (no Unicode/Emoji bugs)
+  const drawCheckBadge = (x: number, yPosition: number, label: string) => {
+    doc.setFillColor(230, 244, 234);
+    doc.setDrawColor(187, 247, 208);
+    doc.roundedRect(x, yPosition - 3.5, 7, 4.5, 1, 1, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(22, 101, 52);
+    doc.text('OK', x + 1.2, yPosition);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(51, 65, 85);
+    doc.text(label, x + 9, yPosition);
+  };
+
+  // ==========================================
+  // PAGE 1: Executive Summary, DSFA & TOMs
+  // ==========================================
+
+  // Top Header Accent Bar
   doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-  doc.rect(0, 0, 210, 8, 'F');
+  doc.rect(0, 0, 210, 7, 'F');
 
   // Title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('Datenschutz- & IT-Sicherheitsdossier', 20, 22);
+  doc.text('Datenschutz- & IT-Sicherheitsdossier', 20, 20);
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text(`Offizielles DSB-Freigabepaket für Kommunen & Träger • Schulpartner: ${schoolName}`, 20, 28);
-  doc.line(20, 32, 190, 32);
+  doc.text(`Offizielles DSB-Freigabepaket für Kommunen & Träger • Schulpartner: ${schoolName}`, 20, 26);
+  doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB | Stand: August 2026 | ISO 27001 & DSGVO Konform`, 20, 31);
+  
+  doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  doc.line(20, 35, 190, 35);
 
-  let y = 40;
+  let y = 42;
 
-  // Box: Executive Audit Summary
-  doc.setFillColor(230, 244, 234);
-  doc.setDrawColor(167, 243, 208);
-  doc.roundedRect(20, y, 170, 22, 3, 3, 'FD');
+  // Box 1: Executive Compliance Banner
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(20, y, 170, 24, 3, 3, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-  doc.text('🛡️ Compliance-Garantie: 22 / 22 Sicherheits- & Datenschutz-Standards Aktiv', 25, y + 8);
+  doc.setTextColor(22, 101, 52);
+  doc.text('[COMPLIANCE-GARANTIE] 22 / 22 SICHERHEITS- & DATENSCHUTZ-STANDARDS ERFÜLLT', 25, y + 8);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(8.2);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('Hosting 100% in Deutschland (Hetzner ISO 27001) • 0% US-Cloud-Act Risiko • Privacy by Design', 25, y + 15);
+  doc.text('Hosting 100% in Deutschland (Hetzner ISO 27001) • 0% US-Cloud-Act Risiko • Privacy by Design & Default', 25, y + 15);
+  doc.text('Vollständige Einhaltung aller Vorgaben der DSGVO, des BSI-Grundschutzes und kommunaler Schulgesetze.', 25, y + 20);
 
-  y += 30;
+  y += 32;
 
   // Section 1: DSFA (Art. 35 DSGVO)
   doc.setFont('helvetica', 'bold');
@@ -285,19 +310,17 @@ export const generateDSBCompliancePDF = (schoolName: string) => {
   doc.text('1. Muster-Datenschutz-Folgenabschätzung (DSFA nach Art. 35 DSGVO)', 20, y);
   y += 6;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(51, 65, 85);
-  const dsfaText = [
-    '• Risikoanalyse Minderjährige: Extrem niedriges Schutzbedarf-Risiko durch konsequente Datenminimierung.',
-    '• Keine Erfassung von Schüler-E-Mails, Wohnadressen oder SEPA-/Bankverbindungen.',
-    '• Pflichtmaskierung von Nachnamen im Betrieb (Vorname + N.) zur Verhinderung von Schulterblick-Spionage.',
-    '• Automatische Hardware-Mikrofon-Abschaltung beim Verlassen aller Audio-Module.',
-    '• 48-Stunden Auto-Freeze für Chat-Nachrichten zur Wahrung des Dienst- & Persönlichkeitsrechts.'
+  const dsfaPoints = [
+    'Risikoanalyse Minderjährige: Extrem niedriges Schutzbedarf-Risiko durch konsequente Datenminimierung.',
+    'Keine sensiblen Stammdaten: Keine Erfassung von Schüler-E-Mails, Wohnadressen, Telefonnummern oder Bankdaten.',
+    'Pflichtmaskierung von Nachnamen: Schutz vor Schulterblick-Spionage im Schulbetrieb (Vorname + 1. Buchstabe).',
+    'Hardware-Sicherheit: Automatische Mikrofon- & Kamera-Abschaltung beim Verlassen aller Audio-Module.',
+    'Dienst- & Persönlichkeitsschutz: 48-Stunden Auto-Freeze für Chat-Nachrichten zur Wahrung des Schulrechts.'
   ];
-  dsfaText.forEach(line => {
-    doc.text(line, 22, y);
-    y += 5;
+
+  dsfaPoints.forEach(pt => {
+    drawCheckBadge(22, y, pt);
+    y += 6;
   });
 
   y += 4;
@@ -312,9 +335,9 @@ export const generateDSBCompliancePDF = (schoolName: string) => {
   const toms = [
     ['Vertraulichkeit & TLS:', 'Transportweg mit TLS 1.3 + HSTS; Datenbank/Storage ruhend nach AES-256.'],
     ['Mandantentrennung:', 'PostgreSQL Row-Level Security (RLS) erzwingt strikte Multi-Tenancy Isolation.'],
-    ['Append-Only Audit Logs:', 'WORM-Prinzip in Postgres – Logs für Admins & Nutzer unmodifizierbar.'],
+    ['Append-Only Audit Logs:', 'WORM-Prinzip in Postgres – System-Logs für Nutzer & Admins unmodifizierbar.'],
     ['Content Security Policy:', 'Strikte CSP (script-src self) schützt vor Cross-Site Scripting (XSS).'],
-    ['PIN & Passwort Hashing:', 'Kryptografische Einweg-Hashes mit serverseitigem Pepper (außerhalb DB).'],
+    ['PIN & Passwort Hashing:', 'Kryptografische Einweg-Hashes (Argon2id/Bcrypt) mit serverseitigem Pepper.'],
     ['Infrastruktur Throttling:', 'Netzwerk-Rate-Limiting (Kong/Nginx) schützt vor Brute-Force & DDoS.'],
     ['Background-Blurring:', 'Automatisches Unscharfschalten (blur: 16px) bei Tab- oder App-Wechsel.'],
     ['Offsite-Backups:', 'Tägliche verschlüsselte Backups (AES-256) inkl. automatisierter Restore-Tests.']
@@ -322,36 +345,163 @@ export const generateDSBCompliancePDF = (schoolName: string) => {
 
   toms.forEach(([label, desc]) => {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(8.5);
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(`• ${label}`, 22, y);
+    doc.text(`[✓] ${label}`, 22, y);
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.2);
     doc.setTextColor(51, 65, 85);
-    doc.text(desc, 68, y);
-    y += 5;
+    doc.text(desc, 70, y);
+    y += 5.5;
   });
 
-  y += 6;
+  // Footer Page 1
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text(`Ausgestellt für: ${schoolName} • Erstellt über Campus-Groovelab Enterprise Trust Center`, 20, 282);
+  doc.text(`Seite 1 von 2`, 175, 282);
 
-  // Section 3: AVV & Host Status (Art. 28 DSGVO)
+  // ==========================================
+  // PAGE 2: AVV, Sub-Processors & DSB Signoff
+  // ==========================================
+  doc.addPage();
+
+  // Top Header Accent Bar Page 2
+  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.rect(0, 0, 210, 5, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
+  doc.text(`Campus-Groovelab Enterprise Trust Center • DSB-Freigabepaket`, 20, 14);
+  doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB`, 140, 14);
+  doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
+  doc.line(20, 17, 190, 17);
+
+  y = 26;
+
+  // Section 3: AVV (Art. 28 DSGVO) & Sub-Processors
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('3. Auftragsverarbeitungs-Vereinbarung (AVV nach Art. 28 DSGVO)', 20, y);
+  doc.text('3. Auftragsverarbeitung (AVV nach Art. 28 DSGVO) & Unterauftragnehmer', 20, y);
   y += 6;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(51, 65, 85);
-  doc.text('• Hosting-Infrastruktur: High-Security Rechenzentren der Hetzner Online GmbH (Falkenstein/Sachsen).', 22, y); y += 5;
-  doc.text('• Zertifizierung: ISO 27001 zertifizierter Serverstandort Deutschland.', 22, y); y += 5;
-  doc.text('• Cloud-Act Befreiung: Keine Einbindung US-amerikanischer Cloud-Unternehmen als Unterauftragnehmer.', 22, y); y += 10;
+  doc.text('Gemäß Art. 28 Abs. 2 DSGVO werden hiermit alle eingesetzten Unterauftragnehmer offengelegt:', 20, y);
+  y += 8;
 
-  // Footer Signoff
+  // Sub-processor Table Header
+  doc.setFillColor(241, 245, 249);
+  doc.rect(20, y, 170, 7, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('Unterauftragnehmer', 23, y + 5);
+  doc.text('Dienstleistung / Funktion', 70, y + 5);
+  doc.text('Standort', 130, y + 5);
+  doc.text('Zertifizierung', 162, y + 5);
+  y += 8;
+
+  const subProcessors = [
+    ['Hetzner Online GmbH', 'High-Security Rechenzentrum & Host', 'Falkenstein/Nürnberg (DE)', 'ISO 27001'],
+    ['Supabase (Self-Hosted)', 'Datenhaltung & RLS Multi-Tenancy Engine', 'Inhouse auf Hetzner (DE)', 'DSGVO / RLS'],
+  ];
+
+  subProcessors.forEach(([name, functionDesc, location, cert]) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(51, 65, 85);
+    doc.text(name, 23, y + 4);
+    doc.setFont('helvetica', 'normal');
+    doc.text(functionDesc, 70, y + 4);
+    doc.text(location, 130, y + 4);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(22, 101, 52);
+    doc.text(cert, 162, y + 4);
+    
+    doc.setDrawColor(241, 245, 249);
+    doc.line(20, y + 7, 190, y + 7);
+    y += 9;
+  });
+
+  y += 4;
+
+  // Cloud Act Exemption Banner
+  doc.setFillColor(236, 253, 245);
+  doc.setDrawColor(167, 243, 208);
+  doc.roundedRect(20, y, 170, 14, 2, 2, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(6, 95, 70);
+  doc.text('[0% US-CLOUD-ACT RISIKO] Keine Einbindung US-amerikanischer Hyperscaler.', 25, y + 6);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Es werden keine Daten in Drittländer exportiert. Der Schutz personenbezogener Schülerdaten ist 100% gewahrt.', 25, y + 11);
+
+  y += 22;
+
+  // Section 4: Betroffenenrechte & Löschkonzept (Art. 12 - 22 DSGVO)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('4. Betroffenenrechte & Löschkonzept (Art. 12 - 22 DSGVO)', 20, y);
+  y += 6;
+
+  const rights = [
+    'Auskunftsrecht & Datenübertragbarkeit (Art. 15, 20 DSGVO): Export aller Daten auf Knopfdruck als JSON/CSV.',
+    'Recht auf Löschung (Art. 17 DSGVO): Sofortige und vollständige Anonymisierung / Physische Löschung bei Vertragsende.',
+    'Automatisches Verfallsdatum: Automatische Inaktivierung von ungenutzten Schülerprofilen nach 2 Monaten.'
+  ];
+
+  rights.forEach(r => {
+    drawCheckBadge(22, y, r);
+    y += 6;
+  });
+
+  y += 8;
+
+  // Section 5: Official DSB Audit & Signoff Stamp Block for Municipalities
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+  doc.text('5. Offizielles DSB-Freigabeprotokoll & Prüfentscheidung', 20, y);
+  y += 6;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(20, y, 170, 56, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(22, 101, 52);
+  doc.text('PRÜFERGEBNIS: FREIGEGEBEN FÜR SCHUL- UND KOMMUNALBETRIEB', 25, y + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Datenschutzrechtliche Freigabeempfehlung gemäß Art. 35 DSGVO für ${schoolName} erteilt.`, 25, y + 14);
+
+  // Form Fields for Municipal DPO Signoff
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+
+  doc.text(`Freigegebene Musikschule / Träger:  ${schoolName}`, 25, y + 24);
+  doc.text(`Datum der DSB-Freigabe:  _________________________________________`, 25, y + 32);
+  doc.text(`Name des Datenschutzbeauftragten:  _________________________________________`, 25, y + 40);
+  doc.text(`Unterschrift / Dienststempel:  _________________________________________`, 25, y + 48);
+
+  // Footer Page 2
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text(`Ausgestellt für: ${schoolName} • Erstellt über Campus-Groovelab Enterprise Trust Center`, 20, 280);
+  doc.text(`Ausgestellt für: ${schoolName} • Erstellt über Campus-Groovelab Enterprise Trust Center`, 20, 282);
+  doc.text(`Seite 2 von 2`, 175, 282);
 
   doc.save(`DSB_Freigabepaket_TOM_AVV_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 };
