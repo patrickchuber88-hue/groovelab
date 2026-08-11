@@ -95,11 +95,9 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   isSharedView = false,
   onRefresh
 }) => {
-  if (!selectedBandForProfile) return null;
-
-  const bSongs = selectedBandForProfile.band_songs || [];
-  const directSong = selectedBandForProfile.songs || selectedBandForProfile.song; // Handle potential naming variations
-  let allSongs: any[] = [];
+  const bSongs = selectedBandForProfile?.band_songs || [];
+  const directSong = selectedBandForProfile?.songs || selectedBandForProfile?.song; // Handle potential naming variations
+  const allSongs: any[] = [];
   
   // 1. Collect songs from direct link (founding song)
   if (directSong) {
@@ -115,8 +113,8 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     if (s && !allSongs.find(as => as.id === s.id)) allSongs.push(s);
   });
   
-  const isMember = (selectedBandForProfile.band_members || []).some((m: any) => m && m.user_id === user?.id);
-  const isCoach = selectedBandForProfile.coach_id === user?.id;
+  const isMember = (selectedBandForProfile?.band_members || []).some((m: any) => m && m.user_id === user?.id);
+  const isCoach = selectedBandForProfile?.coach_id === user?.id;
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const canEdit = isAdmin || isCoach || isMember;
 
@@ -168,7 +166,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
   useEffect(() => {
     const fetchMembersSkills = async () => {
-      const uids = (selectedBandForProfile.band_members || [])
+      const uids = (selectedBandForProfile?.band_members || [])
         .map((m: any) => m.user_id)
         .filter(Boolean);
       if (uids.length === 0) return;
@@ -182,7 +180,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
       }
     };
     fetchMembersSkills();
-  }, [selectedBandForProfile.band_members]);
+  }, [selectedBandForProfile?.band_members]);
 
   const songAssignments = useMemo(() => {
     const assignments: Record<string, Record<string, { user_id: string, name: string, photo_url: string, isCore: boolean }[]>> = {};
@@ -193,7 +191,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
       const bandSong = bSongs.find((bs: any) => bs.song_id === songId);
       const slots = bandSong?.band_song_slots || [];
-      const coreMembers = selectedBandForProfile.band_members || [];
+      const coreMembers = selectedBandForProfile?.band_members || [];
 
       const membersList: any[] = [];
       const addedUserIds = new Set<string>();
@@ -226,7 +224,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
       // 2. Add core band members using the smart vacant slot allocation logic
       const requiredInsts = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 };
-      let instCount: Record<string, number> = {};
+      const instCount: Record<string, number> = {};
       membersList.forEach((m: any) => {
         instCount[m.instrument] = Math.max(instCount[m.instrument] || 0, m.part_number || 1);
       });
@@ -286,16 +284,16 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     });
 
     return assignments;
-  }, [allSongs, bSongs, selectedBandForProfile.band_members, bandMembersSkills]);
+  }, [allSongs, bSongs, selectedBandForProfile?.band_members, bandMembersSkills]);
 
   const bandUserIds = React.useMemo(() => {
-    return (selectedBandForProfile.band_members || [])
+    return (selectedBandForProfile?.band_members || [])
       .map((m: any) => m.user_id || m.student_id)
       .filter(Boolean);
-  }, [selectedBandForProfile.band_members]);
+  }, [selectedBandForProfile?.band_members]);
 
   useEffect(() => {
-    if (bandProfileView === 'backstage') {
+    if (bandProfileView === 'backstage' && selectedBandForProfile?.id) {
       fetchShoutbox();
       fetchSongProposals();
       if (bandUserIds.length > 0) {
@@ -312,7 +310,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
         .subscribe();
       return () => { supabase.removeChannel(channel); };
     }
-  }, [bandProfileView, selectedBandForProfile.id, bandUserIds]);
+  }, [bandProfileView, selectedBandForProfile?.id, bandUserIds]);
 
   // Helper to check if a song is fully mastered by all slot occupiers (100% progress)
   const checkIfFullyMastered = (prop: any) => {
@@ -352,7 +350,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
   const repertoireSongs = useMemo(() => {
     return allSongs.filter(song => {
       // 1. Founding song is always in repertoire
-      if (song.id && selectedBandForProfile.song_id && String(song.id) === String(selectedBandForProfile.song_id)) return true;
+      if (song.id && selectedBandForProfile?.song_id && String(song.id) === String(selectedBandForProfile.song_id)) return true;
 
       // 2. Check if it's explicitly active in bSongs
       const bandSong = bSongs.find((bs: any) => bs.song_id === song.id);
@@ -360,18 +358,18 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
       return false;
     });
-  }, [allSongs, selectedBandForProfile.song_id, bSongs]);
+  }, [allSongs, selectedBandForProfile?.song_id, bSongs]);
 
   // Filtered proposals: only songs that are NOT the founding song AND are NOT active and fully mastered
   const activeProposals = useMemo(() => {
     return songProposals.filter(prop => {
       // 1. Filter out if it is the founding song
-      if (prop.song_id && selectedBandForProfile.song_id && String(prop.song_id) === String(selectedBandForProfile.song_id)) return false;
+      if (prop.song_id && selectedBandForProfile?.song_id && String(prop.song_id) === String(selectedBandForProfile.song_id)) return false;
       // 2. Filter out if it is active and fully mastered
       if (prop.status === 'active' && checkIfFullyMastered(prop)) return false;
       return true;
     });
-  }, [songProposals, selectedBandForProfile.song_id, checkIfFullyMastered]);
+  }, [songProposals, selectedBandForProfile?.song_id, checkIfFullyMastered]);
 
   // Sort active proposals: primary key is occupied instrument slots (descending), secondary key is mastered slots (descending)
   const sortedActiveProposals = useMemo(() => {
@@ -393,7 +391,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
           totalSlotsCount++;
           const occupantSlot = prop.band_song_slots?.find((s: any) => normalize(s.instrument) === normTarget && s.part_number === i);
           
-          const membersWithInst = (selectedBandForProfile.band_members || []).filter((m: any) => normalize(m.instrument) === normTarget);
+          const membersWithInst = (selectedBandForProfile?.band_members || []).filter((m: any) => normalize(m.instrument) === normTarget);
           const member = membersWithInst[i - 1];
           const memberUser = member?.users || member?.profiles;
           const uFromBand = memberUser ? (Array.isArray(memberUser) ? memberUser[0] : memberUser) : null;
@@ -442,7 +440,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     });
 
     return scoredProposals;
-  }, [activeProposals, selectedBandForProfile.band_members]);
+  }, [activeProposals, selectedBandForProfile?.band_members]);
 
   const fetchShoutbox = async () => {
     try {
@@ -782,11 +780,11 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
 
   const uniqueMembersCount = React.useMemo(() => {
-    const ids = (selectedBandForProfile.band_members || [])
+    const ids = (selectedBandForProfile?.band_members || [])
       .map((m: any) => m.user_id || m.student_id || m.external_name)
       .filter(Boolean);
     return new Set(ids).size;
-  }, [selectedBandForProfile.band_members]);
+  }, [selectedBandForProfile?.band_members]);
 
 
 
@@ -1023,7 +1021,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     
     const slots = [];
     try {
-      let current = new Date(`2000-01-01T${minTime}:00`);
+      const current = new Date(`2000-01-01T${minTime}:00`);
       const end = new Date(`2000-01-01T${maxTime}:00`);
       
       while (current <= end) {
@@ -1036,6 +1034,8 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
     }
     return slots.length > 0 ? slots : ["16:45", "17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45", "19:00"];
   }, [openingHours, weekDaysForRange]);
+
+  if (!selectedBandForProfile) return null;
 
   const getWeekDays = (offset = 0) => {
     const days = [];
@@ -1143,7 +1143,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 </button>
              )}
 
-             <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%', padding: '0 40px', position: 'relative', zIndex: 2 }}>
+             <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%', padding: width < 768 ? '0 15px' : '0 40px', position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '40px' }}>
                      <div style={{ position: 'relative', width: '220px', height: '220px', borderRadius: '40px', overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.6)', border: '4px solid rgba(255,255,255,0.2)' }}>
                         {renderBandAvatar(selectedBandForProfile.name, selectedBandForProfile.photo_url, '100%', '36px')}
@@ -1243,7 +1243,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                 </div>
              </div>
         </div>
-        <div style={{ maxWidth: "1600px", margin: "40px auto 0", width: "100%", padding: "0 40px 80px" }}>
+        <div style={{ maxWidth: "1600px", margin: "40px auto 0", width: "100%", padding: width < 768 ? "0 15px 80px" : "0 40px 80px" }}>
           {bandProfileView === "backstage" && !isSharedView ? (            <div style={{ display: 'grid', gridTemplateColumns: width < 1200 ? '1fr' : 'minmax(0, 1fr) 400px', gap: '60px', alignItems: 'start' }}>
               
               {/* LEFT: Band Repertoire-Planer (Compacted & Collapsible) */}
@@ -2110,16 +2110,17 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                      } : undefined}
                                      className={u ? "hover-scale-mini" : ""}
                                    />
-                                   <div style={{ flex: 1 }}>
-                                      <div style={{ fontSize: "0.9rem", fontWeight: 950, color: "white", marginBottom: "2px" }}>{u?.first_name || m.external_name}</div>
+                                   <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: "0.9rem", fontWeight: 950, color: "white", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u?.first_name || m.external_name}</div>
                                       <div style={{ fontSize: "0.65rem", fontWeight: 950, color: brandColor, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                         {displayIcon} {displayInst}
                                       </div>
                                    </div>
                                    {canRemove && !isSharedView && (
                                      <button
+                                       type="button"
                                        onClick={() => handleRemoveMember(uid, u?.first_name || m.external_name || 'Mitglied', m.instruments)}
-                                       style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', marginLeft: 'auto' }}
+                                       style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '50%', width: '36px', height: '36px', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', marginLeft: 'auto', touchAction: 'manipulation', flexShrink: 0 }}
                                        className="hover-scale"
                                        title={user.id === uid ? "Platz freigeben" : "Aus Band entfernen"}
                                      >

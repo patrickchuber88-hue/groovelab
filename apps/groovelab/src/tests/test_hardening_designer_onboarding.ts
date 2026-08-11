@@ -172,13 +172,13 @@ async function main() {
       if (!blockedOnTuesday) throw new Error('Expected tuesday to be blocked based on validSlots insertion');
 
       // Run auto-assign algorithm simulation for the student
-      let currentBoards = [...mockBoards];
+      const currentBoards = [...mockBoards];
       let assignedBoardId: string | null = null;
       let highestScore = -Infinity;
 
       for (const board of currentBoards) {
         // Appending to board
-        let startAnchorTime = board.startAnchor;
+        const startAnchorTime = board.startAnchor;
         let currentMinutes = 0;
         const [h, m] = startAnchorTime.split(':').map(Number);
         currentMinutes = h * 60 + m;

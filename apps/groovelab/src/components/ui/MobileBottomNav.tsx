@@ -17,7 +17,9 @@ import {
   Zap,
   Play,
   Award,
-  Megaphone
+  Megaphone,
+  BarChart2,
+  QrCode
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -38,6 +40,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   unreadCount = 0
 }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   const getActiveThemeClass = () => {
     switch (activePlatform) {
@@ -88,14 +91,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           { id: 'setup', label: 'Einstellungen', icon: Settings },
         ];
       } else {
+        // GrooveLab Desktop Sidebar 1:1 Match
         return [
           { id: 'live', label: 'Live Lab', icon: Monitor },
-          { id: 'messages', label: 'Nachrichten', icon: Mail },
+          { id: 'messages', label: 'Nachrichten', icon: Mail, badge: unreadCount },
           { id: 'students', label: 'Schüler', icon: Users },
           { id: 'team', label: 'Team', icon: Users },
+          { id: 'rooms', label: 'Räume', icon: Box },
+          { id: 'songs', label: 'Songs', icon: Library },
           { id: 'bands', label: 'Bands', icon: Box },
-          { id: 'songs', label: 'Song-Bibliothek', icon: Library },
-          { id: 'repertoire', label: 'Repertoire', icon: Award },
+          { id: 'stats', label: 'Statistik', icon: BarChart2 },
+          { id: 'id_gallery', label: 'ID Galerie', icon: QrCode },
           { id: 'setup', label: 'Einstellungen', icon: Settings },
         ];
       }
@@ -105,26 +111,33 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const menuItems = getMenuItems();
 
   // Primary 4 Tabs for Bottom Nav
-  const primaryTabs = userRole === 'student'
+  const primaryTabs: Array<{ id: string; label: string; icon: any; badge?: number }> = userRole === 'student'
     ? (activePlatform === 'campus'
         ? [
             { id: 'briefing', label: 'Briefing', icon: Monitor },
             { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
             { id: 'events', label: 'Termine', icon: Calendar },
-            { id: 'messages', label: 'Chat', icon: Mail }
+            { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
           ]
         : [
             { id: 'live', label: 'Live Lab', icon: Monitor },
             { id: 'practice', label: 'Üben', icon: Play },
             { id: 'repertoire', label: 'Repertoire', icon: Award },
-            { id: 'messages', label: 'Chat', icon: Megaphone }
+            { id: 'messages', label: 'Chat', icon: Megaphone, badge: unreadCount }
           ])
-    : [
-        { id: 'live', label: 'Briefing', icon: Monitor },
-        { id: 'schedule', label: 'Stundenplan', icon: Calendar },
-        { id: 'events', label: 'Termine', icon: Calendar },
-        { id: 'messages', label: 'Chat', icon: Mail }
-      ];
+    : (activePlatform === 'campus'
+        ? [
+            { id: 'live', label: 'Briefing', icon: Monitor },
+            { id: 'schedule', label: 'Stundenplan', icon: Calendar },
+            { id: 'songs', label: 'Mediathek', icon: Library },
+            { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
+          ]
+        : [
+            { id: 'live', label: 'Live Lab', icon: Monitor },
+            { id: 'bands', label: 'Bands', icon: Box },
+            { id: 'songs', label: 'Songs', icon: Library },
+            { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
+          ]);
 
   return (
     <>
@@ -149,23 +162,47 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         >
           <div 
             style={{
-              width: '85%',
-              maxWidth: '360px',
+              width: '88%',
+              maxWidth: '380px',
               height: '100%',
               background: '#ffffff',
               boxShadow: '-10px 0 30px rgba(0,0,0,0.2)',
               padding: '24px 20px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '14px',
               overflowY: 'auto',
               boxSizing: 'border-box'
             }}
             onClick={e => e.stopPropagation()}
+            onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (touchStartX === null) return;
+              const deltaX = e.changedTouches[0].clientX - touchStartX;
+              if (deltaX < -50 && activePlatform === 'campus') {
+                setActivePlatform('groovelab');
+              } else if (deltaX > 50 && activePlatform === 'groovelab') {
+                setActivePlatform('campus');
+              }
+              setTouchStartX(null);
+            }}
           >
             {/* Drawer Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-              <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Hauptmenü</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Hauptmenü</span>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8',
+                  color: activePlatform === 'campus' ? '#34a853' : '#ca8a04',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  border: activePlatform === 'campus' ? '1px solid #bbf7d0' : '1px solid #fef08a'
+                }}>
+                  {activePlatform === 'campus' ? '🎓 Campus' : '🎵 GrooveLab'}
+                </span>
+              </div>
               <button 
                 onClick={() => setDrawerOpen(false)}
                 style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}
@@ -174,47 +211,53 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
             </div>
 
-            {/* Platform Switcher inside Drawer */}
-            <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '12px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                Modul Wechseln
+            {/* Instagram Swipecard Segmented Platform Switcher */}
+            <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '6px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', textAlign: 'center' }}>
+                Modul wechseln
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                 <button
-                  onClick={() => { setActivePlatform('campus'); setDrawerOpen(false); }}
+                  type="button"
+                  onClick={() => setActivePlatform('campus')}
                   style={{
-                    padding: '12px 8px',
-                    borderRadius: '16px',
-                    border: activePlatform === 'campus' ? '2px solid #34a853' : '1px solid #e2e8f0',
-                    background: activePlatform === 'campus' ? '#e6f4ea' : '#ffffff',
-                    color: activePlatform === 'campus' ? '#34a853' : '#64748b',
+                    padding: '10px 8px',
+                    borderRadius: '14px',
+                    border: activePlatform === 'campus' ? '2px solid #34a853' : '1px solid transparent',
+                    background: activePlatform === 'campus' ? '#34a853' : '#ffffff',
+                    color: activePlatform === 'campus' ? '#ffffff' : '#64748b',
                     fontWeight: 800,
-                    fontSize: '0.85rem',
+                    fontSize: '0.82rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '4px'
+                    gap: '6px',
+                    transition: 'all 0.2s',
+                    boxShadow: activePlatform === 'campus' ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
                   }}
                 >
                   <GraduationCap size={16} /> Campus
                 </button>
 
                 <button
-                  onClick={() => { setActivePlatform('groovelab'); setDrawerOpen(false); }}
+                  type="button"
+                  onClick={() => setActivePlatform('groovelab')}
                   style={{
-                    padding: '12px 8px',
-                    borderRadius: '16px',
-                    border: activePlatform === 'groovelab' ? '2px solid #eab308' : '1px solid #e2e8f0',
-                    background: activePlatform === 'groovelab' ? '#fefce8' : '#ffffff',
-                    color: activePlatform === 'groovelab' ? '#ca8a04' : '#64748b',
+                    padding: '10px 8px',
+                    borderRadius: '14px',
+                    border: activePlatform === 'groovelab' ? '2px solid #eab308' : '1px solid transparent',
+                    background: activePlatform === 'groovelab' ? '#eab308' : '#ffffff',
+                    color: activePlatform === 'groovelab' ? '#ffffff' : '#64748b',
                     fontWeight: 800,
-                    fontSize: '0.85rem',
+                    fontSize: '0.82rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '4px'
+                    gap: '6px',
+                    transition: 'all 0.2s',
+                    boxShadow: activePlatform === 'groovelab' ? '0 3px 10px rgba(234, 179, 8, 0.25)' : 'none'
                   }}
                 >
                   <Music size={16} /> GrooveLab
@@ -222,14 +265,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </div>
             </div>
 
-            {/* 1:1 Navigation Items List (Same sequence as Left Sidebar) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Menüpunkte
+            {/* 1:1 Navigation Items Swipecard List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', flex: 1 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Menüpunkte ({activePlatform === 'campus' ? 'Campus' : 'GrooveLab'})</span>
+                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Wischen zum Wechseln</span>
               </div>
               {menuItems.map(item => {
                 const ItemIcon = item.icon;
                 const isActive = activeTab === item.id;
+                const activeColor = activePlatform === 'campus' ? '#34a853' : '#ca8a04';
+                const activeBg = activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.1)' : 'rgba(234, 179, 8, 0.15)';
 
                 return (
                   <button
@@ -242,22 +288,19 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       padding: '12px 14px',
                       borderRadius: '14px',
                       border: 'none',
-                      background: isActive 
-                        ? (activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.1)' : 'rgba(234, 179, 8, 0.15)') 
-                        : 'transparent',
-                      color: isActive 
-                        ? (activePlatform === 'campus' ? '#34a853' : '#ca8a04') 
-                        : '#334155',
+                      background: isActive ? activeBg : 'transparent',
+                      color: isActive ? activeColor : '#334155',
                       fontWeight: isActive ? 800 : 600,
-                      fontSize: '0.9rem',
+                      fontSize: '0.88rem',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '12px',
                       cursor: 'pointer',
-                      textAlign: 'left'
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease-out'
                     }}
                   >
-                    <ItemIcon size={20} color={isActive ? (activePlatform === 'campus' ? '#34a853' : '#ca8a04') : '#64748b'} />
+                    <ItemIcon size={19} color={isActive ? activeColor : '#64748b'} />
                     <span>{item.label}</span>
                     {item.badge && item.badge > 0 && (
                       <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '100px', padding: '2px 8px', fontSize: '11px', fontWeight: 900 }}>
@@ -268,33 +311,87 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 );
               })}
             </div>
+
+            {/* Instagram Bottom Page Indicator Dots */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '8px',
+              paddingTop: '10px',
+              borderTop: '1px solid #f1f5f9',
+              marginTop: 'auto'
+            }}>
+              <div
+                onClick={() => setActivePlatform('campus')}
+                style={{
+                  width: activePlatform === 'campus' ? '22px' : '8px',
+                  height: '8px',
+                  borderRadius: '4px',
+                  background: activePlatform === 'campus' ? '#34a853' : '#cbd5e1',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                title="Karte 1: Campus Modul"
+              />
+              <div
+                onClick={() => setActivePlatform('groovelab')}
+                style={{
+                  width: activePlatform === 'groovelab' ? '22px' : '8px',
+                  height: '8px',
+                  borderRadius: '4px',
+                  background: activePlatform === 'groovelab' ? '#eab308' : '#cbd5e1',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                title="Karte 2: GrooveLab Modul"
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Fixed Bottom Navigation Bar (4 Primary Tabs + 5th Menü Tab) */}
+      {/* Fixed Bottom Navigation Bar (5 Primary Items) */}
       <nav className="cg-mobile-bottom-nav">
-        {primaryTabs.map(tab => {
-          const TabIcon = tab.icon;
-          const isActive = activeTab === tab.id;
+        {primaryTabs.map(item => {
+          const TabIcon = item.icon;
+          const isActive = activeTab === item.id;
           return (
             <button
-              key={tab.id}
+              key={item.id}
               className={`cg-bottom-nav-item ${isActive ? getActiveThemeClass() : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(item.id)}
             >
-              <TabIcon size={22} color="currentColor" />
-              <span>{tab.label}</span>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TabIcon size={20} color="currentColor" />
+                {item.badge && item.badge > 0 ? (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-7px',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '999px',
+                    padding: '1px 5px',
+                    fontSize: '9px',
+                    fontWeight: 900,
+                    lineHeight: 1
+                  }}>
+                    {item.badge}
+                  </span>
+                ) : null}
+              </div>
+              <span>{item.label}</span>
             </button>
           );
         })}
 
-        {/* 5th Tab: Menü Drawer */}
+        {/* Menü Drawer Button */}
         <button
           className={`cg-bottom-nav-item ${drawerOpen ? getActiveThemeClass() : ''}`}
           onClick={() => setDrawerOpen(true)}
         >
-          <Menu size={22} color="currentColor" />
+          <Menu size={20} color="currentColor" />
           <span>Menü</span>
         </button>
       </nav>

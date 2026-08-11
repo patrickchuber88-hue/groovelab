@@ -25,6 +25,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
   const [calcTeachers, setCalcTeachers] = useState<number>(8);
   const [calcBillingModel, setCalcBillingModel] = useState<'parent' | 'school'>('parent');
   const [showPrivacyAudits, setShowPrivacyAudits] = useState<boolean>(false);
+  const [showFullTomCatalog, setShowFullTomCatalog] = useState<boolean>(false);
 
   // Dynamic pricing state (loaded from master_billing_settings in MasterAdminDashboard)
   const [pricing, setPricing] = useState({
@@ -1188,7 +1189,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 }}
                 className="hover-scale"
               >
-                <span>🛡️ 15 von 15 Sicherheits-Stufen erfüllt</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><ShieldCheck size={16} color="#ffffff" /> 18 von 18 Sicherheits-Stufen erfüllt</span>
                 <span style={{ 
                   background: '#34a853', 
                   color: 'white', 
@@ -2018,7 +2019,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   🛡️ Das Campus-Groovelab Sicherheitsversprechen
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  15-stufiges Sicherheits- & Datenschutzkonzept
+                  5-Säulen Vertrauens- & Freigabekonzept (Enterprise & Kommunal-Standard)
                 </span>
               </div>
               <button 
@@ -2039,12 +2040,13 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               backgroundColor: '#fafbfc'
             }}>
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
-                Als deutscher App-Betreiber hat der Schutz minderjähriger Schülerdaten für uns oberste Priorität. Unsere Plattform wurde von Grund auf nach dem Prinzip <strong>Privacy by Design</strong> entwickelt und setzt fortschrittliche kryptografische Härtungen ein, um ein maximales Sicherheitsniveau zu garantieren:
+                Als deutscher App-Betreiber hat der Schutz minderjähriger Schülerdaten für uns oberste Priorität. Unsere Plattform wurde streng nach dem Prinzip <strong>Privacy by Design & Default</strong> entwickelt und vereint Schulleitung, Eltern und städtische Datenschutzbeauftragte (DSB) in einem unumstößlichen Sicherheitsmodell:
               </p>
 
+              {/* Top Banner: Datensparsamkeit */}
               <div style={{
                 background: '#e6f4ea',
-                border: '1.5px solid #cbd5e1',
+                border: '1.5px solid #a7f3d0',
                 borderRadius: '20px',
                 padding: '20px',
                 display: 'flex',
@@ -2052,115 +2054,215 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 gap: '8px',
                 textAlign: 'left'
               }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  💡 Datensparsamkeit als aktive Härtung (Warum wir weniger Daten speichern)
+                <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#047857', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  💡 Datensparsamkeit als aktive Härtung (Warum weniger Daten mehr Sicherheit bedeuten)
                 </span>
                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.5, opacity: 0.9 }}>
-                  Da Campus-Groovelab als interaktives Lehr- und Organisations-Add-on agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, E-Mail-Adressen von Kindern/Lehrern oder Bankverbindungen). Dieser extrem minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die Freigabe durch Behörden/Datenschützer und garantiert: <strong>Daten, die gar nicht existieren, können niemals gestohlen werden.</strong>
+                  Da Campus-Groovelab als interaktives Lehr- und Organisations-Add-on agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, E-Mail-Adressen von Kindern/Lehrern oder Bankverbindungen). Dieser extrem minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die städtische Freigabe und garantiert: <strong>Daten, die gar nicht existieren, können niemals gestohlen werden.</strong>
                 </p>
               </div>
 
-              {/* 10 Stufen Grid/Liste */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                
+              {/* Die 5 Säulen */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {[
                   {
-                    title: '1. Verschlüsselung nach Stand der Technik (Art. 32 DSGVO)',
-                    desc: 'Sämtliche Daten werden im Transportweg mit Ende-zu-Ende TLS 1.3 und in der Datenbank ruhend mit militärischer AES-256-Bit-Verschlüsselung geschützt. Selbst bei physischem Zugriff auf die Serverinfrastruktur bleiben alle Daten ohne Autorisierung nach aktuellem Stand der Technik unlesbar.'
+                    icon: '🛡️',
+                    pill: 'SÄULE 1',
+                    pillBg: '#e6f4ea',
+                    pillColor: '#047857',
+                    title: 'Absolute Datensparsamkeit für Minderjährige (Zero-Kid-PII)',
+                    desc: 'Keine E-Mail-Adressen von Schülern, keine Wohnadressen, keine Bankverbindungen. Speicherung von Geburtsdaten ist technisch ausgeschlossen: Bei der Ersterfassung filtert die Anwendung Geburtsmonat und -jahr noch lokal im Browser des Administrators unwiderruflich heraus. Lediglich die reine Tageszahl (1–31) wird als temporärer Einmal-Schlüssel für die Erstanmeldung übertragen und nach der Erstellung der eigenen Eltern-PIN ersetzt.'
                   },
                   {
-                    title: '2. E-Mail-Vermeidung für Schüler & Lehrer (Datenminimierung)',
-                    desc: 'Zur maximalen Datensparsamkeit erheben und speichern wir für Schüler und Lehrer keinerlei E-Mail-Adressen. Die gesamte App-Funktionalität läuft ohne diese Angabe. Lediglich die Kontakt-E-Mail der Musikschule als Vertragspartner wird erfasst.'
+                    icon: '📋',
+                    pill: 'SÄULE 2',
+                    pillBg: '#eff6ff',
+                    pillColor: '#1d4ed8',
+                    title: 'Kommunale Compliance & DSB-Blitz-Freigabe (Für städtische DSBs)',
+                    desc: 'Sofort digital unterzeichenbarer AVV nach Art. 28 DSGVO mit fertigem TOM-Katalog. Durch die strikte Datenminimierung ergibt die Schwellwertanalyse (Art. 35 DSGVO) ein minimales Risiko – eine zeitaufwendige DSFA ist im Regelfall nicht erforderlich. Inklusive transparenter Subunternehmer-Kette und automatisierter Löschkonzepte (Art. 17 DSGVO).'
                   },
                   {
-                    title: '3. Strikte Row-Level Security & Mandantentrennung (RLS)',
-                    desc: 'Die Datenbank-Engine erzwingt auf unterster Ebene RLS-Policies und strikte Mandantentrennung (Multi-Tenancy Isolation). Dies stellt sicher, dass eine Musikschule systemisch bedingt nur auf die eigenen Daten zugreifen kann.'
+                    icon: '🇩🇪',
+                    pill: 'SÄULE 3',
+                    pillBg: '#fef3c7',
+                    pillColor: '#b45309',
+                    title: '100% Server-Standort Deutschland & Zero US-Cloud-Act',
+                    desc: 'Infrastruktur und Datenbanken befinden sich zu 100% in deutschen Rechenzentren (Hetzner, ISO 27001 zertifiziert). Keinerlei US-Cloud-Subunternehmer (kein CLOUD Act Risiko, keine Privacy-Shield-Zitterpartie). Datenbankseitig erzwungene Mandantentrennung (Row-Level Security).'
                   },
                   {
-                    title: '4. Kryptografisches Salted-Hashing von Passwörtern & PINs',
-                    desc: 'Weder Passwörter noch 4-stellige Eltern-PINs werden im Klartext gespeichert. Sie werden über kryptografische Einweg-Funktionen (Bcrypt mit dynamischem Salt) gepfeffert und irreversibel gehasht.'
+                    icon: '⚖️',
+                    pill: 'SÄULE 4',
+                    pillBg: '#f3e8ff',
+                    pillColor: '#6b21a8',
+                    title: 'Schulrecht-Kompatibilität & Dienstaufsichts-Schutz',
+                    desc: 'Keine privaten Handynummern für Schul-Chats nötig. Flexible Chat-Modi unterstützen wahlweise dauerhafte Schüler-Lehrer-Direktchats, Band- & lehrermoderierte Ensemble-Chats oder termingekoppelte Unterrichts-Chats mit 48h-Auto-Freeze (wahrt Dienstaufsicht & schützt den Lehrer-Feierabend). Audio-Engine stoppt beim Beenden sofort alle Stream-Zugriffe auf Betriebssystemebene.'
                   },
                   {
-                    title: '5. Brute-Force-Sperre (Lockout-Logic)',
-                    desc: 'Die Eingabe der PINs wird überwacht. Nach drei Falscheingaben wird der Zugriff für die jeweilige Sitzung aus Sicherheitsgründen für 15 Minuten gesperrt.'
-                  },
-                  {
-                    title: '6. Eltern-Souveränität (Art. 8 DSGVO)',
-                    desc: 'Eltern verwalten die Rechte ihres Kindes über ein feingranulares Dashboard. Chat-Rechte, Timer, Gruppenbeitritte und Songvorschläge können einzeln de-/aktiviert werden.'
-                  },
-                  {
-                    title: '7. Revisionssichere Einwilligungsprotokolle',
-                    desc: 'Jede Einwilligung der Eltern und Verträge der Schulen werden revisionssicher inklusive Timestamp, anonymisierter IP und Browser-Fingerprint archiviert.'
-                  },
-                  {
-                    title: '8. Lokale Kamera-Verarbeitung (Zero-Cloud Bio-Login)',
-                    desc: 'Kamera-Feeds für QR-Logins und Biometrie werden ausschließlich lokal auf dem Endgerät verarbeitet. Es findet keine Übertragung von Bild- oder Gesichtsdaten auf unsere Server statt.'
-                  },
-                  {
-                    title: '9. Eliminierte Entwickler-Bypässe im Release',
-                    desc: 'Alle Debug- und Bypass-Schnittstellen für Entwickler werden beim Kompilieren des Produktions-Builds durch strikte Compiler-Flags aus dem Programmcode gelöscht.'
-                  },
-                  {
-                    title: '10. Lokaler Fingerabdruck- & Passkey-Login (TouchID/FaceID)',
-                    desc: 'Nutzer können sich über die biometrische Hardware ihres Endgeräts (TouchID/FaceID) einloggen. Die Verifizierung erfolgt lokal – biometrische Merkmale verlassen das Endgerät nicht.'
-                  },
-                  {
-                    title: '11. Intelligente 45-Minuten Live-Lab Sperre (GrooveLab)',
-                    desc: 'Auf gemeinsam genutzten Schul-iPads im Live-Lab-Bandraum schützt eine 45-minütige Inaktivitäts-Sperre (inkl. Warn-Countdown nach Ablauf der Unterrichtseinheit) die Daten der Schülergruppe. Auf privaten Geräten im Campus-Modus läuft bewusst kein Countdown, um ungestörtes Üben zu Hause zu garantieren.'
-                  },
-                  {
-                    title: '12. Server-Standort 100% in Deutschland (ISO 27001)',
-                    desc: 'Das Hosting erfolgt ausschließlich in nach ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der Hetzner Online GmbH in Deutschland (Standort Falkenstein/Sachsen) – somit besteht keinerlei US-Haftungsrisiko.'
-                  },
-                  {
-                    title: '13. Modul-Kapselung & QR-Sperre vor Ort (Schulbetrieb)',
-                    desc: 'Auf gemeinsam genutzten Schul-Geräten (Lab-Modus) wird das datensensible Campus-Modul physisch gekapselt. Schüler können nicht ohne Weiteres dorthin wechseln; sie müssen sich vor Ort per schnellem QR-Scan erneut verifizieren.'
-                  },
-                  {
-                    title: '14. DSGVO-konforme Nachnamensmaskierung (Schulterblick-Schutz)',
-                    desc: 'Im laufenden Betrieb auf den Dashboards werden Schülernachnamen standardmäßig auf den Anfangsbuchstaben gekürzt (z. B. „Max M.“). Erst durch eine bewusste Klick-Interaktion (Auge-Symbol) können berechtigte Lehrkräfte oder Verwaltungsmitarbeiter den vollständigen Nachnamen für ein Zeitfenster von genau 10 Sekunden einblenden. Dies verhindert das Mitlesen durch Dritte an Arbeitsplätzen und im Unterrichtsraum.'
-                  },
-                  {
-                    title: '15. Hardware-Mikrofonschutz & 48h-Auto-Freeze im Chat (Schulrecht-Plus)',
-                    desc: 'Beim Verlassen aller Übe- und Loopstation-Module stoppt die Hardware-Audio-Engine sofort sämtliche Mikrofon-Tracks (kein Weiterleuchten der Aufnahmelampe). Direktnachrichten laufen ohne private Handynummern über die Schul-App. Der Chat ist strikt an den Unterrichtstermin gebunden und friert nach 48 Stunden automatisch ein (Auto-Freeze), um die Privatsphäre der Lehrkräfte zu schützen und gleichzeitig die gesetzliche Dienstaufsichtspflicht der Musikschule zu wahren.'
+                    icon: '👁️',
+                    pill: 'SÄULE 5',
+                    pillBg: '#fff1f2',
+                    pillColor: '#be123c',
+                    title: 'Klassenzimmer-Sicherheit & Zero-Knowledge Biometrie',
+                    desc: 'DSGVO-konforme Nachnamensmaskierung (z. B. „Max M.“) als Privacy-Default schützt vor Mitlesen an Arbeitsplätzen. Automatisches Background-Blurring bei Tab-Wechsel. Biometrische Logins (FaceID/TouchID) und Kamera-Feeds (QR-Scan) verbleiben zu 100% lokal auf dem Schul-iPad/Endgerät.'
                   }
-                ].map((stufe, idx) => (
+                ].map((saeule, idx) => (
                   <div key={idx} style={{
                     background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    padding: '16px 20px',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '20px',
+                    padding: '20px',
                     display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '16px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                    flexDirection: 'column',
+                    gap: '10px',
+                    boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)'
                   }}>
-                    <div style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      background: '#e6f4ea',
-                      color: '#34a853',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: '0.85rem',
-                      flexShrink: 0
-                    }}>
-                      ✓
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.4rem' }}>{saeule.icon}</span>
+                        <span style={{
+                          background: saeule.pillBg,
+                          color: saeule.pillColor,
+                          padding: '3px 10px',
+                          borderRadius: '8px',
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                          letterSpacing: '0.05em'
+                        }}>
+                          {saeule.pill}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.85rem', fontWeight: 800, color: '#0f172a' }}>
-                        {stufe.title}
-                      </h4>
-                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
-                        {stufe.desc}
-                      </p>
-                    </div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {saeule.title}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', fontWeight: 500, lineHeight: 1.5 }}>
+                      {saeule.desc}
+                    </p>
                   </div>
                 ))}
+              </div>
 
+              {/* Accordion Toggle for 22-Point TOM Catalog (For IT Auditors) */}
+              <div style={{ marginTop: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+                <button
+                  onClick={() => setShowFullTomCatalog(!showFullTomCatalog)}
+                  style={{
+                    width: '100%',
+                    background: showFullTomCatalog ? '#f1f5f9' : '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '14px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    color: '#334155',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📄 Vollständiger technischer TOM-Katalog (Art. 32 DSGVO) für IT-Sicherheitsprüfer {showFullTomCatalog ? 'einklappen' : 'ausklappen'}
+                  </span>
+                  <span style={{ transform: showFullTomCatalog ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                    ▼
+                  </span>
+                </button>
+
+                {showFullTomCatalog && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '16px' }}>
+                    {[
+                      {
+                        sectionTitle: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
+                        sectionBadge: 'Kryptografie & Maskierung',
+                        items: [
+                          { title: '1. Verschlüsselung in Transit & At-Rest', desc: 'TLS 1.3 Transport-Verschlüsselung mit HSTS. Datenbank- & Storage-Verschlüsselung im Ruhezustand nach AES-256.' },
+                          { title: '2. Client-Side Data Minimization (Lokal-Filterung)', desc: 'Geburtsdaten werden bei der Eingabe noch auf dem lokalen Endgerät verarbeitet; Monat und Jahr werden vor dem Senden an den Server verworfen. Es existieren zu keinem Zeitpunkt vollständige Geburtsdaten im System.' },
+                          { title: '3. DSGVO-konforme Nachnamensmaskierung', desc: 'Standardmäßige Kürzung von Schülernamen auf „Max M.“ (Privacy by Default) gegen Schulterblick und unbefugtes Mitlesen im Unterricht.' },
+                          { title: '4. Dynamischer PIN-Lifecycle & Server-Pepper Hashing', desc: 'Der initiale Tagesschlüssel dient ausschließlich der Erstanmeldung. Er wird bei der ersten Nutzung zwingend durch eine benutzerdefinierte 4-stellige PIN ersetzt, welche serverseitig mit Pepper und dynamischem Salt irreversibel gehasht wird.' },
+                          { title: '5. Lokale Zero-Cloud Biometrie- & Kameraverarbeitung', desc: 'Kamera-Feeds für QR-Logins und TouchID/FaceID-Passkeys verbleiben zu 100% lokal auf dem Endgerät des Nutzers.' }
+                        ]
+                      },
+                      {
+                        sectionTitle: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & System-Integrität',
+                        sectionBadge: 'Zugangskontrolle & Audit',
+                        items: [
+                          { title: '6. Strikte Row-Level Security (RLS)', desc: 'Datenbankseitig erzwungene Mandantentrennung (Multi-Tenancy Isolation) verhindert systemisch jeden fremden Datenzugriff.' },
+                          { title: '7. Brute-Force Lockout-Protection', desc: 'Automatische 15-minütige Sitzungssperre nach drei fehlerhaften PIN-Eingaben.' },
+                          { title: '8. Mikrofonschutz & Konfigurierbare Chat-Modi', desc: 'Sofortige Freigabe des Mikrofonzugriffs auf Betriebssystemebene beim Beenden von Modulen. Flexible Chat-Modi unterstützen wahlweise dauerhafte Schüler-Lehrer-Direktchats, Band- & lehrermoderierte Ensemble-Chats oder termingekoppelte Unterrichts-Chats mit 48h-Auto-Freeze nach Unterrichtsende.' },
+                          { title: '9. Automatischer Bildschirm-Schutz (Background-Blurring)', desc: 'Sofortige 16px-Verschwommenheit beim Verlassen der App oder Tab-Wechsel schützt vor Abfotografieren im Raum.' },
+                          { title: '10. Modul-Kapselung & Live-Lab 45m Session-Timeout', desc: 'Sichere Trennung zwischen Schul-Bandraum (GrooveLab) und Verwaltungs-App (Campus) auf gemeinsam genutzten iPads.' },
+                          { title: '11. Revisionssichere Append-Only WORM Audit-Logs', desc: 'Unmanipulierbare, schreibgeschützte Protokollierung aller administrativen Systemaktionen.' },
+                          { title: '12. Strikte Content Security Policy (CSP & XSS-Schutz)', desc: 'Web-Frontend lässt nur weiß gelistete Skripte zu und unterbindet XSS-Injections sowie unerlaubten Datenabfluss.' }
+                        ]
+                      },
+                      {
+                        sectionTitle: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',
+                        sectionBadge: 'Infrastruktur & Resilienz',
+                        items: [
+                          { title: '13. Server-Standort 100% in Deutschland', desc: 'Betrieb in ISO 27001 zertifizierten deutschen Rechenzentren (Hetzner, Deutschland) – ohne US-Cloud-Subunternehmer (No CLOUD Act).' },
+                          { title: '14. Geografisch getrennte Zero-Knowledge-Backups', desc: 'Tägliche verschlüsselte Datenbank-Backups an einem zweiten, geografisch isolierten deutschen Rechenzentrums-Standort.' },
+                          { title: '15. Netzwerkeigenes Rate-Limiting & API-Throttling', desc: 'Automatisierte Bot-Angriffe, Credential-Stuffing und DoS-Versuche werden an den Außengrenzen vor der Datenbank abgefangen.' }
+                        ]
+                      },
+                      {
+                        sectionTitle: 'IV. Art. 32 Abs. 1 lit. d DSGVO – Überprüfung & Evaluierung',
+                        sectionBadge: 'Auditierung & Nachweis',
+                        items: [
+                          { title: '16. Continuous Supply-Chain Security & CVE-Scans', desc: 'Automatische Überprüfung aller verwendeten Bibliotheken auf bekannte Schwachstellen vor jedem Produktions-Deployment.' },
+                          { title: '17. Periodische Penetrationstests & RFC 9116 security.txt', desc: 'Regelmäßige externe IT-Sicherheitsaudits und vertrauliche Meldeschnittstelle für Responsible Disclosure.' },
+                          { title: '18. Revisionssicheres DSGVO-Einwilligungsmanagement', desc: 'Zeitgestempelte, rechtssichere Protokollierung aller Eltern-Einwilligungen nach Art. 7 & Art. 8 DSGVO.' }
+                        ]
+                      }
+                    ].map((group, gIdx) => (
+                      <div key={gIdx} style={{
+                        background: '#ffffff',
+                        border: '1.5px solid #cbd5e1',
+                        borderRadius: '16px',
+                        padding: '18px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                            {group.sectionTitle}
+                          </h4>
+                          <span style={{
+                            background: '#f1f5f9',
+                            color: '#475569',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.68rem',
+                            fontWeight: 700
+                          }}>
+                            {group.sectionBadge}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {group.items.map((tom, itemIdx) => (
+                            <div key={itemIdx} style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '10px',
+                              padding: '10px 14px',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '10px'
+                            }}>
+                              <span style={{ color: '#34a853', fontWeight: 900, fontSize: '0.82rem', marginTop: '1px' }}>✓</span>
+                              <div>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b' }}>{tom.title}</div>
+                                <div style={{ fontSize: '0.73rem', color: '#64748b', fontWeight: 500, lineHeight: 1.4 }}>{tom.desc}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

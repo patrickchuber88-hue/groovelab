@@ -66,11 +66,15 @@
 
 @media (max-width: 639px) {
   .header {
-    padding: calc(10px + var(--sat, 0px)) 14px 10px 14px;
+    padding: calc(10px + var(--sat, 0px)) 15px 10px 15px;
   }
   .main-content {
-    padding: 0 12px calc(24px + var(--sab, 0px)) 12px;
+    padding: 0 15px calc(24px + var(--sab, 0px)) 15px;
     gap: 16px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    box-sizing: border-box;
   }
   .school-name {
     font-size: 1.05rem;
@@ -669,43 +673,25 @@ div:hover > .photo-overlay {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
-  padding: 12px 16px 28px 16px;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom)) 14px;
   border-top: 1px solid rgba(0,0,0,0.08);
   z-index: 1000;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  gap: 12px;
+  gap: 8px;
   justify-content: flex-start;
   align-items: center;
+  white-space: nowrap;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .mobile-nav::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
-}
-
-.mobile-nav button {
-  flex: 0 0 auto;
-  min-width: 72px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 6px;
-  border-radius: 16px;
-  transition: all 0.3s ease;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.mobile-nav button.active {
-  background: #fef3c7 !important;
-  color: #b45309 !important;
-  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
 }
 
 @media (max-width: 1024px) {
@@ -715,8 +701,8 @@ div:hover > .photo-overlay {
   .mobile-nav {
     display: flex;
   }
-  .main-content {
-    padding-bottom: 120px;
+  .main-content, .dashboard-container, .sim-viewport-mobile, .sim-viewport-portrait, .board-page-container {
+    padding-bottom: 140px !important;
   }
 }
 

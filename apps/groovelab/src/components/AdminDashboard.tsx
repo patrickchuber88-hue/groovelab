@@ -293,7 +293,7 @@ export function AdminDashboard({
   const [missionsActiveSubTab, setMissionsActiveSubTab] = useState<'assignments' | 'templates' | 'approvals'>('assignments');
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
   const [activeTab, setActiveTab] = useState<string>(() => forceTab || localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || 'live');
-  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke'>('songs');
+  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [showAddLehrwerk, setShowAddLehrwerk] = useState(false);
   const [newLehrwerk, setNewLehrwerk] = useState({ title: '', author: '', totalPages: 50 });
@@ -1453,12 +1453,7 @@ export function AdminDashboard({
     }
   };
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 1024;
-    }
-    return false;
-  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   
   const [bandSearch, setBandSearch] = useState('');
   const [bandLetter, setBandLetter] = useState<string | null>(null);
@@ -1776,7 +1771,11 @@ export function AdminDashboard({
 
   const handleLogoutStudent = async (sessionId: string) => {
     if (!window.confirm('Schüler wirklich ausloggen?')) return;
-    await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
+    const { error } = await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
+    if (error) {
+      alert('Fehler beim Ausloggen: ' + error.message);
+      return;
+    }
     fetchData();
   };
 
@@ -10623,14 +10622,13 @@ export function AdminDashboard({
     };
 
     return (
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', width: '100%', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', width: '100%' }}>
         {/* Left Side: Main Mediathek Area */}
         <div 
           className="glass-panel" 
           style={{ 
-            flex: '1 1 300px',
-            minWidth: '0',
-            width: '100%',
+            flex: 1,
+            minWidth: 0,
             background: 'white', 
             borderRadius: '20px', 
             border: '1px solid rgba(0, 0, 0, 0.05)', 
@@ -10699,6 +10697,108 @@ export function AdminDashboard({
             )}
           </div>
 
+          {/* Top Mediathek Category Tab Bar (Songs, Lehrwerke, Schnell-Text) */}
+          <div className="mediathek-pill-bar" style={{
+            width: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+            margin: '4px 0 4px 0'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: 'rgba(241, 245, 249, 0.95)',
+              borderRadius: '100px',
+              padding: '4px',
+              width: '100%',
+              boxSizing: 'border-box',
+              gap: '4px',
+              border: '1px solid rgba(226, 232, 240, 0.8)'
+            }}>
+              <button
+                type="button"
+                onClick={() => setMediathekTab('songs')}
+                style={{
+                  flex: 1,
+                  height: '36px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: mediathekTab === 'songs' ? brandColor : 'transparent',
+                  color: mediathekTab === 'songs' ? '#ffffff' : '#64748b',
+                  fontWeight: 850,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  boxShadow: mediathekTab === 'songs' ? `0 2px 8px ${brandColor}40` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <Music size={14} style={{ color: mediathekTab === 'songs' ? '#ffffff' : '#64748b' }} />
+                <span>Songs ({songs.length})</span>
+              </button>
+
+              {activePlatform === 'campus' && (
+                <button
+                  type="button"
+                  onClick={() => setMediathekTab('lehrwerke')}
+                  style={{
+                    flex: 1,
+                    height: '36px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: mediathekTab === 'lehrwerke' ? brandColor : 'transparent',
+                    color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b',
+                    fontWeight: 850,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    boxShadow: mediathekTab === 'lehrwerke' ? `0 2px 8px ${brandColor}40` : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <Library size={14} style={{ color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b' }} />
+                  <span>Lehrwerke ({lehrwerke.length})</span>
+                </button>
+              )}
+
+              {activePlatform === 'campus' && (
+                <button
+                  type="button"
+                  onClick={() => setMediathekTab('schnelltext')}
+                  style={{
+                    flex: 1,
+                    height: '36px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: mediathekTab === 'schnelltext' ? brandColor : 'transparent',
+                    color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b',
+                    fontWeight: 850,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    boxShadow: mediathekTab === 'schnelltext' ? `0 2px 8px ${brandColor}40` : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <Zap size={14} style={{ color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b' }} />
+                  <span>Schnell-Text</span>
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Unified Smart Search Field */}
           <div style={{ position: 'relative', width: '100%' }}>
             <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -10727,9 +10827,12 @@ export function AdminDashboard({
             gridTemplateColumns: activePlatform === 'campus' ? '1fr 1fr' : '1fr', 
             gap: '32px', 
             alignItems: 'flex-start' 
-          }}>
+          }} className="mediathek-grid-layout">
             {/* Left Column: Songs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div 
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+              className={`mediathek-col-card mediathek-col-songs ${mediathekTab === 'songs' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Music size={16} color={brandColor} /> Songs ({songs.length})
@@ -11315,7 +11418,10 @@ export function AdminDashboard({
 
             {/* Column 2: Lehrwerke (Campus only) */}
             {activePlatform === 'campus' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div 
+                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+                className={`mediathek-col-card mediathek-col-lehrwerke ${mediathekTab === 'lehrwerke' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Library size={16} color={brandColor} /> Lehrwerke ({lehrwerke.length})
@@ -11543,28 +11649,133 @@ export function AdminDashboard({
                 </div>
               </div>
             )}
+
+            {/* Column 3: Schnell-Text (Mobile view integration) */}
+            {activePlatform === 'campus' && (
+              <div 
+                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+                className={`mediathek-col-card mediathek-col-schnelltext-mobile ${mediathekTab === 'schnelltext' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ background: `${brandColor}15`, color: brandColor, padding: '3px 6px', borderRadius: '6px', fontSize: '0.95rem' }}>⚡</span>
+                    Schnell-Text ({textbausteine.filter((tb: any) => tb.active).length})
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={() => setShowTextbausteinModal(true)}
+                    style={{ 
+                      background: `linear-gradient(135deg, ${brandColor}, ${brandColor}ee)`, 
+                      color: '#ffffff', 
+                      border: 'none', 
+                      padding: '6px 12px', 
+                      borderRadius: '10px', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 900,
+                      boxShadow: `0 4px 10px -3px ${brandColor}40`,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <Settings size={14} /> Verwalten
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', width: '100%' }}>
+                  {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
+                    const parts = tb.label.split(' ');
+                    const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
+                    const emoji = hasEmoji ? parts[0] : '🎵';
+                    const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
+                    const isCopied = copiedTbId === tb.id;
+
+                    const handleCardClick = () => {
+                      if (selectedLehrwerkForDetail && selectedStudentForProgress) {
+                        setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
+                        setCopiedTbId(tb.id);
+                        setTimeout(() => setCopiedTbId(null), 850);
+                      } else if (selectedSongForDetail && selectedStudentForProgress) {
+                        setSongLessonNotes(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
+                        setCopiedTbId(tb.id);
+                        setTimeout(() => setCopiedTbId(null), 850);
+                      } else {
+                        setPreviewingTextbaustein(tb);
+                      }
+                    };
+
+                    return (
+                      <div 
+                        key={tb.id} 
+                        onClick={handleCardClick}
+                        style={{ 
+                          border: isCopied ? '1.5px solid #34a853' : '1px solid #e2e8f0', 
+                          borderRadius: '16px', 
+                          padding: '12px 10px', 
+                          background: isCopied ? '#e6f4ea' : 'white',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          textAlign: 'center',
+                          gap: '8px',
+                          opacity: tb.active ? 1 : 0.55,
+                          boxShadow: isCopied ? '0 4px 10px rgba(52, 168, 83, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
+                          minHeight: '115px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          transform: isCopied ? 'scale(0.96)' : 'none'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        <span style={{ fontSize: '1.5rem', marginTop: '2px', filter: 'grayscale(100%)' }}>
+                          {isCopied ? '✓' : emoji}
+                        </span>
+                        
+                        <span style={{ 
+                          fontSize: '0.75rem', 
+                          fontWeight: 800, 
+                          color: isCopied ? '#34a853' : '#1e293b', 
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 2, 
+                          WebkitBoxOrient: 'vertical', 
+                          overflow: 'hidden', 
+                          lineHeight: '1.2', 
+                          height: '2.4em', 
+                          wordBreak: 'break-word'
+                        }}>
+                          {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right Side: Textbausteine Sidebar */}
+        {/* Right Side: Textbausteine Sidebar (Desktop Only) */}
         {activePlatform === 'campus' && (
           <div 
-            className="glass-panel" 
-          style={{ 
-            flex: '0 0 260px',
-            width: '260px',
-            minWidth: '240px',
-            background: 'white', 
-            borderRadius: '20px', 
-            border: '1px solid rgba(0, 0, 0, 0.05)', 
-            padding: '24px 16px', 
-            boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '16px',
-            alignSelf: 'stretch'
-          }}
-        >
+            className="mediathek-col-schnelltext-desktop glass-panel" 
+            style={{ 
+              flex: '0 0 260px',
+              width: '260px',
+              minWidth: '240px',
+              background: 'white', 
+              borderRadius: '20px', 
+              border: '1px solid rgba(0, 0, 0, 0.05)', 
+              padding: '24px 16px', 
+              boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              alignSelf: 'stretch'
+            }}
+          >
           {/* Title */}
           <div>
             <h2 style={{ fontSize: '1.2rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 900 }}>

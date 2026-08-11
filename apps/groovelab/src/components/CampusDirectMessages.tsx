@@ -438,7 +438,12 @@ export default function CampusDirectMessages({
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
   const [activeSubTab, setActiveSubTab] = useState<string>('general');
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const checkIsMobile = () => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+  };
+
+  const [isMobile, setIsMobile] = useState(checkIsMobile);
 
   const isTeacherOrStaff = 
     user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' ||
@@ -448,10 +453,25 @@ export default function CampusDirectMessages({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(checkIsMobile());
+    handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
   }, []);
+
+  // Requirement 5: On smartphones, reliably start with contact list view
+  const isInitialMobileMountRef = useRef(true);
+  useEffect(() => {
+    if (isMobile && isInitialMobileMountRef.current) {
+      isInitialMobileMountRef.current = false;
+      setSelectedRecipient(null);
+    }
+  }, [isMobile, setSelectedRecipient]);
+
 
   useEffect(() => {
     if (isStudent) {
@@ -815,11 +835,11 @@ export default function CampusDirectMessages({
   };
 
   useEffect(() => {
-    if (!selectedRecipient && finalPartnersList.length > 0) {
+    if (!isMobile && !selectedRecipient && finalPartnersList.length > 0) {
       const directTeacher = finalPartnersList.find(p => String(p.id) === String(user?.teacher_id));
       setSelectedRecipient(directTeacher || finalPartnersList[0]);
     }
-  }, [finalPartnersList, selectedRecipient, setSelectedRecipient, user?.teacher_id]);
+  }, [isMobile, finalPartnersList, selectedRecipient, setSelectedRecipient, user?.teacher_id]);
 
   useEffect(() => {
     if (selectedRecipient) {
@@ -1133,41 +1153,54 @@ export default function CampusDirectMessages({
 
   return (
     <div className="animation-slide-up" style={{ 
-      padding: isMobile ? '8px 4px 4px 4px' : '24px 10px 10px 10px', 
+      padding: isMobile ? '0px' : '24px 10px 10px 10px', 
       display: 'flex', 
       gap: isMobile ? '0' : '24px', 
-      height: 'calc(100vh - 140px)', 
-      minHeight: isMobile ? '550px' : '700px',
-      fontFamily: '"Outfit", "Inter", sans-serif'
+      height: isMobile ? 'auto' : 'calc(100vh - 140px)', 
+      minHeight: isMobile ? 'auto' : '700px',
+      fontFamily: '"Outfit", "Inter", sans-serif',
+      width: '100%',
+      boxSizing: 'border-box'
     }}>
       {/* Left Pane: Partners / Chats List */}
       <div className="glass-panel" style={{ 
         background: 'white', 
         borderRadius: isMobile ? '16px' : '24px', 
         width: isMobile && selectedRecipient ? '0px' : isMobile ? '100%' : '380px', 
+        height: isMobile ? 'auto' : '100%',
         display: isMobile && selectedRecipient ? 'none' : 'flex', 
         flexDirection: 'column', 
-        overflow: 'hidden', 
+        overflow: isMobile ? 'visible' : 'hidden', 
         border: '1px solid #f1f5f9',
         boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
         flexShrink: 0,
         transition: 'all 0.3s ease'
       }}>
         {/* Search & Header */}
-        <div style={{ padding: '10px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MessageSquare size={22} color="#1e293b" />
-                <h2 style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b', margin: '0' }}>Nachrichten ({assignedStudents.length})</h2>
+        <div style={{ 
+          padding: isMobile ? '24px 20px 16px 20px' : '16px', 
+          borderBottom: '1px solid #f1f5f9', 
+          background: '#f8fafc', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '12px',
+          boxSizing: 'border-box',
+          width: '100%',
+          minWidth: 0
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <MessageSquare size={22} color="#1e293b" style={{ flexShrink: 0 }} />
+                <h2 style={{ fontSize: isMobile ? '20px' : '22px', fontWeight: 900, color: '#1e293b', margin: '0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Nachrichten ({assignedStudents.length})</h2>
               </div>
-              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>
+              <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {isStudent ? 'Kommunikation mit deinen Lehrern' : 'Kommunikation mit deinen Schülern'}
               </p>
             </div>
           </div>
           
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
@@ -1189,38 +1222,49 @@ export default function CampusDirectMessages({
           </div>
 
           {/* Quick Filters */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '2px', paddingLeft: '0px', flexWrap: 'wrap', width: '100%', boxSizing: 'border-box' }}>
             <button
+              type="button"
               onClick={() => setFilterType('all')}
               style={{
-                padding: '6px 16px',
+                padding: '10px 18px',
                 borderRadius: '999px',
                 border: 'none',
                 background: filterType === 'all' ? '#34a853' : '#e2e8f0',
                 color: filterType === 'all' ? 'white' : '#64748b',
-                fontSize: '0.75rem',
+                fontSize: '0.82rem',
                 fontWeight: 800,
                 cursor: 'pointer',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                minHeight: '44px',
+                minWidth: '44px',
+                touchAction: 'manipulation',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxSizing: 'border-box'
               }}
             >
               Alle
             </button>
             <button
+              type="button"
               onClick={() => setFilterType('unread')}
               style={{
-                padding: '6px 16px',
+                padding: '10px 18px',
                 borderRadius: '999px',
                 border: 'none',
                 background: filterType === 'unread' ? '#34a853' : '#e2e8f0',
                 color: filterType === 'unread' ? 'white' : '#64748b',
-                fontSize: '0.75rem',
+                fontSize: '0.78rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                minHeight: '36px',
+                boxSizing: 'border-box'
               }}
             >
               <span>Ungelesen</span>
@@ -1244,8 +1288,8 @@ export default function CampusDirectMessages({
           </div>
         </div>
 
-        {/* Partners List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className="custom-scrollbar">
+        {/* Partners List with 120px Bottom Clearance for Mobile Nav Bar */}
+        <div style={{ flex: 1, overflowY: isMobile ? 'visible' : 'auto', padding: isMobile ? '12px 16px 120px 16px' : '12px', boxSizing: 'border-box' }} className={isMobile ? "" : "custom-scrollbar"}>
           {finalPartnersList.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
               <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
@@ -1262,7 +1306,7 @@ export default function CampusDirectMessages({
                   className="hover-scale-mini"
                   style={{
                     width: '100%',
-                    padding: '14px 16px',
+                    padding: isMobile ? '12px 14px' : '14px 16px',
                     borderRadius: '16px',
                     background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
                     border: '1px solid transparent',
@@ -1272,7 +1316,8 @@ export default function CampusDirectMessages({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    boxSizing: 'border-box'
                   }}
                 >
                   <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -1365,21 +1410,29 @@ export default function CampusDirectMessages({
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 {isMobile && (
                   <button 
+                    type="button"
                     onClick={() => setSelectedRecipient(null)}
+                    aria-label="Zurück zur Nachrichtenübersicht"
                     style={{
-                      background: 'rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.25)',
                       border: 'none',
-                      borderRadius: '10px',
+                      borderRadius: '12px',
                       cursor: 'pointer',
                       color: '#ffffff',
-                      padding: '6px',
+                      width: '44px',
+                      height: '44px',
+                      minWidth: '44px',
+                      minHeight: '44px',
+                      padding: '0',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backdropFilter: 'blur(4px)'
+                      backdropFilter: 'blur(4px)',
+                      flexShrink: 0,
+                      touchAction: 'manipulation'
                     }}
                   >
-                    <ArrowLeft size={18} />
+                    <ArrowLeft size={20} />
                   </button>
                 )}
                 <img 
@@ -1558,7 +1611,7 @@ export default function CampusDirectMessages({
                 let stammterminText: string | null = null;
                 if (occObj) {
                   let rawOrig = occObj.original_date || occObj.rescheduled_from || occObj.originalDate;
-                  let rawOrigTime = occObj.original_start_time || occObj.originalStartTime || occObj.original_time;
+                  const rawOrigTime = occObj.original_start_time || occObj.originalStartTime || occObj.original_time;
 
                   // Parse from shift notification messages in the thread if missing
                   const shiftMsg = (currentTab.messages || []).find((m: any) => m.content && (m.content.includes('verschoben') || m.content.includes('->') || m.content.includes('Stamm-Termin')));

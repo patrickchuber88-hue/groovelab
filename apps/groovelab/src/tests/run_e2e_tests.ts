@@ -791,7 +791,7 @@ async function main() {
 
     const reverseIdMap = Object.entries(idMap).reduce((acc, [k, v]) => ({ ...acc, [v]: k }), {} as Record<string, string>);
 
-    function translateToUUID(obj: any): any {
+    const translateToUUID = (obj: any): any => {
       if (obj === null || obj === undefined) return obj;
       if (typeof obj === 'string') {
         return idMap[obj] || obj;

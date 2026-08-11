@@ -288,14 +288,14 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
     }
     try {
       await supabase.from('activation_days').delete().eq('student_id', student.id);
-      let userResetPayload: any = { 
+      const userResetPayload: any = { 
         onboarding_pin: null, 
         personal_pin: null,
         parent_pin: null,
         is_pin_activated: false,
         status: 'offen'
       };
-      let { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
+      const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
       if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
         delete userResetPayload.onboarding_pin;
         await supabase.from('users').update(userResetPayload).eq('id', student.id);
@@ -1367,7 +1367,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
       return;
     }
 
-    let html = `
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -4152,7 +4152,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
 
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(242, 242, 247, 0.65)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10500, background: 'rgba(242, 242, 247, 0.65)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <style>{`
         @media (max-width: 900px) {
           .student-detail-grid {
@@ -4167,6 +4167,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
             padding: 16px !important;
             border-radius: 24px !important;
           }
+        }
+        .sim-viewport-mobile .student-detail-panel,
+        .sim-viewport-portrait .student-detail-panel {
+          padding: 16px !important;
+          border-radius: 0px !important;
+          max-width: 100% !important;
+          width: 100% !important;
+          max-height: 100dvh !important;
+          height: 100dvh !important;
+          box-sizing: border-box !important;
+          background: #ffffff !important;
+          overscroll-behavior: contain !important;
+          padding-bottom: calc(160px + env(safe-area-inset-bottom, 30px)) !important;
         }
       `}</style>
       <div className="glass-panel student-detail-panel animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.95)', padding: '32px', borderRadius: '32px', maxWidth: '920px', width: '100%', maxHeight: '90vh', overflowY: 'auto', position: 'relative', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 30px 60px rgba(0, 0, 0, 0.08)' }}>
@@ -4324,7 +4337,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 4000,
+            zIndex: 10600,
             background: 'rgba(15, 23, 42, 0.82)',
             backdropFilter: 'blur(20px)',
             display: 'flex',
@@ -4353,7 +4366,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
               color: '#ffffff',
               transition: 'all 0.25s ease',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-              zIndex: 4100
+              zIndex: 10700
             }}
             onMouseOver={e => {
               e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
@@ -4503,7 +4516,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           style={{ 
             position: 'fixed', 
             inset: 0, 
-            zIndex: 4000, 
+            zIndex: 10600, 
             background: 'rgba(0,0,0,0.85)', 
             backdropFilter: 'blur(20px)', 
             display: 'flex', 
@@ -4529,7 +4542,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student,
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 4000,
+            zIndex: 10600,
             background: 'rgba(0, 0, 0, 0.25)',
             backdropFilter: 'blur(20px)',
             display: 'flex',

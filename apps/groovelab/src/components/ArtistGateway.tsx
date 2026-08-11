@@ -18,68 +18,13 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
   selectedBandForGateway,
   APP_INSTRUMENT_ICONS
 }) => {
-  if (!show) return null;
-
-  const target = pendingFounding || selectedBandForGateway;
-  if (!target) return null;
-
-  const name = target.name || target.title || target.songs?.title || 'dein neues Projekt';
-  const members = target.band_members || target.members || [];
-  const songData = target.band_songs?.[0]?.songs || target.songs?.[0] || target.songs || target;
-  const inst = songData?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1 }; // Minimum fallback
-  const requiredCount = Object.values(inst).reduce((acc: number, val: any) => acc + (val || 0), 0);
-
-  // 1. Gather all actual joined members
-  const joinedCards = members.map((m: any) => {
-    const userObj = m.profiles 
-      ? (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
-      : (m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : m);
-    
-    return {
-      isFilled: true,
-      member: m,
-      userObj: userObj,
-      userId: m.user_id || userObj?.id || m.id,
-      firstName: m.first_name || userObj?.first_name || 'Musiker',
-      photoUrl: m.photo_url || userObj?.photo_url || '/avatar_ghost.jpg',
-      instrument: m.instrument || 'Instrument'
-    };
-  });
-
-  // Helper to normalize instrument name
-  const normalize = (name: string) => {
-    const lower = (name || '').toLowerCase();
-    if (lower.includes('guitar') || lower.includes('gitarre')) return 'e-gitarre';
-    if (lower.includes('bass')) return 'e-bass';
-    if (lower.includes('drum') || lower.includes('schlagzeug')) return 'e-drums';
-    if (lower.includes('piano') || lower.includes('key') || lower.includes('klavier')) return 'e-piano';
-    if (lower.includes('vocal') || lower.includes('gesang')) return 'vocals';
-    return lower;
-  };
-
-  // 2. Identify missing required slots
-  const emptyCards: any[] = [];
-  Object.entries(inst).forEach(([instrument, count]) => {
-    const isVoc = instrument.toLowerCase().includes('vocal') || instrument.toLowerCase().includes('gesang');
-    if (isVoc) return; // Vocalists are already fully shown in joinedCards
-
-    const normInst = normalize(instrument);
-    const joinedCount = joinedCards.filter((c: any) => normalize(c.instrument) === normInst).length;
-    const needed = Math.max(0, (count as number) - joinedCount);
-
-    for (let i = 0; i < needed; i++) {
-      emptyCards.push({
-        isFilled: false,
-        instrument: instrument
-      });
-    }
-  });
-
-  const allCards = [...joinedCards, ...emptyCards];
-
   const [suggestion, setSuggestion] = React.useState<any>(null);
 
+  const target = pendingFounding || selectedBandForGateway;
+  const members = target?.band_members || target?.members || [];
+
   React.useEffect(() => {
+    if (!show || !target) return;
     const fetchSuggestion = async () => {
       const bMemberIds = members.map((m: any) => m.user_id || m.id).filter(Boolean);
       if (bMemberIds.length === 0) return;
@@ -138,7 +83,62 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
     };
 
     fetchSuggestion();
-  }, [members]);
+  }, [show, target]);
+
+  if (!show || !target) return null;
+
+  const name = target.name || target.title || target.songs?.title || 'dein neues Projekt';
+  const songData = target.band_songs?.[0]?.songs || target.songs?.[0] || target.songs || target;
+  const inst = songData?.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1 }; // Minimum fallback
+  const requiredCount = Object.values(inst).reduce((acc: number, val: any) => acc + (val || 0), 0);
+
+  // 1. Gather all actual joined members
+  const joinedCards = members.map((m: any) => {
+    const userObj = m.profiles 
+      ? (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
+      : (m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : m);
+    
+    return {
+      isFilled: true,
+      member: m,
+      userObj: userObj,
+      userId: m.user_id || userObj?.id || m.id,
+      firstName: m.first_name || userObj?.first_name || 'Musiker',
+      photoUrl: m.photo_url || userObj?.photo_url || '/avatar_ghost.jpg',
+      instrument: m.instrument || 'Instrument'
+    };
+  });
+
+  // Helper to normalize instrument name
+  const normalize = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('guitar') || lower.includes('gitarre')) return 'e-gitarre';
+    if (lower.includes('bass')) return 'e-bass';
+    if (lower.includes('drum') || lower.includes('schlagzeug')) return 'e-drums';
+    if (lower.includes('piano') || lower.includes('key') || lower.includes('klavier')) return 'e-piano';
+    if (lower.includes('vocal') || lower.includes('gesang')) return 'vocals';
+    return lower;
+  };
+
+  // 2. Identify missing required slots
+  const emptyCards: any[] = [];
+  Object.entries(inst).forEach(([instrument, count]) => {
+    const isVoc = instrument.toLowerCase().includes('vocal') || instrument.toLowerCase().includes('gesang');
+    if (isVoc) return; // Vocalists are already fully shown in joinedCards
+
+    const normInst = normalize(instrument);
+    const joinedCount = joinedCards.filter((c: any) => normalize(c.instrument) === normInst).length;
+    const needed = Math.max(0, (count as number) - joinedCount);
+
+    for (let i = 0; i < needed; i++) {
+      emptyCards.push({
+        isFilled: false,
+        instrument: instrument
+      });
+    }
+  });
+
+  const allCards = [...joinedCards, ...emptyCards];
 
   return (
     <div className="founding-modal-overlay">

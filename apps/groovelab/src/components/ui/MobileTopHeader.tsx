@@ -31,8 +31,8 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         right: 0,
         height: 'auto',
         minHeight: '52px',
-        paddingTop: 'calc(env(safe-area-inset-top, 12px) + 24px)',
-        paddingBottom: '8px',
+        paddingTop: 'max(12px, env(safe-area-inset-top, 12px))',
+        paddingBottom: '10px',
         background: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -40,17 +40,25 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingLeft: '14px',
-        paddingRight: '14px',
+        paddingLeft: 'max(16px, env(safe-area-inset-left, 16px))',
+        paddingRight: 'max(16px, env(safe-area-inset-right, 16px))',
         zIndex: 900,
         boxSizing: 'border-box'
       }}
     >
       {/* Left: App Brand Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ fontSize: '1.05rem', fontWeight: 900, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-          <span style={{ color: '#34a853' }}>Campus</span>
-          <span style={{ color: '#64748b', margin: '0 1px' }}>-</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        <span style={{
+          fontSize: '0.82rem',
+          fontWeight: 900,
+          letterSpacing: '-0.02em',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          lineHeight: 1.05,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start'
+        }}>
+          <span style={{ color: '#34a853' }}>Campus-</span>
           <span style={{ color: '#eab308' }}>Groovelab</span>
         </span>
       </div>

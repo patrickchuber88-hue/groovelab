@@ -17,7 +17,8 @@ import {
   ChevronDown, 
   ChevronUp, 
   Award,
-  BookOpen
+  BookOpen,
+  Sparkles
 } from 'lucide-react';
 
 interface Invoice {
@@ -172,7 +173,6 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
       const monthStr = m < 10 ? `0${m}` : `${m}`;
       const numId = schoolId ? schoolId.replace(/[^0-9]/g, '').substring(0, 3) || '104' : '104';
       const yy = String(y).slice(-2);
-      const invId = `RE-${numId}-${yy}${monthStr}-01`;
       
       const lastDay = new Date(y, m, 0).getDate();
       const monthName = deMonths[m];
@@ -181,9 +181,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
       const isCurrent = (y === currentYear && m === currentMonth);
       const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
       const isCreated = systemDate.getTime() >= creationTime.getTime();
+
+      // GoBD Rule: Official RE- invoice numbers are strictly assigned ONLY once billing period closes
+      const invId = isCreated ? `RE-${numId}-${yy}${monthStr}-01` : `VS-${numId}-${yy}${monthStr}`;
       
       const paidInvoicesList = getPaidInvoices(schoolId);
-      const isMarkedPaid = paidInvoicesList.includes(invId);
+      const isMarkedPaid = paidInvoicesList.includes(invId) || paidInvoicesList.includes(`RE-${numId}-${yy}${monthStr}-01`);
 
       const invoiceAmount = currentInvoiceAmount;
       const status = (currentInvoiceAmount === 0.00)
@@ -1472,7 +1475,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                           billing_date: g.date,
                           year: g.year ? parseInt(g.year) : new Date().getFullYear(),
                           amount: g.amount,
-                          status: g.status === 'Bezahlt' ? 'paid' : 'open',
+                          status: g.status === 'Bezahlt' ? 'paid' : (g.status === 'Vorschau' ? 'preview' : 'open'),
                           type: 'INF',
                           isDb: false,
                           isCurrentMonth: g.isCurrentMonth,
@@ -1488,8 +1491,9 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         );
                       }
 
-                      const unpaidInvoices = allCombined.filter(i => i.status === 'open' || i.status === 'overdue');
-                      const archivedInvoices = allCombined.filter(i => i.status !== 'open' && i.status !== 'overdue');
+                      const previewInvoices = allCombined.filter(i => i.status === 'preview' || i.status === 'Vorschau');
+                      const unpaidInvoices = allCombined.filter(i => (i.status === 'open' || i.status === 'overdue') && i.status !== 'preview');
+                      const archivedInvoices = allCombined.filter(i => i.status !== 'open' && i.status !== 'overdue' && i.status !== 'preview');
 
                       // Group archived invoices by year
                       const archivedByYear: Record<number, any[]> = {};
@@ -1506,12 +1510,13 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                         .sort((a, b) => b - a);
 
                       const renderInvoiceCard = (invoice: any) => {
+                        const isPreview = invoice.status === 'preview' || invoice.status === 'Vorschau';
                         return (
                           <div key={invoice.id} className="receipt-card" style={{ opacity: invoice.status === 'cancelled' ? 0.6 : 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.8rem' }}>
-                                  {invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-')}
+                                <span style={{ fontWeight: 700, color: isPreview ? '#0284c7' : '#0f172a', fontSize: '0.8rem' }}>
+                                  {isPreview ? invoice.id : (invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'))}
                                 </span>
                                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>{invoice.billing_date}</span>
                               </div>
@@ -1534,7 +1539,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                                     schoolCity: inv.schoolCity,
                                     date: invoice.billing_date,
                                     amount: invoice.amount,
-                                    status: invoice.status,
+                                    status: isPreview ? 'Vorschau' : invoice.status,
                                     type: invoice.type,
                                     isCurrentMonth: invoice.isCurrentMonth,
                                     hasCampus: inv.hasCampus,
@@ -1554,21 +1559,26 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                                   });
                                 }}
                                 style={{
-                                  background: 'transparent',
-                                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                                  background: isPreview ? '#e0f2fe' : 'transparent',
+                                  border: isPreview ? '1px solid #bae6fd' : '1px solid rgba(0, 0, 0, 0.08)',
                                   borderRadius: '6px',
-                                  padding: '4px 8px',
+                                  padding: '4px 10px',
                                   fontSize: '0.74rem',
-                                  fontWeight: 600,
-                                  color: '#1e293b',
+                                  fontWeight: 700,
+                                  color: isPreview ? '#0369a1' : '#1e293b',
                                   cursor: 'pointer'
                                 }}
-                                onMouseOver={(e: any) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                                onMouseOut={(e: any) => { e.currentTarget.style.background = 'transparent'; }}
+                                onMouseOver={(e: any) => { e.currentTarget.style.background = isPreview ? '#bae6fd' : '#f1f5f9'; }}
+                                onMouseOut={(e: any) => { e.currentTarget.style.background = isPreview ? '#e0f2fe' : 'transparent'; }}
                               >
-                                Beleg ansehen
+                                {isPreview ? 'Vorschau ansehen' : 'Beleg ansehen'}
                               </button>
-                              {invoice.isDb ? (
+                              
+                              {isPreview ? (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '4px 10px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                                  Vorschau
+                                </span>
+                              ) : invoice.isDb ? (
                                 <select
                                   value={invoice.status}
                                   onChange={(e) => updateInvoiceStatus(invoice.id, e.target.value)}
@@ -1615,8 +1625,30 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                       };
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {/* Floating Unpaid Sektion */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {/* Floating Preview Sektion (Laufender Monat / Künftig) */}
+                          {previewInvoices.length > 0 && (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                              background: '#f0f9ff',
+                              padding: '12px 14px',
+                              borderRadius: '14px',
+                              border: '1px solid #bae6fd',
+                              marginBottom: '4px'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#0369a1', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                <Sparkles size={14} color="#0284c7" />
+                                <span>Laufende Abrechnung (Vorschau / Noch nicht fällig)</span>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {previewInvoices.map(invoice => renderInvoiceCard(invoice))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Floating Unpaid Sektion (Reale offene Rechnungen) */}
                           {unpaidInvoices.length > 0 && (
                             <div style={{
                               display: 'flex',
@@ -1630,7 +1662,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#dc2626', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                 <ShieldAlert size={14} />
-                                <span>Ausstehende Rechnungen ({unpaidInvoices.length})</span>
+                                <span>Ausstehende Fällige Rechnungen ({unpaidInvoices.length})</span>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {unpaidInvoices.map(invoice => renderInvoiceCard(invoice))}

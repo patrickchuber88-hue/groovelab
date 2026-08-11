@@ -7,3 +7,4 @@ export * from './campus';
 export * from './groovelab';
 export * from './verwaltung_billing';
 export * from './schedule_rooms';
+export * from './supabase_joins';

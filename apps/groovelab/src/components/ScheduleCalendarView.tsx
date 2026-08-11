@@ -27,9 +27,14 @@ import {
   MoreVertical,
   ArrowLeftRight,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  Settings,
+  Lock,
+  MessageSquare,
+  BookOpen,
+  Edit3
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 interface ScheduleOccurrence {
   id: string;
@@ -110,12 +115,29 @@ export function ScheduleCalendarView({
   onStartTour
 }: ScheduleCalendarViewProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+
+  useEffect(() => {
+    // Always start with Eye ON (privacy mode active: Vorname N.) when opening ScheduleCalendarView
+    toggleRealNames(true);
+  }, []);
   const [gridSnapMinutes, setGridSnapMinutes] = useState<number>(() => {
     const saved = localStorage.getItem('groovelab_grid_snap_minutes');
     const parsed = saved ? Number(saved) : 15;
     return [15, 30].includes(parsed) ? parsed : 15;
   }); // Default grid snap to 15 mins or saved preference (5 min option removed)
-  const [viewMode, setViewMode] = useState<'week' | 'day' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'week' | 'day' | 'month'>(() => {
+    if (typeof window !== 'undefined' && (window.innerWidth <= 768 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null)) {
+      return 'day';
+    }
+    return 'week';
+  });
+
+  useEffect(() => {
+    const isMobileView = window.innerWidth <= 768 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null;
+    if (isMobileView) {
+      setViewMode('day');
+    }
+  }, []);
   const [showMiniDatePicker, setShowMiniDatePicker] = useState(false);
   const [quickCreateState, setQuickCreateState] = useState<{ isOpen: boolean; date: string; start_time: string } | null>(null);
   const [eventPopoverState, setEventPopoverState] = useState<{ isOpen: boolean; occ: ScheduleOccurrence; anchorRect?: DOMRect } | null>(null);
@@ -174,6 +196,54 @@ export function ScheduleCalendarView({
   }, []);
   const [showWeekend, setShowWeekend] = useState(false);
   const [focusedDayOffset, setFocusedDayOffset] = useState<number | null>(null);
+  const [showMobileToolsSheet, setShowMobileToolsSheet] = useState(false);
+  const [editModalCardIndex, setEditModalCardIndex] = useState<number>(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [orientationTick, setOrientationTick] = useState(0);
+
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setWindowWidth(window.innerWidth);
+      setOrientationTick(t => t + 1);
+    };
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('groovelab_orientation_changed', handleOrientationChange);
+    return () => {
+      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('groovelab_orientation_changed', handleOrientationChange);
+    };
+  }, []);
+
+  // Memoized Orientation & Viewport Detection for 60fps Instant Switching
+  const { isLandscapeMode, isMobilePortrait } = useMemo(() => {
+    const isInsideSim = typeof document !== 'undefined' && (
+      document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
+      document.querySelector('.sim-viewport-tablet') !== null
+    );
+
+    const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape') !== null;
+
+    const isLandscapeMode = isSimLandscape || (
+      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth > 768
+    );
+
+    const isMobilePortrait = !isLandscapeMode && (
+      (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null && !isSimLandscape) ||
+      (!isInsideSim && typeof window !== 'undefined' && window.innerWidth <= 768)
+    );
+
+    return { isLandscapeMode, isMobilePortrait };
+  }, [windowWidth, orientationTick]);
+
+  const activeOffset = isLandscapeMode
+    ? focusedDayOffset
+    : (focusedDayOffset !== null ? focusedDayOffset : (() => {
+        const day = currentDate.getDay(); // 0=Sun, 1=Mon, 2=Tue...
+        return (day >= 1 && day <= 5) ? day - 1 : 0;
+      })());
   const [currentMinutes, setCurrentMinutes] = useState(() => {
     const d = getSimulatedNow();
     return d.getHours() * 60 + d.getMinutes();
@@ -1642,13 +1712,13 @@ export function ScheduleCalendarView({
                   .single();
 
                 if (studentProfile && studentProfile.is_campus_active) {
-                  let pushTitle = 'Terminänderung 🔄';
+                  let pushTitle = 'Terminänderung';
                   if (['cancelled', 'canceled_by_student'].includes(change.status)) {
-                    pushTitle = 'Unterricht fällt aus ☕';
+                    pushTitle = 'Unterricht fällt aus';
                   } else if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
-                    pushTitle = 'Termin zurückgesetzt 🔄';
+                    pushTitle = 'Termin zurückgesetzt';
                   } else {
-                    pushTitle = 'Terminänderung 🔄';
+                    pushTitle = 'Terminänderung';
                   }
 
                   const { data: dbNotif } = await supabase
@@ -2056,7 +2126,7 @@ export function ScheduleCalendarView({
         if (!mainOccsResult.error && mainOccsResult.data) {
 
           // If occurrence student is NOT explicitly assigned to userId, convert to vacant slot (empty gap)
-          let filteredMainData = mainOccsResult.data.map((occ: any) => {
+          const filteredMainData = mainOccsResult.data.map((occ: any) => {
             if (!occ.student_id || occ.student_id === 'vacant') return occ;
             const assignedTeacherId = studentTeacherMap.get(occ.student_id) || occ.student?.teacher_id;
             if (assignedTeacherId && assignedTeacherId !== userId) {
@@ -3983,11 +4053,11 @@ export function ScheduleCalendarView({
   const getOtherRoomOccupancies = (dateStr: string, roomId: string) => {
     const dayDate = new Date(dateStr);
     const dayOfWeek = dayDate.getDay() || 7;
-    const intervals: { start: number; end: number; type: string }[] = [];
+    const rawList: { start: number; end: number; type: string; title: string; teacherName?: string }[] = [];
 
-    // 1. Template schedules of other teachers
+    // 1. Template schedules of teachers for this room
     cachedWeekSchedules.forEach((s: any) => {
-      if (s.room_id === roomId && s.teacher_id !== userId && s.day_of_week === dayOfWeek) {
+      if (s.room_id === roomId && s.day_of_week === dayOfWeek) {
         const start = timeToMinutes(s.time_slot);
         const end = start + (s.duration || 45);
         const hasCancelledOcc = cachedWeekOccurrences.some(o => 
@@ -3996,52 +4066,73 @@ export function ScheduleCalendarView({
           ['cancelled', 'canceled_by_student'].includes(o.status)
         );
         if (!hasCancelledOcc) {
-          intervals.push({ start, end, type: 'template' });
+          const studentName = `${s.first_name || ''} ${s.last_name || ''}`.trim();
+          const teacherName = s.teacher_name || (s.teachers ? `${s.teachers.first_name || ''} ${s.teachers.last_name || ''}`.trim() : '');
+          rawList.push({
+            start,
+            end,
+            type: 'template',
+            title: studentName || s.instrument || 'Unterricht',
+            teacherName: teacherName || undefined
+          });
         }
       }
     });
 
-    // 2. Room bookings (of other teachers and own manual reservations)
+    // 2. Room bookings (of other teachers and manual reservations)
     cachedWeekRoomBookings.forEach((rb: any) => {
       if (rb.room_id === roomId && rb.date === dateStr) {
-        if (rb.booked_by === userId && rb.title?.startsWith('Unterricht:')) {
-          return;
-        }
         const start = timeToMinutes(rb.start_time);
         const end = timeToMinutes(rb.end_time || rb.start_time);
         const duration = end > start ? (end - start) : 45;
-        intervals.push({ start, end: start + duration, type: 'booking' });
+        rawList.push({
+          start,
+          end: start + duration,
+          type: 'booking',
+          title: rb.title || 'Raumbuchung',
+          teacherName: rb.booked_by_name || rb.teacher_name || undefined
+        });
       }
     });
 
-    // 3. Occurrences of other teachers
+    // 3. Occurrences for this room
     cachedWeekOccurrences.forEach((o: any) => {
-      if (o.teacher_id !== userId && o.date === dateStr && o.status !== 'cancelled') {
+      if (o.date === dateStr && o.status !== 'cancelled') {
         const booking = cachedWeekRoomBookings.find(b => 
           b.date === o.date && 
-          b.start_time.substring(0, 5) === o.start_time.substring(0, 5) &&
+          b.start_time?.substring(0, 5) === o.start_time?.substring(0, 5) &&
           b.booked_by === o.teacher_id
         );
-        const currentRoomId = booking ? booking.room_id : (o.schedules?.room_id);
+        const currentRoomId = booking ? booking.room_id : (o.schedules?.room_id || o.room_id);
         if (currentRoomId === roomId) {
           const start = timeToMinutes(o.start_time);
           const end = start + (o.duration || 45);
-          if (!intervals.some(inv => inv.start === start && inv.type === 'template')) {
-            intervals.push({ start, end, type: 'occurrence' });
+          if (!rawList.some(inv => inv.start === start && Math.abs(inv.end - end) < 5)) {
+            const studentName = `${o.first_name || ''} ${o.last_name || ''}`.trim();
+            rawList.push({
+              start,
+              end,
+              type: 'occurrence',
+              title: studentName || o.instrument || 'Unterricht',
+              teacherName: o.teacher_name || undefined
+            });
           }
         }
       }
     });
 
-    intervals.sort((a, b) => a.start - b.start);
-    const merged: typeof intervals = [];
-    intervals.forEach(inv => {
+    rawList.sort((a, b) => a.start - b.start);
+
+    const merged: typeof rawList = [];
+    rawList.forEach(inv => {
       if (merged.length === 0) {
         merged.push(inv);
       } else {
         const last = merged[merged.length - 1];
-        if (inv.start < last.end) {
+        if (inv.start < last.end && Math.abs(inv.start - last.start) < 15) {
           last.end = Math.max(last.end, inv.end);
+          if (!last.teacherName && inv.teacherName) last.teacherName = inv.teacherName;
+          if ((!last.title || last.title === 'Unterricht') && inv.title) last.title = inv.title;
         } else {
           merged.push(inv);
         }
@@ -4161,7 +4252,7 @@ export function ScheduleCalendarView({
   const isLockedForTeacher = false; // Continuous Timetable Validity Rule: Always keep current active timetable accessible
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
+    <div className="fluid-board-scroll-container cg-full-height-board" style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
       <style>{`
         @keyframes pulse-yellow {
           0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
@@ -4235,315 +4326,197 @@ export function ScheduleCalendarView({
       `}</style>
       
       <div style={{ 
-        background: 'rgba(255, 255, 255, 0.65)', 
-        backdropFilter: 'blur(30px) saturate(210%)', 
-        borderRadius: '16px', 
-        padding: '12px 16px', 
-        border: '1px solid rgba(255, 255, 255, 0.6)', 
-        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.03)', 
+        background: isMobilePortrait ? 'transparent' : 'rgba(255, 255, 255, 0.65)', 
+        backdropFilter: isMobilePortrait ? 'none' : 'blur(30px) saturate(210%)', 
+        borderRadius: isMobilePortrait ? '0px' : '16px', 
+        padding: isMobilePortrait ? '4px 4px 8px 4px' : '12px 16px', 
+        border: isMobilePortrait ? 'none' : '1px solid rgba(255, 255, 255, 0.6)', 
+        boxShadow: isMobilePortrait ? 'none' : '0 10px 40px rgba(0, 0, 0, 0.03)', 
         display: 'flex',
         flexDirection: 'column',
         gap: '10px'
       }}>
-        {/* ROW 1: Primäre Steuerung & Haupt-Module (Navigations- & Ansichts-Ebene) */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px', flexWrap: 'wrap' }}>
-          {/* Left: KW-Anzeige & Lehrer-Auswahl */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '10px',
-              background: lightBg,
-              color: brandColor,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <CalendarIcon size={16} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                  KW {weekNumber}
-                </h2>
-                <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
-                </span>
+        {/* ROW 1: Primäre Steuerung & Haupt-Module (Zero-Scroll Mobile Header) */}
+        {isMobilePortrait ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+            {/* Mobile Line 1: KW-Titel (Left) & Datum-Navi (Right) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: lightBg, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CalendarIcon size={16} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                    KW {weekNumber}
+                  </h2>
+                  <span style={{ color: '#86868b', fontSize: '0.68rem', fontWeight: 700 }}>
+                    {weekStart.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                  </span>
+                </div>
               </div>
-              {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
-                  <select
-                    value={selectedTeacherId}
-                    onChange={(e) => setSelectedTeacherId(e.target.value)}
-                    style={{
-                      background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.08)',
-                      borderRadius: '6px',
-                      padding: '2px 6px',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      color: '#1d1d1f',
-                      outline: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+
+              {/* Date Navigation Capsule */}
+              <div className="apple-btn-group" style={{ margin: 0 }}>
+                <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
+                <button onClick={jumpToToday} className="apple-btn" style={{ padding: '6px 10px', fontWeight: 800 }} title="Heute">Heute</button>
+                <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
+                
+                <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 1px' }} />
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    type="date"
+                    value={toLocalYYYYMMDD(currentDate)}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setCurrentDate(new Date(e.target.value));
+                      }
                     }}
+                    style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 2 }}
+                  />
+                  <button className="apple-btn" style={{ pointerEvents: 'none', padding: '6px 8px' }}>
+                    <CalendarIcon size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Line 2: Stundenplan/Designer Switch (Left) & Werkzeuge Button (Right) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
+              {activeTab && setActiveTab && (
+                <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center', flex: 1 }}>
+                  <button 
+                    onClick={() => setActiveTab('calendar')}
+                    className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
+                    style={{ padding: '6px 10px', fontSize: '0.76rem', lineHeight: '1.2', flex: 1, textAlign: 'center' }}
                   >
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.first_name} {t.last_name}
-                      </option>
-                    ))}
-                  </select>
+                    Stundenplan
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('designer')}
+                    className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
+                    style={{ padding: '6px 10px', fontSize: '0.76rem', lineHeight: '1.2', flex: 1, textAlign: 'center' }}
+                  >
+                    Designer
+                  </button>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Center: Main Tabs & Grid Snap */}
-          {activeTab && setActiveTab && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
-                <button 
-                  onClick={() => setActiveTab('calendar')}
-                  className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-                >
-                  Stundenplan
-                </button>
-                <button 
-                  onClick={() => setActiveTab('designer')}
-                  className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
-                >
-                  Stundenplan-Designer
-                </button>
-              </div>
-              {currentUserRole === 'teacher' && onStartTour && (
-                <button
-                  type="button"
-                  onClick={onStartTour}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.65)',
-                    border: '1px solid rgba(0, 0, 0, 0.08)',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#86868b',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                  }}
-                  title="Anleitung / Tour starten"
-                  onMouseOver={e => e.currentTarget.style.color = '#1d1d1f'}
-                  onMouseOut={e => e.currentTarget.style.color = '#86868b'}
-                >
-                  <Info size={16} />
-                </button>
-              )}
-
-              {/* Grid Snap Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
-                <select
-                  value={gridSnapMinutes}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setGridSnapMinutes(val);
-                    localStorage.setItem('groovelab_grid_snap_minutes', String(val));
-                  }}
-                  style={{
-                    border: 'none',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    color: '#1e293b',
-                    background: 'transparent',
-                    outline: 'none',
-                    cursor: 'pointer',
-                    padding: 0
-                  }}
-                >
-                  <option value={15}>15 Min</option>
-                  <option value={30}>30 Min</option>
-                </select>
-              </div>
-
-              {/* Offene Ersatztermine Navigation Capsule */}
-              {allOpenReschedules && allOpenReschedules.length > 0 && (
-                <div style={{
+              <button
+                type="button"
+                onClick={() => setShowMobileToolsSheet(true)}
+                style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: '#fef3c7',
-                  border: '1px solid #fcd34d',
-                  borderRadius: '10px',
-                  padding: '2px 8px',
-                  height: '32px',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 4px rgba(245, 158, 11, 0.12)'
-                }}>
-                  <button
-                    onClick={() => {
-                      const targetOcc = allOpenReschedules[currentRescheduleIndex];
-                      if (targetOcc) {
-                        const occDate = new Date(targetOcc.date);
-                        if (!isNaN(occDate.getTime())) {
-                          setCurrentDate(occDate);
-                        }
-                        setEditOccState({
-                          id: targetOcc.id,
-                          date: targetOcc.date,
-                          start_time: targetOcc.start_time,
-                          room_id: targetOcc.schedules?.room_id || (targetOcc as any).room_id || null,
-                          duration: targetOcc.duration
-                        });
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#b45309',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
-                    title="Klicken, um diesen Ersatztermin zu bearbeiten"
-                  >
-                    <RefreshCw size={13} style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                      {allOpenReschedules.length} {allOpenReschedules.length === 1 ? 'offener Ersatztermin' : 'offene Ersatztermine'}
-                    </span>
-                    {allOpenReschedules[currentRescheduleIndex]?.student && (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', background: 'rgba(255,255,255,0.7)', padding: '1px 5px', borderRadius: '4px', marginLeft: '2px' }}>
-                        ({allOpenReschedules[currentRescheduleIndex].student.first_name})
-                      </span>
-                    )}
-                  </button>
-
-                  {allOpenReschedules.length > 1 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px', borderLeft: '1px solid rgba(180, 83, 9, 0.2)', paddingLeft: '6px' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentRescheduleIndex(prev => (prev > 0 ? prev - 1 : allOpenReschedules.length - 1));
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #fcd34d',
-                          borderRadius: '5px',
-                          padding: '1px 3px',
-                          color: '#b45309',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        title="Vorheriger Ersatztermin"
-                      >
-                        <ChevronLeft size={13} />
-                      </button>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#92400e', padding: '0 3px', fontFamily: 'monospace' }}>
-                        {currentRescheduleIndex + 1}/{allOpenReschedules.length}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentRescheduleIndex(prev => (prev < allOpenReschedules.length - 1 ? prev + 1 : 0));
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #fcd34d',
-                          borderRadius: '5px',
-                          padding: '1px 3px',
-                          color: '#b45309',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        title="Nächster Ersatztermin"
-                      >
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
-                  )}
+                  padding: '8px 14px',
+                  borderRadius: '12px',
+                  background: '#ffffff',
+                  border: '1.5px solid #34a853',
+                  color: '#0f172a',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  boxShadow: '0 2px 6px rgba(52, 168, 83, 0.12)',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                <Settings size={15} color="#34a853" />
+                <span>Werkzeuge</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Left: KW-Anzeige & Lehrer-Auswahl */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: lightBg, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <CalendarIcon size={16} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                    KW {weekNumber}
+                  </h2>
+                  <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Right: Date Navigation & View Mode Switcher */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div className="apple-btn-group">
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('day');
-                  if (focusedDayOffset === null) setFocusedDayOffset(0);
-                }}
-                className={`apple-btn ${viewMode === 'day' ? 'active' : ''}`}
-                style={viewMode === 'day' ? { color: textAccentColor } : {}}
-              >
-                Tag
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('week');
-                  setFocusedDayOffset(null);
-                }}
-                className={`apple-btn ${viewMode === 'week' ? 'active' : ''}`}
-                style={viewMode === 'week' ? { color: textAccentColor } : {}}
-              >
-                Woche
-              </button>
+                {(currentUserRole === 'admin' || currentUserRole === 'secretary') && teachers && teachers.length > 0 && selectedTeacherId && setSelectedTeacherId && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#86868b' }}>Lehrkraft:</span>
+                    <select
+                      value={selectedTeacherId}
+                      onChange={(e) => setSelectedTeacherId(e.target.value)}
+                      style={{ background: '#ffffff', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '6px', padding: '2px 6px', fontSize: '0.68rem', fontWeight: 700, color: '#1d1d1f', outline: 'none', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+                    >
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="apple-btn-group">
-              <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
-              <button onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen">Heute</button>
-              <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
-              
-              <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
+            {/* Center: Main Tabs & Grid Snap */}
+            {activeTab && setActiveTab && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+                  <button onClick={() => setActiveTab('calendar')} className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`} style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}>Stundenplan</button>
+                  <button onClick={() => setActiveTab('designer')} className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`} style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}>Stundenplan-Designer</button>
+                </div>
+                {currentUserRole === 'teacher' && onStartTour && (
+                  <button type="button" onClick={onStartTour} style={{ background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#86868b', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }} title="Anleitung / Tour starten" onMouseOver={e => e.currentTarget.style.color = '#1d1d1f'} onMouseOut={e => e.currentTarget.style.color = '#86868b'}>
+                    <Info size={16} />
+                  </button>
+                )}
 
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input 
-                  type="date"
-                  value={toLocalYYYYMMDD(currentDate)}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setCurrentDate(new Date(e.target.value));
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    opacity: 0,
-                    width: '100%',
-                    height: '100%',
-                    cursor: 'pointer',
-                    zIndex: 2
-                  }}
-                />
-                <button className="apple-btn" style={{ pointerEvents: 'none' }}>
-                  <CalendarIcon size={13} />
-                  <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
-                </button>
+                {/* Grid Snap Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '4px 10px', height: '32px', boxSizing: 'border-box' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist' }}>Raster:</span>
+                  <select value={gridSnapMinutes} onChange={(e) => { const val = Number(e.target.value); setGridSnapMinutes(val); localStorage.setItem('groovelab_grid_snap_minutes', String(val)); }} style={{ border: 'none', fontSize: '0.78rem', fontWeight: 700, color: '#1e293b', background: 'transparent', outline: 'none', cursor: 'pointer', padding: 0 }}>
+                    <option value={15}>15 Min</option>
+                    <option value={30}>30 Min</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Right: Date Navigation & View Mode Switcher */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button type="button" onClick={() => setShowMobileToolsSheet(true)} className="mobile-tools-btn" style={{ alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '12px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.78rem', fontWeight: 800, boxShadow: '0 2px 6px rgba(0,0,0,0.04)', cursor: 'pointer' }}>
+                <Settings size={14} color="#34a853" />
+                <span>Werkzeuge</span>
+              </button>
+              <div className="apple-btn-group">
+                <button type="button" onClick={() => { setViewMode('day'); if (focusedDayOffset === null) setFocusedDayOffset(0); }} className={`apple-btn ${viewMode === 'day' ? 'active' : ''}`} style={viewMode === 'day' ? { color: textAccentColor } : {}}>Tag</button>
+                <button type="button" onClick={() => { setViewMode('week'); setFocusedDayOffset(null); }} className={`apple-btn ${viewMode === 'week' ? 'active' : ''}`} style={viewMode === 'week' ? { color: textAccentColor } : {}}>Woche</button>
+              </div>
+
+              <div className="apple-btn-group">
+                <button onClick={prevWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Vorherige Woche"><ChevronLeft size={14} /></button>
+                <button onClick={jumpToToday} className="apple-btn" title="Aktuelle Woche anzeigen">Heute</button>
+                <button onClick={nextWeek} className="apple-btn" style={{ padding: '6px 8px' }} title="Nächste Woche"><ChevronRight size={14} /></button>
+                <div style={{ height: '16px', width: '1px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input type="date" value={toLocalYYYYMMDD(currentDate)} onChange={(e) => { if (e.target.value) setCurrentDate(new Date(e.target.value)); }} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', zIndex: 2 }} />
+                  <button className="apple-btn" style={{ pointerEvents: 'none' }}>
+                    <CalendarIcon size={13} />
+                    <span>{currentDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Divider line between Row 1 and Row 2 */}
-        <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '4px -4px' }} />
-
-        {/* ROW 2: Aktions- & Werkzeugleiste (Toolbar Row) */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
+        {/* Divider line & ROW 2 (Desktop & Tablet & Landscape) */}
+        {!isMobilePortrait && (
+          <>
+            <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '4px -4px' }} />
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
           {/* Left: Röntgen selector & View filters */}
           <div id="tour-calendar-xray" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
@@ -4601,7 +4574,7 @@ export function ScheduleCalendarView({
           </div>
 
           {/* Center / Highlight: Feature Toggles & Vertretung zuweisen */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="desktop-secondary-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div className="apple-btn-group">
               {/* Vertretungs-Aktionsmodus Button */}
               <button
@@ -4652,10 +4625,10 @@ export function ScheduleCalendarView({
                 onClick={() => toggleRealNames()}
                 className={`apple-btn ${showRealNames ? 'active' : ''}`}
                 style={{ color: showRealNames ? '#ea4335' : undefined }}
-                title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
+                title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
               >
-                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
+                {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
+                <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
               </button>
 
               <button
@@ -4672,7 +4645,7 @@ export function ScheduleCalendarView({
           </div>
 
           {/* Right: Draft & Copy Actions */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div className="desktop-secondary-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div id="tour-calendar-actions" className="apple-btn-group">
               <button
                 onClick={handleCopyWeek}
@@ -4740,6 +4713,9 @@ export function ScheduleCalendarView({
           </div>
         </div>
       </div>
+    </>
+  )}
+</div>
 
       {!hasSubmittedSchedule && (currentUserRole === 'admin' || currentUserRole === 'secretary') && (
         <div style={{
@@ -4836,66 +4812,95 @@ export function ScheduleCalendarView({
           </div>
         )}
 
-        <div id="tour-calendar-grid" ref={gridRef} style={{ 
-          display: 'grid', 
-          position: 'relative',
-          gridTemplateColumns: focusedDayOffset !== null ? '1fr' : (isWeekendVisible ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))'), 
-          gap: '0px',
-          background: '#ffffff',
-          borderRadius: '24px',
-          border: '1px solid #e2e8f0',
-          padding: '20px 8px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-          overflow: 'hidden',
-          transition: 'all 0.3s ease'
-        }}>
-          {isLockedForTeacher && (
+        {/* Mobile Portrait Compact Rotation Hint */}
+        {isMobilePortrait && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '8px'
+          }}>
             <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(255, 255, 255, 0.65)',
-              backdropFilter: 'blur(6px)',
-              zIndex: 100,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'flex-start',
-              paddingTop: '120px',
-              textAlign: 'center',
-              padding: '2rem'
+              justifyContent: 'center',
+              background: 'rgba(240, 253, 244, 0.85)',
+              border: '1px solid #bbf7d0',
+              borderRadius: '100px',
+              padding: '4px 12px',
+              fontSize: '0.72rem',
+              color: '#166534',
+              fontWeight: 650,
+              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)'
             }}>
-              <div style={{
-                position: 'sticky',
-                top: '200px',
-                background: '#ffffff',
-                padding: '2rem',
-                borderRadius: '16px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                maxWidth: '450px',
-                border: '1px solid #e2e8f0'
-              }}>
-                <span style={{ fontSize: '3.5rem', marginBottom: '1rem', display: 'block', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' }}>🔒</span>
-                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.4rem', color: '#1e293b', fontWeight: 800 }}>Stundenplan in Prüfung</h3>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem', lineHeight: '1.6' }}>
-                  Dein Stundenplan befindet sich aktuell in der Zuteilung durch das Sekretariat. 
-                  Sobald dieser freigegeben ist, kannst du hier deine Termine sehen und bearbeiten.
-                </p>
-              </div>
+              <span>📱 Für 5-Tage-Woche Handy ins Querformat drehen</span>
             </div>
-          )}
-        {[0, 1, 2, 3, 4, 5, 6].filter(offset => focusedDayOffset !== null ? offset === focusedDayOffset : (isWeekendVisible || offset < 5)).map(offset => {
-          const dayDate = new Date(weekStart);
-          dayDate.setDate(dayDate.getDate() + offset);
-          const dateStr = toLocalYYYYMMDD(dayDate);
-          
-          const dayOfWeek = dayDate.getDay() || 7;
-          const daySchedules = cachedWeekSchedules.filter((s: any) => s.day_of_week === dayOfWeek && s.teacher_id === userId);
+          </div>
+        )}
+
+
+
+            <div id="tour-calendar-grid" ref={gridRef} className="mobile-unclip-widget" style={{ 
+              display: 'grid', 
+              position: 'relative',
+              gridTemplateColumns: activeOffset !== null ? '1fr' : (isWeekendVisible ? 'repeat(7, minmax(0, 1fr))' : 'repeat(5, minmax(0, 1fr))'), 
+              gap: '0px',
+              background: '#ffffff',
+              borderRadius: isMobilePortrait ? '0px' : '24px',
+              border: isMobilePortrait ? 'none' : '1px solid #e2e8f0',
+              padding: isMobilePortrait ? '12px 0px 40px 0px' : '20px 8px',
+              minHeight: isMobilePortrait ? 'calc(100dvh - 220px)' : 'auto',
+              boxShadow: isMobilePortrait ? 'none' : '0 4px 20px rgba(0, 0, 0, 0.02)',
+              overflow: isMobilePortrait ? 'visible' : 'hidden',
+              transition: 'all 0.3s ease'
+            }}>
+              {isLockedForTeacher && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(255, 255, 255, 0.65)',
+                  backdropFilter: 'blur(6px)',
+                  zIndex: 100,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  paddingTop: '120px',
+                  textAlign: 'center',
+                  padding: '2rem'
+                }}>
+                  <div style={{
+                    position: 'sticky',
+                    top: '200px',
+                    background: '#ffffff',
+                    padding: '2rem',
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    maxWidth: '450px',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <span style={{ fontSize: '3.5rem', marginBottom: '1rem', display: 'block', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' }}>🔒</span>
+                    <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.4rem', color: '#1e293b', fontWeight: 800 }}>Stundenplan in Prüfung</h3>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '1rem', lineHeight: '1.6' }}>
+                      Dein Stundenplan befindet sich aktuell in der Zuteilung durch das Sekretariat. 
+                      Sobald dieser freigegeben ist, kannst du hier deine Termine sehen und bearbeiten.
+                    </p>
+                  </div>
+                </div>
+              )}
+            {[0, 1, 2, 3, 4, 5, 6].filter(offset => activeOffset !== null ? offset === activeOffset : (isWeekendVisible || offset < 5)).map(offset => {
+              const dayDate = new Date(weekStart);
+              dayDate.setDate(dayDate.getDate() + offset);
+              const dateStr = toLocalYYYYMMDD(dayDate);
+              
+              const dayOfWeek = dayDate.getDay() || 7;
+              const daySchedules = cachedWeekSchedules.filter((s: any) => s.day_of_week === dayOfWeek && s.teacher_id === userId);
           let regMin = Infinity;
           let regMax = -Infinity;
           daySchedules.forEach(s => {
@@ -4928,12 +4933,18 @@ export function ScheduleCalendarView({
             .filter(o => o.status !== 'cancelled' && o.start_time)
             .map(o => timeToMinutes(o.start_time));
           
-          const dayBaselineMinutes = activeDayTimes.length > 0 ? Math.min(...activeDayTimes) : globalMinStartMinutes;
+          const activeOccEnds = dayOccurrences
+            .filter(o => o.status !== 'cancelled' && o.start_time)
+            .map(o => timeToMinutes(o.start_time) + (o.duration || 45));
           
-          const columnHeight = (1440 - dayBaselineMinutes) * 2.5;
+          const dayBaselineMinutes = activeDayTimes.length > 0 ? Math.min(...activeDayTimes) : globalMinStartMinutes;
+          const maxEndMinutes = activeOccEnds.length > 0 ? Math.max(...activeOccEnds) : (dayBaselineMinutes + 180);
+          
+          const requiredHeightPx = Math.max((maxEndMinutes - dayBaselineMinutes) * 2.5 + 80, 450);
+          const columnHeight = isMobilePortrait ? requiredHeightPx : Math.max((1440 - dayBaselineMinutes) * 2.5, requiredHeightPx);
           const startHour = Math.ceil(dayBaselineMinutes / 60);
           const markers = [];
-          for (let h = startHour; h <= 24; h++) {
+          for (let h = startHour; h <= Math.ceil(maxEndMinutes / 60) + 1; h++) {
             markers.push({
               hour: h,
               top: (h * 60 - dayBaselineMinutes) * 2.5
@@ -4950,7 +4961,7 @@ export function ScheduleCalendarView({
                 display: 'flex', 
                 flexDirection: 'column', 
                 gap: '8px', 
-                minHeight: '400px',
+                minHeight: isMobilePortrait ? 'calc(100dvh - 190px)' : `${columnHeight + 20}px`,
                 borderRight: isLastCol ? 'none' : '1px solid #e2e8f0',
                 transition: 'all 0.3s ease'
               }}
@@ -5038,7 +5049,7 @@ export function ScheduleCalendarView({
                         textTransform: 'uppercase', 
                         letterSpacing: '0.05em' 
                       }}>
-                        {dayName}
+                        {dayName} ({dayOccurrences.filter(o => o.status !== 'cancelled' && o.student_id).length})
                       </div>
                       <div style={{
                         fontSize: '0.9rem',
@@ -5084,7 +5095,7 @@ export function ScheduleCalendarView({
                 onDragOver={(e) => handleDragOverDay(e, dateStr, dayBaselineMinutes)}
                 onDragLeave={handleDragLeaveDay}
                 onDrop={(e) => handleDropOnDay(e, dateStr, dayBaselineMinutes)}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', height: `${columnHeight}px`, minHeight: `${columnHeight}px` }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', minHeight: isMobilePortrait ? '100%' : `${columnHeight}px`, height: 'auto' }}
               >
 
                 {/* Interactive Preferences Overlays (Roentgen Matrix View) */}
@@ -5262,42 +5273,72 @@ export function ScheduleCalendarView({
 
                 {selectedRoomIdForXRay && getOtherRoomOccupancies(dateStr, selectedRoomIdForXRay).map((inv, idx) => {
                   const top = (inv.start - dayBaselineMinutes) * 2.5;
-                  const height = (inv.end - inv.start) * 2.5;
+                  const height = Math.max(32, (inv.end - inv.start) * 2.5);
+                  const roomObj = rooms.find(r => String(r.id) === String(selectedRoomIdForXRay));
+                  const roomName = roomObj?.name || 'Raum';
+                  const formatTimeStr = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+                  const startTimeStr = formatTimeStr(inv.start);
+                  const endTimeStr = formatTimeStr(inv.end);
+
+                  const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+                  const primaryColor = isCampus ? '#34a853' : '#ea4335';
+                  const bgGradient = isCampus 
+                    ? 'linear-gradient(135deg, rgba(230, 244, 234, 0.96) 0%, rgba(209, 250, 229, 0.96) 100%)'
+                    : 'linear-gradient(135deg, rgba(254, 242, 242, 0.96) 0%, rgba(254, 226, 226, 0.96) 100%)';
+                  const borderColor = primaryColor;
+
                   return (
                     <div
-                      key={`xray-${idx}`}
+                      key={`xray-booking-${idx}`}
                       style={{
                         position: 'absolute',
-                        left: 0,
-                        right: 0,
+                        left: '6px',
+                        right: '6px',
                         top: `${top}px`,
                         height: `${height}px`,
-                        background: 'repeating-linear-gradient(-45deg, rgba(148, 163, 184, 0.12) 0px, rgba(148, 163, 184, 0.12) 8px, transparent 8px, transparent 16px)',
-                        border: '1.5px dashed rgba(148, 163, 184, 0.4)',
-                        borderRadius: '8px',
-                        zIndex: 1,
-                        pointerEvents: 'none',
+                        background: bgGradient,
+                        border: `2px solid ${borderColor}`,
+                        borderRadius: '10px',
+                        zIndex: 20,
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06)',
                         display: 'flex',
-                        alignItems: 'center',
+                        flexDirection: 'column',
                         justifyContent: 'center',
-                        boxSizing: 'border-box'
+                        padding: '4px 10px',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        pointerEvents: 'auto',
+                        transition: 'all 0.2s ease'
                       }}
                     >
-                      <span style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        color: '#475569',
-                        background: 'rgba(255, 255, 255, 0.95)',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(148, 163, 184, 0.3)',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}>
-                        🔒 Besetzt
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                          <span style={{ 
+                            fontSize: '0.68rem', 
+                            fontWeight: 900, 
+                            color: primaryColor, 
+                            background: 'white', 
+                            padding: '1px 6px', 
+                            borderRadius: '5px',
+                            border: `1px solid ${primaryColor}40`,
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            🔒 Besetzt • {roomName}
+                          </span>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {inv.title || inv.teacherName || 'Raumbuchung'}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', whiteSpace: 'nowrap' }}>
+                          {startTimeStr} - {endTimeStr}
+                        </span>
+                      </div>
+                      {height > 44 && inv.teacherName && (
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', marginTop: '2px' }}>
+                          👤 {inv.teacherName}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -5680,8 +5721,8 @@ export function ScheduleCalendarView({
                   const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
                   const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
                   const displayNames = isGroup 
-                    ? occurrencesInGroup.map(o => `${o.student?.first_name || o.student_first_name || o.first_name || ''} ${maskLastName(o.student?.last_name || o.student_last_name || o.last_name || '', showRealNames)}`.trim()).filter(Boolean).join(' & ')
-                    : (occ.student_id === 'vacant' ? 'Freier Platz' : (`${fn} ${maskLastName(ln, showRealNames)}`.trim() || occ.name || occ.student_name || 'Unbekannt'));
+                    ? formatGroupStudentsAnonymized(occurrencesInGroup, !showRealNames)
+                    : (occ.student_id === 'vacant' ? 'Freier Platz' : (formatSingleStudentAnonymized(fn, ln, occ.id, !showRealNames) || occ.name || occ.student_name || 'Unbekannt'));
 
                   const isGroupLesson = isGroup || Boolean(displayNames && (displayNames.includes('&') || displayNames.includes(' & ')));
 
@@ -5950,8 +5991,8 @@ export function ScheduleCalendarView({
                           cursor: (isSick || isCancelled) ? 'pointer' : (isVacant || isBreak) ? 'pointer' : 'grab',
                           opacity: draggedId 
                              ? (draggedId === occ.id ? 0.25 : 0.6) 
-                             : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
-                          filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
+                             : (selectedRoomIdForXRay ? 0.20 : 1),
+                          filter: selectedRoomIdForXRay ? 'grayscale(50%) contrast(80%)' : 'none',
                           position: 'absolute',
                           top: `${topPx}px`,
                           left: (isCancelled || isSick) ? 'calc(0% + 8px)' : `calc(${layout?.left || 0}% + 8px)`,
@@ -5992,16 +6033,15 @@ export function ScheduleCalendarView({
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flexShrink: 0 }}>
                                     <span style={{ 
-                                      fontSize: '0.65rem', 
+                                      fontSize: '0.68rem', 
                                       fontWeight: 800, 
                                       color: finalColors.text, 
-                                      background: 'rgba(0,0,0,0.04)', 
-                                      padding: '1px 4px', 
-                                      borderRadius: '3px',
+                                      background: 'transparent', 
+                                      padding: 0, 
                                       whiteSpace: 'nowrap',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '2px',
+                                      gap: '3px',
                                       flexShrink: 0
                                     }}>
                                       <input
@@ -6021,7 +6061,7 @@ export function ScheduleCalendarView({
                                         style={{
                                           background: 'transparent',
                                           border: 'none',
-                                          fontSize: '0.65rem',
+                                          fontSize: '0.68rem',
                                           fontWeight: 800,
                                           color: finalColors.text,
                                           outline: 'none',
@@ -6062,15 +6102,19 @@ export function ScheduleCalendarView({
                                         return rName ? (
                                            <span style={{ 
                                              fontWeight: isRoomChanged ? 800 : 600, 
-                                             color: isRoomChanged ? '#7c3aed' : '#64748b',
+                                             color: isRoomChanged ? '#7c3aed' : finalColors.text,
+                                             opacity: isRoomChanged ? 1 : 0.75,
                                              background: isRoomChanged ? '#f3e8ff' : 'transparent',
                                              border: isRoomChanged ? '1px solid #ddd6fe' : 'none',
-                                             padding: isRoomChanged ? '0.5px 4px' : '0',
+                                             padding: isRoomChanged ? '0.5px 5px' : '0',
                                              borderRadius: isRoomChanged ? '4px' : '0',
                                              fontSize: '0.62rem', 
-                                             whiteSpace: 'nowrap' 
+                                             whiteSpace: 'nowrap',
+                                             display: 'inline-flex',
+                                             alignItems: 'center',
+                                             gap: '2px'
                                            }} title={isRoomChanged ? `Raum geändert zu ${rName}` : undefined}>
-                                             ({rName})
+                                             • {rName}
                                            </span>
                                         ) : null;
                                       })()}
@@ -6213,10 +6257,7 @@ export function ScheduleCalendarView({
                                     textOverflow: 'ellipsis'
                                   }}>
                                     {isGroup 
-                                      ? (isGruppenunterricht
-                                          ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join(' & ')
-                                          : (occurrencesInGroup[0]?.student ? `${occurrencesInGroup[0].student.first_name} ${maskLastName(occurrencesInGroup[0].student.last_name, showRealNames)} (${occurrencesInGroup.length})` : `${occurrencesInGroup.length} Schüler`)
-                                        ) 
+                                      ? formatGroupStudentsAnonymized(occurrencesInGroup, !showRealNames)
                                       : (isBreak ? 'Pause' : displayNames)
                                     }
                                   </span>
@@ -6301,8 +6342,8 @@ export function ScheduleCalendarView({
                                         const roomId = occ.schedules?.room_id;
                                         const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
                                         return rName ? (
-                                          <span style={{ marginLeft: '3px', fontWeight: 600, opacity: 0.7, fontSize: '0.65rem' }}>
-                                            ({rName})
+                                          <span style={{ fontWeight: 600, opacity: 0.75, fontSize: '0.65rem' }}>
+                                            • {rName}
                                           </span>
                                         ) : null;
                                       })()}
@@ -6454,15 +6495,14 @@ return (
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ 
-                                    fontSize: '0.75rem', 
+                                    fontSize: '0.78rem', 
                                     fontWeight: 800, 
                                     color: finalColors.text, 
-                                    background: 'rgba(0,0,0,0.05)', 
-                                    padding: '2px 6px', 
-                                    borderRadius: '5px',
+                                    background: 'transparent', 
+                                    padding: 0,
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '2px'
+                                    gap: '3px'
                                   }}>
                                     <input
                                       type="time"
@@ -6481,7 +6521,7 @@ return (
                                       style={{
                                         background: 'transparent',
                                         border: 'none',
-                                        fontSize: '0.75rem',
+                                        fontSize: '0.78rem',
                                         fontWeight: 800,
                                         color: finalColors.text,
                                         outline: 'none',
@@ -6496,8 +6536,8 @@ return (
                                       const roomId = occ.schedules?.room_id;
                                       const rName = roomId ? rooms.find(r => r.id === roomId)?.name : (occ.schedules?.room?.name || '');
                                       return rName ? (
-                                        <span style={{ marginLeft: '4px', fontWeight: 600, opacity: 0.7, fontSize: '0.68rem' }}>
-                                          ({rName})
+                                        <span style={{ fontWeight: 600, opacity: 0.75, fontSize: '0.7rem' }}>
+                                          • {rName}
                                         </span>
                                       ) : null;
                                     })()}
@@ -6602,7 +6642,7 @@ return (
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayNames}</span>
                                   </div>
                                   <div style={{ fontSize: '0.65rem', fontWeight: 600, color: finalColors.text, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                    Gruppenunterricht ({occurrencesInGroup.length > 1 ? occurrencesInGroup.length : 2} Schüler)
+                                    {isGruppenunterricht ? getGroupTypeLabel(occurrencesInGroup.length, true) : getGroupTypeLabel(occurrencesInGroup.length, false, (occurrencesInGroup[0] as any)?.ensemble_name)} ({occurrencesInGroup.length > 1 ? occurrencesInGroup.length : 2} Schüler)
                                   </div>
                                 </div>
                               ) : (
@@ -6704,7 +6744,7 @@ return (
           }
 
           return (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 10500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ 
                 position: 'relative',
                 background: '#ffffff', 
@@ -6815,12 +6855,18 @@ return (
         const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim() : 'Schüler';
         const isPastDate = editOccState?.date ? new Date(editOccState.date) < new Date(new Date().setHours(0,0,0,0)) : false;
         
+        const modalGroupLabel = isGruppenunterrichtOcc 
+          ? getGroupTypeLabel(uniqueGroupOccs.length, true)
+          : isEnsembleOcc 
+            ? getGroupTypeLabel(uniqueGroupOccs.length, false, (occ as any)?.ensemble_name || (occ as any)?.group_name)
+            : '';
+
+        const modalGroupStudents = formatGroupStudentsAnonymized(uniqueGroupOccs, !showRealNames);
+
         const modalTitle = occ?.student_id 
-          ? (isGruppenunterrichtOcc 
-              ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name, showRealNames)}`.trim()).join(' & ')
-              : isEnsembleOcc 
-                ? 'Ensemble/Band Termin' 
-                : `Termin bearbeiten: ${studentName}`
+          ? (isGroupOcc
+              ? `${modalGroupLabel}: ${modalGroupStudents}`
+              : `Termin bearbeiten: ${studentName}`
             ) 
           : 'Pause bearbeiten';
 
@@ -6844,8 +6890,10 @@ return (
         const endMin = startMin + (editOccState.duration || 30);
         const endTimeStr = minutesToTime(endMin);
 
+        const isInsideSim = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, [class*="sim-viewport"]');
+
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch' }}>
+          <div style={{ position: isInsideSim ? 'absolute' : 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 10500, display: 'flex', justifyContent: 'flex-end', alignItems: 'stretch', width: '100%', maxWidth: '100%', overflowX: 'hidden', boxSizing: 'border-box' }}>
             <style>{`
               @keyframes slideIn {
                 from { transform: translateX(100%); }
@@ -6884,26 +6932,101 @@ return (
                 display: none;
               }
 
-              @media (max-width: 1023px) {
+              @media (max-width: 1024px) {
                 .drawer-content-grid {
                   flex-wrap: wrap !important;
                   overflow-y: auto !important;
+                  padding-left: 16px !important;
+                  padding-right: 16px !important;
+                  padding-bottom: calc(140px + env(safe-area-inset-bottom, 20px)) !important;
+                  box-sizing: border-box !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
                 }
                 .drawer-col {
                   height: auto !important;
+                  padding-bottom: 20px !important;
+                  min-width: 0 !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  box-sizing: border-box !important;
                 }
                 .drawer-col-1 {
-                  max-width: none !important;
+                  max-width: 100% !important;
+                  min-width: 0 !important;
+                  width: 100% !important;
                   flex: 1 1 100% !important;
+                  box-sizing: border-box !important;
                 }
                 .drawer-col-2 {
-                  max-width: none !important;
+                  max-width: 100% !important;
+                  min-width: 0 !important;
+                  width: 100% !important;
                   flex: 1 1 100% !important;
                   border-left: none !important;
                   padding-left: 0 !important;
                   border-top: 1px solid #e5e5ea;
                   padding-top: 24px;
+                  box-sizing: border-box !important;
                 }
+                .drawer-col-3 {
+                  max-width: 100% !important;
+                  min-width: 0 !important;
+                  width: 100% !important;
+                  box-sizing: border-box !important;
+                }
+              }
+
+              [class*="sim-viewport"] .drawer-content-grid,
+              .sim-viewport-mobile .drawer-content-grid,
+              .sim-viewport-portrait .drawer-content-grid,
+              .sim-viewport-tablet .drawer-content-grid {
+                flex-wrap: wrap !important;
+                overflow-y: auto !important;
+                padding-left: 16px !important;
+                padding-right: 16px !important;
+                padding-bottom: calc(140px + env(safe-area-inset-bottom, 20px)) !important;
+                box-sizing: border-box !important;
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+
+              [class*="sim-viewport"] .drawer-col,
+              .sim-viewport-mobile .drawer-col,
+              .sim-viewport-portrait .drawer-col,
+              .sim-viewport-tablet .drawer-col {
+                height: auto !important;
+                padding-bottom: 20px !important;
+                min-width: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+              }
+
+              [class*="sim-viewport"] .drawer-col-1,
+              .sim-viewport-mobile .drawer-col-1,
+              .sim-viewport-portrait .drawer-col-1,
+              .sim-viewport-tablet .drawer-col-1 {
+                max-width: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
+                flex: 1 1 100% !important;
+                box-sizing: border-box !important;
+              }
+
+              [class*="sim-viewport"] .drawer-col-2,
+              .sim-viewport-mobile .drawer-col-2,
+              .sim-viewport-portrait .drawer-col-2,
+              .sim-viewport-tablet .drawer-col-2 {
+                max-width: 100% !important;
+                min-width: 0 !important;
+                width: 100% !important;
+                flex: 1 1 100% !important;
+                border-left: none !important;
+                padding-left: 0 !important;
+                border-top: 1px solid #e5e5ea;
+                padding-top: 24px;
+                box-sizing: border-box !important;
               }
 
               .drawer-container {
@@ -6925,11 +7048,33 @@ return (
                 width: 1080px;
               }
 
-              @media (max-width: 1023px) {
+              @media (max-width: 1024px) {
                 .drawer-container {
-                  width: 100vw !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  height: 100% !important;
+                  min-height: 100% !important;
+                  max-height: 100% !important;
                   border-radius: 0 !important;
+                  overflow-y: auto !important;
+                  -webkit-overflow-scrolling: touch !important;
+                  box-sizing: border-box !important;
                 }
+              }
+
+              [class*="sim-viewport"] .drawer-container,
+              .sim-viewport-mobile .drawer-container,
+              .sim-viewport-portrait .drawer-container,
+              .sim-viewport-tablet .drawer-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                min-height: 100% !important;
+                max-height: 100% !important;
+                border-radius: 0 !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                box-sizing: border-box !important;
               }
 
               @media (max-width: 680px) {
@@ -6952,55 +7097,29 @@ return (
                 background: isEnsembleOcc 
                   ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
                   : 'linear-gradient(135deg, #34a853 0%, #2e964b 100%)', 
-                padding: '18px 24px', 
+                padding: '16px 20px', 
                 display: 'flex', 
+                flexDirection: isMobilePortrait ? 'column' : 'row',
                 justifyContent: 'space-between', 
-                alignItems: 'center', 
+                alignItems: isMobilePortrait ? 'flex-start' : 'center', 
+                gap: '12px',
                 color: '#ffffff',
                 borderBottom: '1px solid rgba(0,0,0,0.05)',
                 borderTopLeftRadius: '23px',
                 borderTopRightRadius: '0px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '1.5rem' }}>💬</span>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
-                      {modalTitle}
-                    </h3>
-                    <p style={{ margin: '3px 0 0 0', fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
-                      Termin am {formattedDateLabel} um {formattedTimeLabel} Uhr
-                    </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <MessageSquare size={20} color="#ffffff" style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {modalTitle}
+                      </h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
+                        Termin am {formattedDateLabel} um {formattedTimeLabel} Uhr
+                      </p>
+                    </div>
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {/* Prominent Header Action: Aufgabenheft & Tools */}
-                  {occ && occ.student && (
-                    <button
-                      type="button"
-                      onClick={() => setDocStudent(occ.student)}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.22)',
-                        color: '#ffffff',
-                        border: '1px solid rgba(255, 255, 255, 0.4)',
-                        borderRadius: '12px',
-                        padding: '8px 14px',
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '7px',
-                        backdropFilter: 'blur(8px)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                        transition: 'all 0.2s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <span>📝</span>
-                      <span>Aufgabenheft & Tools</span>
-                    </button>
-                  )}
 
                   {/* Close Button Top Right */}
                   <button
@@ -7018,7 +7137,8 @@ return (
                       cursor: 'pointer',
                       color: '#ffffff',
                       transition: 'all 0.2s',
-                      zIndex: 10
+                      zIndex: 10,
+                      flexShrink: 0
                     }}
                     onMouseOver={e => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.35)';
@@ -7030,12 +7150,114 @@ return (
                     <X size={18} strokeWidth={2.5} />
                   </button>
                 </div>
+
+                {/* Header Action: Aufgabenheft & Tools */}
+                {occ && occ.student && (
+                  <button
+                    type="button"
+                    onClick={() => setDocStudent(occ.student)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.22)',
+                      color: '#ffffff',
+                      border: '1px solid rgba(255, 255, 255, 0.4)',
+                      borderRadius: '12px',
+                      padding: '8px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '7px',
+                      backdropFilter: 'blur(8px)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      transition: 'all 0.2s ease',
+                      width: isMobilePortrait ? '100%' : 'auto'
+                    }}
+                    className="hover-scale"
+                  >
+                    <BookOpen size={14} color="#ffffff" />
+                    <span>Aufgabenheft & Tools</span>
+                  </button>
+                )}
               </div>
 
-              {/* Modal Inner Content Body (2 Columns) */}
-              <div className="drawer-content-grid">
+              {/* Mobile 2-Card Segmented Switcher Bar */}
+              {isMobilePortrait && (
+                <div style={{
+                  background: '#f8fafc',
+                  padding: '8px 16px',
+                  display: 'flex',
+                  gap: '8px',
+                  borderBottom: '1px solid #e2e8f0',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalCardIndex(0)}
+                    style={{
+                      flex: 1,
+                      padding: '9px 12px',
+                      borderRadius: '12px',
+                      border: editModalCardIndex === 0 ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                      background: editModalCardIndex === 0 ? '#34a853' : '#ffffff',
+                      color: editModalCardIndex === 0 ? '#ffffff' : '#64748b',
+                      fontWeight: editModalCardIndex === 0 ? 800 : 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: editModalCardIndex === 0 ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
+                    }}
+                  >
+                    <Edit3 size={14} style={{ color: editModalCardIndex === 0 ? '#ffffff' : '#64748b' }} />
+                    <span>Termin bearbeiten</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalCardIndex(1)}
+                    style={{
+                      flex: 1,
+                      padding: '9px 12px',
+                      borderRadius: '12px',
+                      border: editModalCardIndex === 1 ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                      background: editModalCardIndex === 1 ? '#34a853' : '#ffffff',
+                      color: editModalCardIndex === 1 ? '#ffffff' : '#64748b',
+                      fontWeight: editModalCardIndex === 1 ? 800 : 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: editModalCardIndex === 1 ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
+                    }}
+                  >
+                    <MessageSquare size={14} style={{ color: editModalCardIndex === 1 ? '#ffffff' : '#64748b' }} />
+                    <span>1:1 Shoutbox</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Modal Inner Content Body (Swipecard / Carousel Grid) */}
+              <div 
+                className="drawer-content-grid"
+                onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+                onTouchEnd={(e) => {
+                  if (touchStartX === null) return;
+                  const deltaX = e.changedTouches[0].clientX - touchStartX;
+                  if (deltaX < -50) setEditModalCardIndex(1);
+                  if (deltaX > 50) setEditModalCardIndex(0);
+                  setTouchStartX(null);
+                }}
+              >
                 
-                {/* Column 1: Termin-Details, Mini-Profil & Pädagogik */}
+                {/* Card 1: Termin-Details, Mini-Profil & Pädagogik */}
+                {(!isMobilePortrait || editModalCardIndex === 0) && (
                 <div className="drawer-col drawer-col-1">
                   <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', marginBottom: '16px' }}>
                     
@@ -7530,9 +7752,10 @@ return (
                     </div>
                   </div>
                 </div>
+                )}
 
-                {/* Column 2: Termingekoppelte Shoutbox */}
-                {occ && occ.student_id && (() => {
+                {/* Column 2 / Card 2: Termingekoppelte Shoutbox */}
+                {(!isMobilePortrait || editModalCardIndex === 1) && occ && occ.student_id && (() => {
                   let isFrozen = false;
                   try {
                     const timePart = occ.start_time.includes(':') ? occ.start_time : `${occ.start_time}:00`;
@@ -7549,23 +7772,25 @@ return (
                         padding: '16px 20px',
                         color: '#ffffff',
                         display: 'flex',
-                        alignItems: 'center',
+                        flexDirection: isMobilePortrait ? 'column' : 'row',
+                        alignItems: isMobilePortrait ? 'flex-start' : 'center',
                         justifyContent: 'space-between',
+                        gap: '12px',
                         marginBottom: '16px',
                         boxShadow: '0 4px 14px rgba(52, 168, 83, 0.2)'
                       }}>
                         <div>
                           <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>💬</span>
+                            <MessageSquare size={18} color="#ffffff" />
                             <span>Termin-Shoutbox</span>
-                            {isFrozen && <span style={{ fontSize: '0.85rem' }}>🔒</span>}
+                            {isFrozen && <Lock size={14} color="#ffffff" />}
                           </h4>
                           <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
                             Termingekoppelte Direktnachrichten mit {occ.student?.first_name || 'Schüler'}
                           </p>
                         </div>
                         
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span style={{
                             padding: '4px 9px',
                             borderRadius: '8px',
@@ -7577,8 +7802,7 @@ return (
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            backdropFilter: 'blur(4px)',
-                            whiteSpace: 'nowrap'
+                            backdropFilter: 'blur(4px)'
                           }}>
                             <CalendarIcon size={11} color="#ffffff" />
                             <span>Termingekoppelt</span>
@@ -7594,8 +7818,7 @@ return (
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
-                            backdropFilter: 'blur(4px)',
-                            whiteSpace: 'nowrap'
+                            backdropFilter: 'blur(4px)'
                           }}>
                             <ShieldCheck size={12} color="#ffffff" />
                             <span>100% DSGVO-konform</span>
@@ -7632,7 +7855,8 @@ return (
                       >
                         {isFrozen && (
                           <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center', justifyContent: 'center' }}>
-                            🔒 Shoutbox nach 48h eingefroren (Schreibschutz aktiv)
+                            <Lock size={14} style={{ color: '#991b1b' }} />
+                            <span>Shoutbox nach 48h eingefroren (Schreibschutz aktiv)</span>
                           </div>
                         )}
                         {(() => {
@@ -7824,6 +8048,45 @@ return (
                   );
                 })()}
               </div>
+
+              {/* Mobile Carousel Bottom Page Indicator Dots */}
+              {isMobilePortrait && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 0 10px 0',
+                  background: '#ffffff',
+                  borderTop: '1px solid #f1f5f9',
+                  boxShadow: '0 -2px 10px rgba(0,0,0,0.02)'
+                }}>
+                  <div
+                    onClick={() => setEditModalCardIndex(0)}
+                    style={{
+                      width: editModalCardIndex === 0 ? '24px' : '8px',
+                      height: '8px',
+                      borderRadius: '4px',
+                      background: editModalCardIndex === 0 ? '#34a853' : '#cbd5e1',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                    title="Karte 1: Termin bearbeiten"
+                  />
+                  <div
+                    onClick={() => setEditModalCardIndex(1)}
+                    style={{
+                      width: editModalCardIndex === 1 ? '24px' : '8px',
+                      height: '8px',
+                      borderRadius: '4px',
+                      background: editModalCardIndex === 1 ? '#34a853' : '#cbd5e1',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                    title="Karte 2: 1:1 Shoutbox"
+                  />
+                </div>
+              )}
             </div>
             {docStudent && (
               <MeisterwerkDocumentationModal 
@@ -7843,7 +8106,7 @@ return (
       
       {/* Cancelled Lesson Swap Confirmation Dialog */}
       {swapConfirmState && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', zIndex: 10600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'white', padding: '24px', borderRadius: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', width: '480px', maxWidth: '90vw', border: '1px solid rgba(255,255,255,0.5)', boxSizing: 'border-box' }}>
             <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>
               Termintausch mit abgesagtem Termin
@@ -8445,6 +8708,168 @@ return (
           >
             Beenden
           </button>
+        </div>
+      </div>
+    )}
+
+    {/* Mobile Tools Action Sheet Modal */}
+    {showMobileToolsSheet && (
+      <div 
+        style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          background: 'rgba(15, 23, 42, 0.6)', 
+          backdropFilter: 'blur(8px)', 
+          zIndex: 99999, 
+          display: 'flex', 
+          alignItems: 'flex-end', 
+          justifyContent: 'center' 
+        }}
+        onClick={() => setShowMobileToolsSheet(false)}
+      >
+        <div 
+          style={{ 
+            background: '#ffffff', 
+            width: '100%', 
+            maxWidth: '480px', 
+            borderTopLeftRadius: '28px', 
+            borderTopRightRadius: '28px', 
+            padding: '24px 20px 32px 20px', 
+            boxShadow: '0 -10px 40px rgba(0,0,0,0.2)', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '20px',
+            boxSizing: 'border-box'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Settings size={20} color="#34a853" />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>⚙️ Werkzeuge & Optionen</h3>
+            </div>
+            <button 
+              onClick={() => setShowMobileToolsSheet(false)}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Section 1: Ansicht & Namen */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>👁️ Ansicht & Raster</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                onClick={() => { toggleRealNames(); setShowMobileToolsSheet(false); }}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: showRealNames ? '#fef2f2' : '#f8fafc', color: showRealNames ? '#ea4335' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              >
+                {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
+                <span>{showRealNames ? 'Vorname N.' : 'Klarnamen'}</span>
+              </button>
+
+              <button
+                onClick={() => { setShowWeekend(prev => !prev); setShowMobileToolsSheet(false); }}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: isWeekendVisible ? '#e6f4ea' : '#f8fafc', color: isWeekendVisible ? '#34a853' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              >
+                <CalendarIcon size={16} />
+                <span>{isWeekendVisible ? 'Wochenende aus' : 'Wochenende ein'}</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '14px', border: '1px solid #cbd5e1', background: '#f8fafc' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Raster-Auflösung:</span>
+              <select
+                value={gridSnapMinutes}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setGridSnapMinutes(val);
+                  localStorage.setItem('groovelab_grid_snap_minutes', String(val));
+                  setShowMobileToolsSheet(false);
+                }}
+                style={{ border: 'none', background: 'transparent', fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value={15}>15 Min</option>
+                <option value={30}>30 Min</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Section 2: Röntgen-Ansicht (Raumbelegung) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🔍 Röntgen-Ansicht (Raum wählen)</span>
+            <select
+              value={selectedRoomIdForXRay || ''}
+              onChange={(e) => { setSelectedRoomIdForXRay(e.target.value || null); setShowMobileToolsSheet(false); }}
+              style={{ padding: '12px', borderRadius: '14px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', width: '100%' }}
+            >
+              <option value="">Alle Räume anzeigen</option>
+              {rooms.map(r => (
+                <option key={r.id} value={r.id}>Raum: {r.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Section 3: Vertretung & Gruppen */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>👥 Vertretung & Gruppen</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                onClick={() => {
+                  const nextActive = !isSubModeActive;
+                  setIsSubModeActive(nextActive);
+                  if (!nextActive) setSelectedSubOccIds(new Set());
+                  setShowMobileToolsSheet(false);
+                }}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #c7d2fe', background: isSubModeActive ? '#e0e7ff' : '#f8fafc', color: isSubModeActive ? '#4f46e5' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              >
+                <UserCheck size={16} />
+                <span>Vertretung</span>
+              </button>
+
+              <button
+                onClick={() => { setIsGroupModeActive(prev => !prev); setShowMobileToolsSheet(false); }}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #bfdbfe', background: isGroupModeActive ? '#eff6ff' : '#f8fafc', color: isGroupModeActive ? '#2563eb' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              >
+                <Users size={16} />
+                <span>Gruppenunterricht</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section 4: Kopieren & Verwalten */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📋 Aktionen & Vorlagen</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                onClick={() => { handleCopyWeek(); setShowMobileToolsSheet(false); }}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              >
+                <Copy size={16} />
+                <span>Woche kopieren</span>
+              </button>
+              
+              <button
+                onClick={() => { handlePasteWeek(); setShowMobileToolsSheet(false); }}
+                disabled={!localStorage.getItem('groovelab_copied_week_data')}
+                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5, cursor: 'pointer' }}
+              >
+                <Clipboard size={16} />
+                <span>Woche einfügen</span>
+              </button>
+            </div>
+
+            <button
+              onClick={() => { handleResetWeek(); setShowMobileToolsSheet(false); }}
+              style={{ padding: '12px', borderRadius: '14px', border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', marginTop: '4px', cursor: 'pointer' }}
+            >
+              <Trash2 size={16} />
+              <span>Ungespeicherte Änderungen zurücksetzen</span>
+            </button>
+          </div>
         </div>
       </div>
     )}

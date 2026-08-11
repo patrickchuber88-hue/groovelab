@@ -611,7 +611,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       onProgress(pct, `Phase 3 von 4: Grandmaster Ring-Tausch (${iteration}/${RUN_ITERATIONS})...`);
       await new Promise(resolve => setTimeout(resolve, 0));
     }
-    let currentBoards: DayBoard[] = boards.map(b => {
+    const currentBoards: DayBoard[] = boards.map(b => {
       const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
       return {
         ...b,
@@ -1024,7 +1024,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       let stage15Runs = 0;
 
       for (let rIter = 0; rIter < 250; rIter++) {
-        let currentBoards: DayBoard[] = boards.map(b => {
+        const currentBoards: DayBoard[] = boards.map(b => {
           const dayConfig = (teacherAvailability as any)[b.dayOfWeek];
           return {
             ...b,
@@ -1053,7 +1053,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
                   const [bh, bm] = parseTime(board.startAnchor);
                   const boardStartMin = bh * 60 + bm;
                   const [beh, bem] = parseTime(board.availabilityEnd || '23:59');
-                  let boardEndMin = beh * 60 + bem;
+                  const boardEndMin = beh * 60 + bem;
 
                   const searchStartMin = Math.max(boardStartMin, prefStartMin - 30);
                   const searchEndMin = Math.min(boardEndMin, prefEndMin + 30);
@@ -1205,7 +1205,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
         }
 
         // STAGE 14: GRANDMASTER SWAP RESCUE
-        let missingStudents = [];
+        const missingStudents = [];
         let originalHits = 0;
         let originalScore = 0;
         let originalPlacedCount = 0;
@@ -1468,8 +1468,8 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
 
   // STUFE 12: NON-STAR SWAP OPTIMIZER (Convert 26/27 into 27/27 100% Wunschzeiten)
   if (bestWunschHits < wunschStudents.length) {
-    let testBoards = bestBoardsState.map(b => ({ ...b, students: [...b.students] }));
-    let testAssignedMap = { ...bestNewlyAssigned };
+    const testBoards = bestBoardsState.map(b => ({ ...b, students: [...b.students] }));
+    const testAssignedMap = { ...bestNewlyAssigned };
     
     // Find all students without a Wunschzeit star
     for (const board of testBoards) {
@@ -1554,7 +1554,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
 
   // STUFE 12B: GAP COMPACTOR & FLUSH ALIGNMENT PASS (Eliminate 15-min holes)
   bestBoardsState = bestBoardsState.map(board => {
-    let studs = [...board.students];
+    const studs = [...board.students];
     let changed = false;
 
     for (let i = 1; i < studs.length; i++) {
@@ -1747,7 +1747,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
   bestBoardsState = bestBoardsState.map(board => {
     if (!board.students || board.students.length <= 1) return board;
 
-    let modifiedStudents = [...board.students];
+    const modifiedStudents = [...board.students];
     let changed = false;
 
     for (let i = 1; i < modifiedStudents.length; i++) {

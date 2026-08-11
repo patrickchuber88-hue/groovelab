@@ -62,7 +62,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
     <div style={{ 
       position: 'fixed', 
       inset: 0, 
-      zIndex: 3000, 
+      zIndex: 10500, 
       background: 'rgba(15, 23, 42, 0.75)', 
       backdropFilter: 'blur(16px)', 
       display: 'flex', 
@@ -70,8 +70,34 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
       justifyContent: 'center', 
       padding: '20px' 
     }}>
+      <style>{`
+        @media (max-width: 1024px) {
+          .teacher-detail-panel {
+            max-width: 100vw !important;
+            width: 100vw !important;
+            max-height: 100dvh !important;
+            height: 100dvh !important;
+            border-radius: 0px !important;
+            box-sizing: border-box !important;
+            padding-bottom: calc(140px + env(safe-area-inset-bottom, 20px)) !important;
+          }
+        }
+        .sim-viewport-mobile .teacher-detail-panel,
+        .sim-viewport-portrait .teacher-detail-panel,
+        .sim-viewport-tablet .teacher-detail-panel {
+          max-width: 100% !important;
+          width: 100% !important;
+          max-height: 100dvh !important;
+          height: 100dvh !important;
+          border-radius: 0px !important;
+          box-sizing: border-box !important;
+          background: #ffffff !important;
+          overscroll-behavior: contain !important;
+          padding-bottom: calc(160px + env(safe-area-inset-bottom, 30px)) !important;
+        }
+      `}</style>
       <div 
-        className="glass-panel animation-slide-up" 
+        className="glass-panel teacher-detail-panel animation-slide-up" 
         style={{ 
           background: 'rgba(255, 255, 255, 0.95)', 
           backdropFilter: 'blur(20px)',

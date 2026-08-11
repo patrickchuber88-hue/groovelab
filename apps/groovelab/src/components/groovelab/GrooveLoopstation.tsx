@@ -486,6 +486,20 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
     setActiveSubTab('studio');
   };
+
+  const [isMobileView, setIsMobileView] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait');
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [playingSavedLoopUrl, setPlayingSavedLoopUrl] = useState<string | null>(null);
   const [selectedSavedLoop, setSelectedSavedLoop] = useState<any>(null);
   const savedLoopAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -1300,6 +1314,29 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     playClickSound(true);
   };
 
+  const scrollToTracksSection = () => {
+    const doScroll = () => {
+      const targetEl = document.getElementById('groovelab-controls-and-tracks') || document.getElementById('groovelab-tracks-section');
+      if (!targetEl) return;
+
+      try {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {}
+
+      const modalContainer = document.querySelector('.modal-content-container') || document.querySelector('.custom-scrollbar') || document.querySelector('.pwa-modal-drawer');
+      if (modalContainer) {
+        const modalRect = modalContainer.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const targetScrollTop = modalContainer.scrollTop + (targetRect.top - modalRect.top) - 12;
+        modalContainer.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+      }
+    };
+
+    doScroll();
+    setTimeout(doScroll, 80);
+    setTimeout(doScroll, 250);
+  };
+
   const startAutoSequence = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
@@ -1324,6 +1361,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     }
 
     setIsAutoSequenceActive(true);
+    scrollToTracksSection();
     isAutoSequenceActiveRef.current = true;
     setAutoSequenceStatus('WARTE AUF MIKROFON...');
     try {
@@ -2501,7 +2539,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         return;
       }
 
-      let finalLabel = inputLabel.trim() || baseName;
+      const finalLabel = inputLabel.trim() || baseName;
       let checkName = finalLabel;
       let finalCounter = 2;
       while (existingLabels.includes(checkName)) {
@@ -2605,7 +2643,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         return;
       }
 
-      let finalLabel = inputLabel.trim() || baseName;
+      const finalLabel = inputLabel.trim() || baseName;
       let checkName = finalLabel;
       let finalCounter = 2;
       while (existingLabels.includes(checkName)) {
@@ -2784,11 +2822,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
       borderTop: '1px solid #e2e8f0',
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
-      minHeight: '520px',
+      minHeight: isMobileView ? 'auto' : '520px',
       color: '#1d1d1f',
-      padding: '24px 28px',
+      padding: isMobileView ? '16px 16px calc(240px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 28px',
       gap: '20px',
       boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.03)',
+      boxSizing: 'border-box',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     }}>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -2933,7 +2972,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         padding: '3px',
         width: '100%',
         maxWidth: '560px',
-        marginBottom: '20px'
+        marginBottom: '20px',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none'
       }}>
         <button
           type="button"
@@ -3220,16 +3262,16 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         </div>
       ) : (
 
-      <div style={{ display: 'flex', gap: '20px', flex: 1, width: '100%' }} className="flex-col md:flex-row items-center md:items-start">
+      <div style={{ display: 'flex', flexDirection: isMobileView ? 'column' : 'row', gap: '20px', flex: 1, width: '100%', alignItems: isMobileView ? 'center' : 'flex-start' }}>
       <div style={{
-        flex: '1 1 0%',
+        flex: isMobileView ? 'none' : '1 1 0%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'flex-start',
         gap: '20px',
         width: '100%',
-        maxWidth: '300px'
+        maxWidth: isMobileView ? '100%' : '300px'
       }}>
         <div style={{
           width: '300px',
@@ -3590,6 +3632,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 if (activeSubTab === 'saved') {
                   if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url);
                 } else {
+                  scrollToTracksSection();
                   if (isPlaying) {
                     stopAll();
                   } else {
@@ -3875,8 +3918,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         )}
       </div>
 
-      <div style={{
-        flex: '1.2 1 0%',
+      <div id="groovelab-tracks-section" style={{
+        flex: isMobileView ? 'none' : '1.2 1 0%',
+        width: '100%',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
@@ -4001,7 +4045,14 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
               cursor: pointer;
             }
           `}</style>
-          <div style={{ display: 'flex', gap: '12px', width: '100%', alignItems: 'center' }}>
+          <div id="groovelab-controls-and-tracks" style={{
+            display: 'flex',
+            flexWrap: isMobileView ? 'wrap' : 'nowrap',
+            gap: '8px',
+            width: '100%',
+            alignItems: 'center',
+            boxSizing: 'border-box'
+          }} className="loopstation-top-controls">
             <div
               onClick={() => {
                 if (!isAutoSequenceActive) {
@@ -4010,21 +4061,23 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
                 }
               }}
               style={{
-                flex: 1.3,
+                flex: isMobileView ? '1 1 calc(50% - 4px)' : 1.3,
+                minWidth: isMobileView ? '130px' : 'auto',
+                boxSizing: 'border-box',
                 background: useHeadphones ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#ffffff',
                 border: useHeadphones ? '1.5px solid #34a853' : '1.5px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '12px',
-                padding: '8px 12px',
+                padding: '8px 10px',
                 cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '8px',
+                gap: '6px',
                 transition: 'all 0.25s ease',
                 opacity: isAutoSequenceActive ? 0.6 : 1
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Headphones size={13} style={{ color: useHeadphones ? '#2e7d32' : '#86868b' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#2e7d32' : '#1d1d1f' }}>
@@ -4059,14 +4112,16 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             </div>
 
             <div style={{
-              flex: 1,
+              flex: isMobileView ? '1 1 calc(50% - 4px)' : 1,
+              minWidth: isMobileView ? '120px' : 'auto',
+              boxSizing: 'border-box',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               background: '#ffffff',
               border: '1.5px solid rgba(0, 0, 0, 0.08)',
               borderRadius: '12px',
-              padding: '8px 12px'
+              padding: '8px 10px'
             }}>
               <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#55555d' }}>
                 Spuren:
@@ -4099,7 +4154,9 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
             <div
               onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
               style={{
-                flex: 1.5,
+                flex: isMobileView ? '1 1 100%' : 1.5,
+                width: isMobileView ? '100%' : 'auto',
+                boxSizing: 'border-box',
                 background: showAdvancedSettings ? 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)' : '#ffffff',
                 border: showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '12px',

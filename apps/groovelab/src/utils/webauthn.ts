@@ -262,7 +262,7 @@ export const authenticateUserBiometrics = async (
     throw new Error('Kein biometrisches Profil auf diesem Gerät registriert.');
   }
 
-  let selectedProfile = targetUserId
+  const selectedProfile = targetUserId
     ? profiles.find((p) => p.userId === targetUserId)
     : profiles[profiles.length - 1]; // Default to most recently added profile
 

@@ -1,0 +1,9 @@
+# Campus-Groovelab Security & Vulnerability Disclosure Policy
+# RFC 9116 Compliant Security Contact Information
+
+Contact: mailto:security@campus-groovelab.de
+Canonical: https://campus-groovelab.de/.well-known/security.txt
+Preferred-Languages: de, en
+Policy: https://campus-groovelab.de/security
+Expires: 2027-12-31T23:59:59.000Z
+Encryption: https://campus-groovelab.de/pgp-key.txt

@@ -100,22 +100,27 @@ export const PricingTransparencyWidget: React.FC<PricingTransparencyWidgetProps>
         </div>
       </div>
 
-      {/* Protection Note */}
-      <div style={{
-        background: '#eff6ff',
-        border: '1px solid #bfdbfe',
-        borderRadius: '12px',
-        padding: '10px 14px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        fontSize: '0.75rem',
-        color: '#1e40af'
-      }}>
-        <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
-        <span>
-          Volle Kostenkontrolle: Schülerinaktivierungen verursachen keine unerwarteten Kosten für schlafende Konten in der Datenbank.
-        </span>
+      {/* Protection & Legal Note */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontSize: '0.75rem',
+          color: '#1e40af'
+        }}>
+          <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
+          <span>
+            Volle Kostenkontrolle: Schülerinaktivierungen verursachen keine unerwarteten Kosten für schlafende Konten in der Datenbank.
+          </span>
+        </div>
+        <div style={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', fontStyle: 'italic', fontWeight: 600 }}>
+          Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+        </div>
       </div>
     </div>
   );

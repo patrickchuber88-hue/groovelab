@@ -22,6 +22,8 @@ import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl } from './StudioAvatar';
 import { QRCodeModal } from './QRCodeModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { DpoIdCardModal } from './DpoIdCardModal';
+import { DpoAuditPortal } from './DpoAuditPortal';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
@@ -1166,6 +1168,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   const [showAgb, setShowAgb] = useState<boolean>(false);
   const [showPrivacy, setShowPrivacy] = useState<boolean>(false);
+  const [showDpoIdCardModal, setShowDpoIdCardModal] = useState<boolean>(false);
+  const [showDpoPortalModal, setShowDpoPortalModal] = useState<boolean>(false);
 
   // Operator Billing Info States (Loaded from MasterAdmin Settings)
   const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
@@ -11374,7 +11378,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         if (!roomMap) continue;
         const rawPlanned = tu.planned_boards || (tu as any).campus_räume || (tu as any).groovelab_räume;
         if (rawPlanned && typeof rawPlanned === 'object') {
-          let updatedPlanned = { ...rawPlanned, status: 'approved' };
+          const updatedPlanned = { ...rawPlanned, status: 'approved' };
           if (Array.isArray((rawPlanned as any).drafts)) {
             updatedPlanned.drafts = (rawPlanned as any).drafts.map((d: any) => ({
               ...d,
@@ -11427,10 +11431,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           if (!student_id || !day_of_week || !time_slot) return;
           const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
 
-          let current = new Date(today);
+          const current = new Date(today);
           const currentDay = current.getDay() || 7;
           const diff = dayNum - currentDay;
-          let targetDate = new Date(current);
+          const targetDate = new Date(current);
           targetDate.setDate(current.getDate() + diff);
 
           if (targetDate < today) {
@@ -21616,7 +21620,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                         });
 
                         // Filter by search query
-                        let filteredTeachers = Object.entries(grouped).filter(([tId, data]) => {
+                        const filteredTeachers = Object.entries(grouped).filter(([tId, data]) => {
                           const matchesSearch = data.teacherName.toLowerCase().includes(sidebarTeacherSearch.toLowerCase().trim());
                           return matchesSearch;
                         });
@@ -29874,6 +29878,106 @@ status: status,
                       </div>
                     </div>
 
+                    {/* Städtischer DSB-Prüfausweis & Audit-Portal (Art. 38 DSGVO) */}
+                    <div style={{
+                      background: 'linear-gradient(135deg, #ffffff 0%, #f4fbf7 100%)',
+                      border: '1.5px solid #a7f3d0',
+                      borderRadius: '20px',
+                      padding: '24px',
+                      color: '#0f172a',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '16px',
+                      boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '14px',
+                          background: '#34a853',
+                          border: '1.5px solid #34a853',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)'
+                        }}>
+                          <ShieldCheck size={28} />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                              🪪 DSB-Prüfausweis (Art. 38 DSGVO)
+                            </h4>
+                            <span style={{ background: '#e6f4ea', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 800 }}>
+                              E-Mail-Frei
+                            </span>
+                          </div>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#475569', fontWeight: 500 }}>
+                            Offizieller QR-Prüfausweis für den städtischen Datenschutzbeauftragten (Read-Only WORM Audit-Logs).
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowDpoPortalModal(true)}
+                          style={{
+                            background: '#ffffff',
+                            border: '1.5px solid #cbd5e1',
+                            color: '#334155',
+                            padding: '10px 18px',
+                            borderRadius: '12px',
+                            fontWeight: 750,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#f8fafc';
+                            e.currentTarget.style.borderColor = '#94a3b8';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#ffffff';
+                            e.currentTarget.style.borderColor = '#cbd5e1';
+                          }}
+                        >
+                          <Eye size={16} /> Audit-Portal testen
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDpoIdCardModal(true)}
+                          style={{
+                            background: '#34a853',
+                            color: '#ffffff',
+                            border: 'none',
+                            padding: '10px 20px',
+                            borderRadius: '12px',
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          <Printer size={16} /> DSB-Ausweis erstellen
+                        </button>
+                      </div>
+                    </div>
+
                     {/* AV-Vertrag Statusbereich */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       {/* Schule AVV */}
@@ -32286,14 +32390,14 @@ status: status,
                 }
                 try {
                   await supabase.from('activation_days').delete().eq('student_id', s.id);
-                  let userResetPayload: any = { 
+                  const userResetPayload: any = { 
                     onboarding_pin: null, 
                     personal_pin: null,
                     parent_pin: null,
                     is_pin_activated: false,
                     status: 'offen' 
                   };
-                  let { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', s.id);
+                  const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', s.id);
                   if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
                     delete userResetPayload.onboarding_pin;
                     await supabase.from('users').update(userResetPayload).eq('id', s.id);
@@ -32445,6 +32549,33 @@ status: status,
       )}
 
       <TourComponent />
+
+      {/* DPO ID Card Modal (Art. 38 DSGVO) */}
+      <DpoIdCardModal
+        isOpen={showDpoIdCardModal}
+        onClose={() => setShowDpoIdCardModal(false)}
+        schoolName={schoolName || 'Stadtmusikschule'}
+        schoolId={schoolId}
+      />
+
+      {/* DPO Audit Portal Modal */}
+      {showDpoPortalModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          background: '#ffffff',
+          overflowY: 'auto'
+        }}>
+          <DpoAuditPortal
+            onClose={() => setShowDpoPortalModal(false)}
+            schoolName={schoolName || 'Stadtmusikschule'}
+          />
+        </div>
+      )}
     </div>
   </div>
 );

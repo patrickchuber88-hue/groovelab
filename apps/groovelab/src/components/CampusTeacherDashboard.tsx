@@ -1293,7 +1293,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             if (student1Id) {
               triggerFallbackPush(
                 student1Id,
-                'Terminänderung freigeben? 📅',
+                'Terminänderung freigeben?',
                 `Hallo ${student1Name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
                 { schedule_id: scheduleId, type: 'pending_parent_approval' }
               );
@@ -1301,7 +1301,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             if (student2Id) {
               triggerFallbackPush(
                 student2Id,
-                'Terminänderung freigeben? 📅',
+                'Terminänderung freigeben?',
                 `Hallo ${student2Name}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${sourceDayName} um ${sourceSlot.time_slot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
                 { schedule_id: targetConflict.id, type: 'pending_parent_approval' }
               );
@@ -1332,14 +1332,14 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
           if (status === 'approved') {
             triggerFallbackPush(
               studentId,
-              'Unterricht verschoben 📅',
+              'Unterricht verschoben',
               `Hallo ${studentName}, dein Unterricht bei ${teacherName} wurde verschoben auf ${targetDayName} um ${timeSlot} Uhr.`,
               { schedule_id: scheduleId, type: 'rescheduled' }
             );
           } else {
             triggerFallbackPush(
               studentId,
-              'Terminänderung freigeben? 📅',
+              'Terminänderung freigeben?',
               `Hallo ${studentName}, dein Lehrer ${teacherName} möchte deinen Unterricht auf ${targetDayName} um ${timeSlot} Uhr verschieben. Bitte stimme dem Termin in der App zu.`,
               { schedule_id: scheduleId, type: 'pending_parent_approval' }
             );
@@ -2043,10 +2043,10 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
                 ? 'bg-red-950/20 text-red-400 border-red-900/50 hover:bg-red-950/30'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
             }`}
-            title={showRealNames ? "Nachnamen ausblenden" : "Nachnamen einblenden (für 10s)"}
+            title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
           >
-            {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-            <span>{showRealNames ? "Ausblenden" : "Namen zeigen"}</span>
+            {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
+            <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
           </button>
           <button
             onClick={onLogout}
@@ -2059,7 +2059,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
       )}
 
       {/* Main Board Viewport */}
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-y-auto cg-full-height-board fluid-board-scroll-container">
         {/* Holiday Banner */}
         {isTodayHoliday && (
           <div className="mx-8 mt-6 p-6 bg-gradient-to-r from-slate-900/95 to-slate-900/85 border border-emerald-500/15 rounded-3xl flex items-center gap-5 shadow-xl backdrop-blur-md relative overflow-hidden animate-fade-in hover:border-emerald-500/25 transition duration-300">
@@ -2487,7 +2487,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
             </div>
 
             {/* Student Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="schueler-board-grid student-board-grid">
               {filteredStudents.map(student => (
                 <div 
                   key={student.id}
@@ -2565,7 +2565,7 @@ export function CampusTeacherDashboard({ userId, onLogout, hideSidebar = false, 
         {/* Board 3: MEIN STUNDENPLAN */}
         {/* Board 3: MEIN STUNDENPLAN */}
         {activeBoard === 'schedule' && (
-          <div className="p-4 md:p-8 max-w-full w-full mx-auto space-y-6">
+          <div className="p-4 md:p-8 max-w-full w-full mx-auto space-y-6 cg-full-height-board fluid-board-scroll-container">
             <ScheduleCalendarView 
               schoolId={teacher?.school_id || school?.id || ''} 
               userId={userId} 

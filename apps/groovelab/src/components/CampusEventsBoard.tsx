@@ -34,8 +34,12 @@ import {
   ShieldCheck,
   CheckCheck,
   CalendarX,
-  Send
+  Send,
+  Landmark,
+  Star,
+  History
 } from 'lucide-react';
+import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 
 interface CampusEventsBoardProps {
   userId: string;
@@ -235,6 +239,47 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
   // Tabs for Column 1 (My Lessons)
   const [lessonTab, setLessonTab] = useState<'upcoming' | 'past'>('upcoming');
+
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [orientationTick, setOrientationTick] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [eventsCardIndex, setEventsCardIndex] = useState<number>(0);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleOrientationChange = () => setOrientationTick(prev => prev + 1);
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleOrientationChange);
+
+    const observer = new MutationObserver(() => {
+      setOrientationTick(prev => prev + 1);
+    });
+    if (document.documentElement) {
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    }
+    if (document.body) {
+      observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleOrientationChange);
+      observer.disconnect();
+    };
+  }, []);
+
+  const isMobilePortrait = useMemo(() => {
+    const isSimMobileOrPortrait = Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+    const isSimLandscape = Boolean(document.querySelector('.sim-viewport-landscape'));
+    if (isSimMobileOrPortrait) {
+      return true;
+    }
+    if (isSimLandscape) {
+      return false;
+    }
+    return windowWidth <= 1024;
+  }, [windowWidth, orientationTick]);
 
   // Tabs for Column 3 (Event-Planung)
   const [planningEventTab, setPlanningEventTab] = useState<'upcoming' | 'past'>('upcoming');
@@ -2745,7 +2790,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         occurrenceQuery = occurrenceQuery.eq('teacher_id', userId);
       }
 
-      let { data: occurrencesData } = await occurrenceQuery;
+      const { data: occurrencesData } = await occurrenceQuery;
       let occurrences: any[] = occurrencesData || [];
 
       if (occurrences.length > 0) {
@@ -3055,7 +3100,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       }
 
       // Priority 1: Process teacher planned_boards (the active Stundenplan Designer layout)
-      let combinedSchedules: any[] = [];
+      const combinedSchedules: any[] = [];
       const processedStudentIds = new Set<string>();
       const processedStudentNames = new Set<string>();
 
@@ -4152,7 +4197,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       <head>
         <title>${activeEv.title} - Programmheft</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          /* DSGVO-compliant local font stack */
           body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
             color: #1d1d1f;
@@ -4502,7 +4547,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
       <head>
         <title>Technik-Rundown - Bühne ${activeStage}</title>
         <style>
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+          /* DSGVO-compliant local font stack */
           body {
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
             color: #1d1d1f;
@@ -4725,30 +4770,44 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   const renderLessonsColumn = () => {
     return (
       <div id="tour-lessons-column" style={{
-        background: '#ffffff',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        borderRadius: '24px',
-        padding: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.02)',
+        background: isMobilePortrait ? 'transparent' : '#ffffff',
+        border: isMobilePortrait ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        borderRadius: isMobilePortrait ? '0' : '24px',
+        padding: isMobilePortrait ? '0' : '10px',
+        boxShadow: isMobilePortrait ? 'none' : '0 8px 32px rgba(0,0,0,0.02)',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        height: 'calc(100vh - 120px)',
-        overflow: 'hidden'
+        width: '100%',
+        maxWidth: isMobilePortrait ? '820px' : '100%',
+        minWidth: 0,
+        margin: isMobilePortrait ? '0 auto' : '0',
+        boxSizing: 'border-box',
+        height: isMobilePortrait ? 'auto' : 'calc(100vh - 120px)',
+        overflow: isMobilePortrait ? 'visible' : 'hidden'
       }}>
-        {/* Title & Right-Aligned Subscribe Button */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CalendarDays size={18} color={brandColor} /> Unterrichtstermine
+        {/* Title & Right-Aligned Subscribe Button (Smartphone Zero-Scrollbar Header) */}
+        <div style={{
+          display: 'flex',
+          flexDirection: isMobilePortrait ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobilePortrait ? 'stretch' : 'center',
+          gap: '8px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <CalendarDays size={18} color={brandColor} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Unterrichtstermine</span>
               <TourStartButton onClick={startTour} platformTheme={isAdminView ? 'admin' : (isGroovelab ? 'groovelab' : 'campus')} />
             </h3>
-            <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '4px 0 0 0', fontWeight: 550 }}>
+            <p style={{ color: '#64748b', fontSize: '0.74rem', margin: '2px 0 0 0', fontWeight: 550, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Deine persönlichen Stundenplandaten
             </p>
           </div>
 
-          {/* iCal Subscription Button (Noticeable Apple Red) */}
+          {/* iCal Subscription Button (Adaptive compact label on multi-column layout) */}
           {icalActive && (
             <button
               onClick={() => setShowIcalModal(true)}
@@ -4758,33 +4817,38 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 border: 'none',
                 background: brandColor,
                 color: '#ffffff',
-                padding: '8px 14px',
-                borderRadius: '20px',
+                padding: '6px 12px',
+                borderRadius: '14px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '5px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
-                fontSize: '0.78rem',
+                fontSize: '0.74rem',
                 fontWeight: 800,
-                flexShrink: 0
+                width: isMobilePortrait ? '100%' : 'auto',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                boxSizing: 'border-box'
               }}
             >
-              <CalendarPlus size={15} />
-              <span>Abonnieren</span>
+              <CalendarPlus size={14} style={{ flexShrink: 0 }} />
+              <span>{isMobilePortrait ? 'Unterrichtstermine abonnieren' : 'Abonnieren'}</span>
             </button>
           )}
         </div>
 
-        {/* Tabs switcher */}
+        {/* Tabs switcher (Segmented Pill Carousel) */}
         <div style={{
           display: 'flex',
           background: '#f1f5f9',
-          padding: '4px',
-          borderRadius: '12px',
-          gap: '4px'
+          padding: '3px',
+          borderRadius: '14px',
+          gap: '4px',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           <button
             onClick={() => {
@@ -4799,16 +4863,20 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               border: 'none',
               background: lessonTab === 'upcoming' ? '#ffffff' : 'transparent',
               color: lessonTab === 'upcoming' ? brandColor : '#64748b',
-              padding: '8px 12px',
-              borderRadius: '8px',
+              padding: '8px 10px',
+              borderRadius: '10px',
               fontWeight: 800,
               fontSize: '0.75rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: lessonTab === 'upcoming' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+              boxShadow: lessonTab === 'upcoming' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
             }}
           >
-            Kommende
+            <Calendar size={14} /> Kommende
           </button>
           <button
             onClick={() => {
@@ -4823,21 +4891,25 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
               border: 'none',
               background: lessonTab === 'past' ? '#ffffff' : 'transparent',
               color: lessonTab === 'past' ? brandColor : '#64748b',
-              padding: '8px 12px',
-              borderRadius: '8px',
+              padding: '8px 10px',
+              borderRadius: '10px',
               fontWeight: 800,
               fontSize: '0.75rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: lessonTab === 'past' ? '0 2px 4px rgba(0,0,0,0.04)' : 'none'
+              boxShadow: lessonTab === 'past' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
             }}
           >
-            Vergangene
+            <History size={14} /> Vergangene
           </button>
         </div>
 
-        {/* Scrollable list */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '2px' }}>
+        {/* Scrollable list (Invisible Scrollbar) */}
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '140px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {loadingLessons ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Stundenplan lädt...
@@ -4977,7 +5049,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
                               {/* Week Items List */}
                               {isWeekExpanded && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px', borderLeft: '2px solid #f1f5f9', marginLeft: '6px', marginTop: '2px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', boxSizing: 'border-box', marginTop: '2px' }}>
                                   {(() => {
                                     // 1. Deduplicate by student and date: ensure each student appears at most once per date
                                     const studentDateMap = new Map<string, any>();
@@ -5120,51 +5192,46 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                     return groupedSlotItems.map(occ => {
                                       const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
                                       const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
-                                      const isRescheduled = occ.status === 'pending_reschedule' || 
+                                      const isRescheduled = Boolean(
+                                        occ.status === 'pending_reschedule' || 
                                         occ.status === 'rescheduled_confirmed' ||
                                         occ.status === 'rescheduled' ||
                                         occ.status === 'reschedule_requested' ||
                                         occ.status === 'pending_student_approval' ||
-                                        occ.status === 'pending_approval' ||
-                                        occ.status === 'pending' ||
-                                        occ.student_acknowledged === false ||
-                                        occ.student_confirmed === false ||
                                         occ.is_moved === true ||
                                         occ.is_rescheduled === true ||
                                         (occ.original_date && occ.original_date !== occ.date) ||
-                                        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
-                                        (occ.schedule && occ.schedule.time_slot && occ.start_time && occ.schedule.time_slot.substring(0, 5) !== occ.start_time.substring(0, 5)) ||
-                                        (occ.original_time_slot && occ.start_time && occ.original_time_slot.substring(0, 5) !== occ.start_time.substring(0, 5));
+                                        (occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5))
+                                      );
                                         
                                       const hasMessages = activeChatOccIds.has(occ.id) ||
                                          (occ.student_id && activeChatStudentIds.has(occ.student_id)) ||
                                          (occ.teacher_id && activeChatStudentIds.has(occ.teacher_id));
                                       
-                                      const groupFirstNames = (occ.students || occ.group_occurrences)
-                                        ? (occ.students || occ.group_occurrences).map((s: any) => (s.first_name || s.student?.first_name || '').trim()).filter(Boolean).join(', ')
-                                        : null;
+                                        const groupFirstNames = (occ.students || occ.group_occurrences)
+                                          ? formatGroupStudentsAnonymized(occ.students || occ.group_occurrences)
+                                          : null;
 
-                                      const opponentName = groupFirstNames || (role === 'student'
-                                        ? (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name || ''}`.trim() : 'Lehrkraft')
-                                        : (() => {
-                                            const fn = occ.student?.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
-                                            if (fn) {
-                                              const clean = String(fn).replace(/^Unterricht:\s*/i, '').trim();
-                                              const parts = clean.split(' ');
-                                              const first = parts[0];
-                                              const last = parts.slice(1).join(' ');
-                                              const initial = last ? `${last[0].toUpperCase()}.` : '';
-                                              return initial ? `${first} ${initial}` : first;
-                                            }
-                                            return 'Schüler';
-                                          })());
-                                      const isGroupOcc = Boolean(
-                                        occ.isGroupOcc || occ.isGroup || occ.is_group ||
-                                        (occ.students && occ.students.length > 1) ||
-                                        (occ.group_occurrences && occ.group_occurrences.length > 1) ||
-                                        !!occ.group_id ||
-                                        (opponentName && (opponentName.includes(',') || opponentName.includes('&')))
-                                      );
+                                        const opponentName = groupFirstNames || (role === 'student'
+                                          ? (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name ? occ.teacher.last_name[0].toUpperCase() + '.' : ''}`.trim() : 'Lehrkraft')
+                                          : (() => {
+                                              const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || occ.student_name || occ.studentName || occ.name || occ.purpose || '';
+                                              const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
+                                              const id = occ.student_id || occ.student?.id || occ.id;
+                                              return formatSingleStudentAnonymized(fn, ln, id);
+                                            })());
+
+                                       const isGroupOcc = Boolean(
+                                         occ.isGroupOcc || occ.isGroup || occ.is_group ||
+                                         (occ.students && occ.students.length > 1) ||
+                                         (occ.group_occurrences && occ.group_occurrences.length > 1) ||
+                                         !!occ.group_id ||
+                                         (opponentName && (opponentName.includes(',') || opponentName.includes('&')))
+                                       );
+
+                                       const studentCount = (occ.students || occ.group_occurrences)?.length || (opponentName.includes('&') ? opponentName.split('&').length : 2);
+                                       const isFixedGroup = Boolean(occ.group_id || occ.is_db_group || occ.is_stammtermin || (!occ.is_virtual && !String(occ.id).startsWith('virt_') && !occ.is_ensemble));
+                                       const groupBadgeLabel = getGroupTypeLabel(studentCount, isFixedGroup, occ.group_name || occ.ensemble_name);
 
                                       const isConfirmedOcc = Boolean(
                                         occ.status === 'rescheduled_confirmed' ||
@@ -5330,6 +5397,23 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                                               }}>
                                                 {opponentName}
                                               </span>
+
+                                              {isGroupOcc && (
+                                                <span style={{
+                                                  fontSize: '9.5px',
+                                                  fontWeight: 800,
+                                                  background: '#e0f2fe',
+                                                  color: '#0369a1',
+                                                  border: '1px solid #bae6fd',
+                                                  padding: '1px 6px',
+                                                  borderRadius: '6px',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '3px'
+                                                }}>
+                                                  👥 {groupBadgeLabel}
+                                                </span>
+                                              )}
 
                                               {(() => {
                                                 if (!rName || rName === 'Raum') return null;
@@ -5500,6 +5584,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
         height: 'calc(100vh - 120px)',
         overflow: 'hidden'
       }}>
@@ -5518,8 +5605,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
 
 
 
-        {/* Unified Timeline List */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '2px' }}>
+        {/* Unified Timeline List (Invisible Scrollbar) */}
+        <div className="no-scrollbar fluid-board-scroll-container mobile-unclip-widget" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '0px', paddingBottom: isMobilePortrait ? '140px' : '40px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {loadingEvents ? (
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Termine werden geladen...
@@ -5683,6 +5770,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
         height: 'calc(100vh - 120px)',
         overflowY: 'auto'
       }}>
@@ -6406,6 +6496,9 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
           display: 'flex',
           flexDirection: 'column',
           gap: '10px',
+          width: '100%',
+          minWidth: 0,
+          boxSizing: 'border-box',
           height: 'calc(100vh - 120px)',
           overflowY: 'auto',
           transition: 'all 0.2s ease',
@@ -11705,10 +11798,12 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: showLessons 
-        ? 'minmax(320px, 1.2fr) minmax(360px, 1.5fr) minmax(300px, 1.2fr)' 
-        : 'minmax(360px, 1.5fr) minmax(380px, 1.8fr) minmax(300px, 1.2fr)',
-      gap: '10px',
+      gridTemplateColumns: isMobilePortrait
+        ? '1fr'
+        : (showLessons 
+            ? 'repeat(3, minmax(0, 1fr))' 
+            : 'repeat(2, minmax(0, 1fr))'),
+      gap: isMobilePortrait ? '16px' : '10px',
       alignItems: 'start',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       width: '100%',
@@ -11923,18 +12018,192 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
         }
       `}} />
       
-      {/* COLUMN 1 */}
-      {showLessons ? renderLessonsColumn() : renderTimelineColumn()}
+      {isMobilePortrait ? (
+        <div
+          className="no-scrollbar"
+          onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+          onTouchEnd={(e) => {
+            if (touchStartX === null) return;
+            const deltaX = e.changedTouches[0].clientX - touchStartX;
+            if (deltaX < -50 && eventsCardIndex < 2) {
+              setEventsCardIndex(prev => prev + 1);
+            } else if (deltaX > 50 && eventsCardIndex > 0) {
+              setEventsCardIndex(prev => prev - 1);
+            }
+            setTouchStartX(null);
+          }}
+          style={{
+            width: '100%',
+            maxWidth: '740px',
+            margin: '0 auto',
+            padding: '0 4px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            boxSizing: 'border-box'
+          }}
+        >
+          {/* Segmented Top Pill Switcher */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '4px',
+            background: '#f1f5f9',
+            padding: '4px',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '680px',
+            margin: '0 auto',
+            boxSizing: 'border-box'
+          }}>
+            <button
+              type="button"
+              onClick={() => setEventsCardIndex(0)}
+              style={{
+                padding: '9px 4px',
+                borderRadius: '12px',
+                border: 'none',
+                background: eventsCardIndex === 0 ? brandColor : 'transparent',
+                color: eventsCardIndex === 0 ? '#ffffff' : '#64748b',
+                fontWeight: eventsCardIndex === 0 ? 800 : 700,
+                fontSize: '0.78rem',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                transition: 'all 0.2s',
+                boxShadow: eventsCardIndex === 0 ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                flexShrink: 0
+              }}
+            >
+              <Calendar size={14} /> Termine
+            </button>
+            <button
+              type="button"
+              onClick={() => setEventsCardIndex(1)}
+              style={{
+                padding: '9px 4px',
+                borderRadius: '12px',
+                border: 'none',
+                background: eventsCardIndex === 1 ? brandColor : 'transparent',
+                color: eventsCardIndex === 1 ? '#ffffff' : '#64748b',
+                fontWeight: eventsCardIndex === 1 ? 800 : 700,
+                fontSize: '0.78rem',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                transition: 'all 0.2s',
+                boxShadow: eventsCardIndex === 1 ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                flexShrink: 0
+              }}
+            >
+              <Landmark size={14} /> Events & News
+            </button>
+            <button
+              type="button"
+              onClick={() => setEventsCardIndex(2)}
+              style={{
+                padding: '9px 4px',
+                borderRadius: '12px',
+                border: 'none',
+                background: eventsCardIndex === 2 ? brandColor : 'transparent',
+                color: eventsCardIndex === 2 ? '#ffffff' : '#64748b',
+                fontWeight: eventsCardIndex === 2 ? 800 : 700,
+                fontSize: '0.78rem',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                transition: 'all 0.2s',
+                boxShadow: eventsCardIndex === 2 ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                flexShrink: 0
+              }}
+            >
+              <Star size={14} /> {role === 'teacher' ? 'Planung' : 'Auftritte'}
+            </button>
+          </div>
 
-      {/* COLUMN 2 */}
-      {showLessons ? renderTimelineColumn() : renderTeacherEventPlanningColumn()}
+          {/* Active Card Body */}
+          {eventsCardIndex === 0 && (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              {renderLessonsColumn()}
+            </div>
+          )}
+          {eventsCardIndex === 1 && (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              {renderTimelineColumn()}
+            </div>
+          )}
+          {eventsCardIndex === 2 && (
+            <div style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              {role === 'teacher'
+                ? renderTeacherEventPlanningColumn()
+                : role === 'student'
+                  ? renderStudentEventsColumn()
+                  : renderAnnouncementsColumn()}
+            </div>
+          )}
 
-      {/* COLUMN 3 */}
-      {role === 'teacher' 
-        ? renderTeacherEventPlanningColumn() 
-        : role === 'student'
-          ? renderStudentEventsColumn()
-          : renderAnnouncementsColumn()}
+          {/* Instagram Page Indicator Dots */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '8px 0' }}>
+            <div
+              onClick={() => setEventsCardIndex(0)}
+              style={{
+                width: eventsCardIndex === 0 ? '18px' : '6px',
+                height: '6px',
+                borderRadius: '4px',
+                background: eventsCardIndex === 0 ? brandColor : '#cbd5e1',
+                cursor: 'pointer',
+                transition: 'all 0.25s'
+              }}
+            />
+            <div
+              onClick={() => setEventsCardIndex(1)}
+              style={{
+                width: eventsCardIndex === 1 ? '18px' : '6px',
+                height: '6px',
+                borderRadius: '4px',
+                background: eventsCardIndex === 1 ? brandColor : '#cbd5e1',
+                cursor: 'pointer',
+                transition: 'all 0.25s'
+              }}
+            />
+            <div
+              onClick={() => setEventsCardIndex(2)}
+              style={{
+                width: eventsCardIndex === 2 ? '18px' : '6px',
+                height: '6px',
+                borderRadius: '4px',
+                background: eventsCardIndex === 2 ? brandColor : '#cbd5e1',
+                cursor: 'pointer',
+                transition: 'all 0.25s'
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* COLUMN 1 */}
+          {showLessons ? renderLessonsColumn() : renderTimelineColumn()}
+
+          {/* COLUMN 2 */}
+          {showLessons ? renderTimelineColumn() : renderTeacherEventPlanningColumn()}
+
+          {/* COLUMN 3 */}
+          {role === 'teacher' 
+            ? renderTeacherEventPlanningColumn() 
+            : role === 'student'
+              ? renderStudentEventsColumn()
+              : renderAnnouncementsColumn()}
+        </>
+      )}
 
       {/* Fullscreen Overlay for Teacher submissions */}
       {renderFullscreenTeacherSubmissionOverlay()}
@@ -12617,7 +12886,8 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>💬</span> {titleText}
+                      <MessageSquare size={18} color="#ffffff" />
+                      <span>{titleText}</span>
                     </h3>
                   </div>
                   <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
@@ -12625,7 +12895,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                   </p>
                   
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                     <span style={{
                       padding: '4px 10px',
                       borderRadius: '8px',
@@ -12636,8 +12906,7 @@ export function CampusEventsBoard({ userId, role, schoolId, supabase, brandColor
                       backdropFilter: 'blur(4px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
-                      whiteSpace: 'nowrap'
+                      gap: '5px'
                     }}>
                       <ShieldCheck size={13} color="#ffffff" />
                       <span>100% DSGVO-konform • End-to-End verschlüsselt</span>

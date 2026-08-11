@@ -97,7 +97,8 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
 
   useEffect(() => {
     localStorage.setItem('groovelab_dev_device_preset', selectedPresetId);
-  }, [selectedPresetId]);
+    window.dispatchEvent(new CustomEvent('groovelab_orientation_changed'));
+  }, [selectedPresetId, isRotated, isActive]);
 
   // Keyboard shortcut: Shift + D to toggle simulator
   useEffect(() => {
@@ -190,29 +191,30 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
       </div>
 
       {/* Main App Content Container */}
-      {!isActive || isDesktop ? (
-        // Standard Desktop View
-        <div className="sim-viewport-desktop" style={{ width: '100%', minHeight: '100vh' }}>
+      {!isActive ? (
+        // Standard View without Simulator
+        <div style={{ width: '100%', minHeight: '100vh' }}>
           {children}
         </div>
       ) : (
-        // Simulated Device Viewport Canvas
+        /* Simulated Device Viewport Canvas */
         <div
           style={{
-            minHeight: '100vh',
+            height: isDesktop ? 'auto' : '100vh',
+            maxHeight: isDesktop ? 'none' : '100vh',
             width: '100%',
-            background: '#090d16',
-            backgroundImage:
+            background: isDesktop ? 'var(--bg-color)' : '#090d16',
+            backgroundImage: isDesktop ? 'none' :
               'radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.5) 0%, rgba(9, 13, 22, 1) 100%), linear-gradient(0deg, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
             backgroundSize: '100% 100%, 32px 32px, 32px 32px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            paddingTop: '80px',
-            paddingBottom: '60px',
+            justifyContent: isDesktop ? 'flex-start' : 'center',
+            paddingTop: isDesktop ? '0px' : '60px',
+            paddingBottom: isDesktop ? '0px' : '20px',
             boxSizing: 'border-box',
-            overflowX: 'hidden'
+            overflow: isDesktop ? 'visible' : 'hidden'
           }}
         >
           {/* Interactive Floating Control Dock (Top Bar) */}
@@ -352,104 +354,113 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
             </button>
           </div>
 
-          {/* Physical Device Hardware Shell */}
-          <div
-            style={{
-              position: 'relative',
-              width: `${frameWidth}px`,
-              height: `${frameHeight}px`,
-              background: '#ffffff',
-              borderRadius: currentPreset.borderRadius || '36px',
-              boxShadow:
-                '0 0 0 12px #1e293b, 0 0 0 14px #0f172a, 0 25px 60px -10px rgba(0, 0, 0, 0.7), 0 0 40px rgba(59, 130, 246, 0.15)',
-              overflow: 'hidden',
-              transform: 'translate3d(0, 0, 0)', // Containing block for inner position: fixed elements
-              transition: 'width 0.3s ease, height 0.3s ease, border-radius 0.3s ease'
-            }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-          >
-            {/* Dynamic Island / iPhone Notch (Top Bezel) */}
-            {currentPreset.hasNotch && !isRotated && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '10px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '120px',
-                  height: '30px',
-                  background: '#000000',
-                  borderRadius: '20px',
-                  zIndex: 9999,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                  pointerEvents: 'none'
-                }}
-              >
-                {/* Camera Lens Circle */}
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0a0f1d' }} />
-                {/* Sensor Lens Pill */}
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#0f172a' }} />
-              </div>
-            )}
-
-            {/* iOS Home Indicator Bar (Bottom Bezel) */}
-            {currentPreset.hasHomeBar && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '8px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '134px',
-                  height: '5px',
-                  background: 'rgba(15, 23, 42, 0.4)',
-                  borderRadius: '100px',
-                  zIndex: 9999,
-                  pointerEvents: 'none'
-                }}
-              />
-            )}
-
-            {/* Touch Circle Cursor Overlay */}
-            {showTouchCursor && touchPos && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: `${touchPos.y - 18}px`,
-                  left: `${touchPos.x - 18}px`,
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: 'rgba(59, 130, 246, 0.35)',
-                  border: '2px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
-                  pointerEvents: 'none',
-                  zIndex: 99999,
-                  transition: 'transform 0.05s ease-out'
-                }}
-              />
-            )}
-
-            {/* Viewport Content Wrapper with Preset Class Injection */}
-            <div
-              className={`sim-viewport-${currentPreset.category}`}
-              style={{
-                width: '100%',
-                height: '100%',
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                position: 'relative',
-                boxSizing: 'border-box'
-              }}
-            >
+          {/* Content Rendering: Desktop vs Phone/Tablet Canvas */}
+          {isDesktop ? (
+            <div className="sim-viewport-desktop" style={{ width: '100%', minHeight: '100vh', paddingTop: '60px' }}>
               {children}
             </div>
-          </div>
+          ) : (
+            /* Physical Device Hardware Shell */
+            <div
+              style={{
+                position: 'relative',
+                width: `${frameWidth}px`,
+                height: `${frameHeight}px`,
+                background: '#ffffff',
+                borderRadius: currentPreset.borderRadius || '36px',
+                boxShadow:
+                  '0 0 0 12px #1e293b, 0 0 0 14px #0f172a, 0 25px 60px -10px rgba(0, 0, 0, 0.7), 0 0 40px rgba(59, 130, 246, 0.15)',
+                overflow: 'hidden',
+                transform: 'translate3d(0, 0, 0)', // Containing block for inner position: fixed elements
+                transition: 'width 0.3s ease, height 0.3s ease, border-radius 0.3s ease'
+              }}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+            >
+              {/* Dynamic Island / iPhone Notch (Top Bezel) */}
+              {currentPreset.hasNotch && !isRotated && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '120px',
+                    height: '30px',
+                    background: '#000000',
+                    borderRadius: '20px',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 12px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {/* Camera Lens Circle */}
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0a0f1d' }} />
+                  {/* Sensor Lens Pill */}
+                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#0f172a' }} />
+                </div>
+              )}
+
+              {/* iOS Home Indicator Bar (Bottom Bezel) */}
+              {currentPreset.hasHomeBar && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '134px',
+                    height: '5px',
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    borderRadius: '100px',
+                    zIndex: 9999,
+                    pointerEvents: 'none'
+                  }}
+                />
+              )}
+
+              {/* Touch Circle Cursor Overlay */}
+              {showTouchCursor && touchPos && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: `${touchPos.y - 18}px`,
+                    left: `${touchPos.x - 18}px`,
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'rgba(59, 130, 246, 0.35)',
+                    border: '2px solid rgba(255, 255, 255, 0.8)',
+                    boxShadow: '0 0 12px rgba(59, 130, 246, 0.5)',
+                    pointerEvents: 'none',
+                    zIndex: 99999,
+                    transition: 'transform 0.05s ease-out'
+                  }}
+                />
+              )}
+
+              {/* Viewport Content Wrapper with Preset & Orientation Class Injection */}
+              <div
+                className={`sim-viewport-${currentPreset.category} ${frameWidth > frameHeight ? 'sim-viewport-landscape' : 'sim-viewport-portrait'} no-scrollbar`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  position: 'relative',
+                  boxSizing: 'border-box',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}
+              >
+                {children}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

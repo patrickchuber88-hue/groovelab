@@ -382,8 +382,8 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                       👨‍🎓
                     </div>
                     <div className="min-w-0">
-                      <span className="block font-bold text-slate-800 text-base truncate">
-                        {student.first_name} {student.last_name}
+                      <span className="block font-bold text-slate-800 text-base truncate" style={{ minWidth: 0 }}>
+                        {student.first_name} {student.last_name ? (student.last_name.endsWith('.') ? student.last_name : student.last_name.charAt(0).toUpperCase() + '.') : ''}
                       </span>
                       <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
@@ -422,7 +422,7 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                   {/* Actions & Link Block */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
                     {!student.is_app_user && (
-                      <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 min-w-[280px]">
+                      <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 w-full sm:w-auto sm:min-w-[280px]">
                         <input
                           type="text"
                           readOnly
@@ -433,7 +433,8 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                         <button
                           type="button"
                           onClick={() => handleCopyLink(student)}
-                          className="p-2 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-slate-50 transition-all cursor-pointer shadow-sm shrink-0"
+                          style={{ touchAction: 'manipulation' }}
+                          className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-slate-50 transition-all cursor-pointer shadow-sm shrink-0"
                           title="Link kopieren"
                         >
                           {copiedId === student.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
@@ -442,8 +443,10 @@ export function TeacherStudentManagement({ teacherId, schoolId, maxStudents }: T
                     )}
 
                     <button
+                      type="button"
                       onClick={() => handleDeleteStudent(student)}
-                      className="p-3.5 rounded-xl border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex items-center justify-center shrink-0"
+                      style={{ touchAction: 'manipulation' }}
+                      className="p-3.5 min-w-[44px] min-h-[44px] rounded-xl border border-rose-100 text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex items-center justify-center shrink-0"
                       title="Schüler löschen"
                     >
                       <Trash2 size={16} />

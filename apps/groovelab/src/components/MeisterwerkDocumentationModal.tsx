@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronRight, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, Book, Star, Sliders, RotateCcw, Mic, Square, Play, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 // @ts-ignore
@@ -313,7 +313,29 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [pendingFeedbackStatus, setPendingFeedbackStatus] = useState<'beherrscht' | 'in_entwicklung' | 'wiederholen' | null>(null);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const activePlat = typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(typeof window !== 'undefined' ? window.innerWidth : 1200);
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
+  }, []);
+
+  const isInsideSimMobile = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait');
+  const isInsideSimTabletLandscape = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape');
+  const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
+  const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
+  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>('repertoire');
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
+  const radarAnalysisCardsRef = useRef<HTMLDivElement>(null);
 
   const toggleFullscreen = () => {
     setIsFullscreen(prev => !prev);
@@ -610,6 +632,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Active paintbrush mode
   const [activeBrush, setActiveBrush] = useState<'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' | 'THEORY'>('NONE');
   const [showAllPagesGrid, setShowAllPagesGrid] = useState(false);
+  const [showAllPresets, setShowAllPresets] = useState(false);
   const [textbookPageChunkIndex, setTextbookPageChunkIndex] = useState<number>(() => {
     try {
       const val = localStorage.getItem('groovelab_textbook_page_chunk_index');
@@ -3453,7 +3476,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const renderSkillRadarTabContent = () => {
-    const feedbackEntries = (homeworkNotesList || []).slice(0, 12);
+    const feedbackEntries = (progressItems || [])
+      .map((item: any) => {
+        try {
+          const notes: string[] = JSON.parse(item.homework_notes || '[]');
+          const fbStr = notes.find(n => n.startsWith('FEEDBACK:'));
+          if (!fbStr) return null;
+          return JSON.parse(fbStr.substring(9));
+        } catch { return null; }
+      })
+      .filter(Boolean)
+      .slice(0, 12);
 
     const currentWeekStr = getISOWeek();
     const allActiveNotesText = [
@@ -3539,7 +3572,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     const N = SKILL_TAGS.length;
-    const cx = 220, cy = 220, rMax = 145;
+    const cx = 260, cy = 250, rMax = 135;
     const getPoint = (index: number, val: number) => {
       const angle = (Math.PI * 2 / N) * index - Math.PI / 2;
       return {
@@ -3557,31 +3590,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       return pts.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ') + ' Z';
     });
 
+    const isMobileOrTabletView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
     return (
-      <div style={{ flex: 1, width: '100%', display: 'flex', overflow: 'hidden', background: useNotebookLayout ? '#fcfaf7' : '#ffffff' }} className="modal-content-container">
+      <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: isMobileOrTabletView ? 'column' : 'row', overflowY: isMobileOrTabletView ? 'auto' : 'hidden', background: useNotebookLayout ? '#fcfaf7' : '#ffffff' }} className="modal-content-container custom-scrollbar">
         {/* LINKE BUCHSEITE: SKILL-RADAR */}
         <div style={{
-          flex: '1 1 0%',
+          flex: isMobileOrTabletView ? 'none' : '1 1 0%',
+          width: '100%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderRight: '1px solid #e8e8ed',
-          padding: '24px 28px',
+          borderRight: isMobileOrTabletView ? 'none' : '1px solid #e8e8ed',
+          borderBottom: isMobileOrTabletView ? '1.5px solid #e8e8ed' : 'none',
+          padding: isMobileOrTabletView ? '16px 14px' : '24px 28px',
           position: 'relative',
           background: 'radial-gradient(circle at 50% 50%, rgba(52, 168, 83, 0.07) 0%, rgba(59, 130, 246, 0.03) 50%, transparent 80%)'
         }}>
           {/* Glassmorphic Legend Pill */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.88)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            border: '1px solid rgba(226, 232, 240, 0.8)',
-            borderRadius: '24px',
-            padding: '8px 18px',
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
-            gap: '16px',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '6px 14px',
             fontSize: '0.78rem',
             fontWeight: 800,
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
@@ -3602,7 +3635,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <div style={{
             margin: 'auto 0',
             width: '100%',
-            maxHeight: '440px',
+            maxHeight: isMobileOrTabletView ? '340px' : '440px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -3612,10 +3645,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <svg
               width="100%"
               height="100%"
-              viewBox="0 0 440 440"
+              viewBox="-10 -10 540 520"
               style={{
-                maxWidth: '420px',
-                maxHeight: '420px',
+                maxWidth: '520px',
+                maxHeight: '500px',
                 display: 'block',
                 overflow: 'visible'
               }}
@@ -3697,13 +3730,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
               {/* Skill Labels around the radar */}
               {tagCounts.map((tag, i) => {
-                const p = getPoint(i, 1.25);
+                const p = getPoint(i, 1.20);
                 const isSuperkraft = tag.interventions === 0;
                 const isTargetFocus = activeWeeklyTargetTags.includes(tag.key);
+                const cosVal = Math.cos(p.angle);
                 
                 let textAnchor: "middle" | "start" | "end" = "middle";
-                if (p.x > cx + 20) textAnchor = "start";
-                else if (p.x < cx - 20) textAnchor = "end";
+                if (cosVal > 0.25) textAnchor = "start";
+                else if (cosVal < -0.25) textAnchor = "end";
 
                 return (
                   <text
@@ -3725,7 +3759,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           </div>
 
           {/* LEHRER INTERAKTIONS-COCKPIT (NUR FÜR LEHRER / ADMIN) */}
-          {(!readOnly || isTeacherTools || !!teacherId) && (
+          {(!readOnly || isTeacherTools) && (
             <div style={{
               width: '100%',
               background: 'rgba(255, 255, 255, 0.95)',
@@ -3783,18 +3817,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               )}
             </div>
           )}
+
+          {/* Floating Apple Scroll Indicator Pill for Mobile */}
+          {isMobileOrTabletView && (
+            <button
+              type="button"
+              onClick={() => {
+                radarAnalysisCardsRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{
+                marginTop: '10px',
+                marginBottom: '4px',
+                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '100px',
+                padding: '8px 16px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.15)',
+                transition: 'all 0.2s ease',
+                zIndex: 10
+              }}
+              className="hover-scale"
+            >
+              <span>Detail-Analyse & Superkräfte anzeigen</span>
+              <ChevronDown size={14} color="#22c55e" />
+            </button>
+          )}
         </div>
 
         {/* RECHTE BUCHSEITE: PÄDAGOGISCHES FEEDBACK */}
-        <div style={{
-          flex: '1 1 0%',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          padding: '24px',
-          position: 'relative'
-        }}>
+        <div
+          ref={radarAnalysisCardsRef}
+          style={{
+            flex: isMobileOrTabletView ? 'none' : '1 1 0%',
+            width: '100%',
+            overflowY: isMobileOrTabletView ? 'visible' : 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            padding: isMobileOrTabletView ? '16px' : '24px',
+            position: 'relative'
+          }}
+        >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* Active Weekly Practice Goal Card (Golden Focus Banner) */}
             {activeWeeklyTargetTags.length > 0 && (
@@ -4090,27 +4160,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (isEmbed) return null;
     return (
       <button
+        type="button"
         onClick={handleClose}
         style={{
-          background: 'rgba(255,255,255,0.15)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '50%',
-          width: '30px',
-          height: '30px',
+          background: 'rgba(255,255,255,0.22)',
+          border: '1px solid rgba(255,255,255,0.3)',
+          borderRadius: '20px',
+          padding: '6px 14px',
+          height: '32px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: '6px',
           cursor: 'pointer',
           color: '#ffffff',
+          fontWeight: 800,
+          fontSize: '0.80rem',
           transition: 'all 0.18s ease',
-          flexShrink: 0
+          flexShrink: 0,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
         }}
         className="hover-scale"
+        title="Modale Ansicht schließen / Zurück zum Dashboard"
       >
-        <X size={13} />
+        <ArrowLeft size={15} />
+        <span>Zurück</span>
       </button>
     );
   };
+
+  const isMobileOrSim = isFullscreen || isMobileView || isInsideSim || (typeof window !== 'undefined' && window.innerWidth <= 1024);
 
   const content = (
     <div style={{
@@ -4118,11 +4197,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         ? (bookColor 
             ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
             : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
-        : '#f3f3f6', // Zurich neutral gray background canvas or tactile book cover
-      borderRadius: isFullscreen ? '0' : '20px',
+        : '#ffffff', // Opaque white background canvas for seamless full-height scrolling
+      borderRadius: isMobileOrSim ? '0' : '20px',
       width: '100%',
-      maxWidth: isFullscreen ? '100vw' : '1360px',
-      height: isEmbed ? '100%' : (isFullscreen ? '100vh' : '92vh'),
+      maxWidth: isMobileOrSim ? '100%' : '1360px',
+      height: isEmbed ? '100%' : (isMobileOrSim ? '100%' : '92vh'),
       boxShadow: useNotebookLayout ? '0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 40px rgba(0, 0, 0, 0.4)' : '0 30px 60px -15px rgba(0, 0, 0, 0.25)',
       display: 'flex',
       flexDirection: 'column',
@@ -4134,9 +4213,155 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       position: 'relative',
       transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
     }} className="animation-slide-up">
-                {/* Header - Apple-style compact redesign */}
+                {/* Embedded Style Block - Universal for ALL Tabs */}
+        <style dangerouslySetInnerHTML={{__html: `
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          .modal-content-container {
+            display: flex !important;
+            flex-direction: row !important;
+          }
+          
+          @media (max-width: 900px) {
+            .modal-header-container {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              padding: 8px 12px 6px 12px !important;
+              gap: 4px !important;
+              flex: 0 0 auto !important;
+              flex-shrink: 0 !important;
+              height: auto !important;
+              min-height: auto !important;
+            }
+            .header-top-row {
+              width: 100% !important;
+            }
+            .header-tabs-desktop-container {
+              display: none !important;
+            }
+            .header-desktop-archiv {
+              display: none !important;
+            }
+            .header-mobile-menu-row {
+              display: flex !important;
+            }
+            .header-left-info {
+              flex-wrap: nowrap !important;
+              width: auto !important;
+              gap: 8px !important;
+            }
+            
+            .modal-content-container {
+              flex-direction: column !important;
+              overflow-y: auto !important;
+              height: auto !important;
+              flex: 1 1 0% !important;
+              min-height: 0 !important;
+              -webkit-overflow-scrolling: touch !important;
+            }
+            .modal-content-container > div {
+              width: 100% !important;
+              max-width: 100% !important;
+              height: auto !important;
+              max-height: none !important;
+              flex: none !important;
+              min-height: 0 !important;
+              overflow-y: visible !important;
+              box-sizing: border-box !important;
+              border-right: none !important;
+              border-left: none !important;
+            }
+          }
+
+          [class*="sim-viewport"] .modal-header-container,
+          .sim-viewport-mobile .modal-header-container,
+          .sim-viewport-portrait .modal-header-container,
+          .sim-viewport-tablet .modal-header-container {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            padding: 8px 12px 6px 12px !important;
+            gap: 4px !important;
+            flex: 0 0 auto !important;
+            flex-shrink: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+          }
+          [class*="sim-viewport"] .header-top-row,
+          .sim-viewport-mobile .header-top-row,
+          .sim-viewport-portrait .header-top-row,
+          .sim-viewport-tablet .header-top-row {
+            width: 100% !important;
+          }
+          [class*="sim-viewport"] .header-tabs-desktop-container,
+          .sim-viewport-mobile .header-tabs-desktop-container,
+          .sim-viewport-portrait .header-tabs-desktop-container,
+          .sim-viewport-tablet .header-tabs-desktop-container {
+            display: none !important;
+          }
+          [class*="sim-viewport"] .header-desktop-archiv,
+          .sim-viewport-mobile .header-desktop-archiv,
+          .sim-viewport-portrait .header-desktop-archiv,
+          .sim-viewport-tablet .header-desktop-archiv {
+            display: none !important;
+          }
+          [class*="sim-viewport"] .header-mobile-menu-row,
+          .sim-viewport-mobile .header-mobile-menu-row,
+          .sim-viewport-portrait .header-mobile-menu-row,
+          .sim-viewport-tablet .header-mobile-menu-row {
+            display: flex !important;
+          }
+          [class*="sim-viewport"] .header-left-info,
+          .sim-viewport-mobile .header-left-info,
+          .sim-viewport-portrait .header-left-info,
+          .sim-viewport-tablet .header-left-info {
+            flex-wrap: nowrap !important;
+            width: auto !important;
+            gap: 8px !important;
+          }
+          [class*="sim-viewport"] .modal-content-container,
+          .sim-viewport-mobile .modal-content-container,
+          .sim-viewport-portrait .modal-content-container,
+          .sim-viewport-tablet .modal-content-container {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+            height: auto !important;
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          [class*="sim-viewport"] .modal-content-container > div,
+          .sim-viewport-mobile .modal-content-container > div,
+          .sim-viewport-portrait .modal-content-container > div,
+          .sim-viewport-tablet .modal-content-container > div {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            flex: none !important;
+            min-height: 0 !important;
+            overflow-y: visible !important;
+            box-sizing: border-box !important;
+            border-right: none !important;
+            border-left: none !important;
+          }
+        `}} />
+
+        {/* Header - Apple-style compact redesign */}
         <div style={{
-          padding: '16px 20px',
+          padding: isMobileOrSim ? '8px 12px 6px 12px' : 'max(16px, env(safe-area-inset-top, 16px)) max(20px, env(safe-area-inset-right, 20px)) 16px max(20px, env(safe-area-inset-left, 20px))',
           background: 'linear-gradient(135deg, #34a853 0%, #4f46e5 100%)',
           backdropFilter: 'none',
           borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
@@ -4150,13 +4375,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           {/* Top Row / Desktop Row */}
           <div className="header-top-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', minWidth: 0 }}>
             {/* Left: Avatar + Student Info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }} className="header-left-info">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }} className="header-left-info">
               <div 
                 onClick={() => onProfileClick && onProfileClick(student)}
                 title={onProfileClick ? 'Schülerprofil anzeigen' : undefined}
                 style={{
-                  width: '38px',
-                  height: '38px',
+                  width: isMobileOrSim ? '30px' : '38px',
+                  height: isMobileOrSim ? '30px' : '38px',
                   borderRadius: '10px',
                   overflow: 'hidden',
                   flexShrink: 0,
@@ -4242,7 +4467,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             </div>
 
             {/* Desktop Tabs */}
-            <div style={{ display: 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
+            <div style={{ display: isMobileOrSim ? 'none' : 'flex', gap: '8px', marginLeft: '12px' }} className="header-tabs-desktop-container">
               {isTeacherTools ? (
                 <>
                   {/* Teacher tools order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
@@ -4410,7 +4635,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
-              <div className="header-desktop-archiv" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="header-desktop-archiv" style={{ display: isMobileOrSim ? 'none' : 'flex', alignItems: 'center', gap: '4px' }}>
                 {renderSkillRadarButton()}
                 {renderArchivButton()}
               </div>
@@ -4420,217 +4645,244 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
           </div>
 
-          {/* Bottom Row (mobile/tablet only) - Wrapped cleanly in 2 rows, no horizontal scrolling cutoffs */}
-          <div className="header-mobile-menu-row" style={{
-            display: 'none',
-            flexWrap: 'wrap',
-            gap: '8px',
-            width: '100%',
-            marginTop: '12px',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}>
-            {isTeacherTools ? (
-              <>
-                {/* Teacher mobile order: Loopstation -> Übe-Begleiter -> Aufnahmen */}
+          {/* Bottom Row (mobile/tablet only) - Apple Native Dropdown Selection Menu + Left/Right Quick-Click Buttons */}
+          {(() => {
+            const tabOptions = [
+              { value: 'document', label: isTeacherTools ? 'Aufgabenheft' : 'Schüler-Protokoll' },
+              { value: 'loopstation', label: 'Audio-Loopstation' },
+              { value: 'practice', label: 'Übe-Begleiter' },
+              { value: 'recordings', label: 'Audio-Aufnahmen' },
+              { value: 'radar', label: 'Skill-Radar' },
+              { value: 'history', label: 'Archiv & Historie' }
+            ];
+
+            const currentTabValue = 
+              activeModalTab === 'skillradar' ? 'radar' :
+              activeModalTab === 'stickeralbum' ? 'stickers' :
+              activeModalTab === 'logbook' ? 'meisterwerke' :
+              (activeModalTab === 'document' && activeSubView === 'history') ? 'history' :
+              activeViewMode;
+
+            const handleTabSelect = (val: string) => {
+              if (val === 'radar') {
+                setActiveModalTab('skillradar');
+              } else if (val === 'stickers') {
+                setActiveModalTab('stickeralbum');
+                setActiveSubView('hub');
+              } else if (val === 'meisterwerke') {
+                setActiveModalTab('logbook');
+              } else if (val === 'history') {
+                setActiveModalTab('document');
+                setActiveSubView('history');
+              } else {
+                setActiveModalTab('document');
+                setActiveViewMode(val as any);
+                setActiveSubView('hub');
+              }
+            };
+
+            const currentIndex = tabOptions.findIndex(t => t.value === currentTabValue);
+
+            const handlePrevTab = () => {
+              const prevIdx = (currentIndex - 1 + tabOptions.length) % tabOptions.length;
+              handleTabSelect(tabOptions[prevIdx].value);
+            };
+
+            const handleNextTab = () => {
+              const nextIdx = (currentIndex + 1) % tabOptions.length;
+              handleTabSelect(tabOptions[nextIdx].value);
+            };
+
+            return (
+              <div className="header-mobile-menu-row" style={{
+                display: isMobileOrSim ? 'flex' : 'none',
+                width: '100%',
+                marginTop: '4px',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                {/* Left Arrow Quick-Click Button */}
                 <button
                   type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
+                  onClick={handlePrevTab}
+                  title="Vorheriger Tab"
                   style={{
-                    background: activeViewMode === 'loopstation' ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.4)',
                     color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
+                    flexShrink: 0,
+                    outline: 'none'
                   }}
                 >
-                  <Sliders size={12} />
-                  <span>Loopstation</span>
+                  <ChevronLeft size={18} color="white" />
                 </button>
+
+                {/* Center Select Dropdown */}
+                <div style={{
+                  position: 'relative',
+                  width: '100%',
+                  maxWidth: '240px'
+                }}>
+                  <select
+                    value={currentTabValue}
+                    onChange={(e) => handleTabSelect(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 32px 8px 14px',
+                      borderRadius: '100px',
+                      background: 'rgba(255, 255, 255, 0.22)',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                      border: '1px solid rgba(255, 255, 255, 0.4)',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '0.82rem',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+                      outline: 'none',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {tabOptions.map(opt => (
+                      <option key={opt.value} value={opt.value} style={{ color: '#000', background: '#fff' }}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={15} color="white" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                </div>
+
+                {/* Right Arrow Quick-Click Button */}
                 <button
                   type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
+                  onClick={handleNextTab}
+                  title="Nächster Tab"
                   style={{
-                    background: activeViewMode === 'practice' ? '#eab308' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.4)',
                     color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Music size={12} />
-                  <span>Übe-Begleiter</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
-                  style={{
-                    background: activeViewMode === 'recordings' ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
+                    justifyContent: 'center',
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
+                    flexShrink: 0,
+                    outline: 'none'
                   }}
                 >
-                  <Mic size={12} />
-                  <span>Aufnahmen</span>
+                  <ChevronRight size={18} color="white" />
                 </button>
-              </>
-            ) : (
-              <>
-                {/* Student mobile order: Protokoll -> Loopstation -> Übe-Begleiter -> Aufnahmen */}
-                <button
-                  type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('document'); setActiveSubView('hub'); }}
-                  style={{
-                    background: (activeModalTab === 'document' && activeViewMode === 'document' && activeSubView !== 'history') ? '#34a853' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <BookOpen size={12} />
-                  <span>Protokoll</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('loopstation'); setActiveSubView('hub'); }}
-                  style={{
-                    background: (activeModalTab === 'document' && activeViewMode === 'loopstation') ? '#dc2626' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Sliders size={12} />
-                  <span>Loopstation</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('practice'); setActiveSubView('hub'); }}
-                  style={{
-                    background: (activeModalTab === 'document' && activeViewMode === 'practice') ? '#eab308' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Music size={12} />
-                  <span>Übe-Begleiter</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveModalTab('document'); setActiveViewMode('recordings'); setActiveSubView('hub'); }}
-                  style={{
-                    background: (activeModalTab === 'document' && activeViewMode === 'recordings') ? '#4f46e5' : 'rgba(255,255,255,0.15)',
-                    border: 'none',
-                    color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <Mic size={12} />
-                  <span>Aufnahmen</span>
-                </button>
-              </>
-            )}
-            {renderSkillRadarButton(true)}
-            {renderArchivButton(true)}
-          </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Modal Content - Side-by-side Columns or Logbook */}
-        <div style={{
-          display: 'flex',
-          flex: 1,
-          overflow: 'hidden',
-          minHeight: 0,
-          background: useNotebookLayout 
-            ? (bookColor 
-                ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
-                : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
-            : 'transparent',
-          padding: '0',
-          position: 'relative'
-        }} className="modal-content-container">
+        <div
+          onTouchStart={(e) => {
+            if (!isMobileView || activeModalTab !== 'document') return;
+            touchStartXRef.current = e.touches[0].clientX;
+            touchStartYRef.current = e.touches[0].clientY;
+          }}
+          onTouchEnd={(e) => {
+            if (!isMobileView || activeModalTab !== 'document' || touchStartXRef.current === null || touchStartYRef.current === null) return;
+            const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+            const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+            touchStartXRef.current = null;
+            touchStartYRef.current = null;
+
+            if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+              if (deltaX < -40) {
+                setMobileProtokollTab('homework');
+              } else if (deltaX > 40) {
+                setMobileProtokollTab('repertoire');
+              }
+            }
+          }}
+          style={{
+            display: 'flex',
+            flex: 1,
+            overflowY: isMobileOrSim ? 'auto' : 'hidden',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            minHeight: 0,
+            background: useNotebookLayout 
+              ? (bookColor 
+                  ? `radial-gradient(circle, ${bookColor.from} 0%, ${bookColor.to} 100%)` 
+                  : 'radial-gradient(circle, #5c4d40 0%, #30261f 100%)') 
+              : '#ffffff',
+            padding: '0',
+            position: 'relative'
+          }} className="modal-content-container">
           {activeModalTab === 'skillradar' ? (
-            renderSkillRadarTabContent()
+            <div style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
+            }}>
+              {renderSkillRadarTabContent()}
+            </div>
           ) : activeViewMode === 'loopstation' ? (
-            <GrooveLoopstation
-              student={student}
-              homeworkNotesList={homeworkNotesList}
-              setHomeworkNotesList={setHomeworkNotesList}
-              syncHomeworkNotes={syncHomeworkNotes}
-              fetchProgress={fetchProgress}
-              notifyHomeworkChange={notifyHomeworkChange}
-              readOnly={readOnly}
-              setActiveViewMode={setActiveViewMode}
-              useNotebookLayout={useNotebookLayout}
-            />
+            <div style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
+            }}>
+              <GrooveLoopstation
+                student={student}
+                homeworkNotesList={homeworkNotesList}
+                setHomeworkNotesList={setHomeworkNotesList}
+                syncHomeworkNotes={syncHomeworkNotes}
+                fetchProgress={fetchProgress}
+                notifyHomeworkChange={notifyHomeworkChange}
+                readOnly={readOnly}
+                setActiveViewMode={setActiveViewMode}
+                useNotebookLayout={useNotebookLayout}
+              />
+            </div>
           ) : activeViewMode === 'practice' ? (
-            <GroovePracticeCompanion
-              useNotebookLayout={useNotebookLayout}
-              isCampusModule={true}
-              activeSongContext={activeRhythmSong}
-              onRhythmScoreUpdate={(score, details) => {
-                if (details.beatsCount >= 12) {
-                  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  const starsStr = '⭐'.repeat(details.stars || 1);
-                  const entry = `RHYTHM_SCORE:${score}%|${details.bpm}|${details.beatsCount}|${timeStr}|${starsStr}|${details.songTitle || ''}`;
-                  setHomeworkNotesList(prev => {
-                    const filtered = prev.filter(n => !n.startsWith('RHYTHM_SCORE:'));
-                    const updated = [...filtered, entry];
-                    syncHomeworkNotes(updated).catch(err => console.error('Error syncing rhythm score:', err));
-                    return updated;
-                  });
-                }
-              }}
-            />
+            <div style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
+            }}>
+              <GroovePracticeCompanion
+                useNotebookLayout={useNotebookLayout}
+                isCampusModule={true}
+                activeSongContext={activeRhythmSong}
+                onRhythmScoreUpdate={(score, details) => {
+                  if (details.beatsCount >= 12) {
+                    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const starsStr = '⭐'.repeat(details.stars || 1);
+                    const entry = `RHYTHM_SCORE:${score}%|${details.bpm}|${details.beatsCount}|${timeStr}|${starsStr}|${details.songTitle || ''}`;
+                    setHomeworkNotesList(prev => {
+                      const filtered = prev.filter(n => !n.startsWith('RHYTHM_SCORE:'));
+                      const updated = [...filtered, entry];
+                      syncHomeworkNotes(updated).catch(err => console.error('Error syncing rhythm score:', err));
+                      return updated;
+                    });
+                  }
+                }}
+              />
+            </div>
           ) : activeViewMode === 'recordings' ? (
             <>
               {/* LEFT PAGE: Lehrer Aufnahmen */}
@@ -4643,8 +4895,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 borderRadius: isTeacherTools ? '0 0 20px 20px' : (useNotebookLayout ? '0 0 0 20px' : '0'),
                 boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
                 borderRight: isTeacherTools ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
-                position: 'relative',
-                padding: '28px'
+                padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 28px 80px 28px'
               }}>
                 {useNotebookLayout && !isTeacherTools && (
                   <div style={{
@@ -4811,7 +5062,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   }
 
                   return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
                       {teacherAudios.map((aud, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
                           <RetroCassettePlayer
@@ -5062,7 +5313,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     }
 
                     return (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '16px' }}>
                         {studentAudios.map((aud, idx) => (
                           <div key={idx} style={{ display: 'flex', justifyContent: 'center' }}>
                             <RetroCassettePlayer
@@ -5084,84 +5335,107 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             <>
           
           {/* LEFT COLUMN: 🎯 FOKUS-ARBEITSPLATZ (Lehrwerke & Songs) */}
-          <style dangerouslySetInnerHTML={{__html: `
-            .hide-scrollbar::-webkit-scrollbar {
-              display: none;
-            }
-            .hide-scrollbar {
-              -ms-overflow-style: none;
-              scrollbar-width: none;
-            }
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            @keyframes slideUp {
-              from { transform: translateY(20px); opacity: 0; }
-              to { transform: translateY(0); opacity: 1; }
-            }
-            .modal-content-container {
-              display: flex !important;
-              flex-direction: row !important;
-            }
-            
-            @media (max-width: 900px) {
-              .modal-header-container {
-                flex-direction: column !important;
-                align-items: stretch !important;
-                padding: 12px 16px !important;
-                gap: 12px !important;
-              }
-              .header-top-row {
-                width: 100% !important;
-              }
-              .header-tabs-desktop-container {
-                display: none !important;
-              }
-              .header-desktop-archiv {
-                display: none !important;
-              }
-              .header-mobile-menu-row {
-                display: flex !important;
-              }
-              .header-left-info {
-                flex-wrap: nowrap !important;
-                width: auto !important;
-                gap: 8px !important;
-              }
-              
-              /* Stack columns vertically on mobile and tablet viewport sizes */
-              .modal-content-container {
-                flex-direction: column !important;
-                overflow-y: auto !important;
-              }
-              .modal-content-container > div {
-                flex: none !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
-                height: auto !important;
-                min-height: auto !important;
-                overflow: visible !important;
-                border-right: none !important;
-                border-left: none !important;
-                padding: 16px !important;
-              }
-            }
-          `}} />
+
+          {/* MOBILE SEGMENTED CONTROL PILL-BAR FOR 2 SWIPE CARDS */}
+          {isMobileView && (
+            <div style={{
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '6px 16px',
+              background: '#faf8f2',
+              borderBottom: '1px solid #e0dad0',
+              flexShrink: 0,
+              zIndex: 35
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'rgba(0, 0, 0, 0.06)',
+                borderRadius: '100px',
+                padding: '3px',
+                width: '100%',
+                maxWidth: '340px',
+                height: '38px',
+                boxSizing: 'border-box',
+                gap: '3px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setMobileProtokollTab('repertoire')}
+                  style={{
+                    flex: 1,
+                    height: '32px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: mobileProtokollTab === 'repertoire' ? '#ffffff' : 'transparent',
+                    color: mobileProtokollTab === 'repertoire' ? '#0f172a' : '#64748b',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    boxShadow: mobileProtokollTab === 'repertoire' ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <BookOpen size={13} style={{ color: mobileProtokollTab === 'repertoire' ? '#34a853' : '#64748b' }} />
+                  <span>Lehrwerke & Songs</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMobileProtokollTab('homework')}
+                  style={{
+                    flex: 1,
+                    height: '32px',
+                    borderRadius: '100px',
+                    border: 'none',
+                    background: mobileProtokollTab === 'homework' ? '#ffffff' : 'transparent',
+                    color: mobileProtokollTab === 'homework' ? '#0f172a' : '#64748b',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    boxShadow: mobileProtokollTab === 'homework' ? '0 2px 6px rgba(0,0,0,0.12)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <Edit3 size={13} style={{ color: mobileProtokollTab === 'homework' ? '#ea4335' : '#64748b' }} />
+                  <span>Hausaufgabe</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div style={{
-            flex: '1 1 0%',
-            overflow: 'hidden',
-            display: 'flex',
+            flex: isMobileView ? 'none' : '1 1 0%',
+            height: isMobileView ? 'auto' : '100%',
+            minHeight: '0',
+            maxHeight: isMobileView ? 'none' : '100%',
+            overflowY: isMobileView ? 'visible' : 'auto',
+            display: isMobileView ? (mobileProtokollTab === 'repertoire' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
-            background: useNotebookLayout ? '#faf8f2' : 'white',
-            borderRadius: useNotebookLayout ? '0 0 0 20px' : '0',
-            boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+            justifyContent: 'flex-start',
+            gap: '16px',
+            background: useNotebookLayout ? '#faf8f2' : '#ffffff',
+            borderRadius: '0',
+            boxShadow: 'none',
             borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
-            position: 'relative'
+            position: 'relative',
+            padding: isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '0px',
+            boxSizing: 'border-box'
           }}>
             
-            {useNotebookLayout && (
+            {useNotebookLayout && !isMobileView && (
               <div style={{
                 position: 'absolute',
                 top: '20px',
@@ -6577,7 +6851,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   }} className="animation-slide-up">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '0.76rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        📚 Eigenes Lehrwerk erstellen
+                        <BookOpen size={14} style={{ color: '#34a853' }} />
+                        <span>Eigenes Lehrwerk erstellen</span>
                       </div>
                       <button
                         type="button"
@@ -6950,7 +7225,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       }}
                       className="hover-scale-mini"
                     >
-                      ➕ Neu anlegen
+                      <Plus size={12} /> Neu anlegen
                     </button>
                   </div>
 
@@ -7168,7 +7443,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         )}
       </div>
 
-        {useNotebookLayout && (
+        {useNotebookLayout && !isMobileView && (
           <div style={{
             width: '6px',
             background: '#18181b',
@@ -7201,21 +7476,25 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         {/* COLUMN 3: ✍️ DOKUMENTATION & HAUSAUFGABE (32%) */}
           
           <div style={{
-            flex: '1 1 0%',
-            padding: useNotebookLayout ? '24px 24px 24px 60px' : '24px',
-            overflowY: 'auto',
-            display: 'flex',
+            flex: isMobileView ? 'none' : '1 1 0%',
+            height: isMobileView ? 'auto' : '100%',
+            minHeight: '0',
+            maxHeight: isMobileView ? 'none' : '100%',
+            padding: useNotebookLayout ? (isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 24px 24px 60px') : (isMobileView ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px'),
+            overflowY: isMobileView ? 'visible' : 'auto',
+            display: isMobileView ? (mobileProtokollTab === 'homework' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
+            justifyContent: 'flex-start',
             gap: '20px',
             background: useNotebookLayout ? 'white' : '#f8fafc',
             backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
             borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
-            borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
-            boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
+            borderRadius: '0',
+            boxShadow: 'none',
             position: 'relative',
-            height: '100%'
+            boxSizing: 'border-box'
           }}>
-            {useNotebookLayout && (
+            {useNotebookLayout && !isMobileView && (
               <div style={{
                 position: 'absolute',
                 top: 0,
@@ -7562,7 +7841,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>
 
                 {/* textbook page documentation form */}
-                <form onSubmit={(e) => handleSave(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <form onSubmit={(e) => handleSave(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }}>
                   {/* Teacher View: Homework & Notes Editor */}
                   {!readOnly ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -7986,7 +8265,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   </div>
 )}
 
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px', paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '180px' : '48px' }}>
                     <button
                       type="button"
                       onClick={() => {
@@ -8074,7 +8353,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       </div>
                     </div>
 
-                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '80px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <label style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           📝 Übungs-Fahrplan & Hausaufgabe:
@@ -8195,7 +8474,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
 
 
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px', paddingBottom: (isMobileView || isInsideSim || isFullscreen || isMobileOrSim) ? '180px' : '48px' }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -8249,8 +8528,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                   <div>
-                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      ✍️ Eintrag & Hausaufgabe
+                    <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#09090b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Edit3 size={16} style={{ color: '#0f172a' }} />
+                      <span>Eintrag & Hausaufgabe</span>
                     </span>
                     <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#71717a', fontWeight: 550, lineHeight: '1.3' }}>
                       Dokumentiere den heutigen Unterricht für den Schüler.
@@ -8259,14 +8539,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 </div>
 
                 {/* The Main Input Form Card */}
-                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', gap: '16px' }}>
+                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: '16px' }}>
                   <div style={{
                     flex: 1,
-                    overflowY: 'auto',
-                    paddingRight: '6px',
-                    paddingBottom: '8px',
                     display: 'flex',
-                    flexDirection: 'column'
+                    flexDirection: 'column',
+                    gap: '16px'
                   }}>
                     <div style={{
                       background: 'white',
@@ -8984,188 +9262,299 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
                         {!readOnly && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                ⚡ Schnellbaukasten Presets:
-                              </span>
-                              <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 700 }}>
-                                Wische für mehr ➔
-                              </span>
-                            </div>
+                            {(() => {
+                              const isPresetActive = (itemText: string, isBpm = false) => {
+                                const currentNotes = homeworkNotes || '';
+                                if (isBpm) {
+                                  return currentNotes.includes("Achte diese Woche besonders darauf, das Metronom bei");
+                                }
+                                return currentNotes.includes(itemText);
+                              };
 
-                            <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
-                              <div 
-                                style={{ 
-                                  display: 'flex', 
-                                  gap: '8px', 
-                                  overflowX: 'auto', 
-                                  padding: '4px 2px 8px 2px', 
-                                  scrollbarWidth: 'thin',
-                                  WebkitOverflowScrolling: 'touch',
-                                }}
-                                className="presets-scrollbar-container"
-                              >
-                                {(() => {
-                                  const isPresetActive = (itemText: string, isBpm = false) => {
-                                    const currentNotes = homeworkNotes || '';
-                                    if (isBpm) {
-                                      return currentNotes.includes("Achte diese Woche besonders darauf, das Metronom bei");
-                                    }
-                                    return currentNotes.includes(itemText);
-                                  };
+                              const togglePreset = (itemText: string, isBpm = false, tagKey?: string) => {
+                                let currentNotes = homeworkNotes || '';
+                                const active = isPresetActive(itemText, isBpm);
 
-                                  const togglePreset = (itemText: string, isBpm = false, tagKey?: string) => {
-                                    let currentNotes = homeworkNotes || '';
-                                    const active = isPresetActive(itemText, isBpm);
+                                if (active) {
+                                  if (isBpm) {
+                                    currentNotes = currentNotes.replace(/\n*Achte diese Woche besonders darauf, das Metronom bei .* zu halten\./g, '');
+                                  } else {
+                                    const escapedText = itemText.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+                                    currentNotes = currentNotes.replace(new RegExp('\\n*' + escapedText, 'g'), '');
+                                  }
+                                  currentNotes = currentNotes.replace(/\n{3,}/g, '\n\n').trim();
+                                  setHomeworkNotes(currentNotes);
 
-                                    if (active) {
-                                      // Remove the text and clean trailing whitespace / extra linebreaks
-                                      if (isBpm) {
-                                        currentNotes = currentNotes.replace(/\n*Achte diese Woche besonders darauf, das Metronom bei .* zu halten\./g, '');
-                                      } else {
-                                        // Escape regex special chars to safely replace
-                                        const escapedText = itemText.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                                        currentNotes = currentNotes.replace(new RegExp('\\n*' + escapedText, 'g'), '');
-                                      }
-                                      currentNotes = currentNotes.replace(/\n{3,}/g, '\n\n').trim();
-                                      setHomeworkNotes(currentNotes);
+                                  if (tagKey) {
+                                    setPendingTargetFocusTags(prev => prev.filter(t => t !== tagKey));
+                                  }
+                                } else {
+                                  let textToAdd = itemText;
+                                  if (isBpm) {
+                                    const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
+                                    const bpmText = bpm ? `${bpm} BPM` : "120 BPM";
+                                    textToAdd = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
+                                  }
+                                  currentNotes = currentNotes ? `${currentNotes.trim()}\n\n${textToAdd}` : textToAdd;
+                                  setHomeworkNotes(currentNotes);
+                                  setIsCurrentHomework(true);
 
-                                      if (tagKey) {
-                                        setPendingTargetFocusTags(prev => prev.filter(t => t !== tagKey));
-                                      }
-                                    } else {
-                                      // Add the text
-                                      let textToAdd = itemText;
-                                      if (isBpm) {
-                                        const bpm = prompt("Geben Sie die BPM-Zahl ein:", "120");
-                                        const bpmText = bpm ? `${bpm} BPM` : "120 BPM";
-                                        textToAdd = `Achte diese Woche besonders darauf, das Metronom bei ${bpmText} zu halten.`;
-                                      }
-                                      currentNotes = currentNotes ? `${currentNotes.trim()}\n\n${textToAdd}` : textToAdd;
-                                      setHomeworkNotes(currentNotes);
-                                      setIsCurrentHomework(true);
+                                  if (tagKey) {
+                                    setPendingTargetFocusTags(prev => prev.includes(tagKey) ? prev : [...prev, tagKey]);
+                                  }
+                                }
+                                setHasChanges(true);
+                              };
 
-                                      if (tagKey) {
-                                        setPendingTargetFocusTags(prev => prev.includes(tagKey) ? prev : [...prev, tagKey]);
-                                      }
-                                    }
-                                    setHasChanges(true);
-                                  };
+                              const allPresets = [
+                                {
+                                  label: '⏱️ Tempo halten',
+                                  desc: 'Metronom BPM',
+                                  text: '',
+                                  tagKey: 'tempo',
+                                  isBpm: true,
+                                  onClick: () => togglePreset('', true, 'tempo')
+                                },
+                                {
+                                  label: '✨ Sauber spielen',
+                                  desc: 'Töne & Intonation',
+                                  text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.',
+                                  tagKey: 'intonation',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.', false, 'intonation')
+                                },
+                                {
+                                  label: '🥁 Rhythmus-Metronom',
+                                  desc: 'Timing & Takt',
+                                  text: 'Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.',
+                                  tagKey: 'rhythmus',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.', false, 'rhythmus')
+                                },
+                                {
+                                  label: '🖖 Fingersatz üben',
+                                  desc: 'Fingersatz einhalten',
+                                  text: 'Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.',
+                                  tagKey: 'fingersatz',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.', false, 'fingersatz')
+                                },
+                                {
+                                  label: '🎭 Ausdruck & Dynamik',
+                                  desc: 'Musikalität',
+                                  text: 'Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.',
+                                  tagKey: 'ausdruck',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.', false, 'ausdruck')
+                                },
+                                {
+                                  label: '📖 Auswendig lernen',
+                                  desc: 'Spiel ohne Blatt',
+                                  text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.',
+                                  tagKey: 'auswendig',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.', false, 'auswendig')
+                                },
+                                {
+                                  label: '🔄 Kontinuität üben',
+                                  desc: 'Tägliche Routine',
+                                  text: 'Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.',
+                                  tagKey: 'kontinuitaet',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.', false, 'kontinuitaet')
+                                },
+                                {
+                                  label: '💪 Selbstständig üben',
+                                  desc: 'Pionier-Üben',
+                                  text: 'Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.',
+                                  tagKey: 'selbststaendigkeit',
+                                  isBpm: false,
+                                  onClick: () => togglePreset('Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.', false, 'selbststaendigkeit')
+                                },
+                                ...textbausteine
+                                  .filter((tb: any) => tb.active)
+                                  .map((tpl: any) => ({
+                                    label: `📝 ${tpl.label}`,
+                                    desc: 'Textbaustein',
+                                    text: tpl.text,
+                                    tagKey: undefined,
+                                    isBpm: false,
+                                    onClick: () => togglePreset(tpl.text, false)
+                                  }))
+                              ];
 
-                                  const allPresets = [
-                                    {
-                                      label: '⏱️ Tempo halten',
-                                      desc: 'Metronom BPM',
-                                      text: '',
-                                      tagKey: 'tempo',
-                                      isBpm: true,
-                                      onClick: () => togglePreset('', true, 'tempo')
-                                    },
-                                    {
-                                      label: '✨ Sauber spielen',
-                                      desc: 'Töne & Intonation',
-                                      text: 'Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.',
-                                      tagKey: 'intonation',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Achte auf eine präzise Ausführung und einen sauberen, klaren Klang.', false, 'intonation')
-                                    },
-                                    {
-                                      label: '🥁 Rhythmus-Metronom',
-                                      desc: 'Timing & Takt',
-                                      text: 'Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.',
-                                      tagKey: 'rhythmus',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Achte auf ein stabiles Rhythmus-Metronom und spiele genau auf den Schlag.', false, 'rhythmus')
-                                    },
-                                    {
-                                      label: '🖖 Fingersatz üben',
-                                      desc: 'Fingersatz einhalten',
-                                      text: 'Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.',
-                                      tagKey: 'fingersatz',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Achte darauf, den vorgegebenen Fingersatz genau einzuhalten und zu üben.', false, 'fingersatz')
-                                    },
-                                    {
-                                      label: '🎭 Ausdruck & Dynamik',
-                                      desc: 'Musikalität',
-                                      text: 'Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.',
-                                      tagKey: 'ausdruck',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Spiele mit voller Hingabe, achte auf die Lautstärken-Dynamik und Phrasierung.', false, 'ausdruck')
-                                    },
-                                    {
-                                      label: '📖 Auswendig lernen',
-                                      desc: 'Spiel ohne Blatt',
-                                      text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.',
-                                      tagKey: 'auswendig',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.', false, 'auswendig')
-                                    },
-                                    {
-                                      label: '🔄 Kontinuität üben',
-                                      desc: 'Tägliche Routine',
-                                      text: 'Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.',
-                                      tagKey: 'kontinuitaet',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.', false, 'kontinuitaet')
-                                    },
-                                    {
-                                      label: '💪 Selbstständig üben',
-                                      desc: 'Pionier-Üben',
-                                      text: 'Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.',
-                                      tagKey: 'selbststaendigkeit',
-                                      isBpm: false,
-                                      onClick: () => togglePreset('Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.', false, 'selbststaendigkeit')
-                                    },
-                                    ...textbausteine
-                                      .filter((tb: any) => tb.active)
-                                      .map((tpl: any) => ({
-                                        label: `📝 ${tpl.label}`,
-                                        desc: 'Textbaustein',
-                                        text: tpl.text,
-                                        tagKey: undefined,
-                                        isBpm: false,
-                                        onClick: () => togglePreset(tpl.text, false)
-                                      }))
-                                  ];
+                              const topPresets = allPresets.slice(0, 5);
+                              const extraPresets = allPresets.slice(5);
 
-                                  return allPresets.map((item, idx) => {
-                                    const active = isPresetActive(item.text, item.isBpm);
-                                    return (
-                                      <button
-                                        key={idx}
-                                        type="button"
-                                        onClick={item.onClick}
-                                        style={{
-                                          flexShrink: 0,
-                                          background: active ? '#e6f4ea' : '#f8fafc',
-                                          color: active ? '#2e7d32' : '#1e293b',
-                                          border: active ? '1px solid #34a853' : '1px solid #cbd5e1',
-                                          padding: '6px 12px',
-                                          borderRadius: '12px',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          alignItems: 'flex-start',
-                                          gap: '1px',
-                                          textAlign: 'left',
-                                          outline: 'none',
-                                          boxShadow: active ? '0 2px 5px rgba(52, 168, 83, 0.12)' : 'none'
-                                        }}
-                                        className="preset-chip-card preset-btn"
-                                      >
-                                        <span style={{ fontWeight: 800, fontSize: '0.70rem', color: active ? '#2e7d32' : '#0f172a', whiteSpace: 'nowrap' }}>
-                                          {item.label}
+                              const renderPill = (item: any, idx: number) => {
+                                const active = isPresetActive(item.text, item.isBpm);
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={item.onClick}
+                                    style={{
+                                      flexShrink: 0,
+                                      background: active ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)' : '#ffffff',
+                                      color: active ? '#ffffff' : '#1e293b',
+                                      border: active ? '1px solid #34a853' : '1px solid #e2e8f0',
+                                      padding: '6px 12px',
+                                      borderRadius: '100px',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      outline: 'none',
+                                      boxShadow: active ? '0 3px 10px rgba(52, 168, 83, 0.25)' : '0 1px 3px rgba(0, 0, 0, 0.05)',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                    className="preset-chip-card hover-scale"
+                                  >
+                                    <span style={{ fontWeight: 800, fontSize: '0.72rem', letterSpacing: '-0.01em' }}>
+                                      {item.label}
+                                    </span>
+                                    {active && (
+                                      <span style={{ 
+                                        background: 'rgba(255, 255, 255, 0.25)', 
+                                        borderRadius: '50%', 
+                                        width: '14px', 
+                                        height: '14px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center', 
+                                        fontSize: '0.6rem', 
+                                        fontWeight: 900 
+                                      }}>
+                                        ✓
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              };
+
+                              return (
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                      ⚡ Schnellbaukasten Presets:
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowAllPresets(prev => !prev)}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        fontSize: '0.68rem',
+                                        color: '#34a853',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        padding: 0
+                                      }}
+                                    >
+                                      {showAllPresets ? 'Weniger ▴' : `Mehr (${extraPresets.length}) ▾`}
+                                    </button>
+                                  </div>
+
+                                  {/* Top 5 Horizontal Pill Bar */}
+                                  <div style={{ position: 'relative', width: '100%', marginBottom: '4px' }}>
+                                    <div 
+                                      style={{ 
+                                        display: 'flex', 
+                                        gap: '6px', 
+                                        overflowX: 'auto', 
+                                        padding: '4px 2px 8px 2px', 
+                                        scrollbarWidth: 'none',
+                                        WebkitOverflowScrolling: 'touch',
+                                        flexWrap: 'nowrap',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
+                                      }}
+                                      className="presets-scrollbar-container hide-scrollbar"
+                                    >
+                                      {topPresets.map((item, idx) => renderPill(item, idx))}
+
+                                      {/* Expand Pill Button */}
+                                      {extraPresets.length > 0 && !showAllPresets && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowAllPresets(true)}
+                                          style={{
+                                            flexShrink: 0,
+                                            background: '#f1f5f9',
+                                            color: '#34a853',
+                                            border: '1.5px dashed #34a853',
+                                            padding: '6px 14px',
+                                            borderRadius: '100px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontWeight: 850,
+                                            fontSize: '0.72rem',
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                          className="preset-chip-card hover-scale"
+                                        >
+                                          <span>Mehr ({extraPresets.length}) ▾</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Expanded Glass Accordion Container */}
+                                  {showAllPresets && (
+                                    <div style={{
+                                      width: '100%',
+                                      padding: '12px',
+                                      background: 'rgba(248, 250, 252, 0.95)',
+                                      borderRadius: '16px',
+                                      border: '1px solid #e2e8f0',
+                                      marginTop: '4px',
+                                      boxSizing: 'border-box',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px',
+                                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)'
+                                    }} className="animation-fade-in">
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 850, color: '#1e293b' }}>
+                                          🎯 Alle Schnelltext-Bausteine ({allPresets.length}):
                                         </span>
-                                        <span style={{ fontSize: '0.56rem', color: active ? '#34a853' : '#64748b', whiteSpace: 'nowrap' }}>
-                                          {item.desc}
-                                        </span>
-                                      </button>
-                                    );
-                                  });
-                                })()}
-                              </div>
-                            </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowAllPresets(false)}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#64748b',
+                                            fontSize: '0.65rem',
+                                            fontWeight: 800,
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          Schließen ✕
+                                        </button>
+                                      </div>
+
+                                      <div style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '6px',
+                                        maxHeight: '220px',
+                                        overflowY: 'auto',
+                                        padding: '4px 0'
+                                      }}>
+                                        {extraPresets.map((item, idx) => renderPill(item, idx + 5))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -9351,7 +9740,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px', paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '48px' }}>
                     <button
                       type="submit"
                       disabled={saving}
@@ -9396,7 +9785,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         <div style={{
           flex: 1,
           width: '100%',
-          padding: '28px 32px',
+          padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 32px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -10655,7 +11044,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         /* COLUMN 4: 🏆 MEISTERWERKE & LOGBUCH (Full Width in Swiss Modernist Style) */
         <div style={{
           flex: 1,
-          padding: useNotebookLayout ? '32px 32px 32px 60px' : '32px',
+          padding: isMobileOrSim ? '20px 16px 100px 16px' : (useNotebookLayout ? '32px 32px 80px 60px' : '32px 32px 80px 32px'),
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -11466,152 +11855,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // ── Skill-Radar Drawer ──────────────────────────────────────────────
     const skillRadarDrawer = showSkillRadar ? createPortal(
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(9,9,11,0.72)', backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        style={{ position: 'fixed', inset: 0, zIndex: 999999, background: 'rgba(9,9,11,0.72)', backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
         onClick={() => setShowSkillRadar(false)}
       >
         <div
-          style={{ background: 'white', borderRadius: '28px', width: '100%', maxWidth: '540px', maxHeight: '85vh', overflowY: 'auto', padding: '28px', boxShadow: '0 30px 80px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: '20px' }}
+          style={{ background: 'white', borderRadius: '28px', width: '100%', maxWidth: '840px', maxHeight: '90vh', overflowY: 'auto', padding: '20px', boxShadow: '0 30px 80px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: '16px' }}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>Skill-Radar</h3>
-              <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Häufigste Schwierigkeiten — letzte 12 Bewertungen</p>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>Skill-Radar Cockpit</h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Entwicklungs-Analyse & Kompetenz-Cockpit</p>
             </div>
             <button
               onClick={() => setShowSkillRadar(false)}
-              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <X size={14} color="#475569" />
+              <X size={16} color="#475569" />
             </button>
           </div>
 
-          {/* Chart + Legend */}
-          {(() => {
-            const feedbackEntries = progressItems
-              .map(item => {
-                try {
-                  const notes: string[] = JSON.parse(item.homework_notes || '[]');
-                  const fbStr = notes.find(n => n.startsWith('FEEDBACK:'));
-                  if (!fbStr) return null;
-                  return JSON.parse(fbStr.substring(9));
-                } catch { return null; }
-              })
-              .filter(Boolean)
-              .slice(-12);
-
-            if (feedbackEntries.length === 0) {
-              return (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>📡</div>
-                  <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: '0 0 4px' }}>Noch keine Bewertungen</p>
-                  <p style={{ fontSize: '0.75rem', margin: 0 }}>Hier werden deine am häufigsten markierten Schwierigkeiten aus den letzten 12 Unterrichtsstunden visualisiert.</p>
-                </div>
-              );
-            }
-
-            const tagCounts = SKILL_TAGS.map(tag => ({
-              ...tag,
-              count: feedbackEntries.filter((fb: any) => fb.tags?.includes(tag.key)).length,
-              pct: feedbackEntries.filter((fb: any) => fb.tags?.includes(tag.key)).length / feedbackEntries.length,
-            }));
-
-            // Calculate custom tags counts in the last 12 entries
-            const customTagCounts: { key: string; count: number }[] = [];
-            feedbackEntries.forEach((fb: any) => {
-              if (Array.isArray(fb.tags)) {
-                fb.tags.forEach((t: string) => {
-                  if (!SKILL_TAGS.some(st => st.key === t)) {
-                    const existing = customTagCounts.find(c => c.key === t);
-                    if (existing) {
-                      existing.count++;
-                    } else {
-                      customTagCounts.push({ key: t, count: 1 });
-                    }
-                  }
-                });
-              }
-            });
-
-            // SVG Radar
-            const N = SKILL_TAGS.length;
-            const cx = 150, cy = 150, r = 110;
-            const getPoint = (i: number, scale: number) => ({
-              x: cx + scale * r * Math.sin((i * 2 * Math.PI) / N),
-              y: cy - scale * r * Math.cos((i * 2 * Math.PI) / N),
-            });
-            const gridLevels = [0.25, 0.5, 0.75, 1.0];
-            const gridPaths = gridLevels.map(lvl =>
-              SKILL_TAGS.map((_, i) => getPoint(i, lvl))
-                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-                .join(' ') + ' Z'
-            );
-            const dataPath = tagCounts
-              .map((tag, i) => { const p = getPoint(i, Math.max(tag.pct, 0.02)); return `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`; })
-              .join(' ') + ' Z';
-
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <svg width="300" height="300" viewBox="0 0 300 300" style={{ margin: '0 auto', display: 'block' }}>
-                  {gridPaths.map((d, i) => <path key={i} d={d} fill="none" stroke="#e2e8f0" strokeWidth="1" />)}
-                  {SKILL_TAGS.map((_, i) => { const pt = getPoint(i, 1); return <line key={i} x1={cx} y1={cy} x2={pt.x} y2={pt.y} stroke="#e2e8f0" strokeWidth="1" />; })}
-                  <path d={dataPath} fill="rgba(52,168,83,0.18)" stroke="#34a853" strokeWidth="2.5" strokeLinejoin="round" />
-                  {tagCounts.map((tag, i) => { const p = getPoint(i, Math.max(tag.pct, 0.02)); return <circle key={i} cx={p.x} cy={p.y} r={tag.pct > 0 ? 5 : 3} fill={tag.pct > 0 ? '#34a853' : '#e2e8f0'} />; })}
-                  {tagCounts.map((tag, i) => {
-                    const p = getPoint(i, 1.28);
-                    return (
-                      <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fontWeight="700" fill={tag.pct > 0.5 ? '#dc2626' : tag.pct > 0 ? '#ca8a04' : '#94a3b8'}>
-                        {tag.icon} {tag.label}
-                      </text>
-                    );
-                  })}
-                </svg>
-
-                {/* Tag pills sorted by frequency */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {tagCounts.filter(t => t.count > 0).sort((a, b) => b.count - a.count).map(tag => (
-                    <span key={tag.key} style={{
-                      background: tag.pct > 0.5 ? '#fef2f2' : '#fefce8',
-                      color: tag.pct > 0.5 ? '#dc2626' : '#ca8a04',
-                      border: `1px solid ${tag.pct > 0.5 ? '#fecaca' : '#fde68a'}`,
-                      padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
-                    }}>
-                      {tag.icon} {tag.label} · {tag.count}×
-                    </span>
-                  ))}
-                  {tagCounts.every(t => t.count === 0) && customTagCounts.length === 0 && (
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Keine Schwierigkeiten erfasst</span>
-                  )}
-                </div>
-
-                {/* Custom tag pills */}
-                {customTagCounts.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Weitere dokumentierte Schwierigkeiten
-                    </span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {customTagCounts.sort((a, b) => b.count - a.count).map(tag => (
-                        <span key={tag.key} style={{
-                          background: '#f8fafc',
-                          color: '#475569',
-                          border: '1px solid #e2e8f0',
-                          padding: '4px 10px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 800
-                        }}>
-                          ✏️ {tag.key} · {tag.count}×
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <p style={{ margin: 0, fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center' }}>
-                  Basierend auf {feedbackEntries.length} Bewertung{feedbackEntries.length !== 1 ? 'en' : ''}
-                </p>
-              </div>
-            );
-          })()}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+            {renderSkillRadarTabContent()}
+          </div>
         </div>
       </div>,
       document.body
@@ -11622,7 +11889,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (isEmbed && !isFullscreen) {
       return (
         <>
-          <div style={{ width: '100%', height: 'calc(100vh - 120px)', minHeight: '600px', fontFamily: '"Inter", sans-serif' }}>
+          <div style={{ width: '100%', height: (isMobileOrSim || isMobileView) ? '100%' : 'calc(100vh - 120px)', minHeight: (isMobileOrSim || isMobileView) ? '100%' : '600px', fontFamily: '"Inter", sans-serif' }}>
             {content}
           </div>
           {skillRadarDrawer}
@@ -11630,30 +11897,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       );
     }
 
+    const simTarget = typeof document !== 'undefined' ? (document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet') as HTMLElement) : null;
+    const portalTarget = simTarget || document.body;
+
     // Embed-Modus MIT Fullscreen ODER normales Modal → immer als Portal über alles
     return (
       <>
         {createPortal(
           <div
             ref={modalContainerRef}
+            className="meisterwerk-modal-portal-overlay"
             style={{
-              position: 'fixed',
+              position: isInsideSim ? 'absolute' : 'fixed',
               inset: 0,
               zIndex: 99999,
-              background: isFullscreen ? 'transparent' : 'rgba(9, 9, 11, 0.65)',
+              background: isFullscreen ? 'transparent' : (isMobileOrSim ? '#ffffff' : 'rgba(9, 9, 11, 0.85)'),
               backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: isFullscreen ? '0' : '20px',
+              padding: (isFullscreen || isInsideSim || isMobileView) ? '0' : '20px',
               fontFamily: '"Inter", sans-serif',
               overflow: 'hidden',
+              overscrollBehavior: 'contain',
               transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
             {content}
           </div>,
-          document.body
+          portalTarget
         )}
         {skillRadarDrawer}
       </>
@@ -11712,6 +11984,7 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   const togglePlay = (e?: React.MouseEvent) => {
@@ -11756,12 +12029,17 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
     };
   }, [url]);
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = playbackRate;
+  }, [playbackRate]);
+
   return (
     <div style={{
       background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
       borderRadius: '16px',
       padding: '16px',
-      width: '320px',
+      width: '100%',
+      maxWidth: '360px',
       border: '4px solid #0f0e0d',
       boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
       display: 'flex',
@@ -11805,7 +12083,31 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
             {label.toUpperCase()}
           </span>
-          <span>{Math.round(currentTime)}s / {duration || '9'}s</span>
+          <span>{Math.round(currentTime)}s / {duration || '0'}s</span>
+        </div>
+
+        {/* Interactive Seek Range Slider */}
+        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '6px', margin: '2px 0' }}>
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            step={0.1}
+            value={currentTime}
+            onChange={(e) => {
+              const newTime = parseFloat(e.target.value);
+              setCurrentTime(newTime);
+              if (audioRef.current) {
+                audioRef.current.currentTime = newTime;
+              }
+            }}
+            style={{
+              width: '100%',
+              accentColor: '#ef4444',
+              cursor: 'pointer',
+              height: '14px'
+            }}
+          />
         </div>
 
         <div style={{
@@ -11908,6 +12210,28 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
             <rect x="5" y="5" width="14" height="14" rx="1.5"/>
           </svg>
           <span>STOP</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPlaybackRate(prev => prev === 1 ? 0.8 : (prev === 0.8 ? 0.6 : 1))}
+          title="Wiedergabegeschwindigkeit verlangsamen zum Üben"
+          style={{
+            background: playbackRate !== 1 ? '#2563eb' : '#475569',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '8px 10px',
+            fontSize: '0.70rem',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <span>{playbackRate}x</span>
         </button>
 
         {onDelete && (

@@ -804,7 +804,7 @@ export function DeviceSetupScreen({
           textAlign: 'left'
         }}>
           <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px', color: '#34a853' }}>Auftragsverarbeitungsvereinbarung (AVV)</strong>
-          Der AVV nach Art. 28 DSGVO (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Pilotphasen-Freischaltung digital gezeichnet.
+          Der AVV nach Art. 28 DSGVO (inkl. Hetzner Falkenstein Server-Hosting) wurde für deine Schule während der Erst-Freischaltung digital gezeichnet.
         </div>
       </>
     )}

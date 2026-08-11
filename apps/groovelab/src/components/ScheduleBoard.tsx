@@ -15,6 +15,8 @@ import {
   Sparkles,
   MapPin,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Info,
   X,
   Search,
@@ -32,7 +34,7 @@ import {
   MoreVertical
 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import { useRealNamesVisibility, maskLastName } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 import { run15StageSolver } from '../engine/Schedule15StageSolverEngine';
@@ -90,8 +92,8 @@ const parseTime = (timeStr: string | null | undefined, fallback = '14:00'): [num
 const getPrefStartEndMinutes = (pref: any): { startMin: number; endMin: number } => {
   if (!pref) return { startMin: 0, endMin: 0 };
   const [sh, sm] = parseTime(pref.start_time);
-  let [eh, em] = parseTime(pref.end_time || pref.start_time);
-  let startMin = sh * 60 + sm;
+  const [eh, em] = parseTime(pref.end_time || pref.start_time);
+  const startMin = sh * 60 + sm;
   let endMin = eh * 60 + em;
   if (endMin <= startMin) {
     endMin = startMin + 120;
@@ -204,8 +206,145 @@ function InstrumentBadge({ instrument, color }: { instrument: string; color: str
 export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
+  useEffect(() => {
+    // Always start with Eye ON (privacy mode active: Vorname N.) when opening ScheduleBoard
+    toggleRealNames(true);
+  }, []);
+
   // Main state
   const [activeTab, setActiveTab] = useState<'calendar' | 'designer'>('calendar');
+  const [designerCardIndex, setDesignerCardIndex] = useState<number>(0);
+  const [showDesignerToolsSheet, setShowDesignerToolsSheet] = useState<boolean>(false);
+  const [showUnassignedDrawer, setShowUnassignedDrawer] = useState<boolean>(false);
+  const [drawerSearchQuery, setDrawerSearchQuery] = useState<string>('');
+  const [showDayPickerMenu, setShowDayPickerMenu] = useState<boolean>(false);
+  const [moveStudentModalState, setMoveStudentModalState] = useState<{ boardId: string; student: Student } | null>(null);
+  const [showAutoAssignWizardModal, setShowAutoAssignWizardModal] = useState<boolean>(false);
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [orientationTick, setOrientationTick] = useState(0);
+
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setWindowWidth(window.innerWidth);
+      setOrientationTick(t => t + 1);
+    };
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('groovelab_orientation_changed', handleOrientationChange);
+    return () => {
+      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('groovelab_orientation_changed', handleOrientationChange);
+    };
+  }, []);
+
+  const { isLandscapeMode, isMobilePortrait } = useMemo(() => {
+    const isInsideSim = typeof document !== 'undefined' && (
+      document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
+      document.querySelector('.sim-viewport-tablet') !== null
+    );
+
+    const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape') !== null;
+
+    const isLandscapeMode = isSimLandscape || (
+      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth > 768
+    );
+
+    const isMobilePortrait = !isLandscapeMode && (
+      (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null && !isSimLandscape) ||
+      (!isInsideSim && typeof window !== 'undefined' && window.innerWidth <= 834)
+    );
+
+    return { isLandscapeMode, isMobilePortrait };
+  }, [windowWidth, orientationTick]);
+
+  const isProgrammaticScrollingRef = useRef(false);
+
+  const navigateToDay = (targetDay: number) => {
+    isProgrammaticScrollingRef.current = true;
+    
+    // Ensure board exists for targetDay, if not create it dynamically!
+    setBoards(prev => {
+      const exists = prev.some(b => b.dayOfWeek === targetDay);
+      if (!exists) {
+        const newBoard: DayBoard = {
+          id: `board-${crypto.randomUUID()}`,
+          dayOfWeek: targetDay,
+          startAnchor: '14:00',
+          availabilityEnd: '20:00',
+          roomId: undefined,
+          students: []
+        };
+        return [...prev, newBoard].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+      }
+      return prev;
+    });
+    
+    setFocusedDayOfWeek(targetDay);
+    setShowDayPickerMenu(false);
+
+    setTimeout(() => {
+      const container = document.getElementById('tour-day-boards');
+      if (container) {
+        const currentBoards = boards.some(b => b.dayOfWeek === targetDay) ? boards : [...boards, { dayOfWeek: targetDay } as any].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+        const targetIdx = currentBoards.findIndex(b => b.dayOfWeek === targetDay);
+        if (targetIdx !== -1) {
+          const colWidth = container.clientWidth;
+          container.scrollTo({ left: targetIdx * colWidth, behavior: 'smooth' });
+        }
+      }
+      setTimeout(() => {
+        isProgrammaticScrollingRef.current = false;
+      }, 500);
+    }, 40);
+  };
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+
+    const diffX = touchEndX - touchStartX.current;
+    const diffY = touchEndY - touchStartY.current;
+
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      const isMobileView = typeof window !== 'undefined' && (window.innerWidth <= 834 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null);
+      if (isMobileView && activeTab === 'designer') {
+        const availableDays = boards.map(b => b.dayOfWeek).sort((a, b) => a - b);
+        if (availableDays.length > 0) {
+          const currentDay = focusedDayOfWeek !== null ? focusedDayOfWeek : (availableDays[0] || 1);
+          if (diffX < 0) {
+            // Swipe Left -> Next Day
+            const higherDays = availableDays.filter(d => d > currentDay);
+            if (higherDays.length > 0) {
+              navigateToDay(higherDays[0]);
+            }
+          } else if (diffX > 0) {
+            // Swipe Right -> Previous Day
+            const lowerDays = availableDays.filter(d => d < currentDay);
+            if (lowerDays.length > 0) {
+              navigateToDay(lowerDays[lowerDays.length - 1]);
+            }
+          }
+        }
+      } else if (diffX < 0 && activeTab === 'calendar') {
+        setActiveTab('designer');
+      } else if (diffX > 0 && activeTab === 'designer') {
+        setActiveTab('calendar');
+      }
+    }
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
 
   // Teacher onboarding state variables
   const [isOnboardingCompleted, setIsOnboardingCompleted] = useState<boolean>(true);
@@ -452,7 +591,35 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   const [siblingInfo, setSiblingInfo] = useState<any | null>(null);
 
   // Focus Day Zoom state
-  const [focusedDayOfWeek, setFocusedDayOfWeek] = useState<number | null>(null);
+  const [focusedDayOfWeek, setFocusedDayOfWeek] = useState<number | null>(() => {
+    if (typeof window !== 'undefined' && (window.innerWidth <= 834 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'))) {
+      const todayNum = new Date().getDay();
+      return (todayNum >= 1 && todayNum <= 5) ? todayNum : 1;
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const isMobileView = window.innerWidth <= 834 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait');
+    if (isMobileView && focusedDayOfWeek === null) {
+      const todayNum = new Date().getDay();
+      setFocusedDayOfWeek((todayNum >= 1 && todayNum <= 5) ? todayNum : 1);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMobilePortrait && focusedDayOfWeek !== null) {
+      const container = document.getElementById('tour-day-boards');
+      if (container) {
+        const targetIdx = boards.findIndex(b => b.dayOfWeek === focusedDayOfWeek);
+        if (targetIdx !== -1) {
+          const colWidth = container.clientWidth;
+          container.scrollTo({ left: targetIdx * colWidth, behavior: 'smooth' });
+        }
+      }
+    }
+  }, [focusedDayOfWeek, isMobilePortrait, boards]);
+
   const autoSaveDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Dynamic Theme calculations
@@ -2309,10 +2476,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           if (!student_id || !day_of_week || !time_slot) return;
           const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
 
-          let current = new Date(today);
+          const current = new Date(today);
           const currentDay = current.getDay() || 7;
           const diff = dayNum - currentDay;
-          let targetDate = new Date(current);
+          const targetDate = new Date(current);
           targetDate.setDate(current.getDate() + diff);
 
           if (targetDate < today) {
@@ -3419,7 +3586,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
     const newGroupBlock: Student = {
       id: `group-${crypto.randomUUID()}`,
-      first_name: groupStudents.map(s => s.first_name).join(' & '),
+      first_name: formatGroupStudentsAnonymized(groupStudents, !showRealNames),
       last_name: '',
       instrument: groupStudents.map(s => s.instrument || 'Musiker').filter((v, i, a) => a.indexOf(v) === i).join('/'),
       duration: Math.max(...groupStudents.map(s => s.duration || 30)),
@@ -4222,7 +4389,12 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="fluid-board-scroll-container cg-full-height-board"
+      style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '100%', margin: '0', fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
+    >
       <style>{`
         .apple-btn-group {
           background: rgba(0, 0, 0, 0.03);
@@ -4308,112 +4480,84 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-          {/* Header Panel — sticky on iPad / desktop */}
+          {/* Header Panel — sticky on iPad / desktop, scrolling on mobile */}
           <div style={{ 
-            position: 'sticky',
-            top: '10px',
+            position: isMobilePortrait ? 'relative' : 'sticky',
+            top: isMobilePortrait ? undefined : '10px',
             zIndex: 50,
             background: 'rgba(255, 255, 255, 0.75)', 
             backdropFilter: 'blur(30px) saturate(210%)', 
             WebkitBackdropFilter: 'blur(30px) saturate(210%)',
-            borderRadius: '16px', 
-            padding: '12px 16px', 
+            borderRadius: isMobilePortrait ? '14px' : '16px', 
+            padding: isMobilePortrait ? '10px 10px' : '12px 16px', 
             border: '1px solid rgba(255, 255, 255, 0.6)', 
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.04)', 
             display: 'flex',
             flexDirection: 'column',
-            gap: '10px'
+            gap: '8px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
 
             {/* ── ROW 1: Title | Tabs+Tour+Raster | Spacer ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', width: '100%', gap: '10px' }}>
-              {/* Left: Titel */}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ height: '32px', width: '32px', borderRadius: '8px', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Calendar size={16} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            <div style={{ display: isMobilePortrait ? 'flex' : 'grid', flexDirection: isMobilePortrait ? 'column' : undefined, gridTemplateColumns: isMobilePortrait ? undefined : '1fr auto 1fr', justifyContent: 'space-between', alignItems: isMobilePortrait ? 'stretch' : 'center', width: '100%', gap: '8px', boxSizing: 'border-box' }}>
+              {/* Left: Titel + Mobile Tools Trigger */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ height: '30px', width: '30px', borderRadius: '8px', background: 'rgba(52, 168, 83, 0.12)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Calendar size={15} />
+                  </div>
+                  <h2 style={{ fontSize: isMobilePortrait ? '0.98rem' : '1.25rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                     Stundenplan-Designer
                   </h2>
                 </div>
-                {boards.some(b => b.students.some(s => !s.isBreak && s.assignedTime)) && (() => {
-                  const { totalGapsMin, gapCount, totalAssigned, wunschHits, studentsWithWunsch } = calculateLiveBoardGaps(boards);
-                  const unassignedCount = students.filter(s => !s.isBreak && !s.assignedTime).length;
-                  const totalStudentsCount = unassignedCount + totalAssigned;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const assignmentPct = totalStudentsCount > 0 ? (totalAssigned / totalStudentsCount) * 50 : 50;
-                        const wunschRatio = studentsWithWunsch > 0 ? (wunschHits / studentsWithWunsch) : 1;
-                        const wunschPct = wunschRatio * 35;
-                        const gapBonus = gapCount === 0 ? 15 : Math.max(0, 15 - gapCount * 5);
-                        const overallScore = Math.min(100, Math.round(assignmentPct + wunschPct + gapBonus));
 
-                        setAutoScheduleReportData({
-                          totalAssigned,
-                          totalStudents: totalStudentsCount,
-                          totalGapsMin,
-                          gapCount,
-                          wunschHits,
-                          studentsWithWunsch,
-                          siblingHits: 0,
-                          totalSiblings: 0,
-                          overallScore
-                        });
-                        setShowAutoScheduleReportModal(true);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '5px 12px',
-                        borderRadius: '20px',
-                        background: totalGapsMin === 0 ? '#f0fdf4' : '#fffbeb',
-                        border: `1px solid ${totalGapsMin === 0 ? '#bbf7d0' : '#fde68a'}`,
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        color: totalGapsMin === 0 ? '#15803d' : '#b45309',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                        transition: 'all 0.15s',
-                        marginLeft: '8px'
-                      }}
-                      className="hover-scale-mini"
-                      title="Klicken, um die Auswertung & Erfolgsanalyse erneut zu öffnen"
-                    >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle size={13} color={totalGapsMin === 0 ? "#34a853" : "#d97706"} />
-                        <span>{totalAssigned} Schüler eingeteilt</span>
-                      </span>
-                      <span style={{ color: '#cbd5e1' }}>•</span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Zap size={12} color={totalGapsMin === 0 ? "#16a34a" : "#d97706"} />
-                        <span>{gapCount === 0 ? '0 Min Lücken (Lückenlos)' : `${totalGapsMin} Min ${gapCount === 1 ? 'Lücke' : 'Lücken'}`}</span>
-                      </span>
-                      <Sparkles size={12} style={{ marginLeft: '2px', opacity: 0.8 }} />
-                    </button>
-                  );
-                })()}
+                {isMobilePortrait && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDesignerToolsSheet(true)}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '5px 10px',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Settings size={13} color="#34a853" />
+                    <span>Werkzeuge</span>
+                  </button>
+                )}
               </div>
 
-              {/* Center: Tab-Switcher + Tour */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center' }}>
+              {/* Center: Tab-Switcher (Full Width on Mobile) */}
+              <div style={{ display: 'flex', alignItems: 'center', width: isMobilePortrait ? '100%' : 'auto', boxSizing: 'border-box' }}>
+                <div id="tour-calendar-switch" className="app-segmented-switch" style={{ margin: 0, padding: '3px', gap: '4px', minHeight: '36px', display: 'flex', alignItems: 'center', width: isMobilePortrait ? '100%' : 'auto', boxSizing: 'border-box' }}>
                   <button 
                     type="button"
                     onClick={() => setActiveTab('calendar')}
                     className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
                     style={{
-                      padding: '6px 12px',
-                      fontSize: '0.78rem',
+                      padding: '6px 8px',
+                      fontSize: '0.76rem',
                       lineHeight: '1.2',
                       opacity: 1,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      justifyContent: 'center',
+                      gap: '5px',
+                      flex: isMobilePortrait ? 1 : undefined,
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap'
                     }}
                     title="Wöchentlicher freigegebener Stundenplan"
                   >
@@ -4424,24 +4568,30 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                     type="button"
                     onClick={() => setActiveTab('designer')}
                     className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                    style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                    style={{ 
+                      padding: '6px 8px', 
+                      fontSize: '0.76rem', 
+                      lineHeight: '1.2',
+                      flex: isMobilePortrait ? 1 : undefined,
+                      textAlign: 'center',
+                      justifyContent: 'center',
+                      display: 'inline-flex',
+                      whiteSpace: 'nowrap'
+                    }}
                   >
                     Stundenplan-Designer
                   </button>
                 </div>
-                {currentUserRole === 'teacher' && (
-                  <TourStartButton onClick={startDesignerTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
-                )}
               </div>
-
-              {/* Right: Spacer (for centering) */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }} />
             </div>
 
-            {/* Divider */}
-            <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
+            {/* Divider (Desktop Only) */}
+            {!isMobilePortrait && (
+              <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.06)', margin: '0 -4px' }} />
+            )}
 
-            {/* ── ROW 2: Teacher-Filter | Apple-Btn-Group | Status + Senden ── */}
+            {/* ── ROW 2: Teacher-Filter | Apple-Btn-Group | Status + Senden (Desktop Only) ── */}
+            {!isMobilePortrait && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
 
               {/* Left: Lehrkraft-Filter & Apple Raster Capsule */}
@@ -4500,10 +4650,10 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   onClick={() => toggleRealNames()}
                   className={`apple-btn ${showRealNames ? 'active' : ''}`}
                   style={{ color: showRealNames ? '#ea4335' : undefined }}
-                  title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
+                  title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
                 >
-                  {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                  <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
+                  {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
+                  <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
                 </button>
 
                 <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
@@ -4680,6 +4830,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 </button>
               </div>
             </div>
+            )}
           </div>
 
 
@@ -4708,176 +4859,178 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
         </div>
           ) : (
             <>
-          {/* Draft Management Toolbar */}
-          <div style={{ 
-            background: 'rgba(255, 255, 255, 0.55)', 
-            backdropFilter: 'blur(20px) saturate(190%)', 
-            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
-            borderRadius: '16px', 
-            padding: '10px 16px', 
-            border: '1px solid rgba(255, 255, 255, 0.5)', 
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            gap: '12px',
-            marginTop: '-4px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#86868b', marginRight: '4px' }}>Entwürfe:</span>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {drafts.map(d => {
-                  const isActive = d.id === activeDraftId;
-                  const totalLessons = d.boards?.reduce((acc, b) => acc + (b.students?.length || 0), 0) || 0;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => handleSwitchDraft(d.id)}
-                      style={{
-                        background: isActive 
-                          ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
-                          : 'rgba(255, 255, 255, 0.65)',
-                        color: isActive ? 'white' : '#1d1d1f',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                        borderRadius: '8px',
-                        padding: '6px 12px',
-                        fontSize: '0.76rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        boxShadow: isActive ? '0 4px 12px rgba(217, 119, 6, 0.15)' : '0 2px 4px rgba(0,0,0,0.01)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                      onMouseOver={e => {
-                        if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-                      }}
-                      onMouseOut={e => {
-                        if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
-                      }}
-                    >
-                      <span>{d.id === submittedDraftId ? 'Mein Stundenplan' : d.name}</span>
-                      <span style={{ 
-                        background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.05)', 
-                        padding: '1px 5px', 
-                        borderRadius: '4px', 
-                        fontSize: '0.65rem',
-                        color: isActive ? 'white' : '#86868b'
-                      }}>
-                        {totalLessons}
-                      </span>
-                    </button>
-                  );
-                })}
+          {/* Draft Management Toolbar (Desktop Only) */}
+          {!isMobilePortrait && (
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.55)', 
+              backdropFilter: 'blur(20px) saturate(190%)', 
+              WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+              borderRadius: '16px', 
+              padding: '10px 16px', 
+              border: '1px solid rgba(255, 255, 255, 0.5)', 
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              gap: '12px',
+              marginTop: '-4px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#86868b', marginRight: '4px' }}>Entwürfe:</span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {drafts.map(d => {
+                    const isActive = d.id === activeDraftId;
+                    const totalLessons = d.boards?.reduce((acc, b) => acc + (b.students?.length || 0), 0) || 0;
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => handleSwitchDraft(d.id)}
+                        style={{
+                          background: isActive 
+                            ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
+                            : 'rgba(255, 255, 255, 0.65)',
+                          color: isActive ? 'white' : '#1d1d1f',
+                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: isActive ? '0 4px 12px rgba(217, 119, 6, 0.15)' : '0 2px 4px rgba(0,0,0,0.01)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        onMouseOver={e => {
+                          if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                        }}
+                        onMouseOut={e => {
+                          if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
+                        }}
+                      >
+                        <span>{d.id === submittedDraftId ? 'Mein Stundenplan' : d.name}</span>
+                        <span style={{ 
+                          background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.05)', 
+                          padding: '1px 5px', 
+                          borderRadius: '4px', 
+                          fontSize: '0.65rem',
+                          color: isActive ? 'white' : '#86868b'
+                        }}>
+                          {totalLessons}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                  style={{
+                    background: undoStack.length > 0 ? 'rgba(0, 122, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+                    color: undoStack.length > 0 ? '#007aff' : '#94a3b8',
+                    border: undoStack.length > 0 ? '1px solid rgba(0, 122, 255, 0.2)' : '1px solid rgba(0, 0, 0, 0.08)',
+                    fontWeight: 600,
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s',
+                    opacity: undoStack.length > 0 ? 1 : 0.5
+                  }}
+                  onMouseOver={e => { if (undoStack.length > 0) e.currentTarget.style.background = 'rgba(0, 122, 255, 0.15)'; }}
+                  onMouseOut={e => { if (undoStack.length > 0) e.currentTarget.style.background = 'rgba(0, 122, 255, 0.08)'; }}
+                  title={undoStack.length > 0 ? `Letzte Verschiebung rückgängig machen (⌘Z) – ${undoStack.length} im Speicher` : "Keine Änderungen zum Rückgängig machen"}
+                >
+                  <RotateCcw size={12} />
+                  <span>Rückgängig{undoStack.length > 0 ? ` (${undoStack.length})` : ''}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAutoAssign}
+                  disabled={students.filter(s => !s.assignedDay && !s.isBreak).length === 0}
+                  style={{
+                    background: 'rgba(52, 168, 83, 0.1)',
+                    color: '#34a853',
+                    border: '1px solid rgba(52, 168, 83, 0.15)',
+                    fontWeight: 600,
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s',
+                    opacity: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 0.5 : 1,
+                    pointerEvents: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'none' : 'auto'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.1)'}
+                >
+                  <Sparkles size={12} />
+                  Automatisch zuteilen
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetAllAssignments}
+                  disabled={students.filter(s => !!s.assignedDay).length === 0}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                    fontWeight: 600,
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.15s',
+                    opacity: students.filter(s => !!s.assignedDay).length === 0 ? 0.5 : 1,
+                    pointerEvents: students.filter(s => !!s.assignedDay).length === 0 ? 'none' : 'auto'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                >
+                  <Trash2 size={12} />
+                  Zuteilung zurücksetzen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreateDraft()}
+                  style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
+                >
+                  <Plus size={12} />
+                  Neuer leerer Entwurf
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteDraft(activeDraftId)}
+                  disabled={drafts.length <= 1}
+                  style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.12)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s', opacity: drafts.length <= 1 ? 0.5 : 1, pointerEvents: drafts.length <= 1 ? 'none' : 'auto' }}
+                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                >
+                  <Trash2 size={12} />
+                  Löschen
+                </button>
               </div>
             </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={handleUndo}
-                disabled={undoStack.length === 0}
-                style={{
-                  background: undoStack.length > 0 ? 'rgba(0, 122, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
-                  color: undoStack.length > 0 ? '#007aff' : '#94a3b8',
-                  border: undoStack.length > 0 ? '1px solid rgba(0, 122, 255, 0.2)' : '1px solid rgba(0, 0, 0, 0.08)',
-                  fontWeight: 600,
-                  padding: '5px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem',
-                  cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.15s',
-                  opacity: undoStack.length > 0 ? 1 : 0.5
-                }}
-                onMouseOver={e => { if (undoStack.length > 0) e.currentTarget.style.background = 'rgba(0, 122, 255, 0.15)'; }}
-                onMouseOut={e => { if (undoStack.length > 0) e.currentTarget.style.background = 'rgba(0, 122, 255, 0.08)'; }}
-                title={undoStack.length > 0 ? `Letzte Verschiebung rückgängig machen (⌘Z) – ${undoStack.length} im Speicher` : "Keine Änderungen zum Rückgängig machen"}
-              >
-                <RotateCcw size={12} />
-                <span>Rückgängig{undoStack.length > 0 ? ` (${undoStack.length})` : ''}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleAutoAssign}
-                disabled={students.filter(s => !s.assignedDay && !s.isBreak).length === 0}
-                style={{
-                  background: 'rgba(52, 168, 83, 0.1)',
-                  color: '#34a853',
-                  border: '1px solid rgba(52, 168, 83, 0.15)',
-                  fontWeight: 600,
-                  padding: '5px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.15s',
-                  opacity: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 0.5 : 1,
-                  pointerEvents: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'none' : 'auto'
-                }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.1)'}
-              >
-                <Sparkles size={12} />
-                Automatisch zuteilen
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResetAllAssignments}
-                disabled={students.filter(s => !!s.assignedDay).length === 0}
-                style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(239, 68, 68, 0.15)',
-                  fontWeight: 600,
-                  padding: '5px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  transition: 'all 0.15s',
-                  opacity: students.filter(s => !!s.assignedDay).length === 0 ? 0.5 : 1,
-                  pointerEvents: students.filter(s => !!s.assignedDay).length === 0 ? 'none' : 'auto'
-                }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-              >
-                <Trash2 size={12} />
-                Zuteilung zurücksetzen
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCreateDraft()}
-                style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
-              >
-                <Plus size={12} />
-                Neuer leerer Entwurf
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteDraft(activeDraftId)}
-                disabled={drafts.length <= 1}
-                style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.12)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s', opacity: drafts.length <= 1 ? 0.5 : 1, pointerEvents: drafts.length <= 1 ? 'none' : 'auto' }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-              >
-                <Trash2 size={12} />
-                Löschen
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* Unsubmitted edits warning banner */}
           {hasUnsubmittedEdits && (
@@ -4902,23 +5055,25 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
             </div>
           )}
 
-          {/* Info/Guide banner beneath header */}
-          <div style={{
-            background: 'rgba(37, 99, 235, 0.06)',
-            border: '1px solid rgba(37, 99, 235, 0.12)',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            fontSize: '0.78rem',
-            color: '#1d4ed8',
-            fontWeight: 500,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '4px'
-          }}>
-            <span style={{ fontSize: '1rem' }}>💡</span>
-            <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
-          </div>
+          {/* Info/Guide banner beneath header (Desktop Only) */}
+          {!isMobilePortrait && (
+            <div style={{
+              background: 'rgba(37, 99, 235, 0.06)',
+              border: '1px solid rgba(37, 99, 235, 0.12)',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              fontSize: '0.78rem',
+              color: '#1d4ed8',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '4px'
+            }}>
+              <span style={{ fontSize: '1rem' }}>💡</span>
+              <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
+            </div>
+          )}
 
           {/* Form to Add Day Board */}
           {showAddBoardForm && (
@@ -4977,116 +5132,254 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           )}
 
           {/* Main workspace layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 240px', gap: '14px', alignItems: 'start' }}>
-            
-            {/* Trello Board List Column Area */}
-            <div id="tour-day-boards" style={{ 
-              display: 'flex', 
-              gap: '0px', 
-              width: '100%', 
-              minHeight: '520px', 
-              alignItems: 'stretch',
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '24px',
-              padding: '20px 8px',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
-              overflowX: 'auto',
-              WebkitOverflowScrolling: 'touch'
-            }}>
-              {boards.filter(b => focusedDayOfWeek === null || b.dayOfWeek === focusedDayOfWeek).map((board, index, arr) => {
-                const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
-                const PX_PER_MIN = 2.5;
-                const [anchorH, anchorM] = parseTime(board.startAnchor);
-                const startMinutes = anchorH * 60 + anchorM;
-                const dayConfig = (teacherAvailability as any)?.[board.dayOfWeek];
-                let availEndMins = startMinutes + 300; // default 5 hours if not specified
-                if (dayConfig?.end) {
-                  const [eh, em] = parseTime(dayConfig.end);
-                  availEndMins = eh * 60 + em;
-                }
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
 
-                let maxStudentEndMins = startMinutes;
-                let curMins = startMinutes;
-                board.students.forEach(s => {
-                  curMins += s.duration;
-                  if (curMins > maxStudentEndMins) maxStudentEndMins = curMins;
-                });
-
-                let maxPrefEndMins = startMinutes;
-                if ((selectedStudentId || draggedStudentId) && selectedStudentPrefs.length > 0) {
-                  selectedStudentPrefs.forEach(pref => {
-                    if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
-                      const [peh, pem] = parseTime(pref.end_time);
-                      const prefEndMins = peh * 60 + pem;
-                      if (prefEndMins > maxPrefEndMins) maxPrefEndMins = prefEndMins;
+            <div style={{ display: 'grid', gridTemplateColumns: isMobilePortrait ? '1fr' : 'minmax(0, 1fr) 240px', gap: '14px', alignItems: 'start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+              
+              {/* Trello Board List Column Area */}
+              <div 
+                id="tour-day-boards" 
+                onScroll={(e) => {
+                  if (isMobilePortrait && !isProgrammaticScrollingRef.current) {
+                    const el = e.currentTarget;
+                    const colWidth = el.clientWidth;
+                    if (colWidth > 0) {
+                      const newIdx = Math.round(el.scrollLeft / colWidth);
+                      if (boards[newIdx] && boards[newIdx].dayOfWeek !== focusedDayOfWeek) {
+                        setFocusedDayOfWeek(boards[newIdx].dayOfWeek);
+                      }
                     }
-                  });
-                }
-
-                const endMinutes = Math.max(availEndMins, maxStudentEndMins, maxPrefEndMins, startMinutes + 60);
-                const columnHeightPx = (endMinutes - startMinutes) * PX_PER_MIN + 48;
-                const startHour = Math.floor(startMinutes / 60);
-                const endHour = Math.ceil(endMinutes / 60);
-                const hourMarkers: { hour: number; top: number }[] = [];
-                for (let h = startHour; h <= endHour; h++) {
-                  const top = (h * 60 - startMinutes) * PX_PER_MIN;
-                  if (top >= -2 && top <= columnHeightPx + 30) {
-                    hourMarkers.push({ hour: h % 24, top });
                   }
-                }
+                }}
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'row',
+                  gap: '0px', 
+                  width: '100%', 
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  minHeight: '520px', 
+                  alignItems: 'stretch',
+                  background: isMobilePortrait ? 'transparent' : '#ffffff',
+                  border: isMobilePortrait ? 'none' : '1px solid #e2e8f0',
+                  borderRadius: isMobilePortrait ? '0px' : '24px',
+                  padding: isMobilePortrait ? '4px 0px' : '20px 8px',
+                  boxShadow: isMobilePortrait ? 'none' : '0 4px 20px rgba(0, 0, 0, 0.02)',
+                  overflowX: isMobilePortrait ? 'auto' : (focusedDayOfWeek !== null ? 'hidden' : 'auto'),
+                  scrollSnapType: isMobilePortrait ? 'x mandatory' : undefined,
+                  WebkitOverflowScrolling: 'touch',
+                  scrollBehavior: 'smooth'
+                }}
+              >
+              {(() => {
+                const isMobileLayout = typeof window !== 'undefined' && (
+                  window.innerWidth <= 834 || 
+                  document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
+                  (document.querySelector('.main-wrapper') && (document.querySelector('.main-wrapper') as HTMLElement).clientWidth <= 834)
+                );
 
-                return (
-                  <div
-                    key={board.id}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDropOnBoard(board.id);
-                    }}
-                    style={{ 
-                      flex: 1,
-                      minWidth: focusedDayOfWeek !== null ? '100%' : '170px',
-                      background: 'transparent', 
-                      borderRight: index < arr.length - 1 ? '1px solid #e2e8f0' : 'none', 
-                      padding: '0 10px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '8px',
-                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-                    }}
+                const targetBoards = isMobileLayout
+                  ? boards
+                  : boards.filter(b => focusedDayOfWeek === null || b.dayOfWeek === focusedDayOfWeek);
+
+                return targetBoards.map((board, index, arr) => {
+                  const dayLabel = DAYS_OF_WEEK.find(d => d.value === board.dayOfWeek)?.name || '';
+                  const PX_PER_MIN = 2.5;
+                  const [anchorH, anchorM] = parseTime(board.startAnchor);
+                  const startMinutes = anchorH * 60 + anchorM;
+                  const dayConfig = (teacherAvailability as any)?.[board.dayOfWeek];
+                  let availEndMins = startMinutes + 300; // default 5 hours if not specified
+                  if (dayConfig?.end) {
+                    const [eh, em] = parseTime(dayConfig.end);
+                    availEndMins = eh * 60 + em;
+                  }
+
+                  let maxStudentEndMins = startMinutes;
+                  let curMins = startMinutes;
+                  board.students.forEach(s => {
+                    curMins += s.duration;
+                    if (curMins > maxStudentEndMins) maxStudentEndMins = curMins;
+                  });
+
+                  let maxPrefEndMins = startMinutes;
+                  if ((selectedStudentId || draggedStudentId) && selectedStudentPrefs.length > 0) {
+                    selectedStudentPrefs.forEach(pref => {
+                      if (Number(pref.day_of_week) === Number(board.dayOfWeek)) {
+                        const [peh, pem] = parseTime(pref.end_time);
+                        const prefEndMins = peh * 60 + pem;
+                        if (prefEndMins > maxPrefEndMins) maxPrefEndMins = prefEndMins;
+                      }
+                    });
+                  }
+
+                  const endMinutes = Math.max(availEndMins, maxStudentEndMins, maxPrefEndMins, startMinutes + 60);
+                  const columnHeightPx = (endMinutes - startMinutes) * PX_PER_MIN + 48;
+                  const startHour = Math.floor(startMinutes / 60);
+                  const endHour = Math.ceil(endMinutes / 60);
+                  const hourMarkers: { hour: number; top: number }[] = [];
+                  for (let h = startHour; h <= endHour; h++) {
+                    const top = (h * 60 - startMinutes) * PX_PER_MIN;
+                    if (top >= -2 && top <= columnHeightPx + 30) {
+                      hourMarkers.push({ hour: h % 24, top });
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={board.id}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDropOnBoard(board.id);
+                      }}
+                      style={{ 
+                        flex: isMobilePortrait ? '0 0 100%' : 1,
+                        minWidth: '100%',
+                        width: '100%',
+                        maxWidth: '100%',
+                        scrollSnapAlign: isMobilePortrait ? 'start' : undefined,
+                        scrollSnapStop: isMobilePortrait ? 'always' : undefined,
+                        boxSizing: 'border-box',
+                        background: 'transparent', 
+                        borderRight: index < arr.length - 1 ? '1px solid #e2e8f0' : 'none', 
+                        padding: isMobilePortrait ? '0 6px 140px 6px' : '0 10px', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '8px',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                      }}
                   >
-                    {/* Day Column Header */}
-                    <div 
-                      style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', position: 'relative', cursor: 'pointer' }}
-                      onClick={() => setFocusedDayOfWeek(focusedDayOfWeek === board.dayOfWeek ? null : board.dayOfWeek)}
-                      title={focusedDayOfWeek === board.dayOfWeek ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
-                    >
-                      {focusedDayOfWeek === board.dayOfWeek && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFocusedDayOfWeek(null);
-                          }}
-                          className="apple-btn"
-                          style={{
-                            position: 'absolute',
-                            top: '0px',
-                            right: '4px',
-                            padding: '4px 8px',
-                            fontSize: '0.65rem',
-                            background: 'rgba(0,0,0,0.05)',
-                            borderRadius: '6px',
-                            minHeight: '22px'
-                          }}
-                        >
-                          Wochenansicht
-                        </button>
+                    {/* Day Column Header — Sticky on mobile so navigation arrows & day label stay visible on scroll */}
+                    <div style={{ textAlign: 'center', paddingBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', position: isMobilePortrait ? 'sticky' : 'relative', top: isMobilePortrait ? '0px' : undefined, zIndex: 100, background: isMobilePortrait ? 'rgba(248, 250, 252, 0.95)' : 'transparent', backdropFilter: isMobilePortrait ? 'blur(20px)' : undefined, WebkitBackdropFilter: isMobilePortrait ? 'blur(20px)' : undefined, paddingTop: isMobilePortrait ? '6px' : '0', margin: isMobilePortrait ? '0 -6px 8px -6px' : '0', paddingLeft: isMobilePortrait ? '6px' : '0', paddingRight: isMobilePortrait ? '6px' : '0', boxSizing: 'border-box' }}>
+                      {isMobilePortrait ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '6px', position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const availableDays = [1, 2, 3, 4, 5];
+                              const currentIndex = availableDays.indexOf(board.dayOfWeek);
+                              const prevDay = currentIndex > 0 ? availableDays[currentIndex - 1] : availableDays[availableDays.length - 1];
+                              navigateToDay(prevDay);
+                            }}
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '10px',
+                              width: '36px',
+                              height: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                              flexShrink: 0
+                            }}
+                            title="Vorheriger Tag"
+                          >
+                            <ChevronLeft size={20} color="#0f172a" strokeWidth={2.5} />
+                          </button>
+
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowDayPickerMenu(!showDayPickerMenu);
+                            }}
+                            style={{ textAlign: 'center', cursor: 'pointer', padding: '6px 12px', borderRadius: '12px', background: '#e6f4ea', border: '1px solid #a7f3d0', color: '#166534', display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: 'calc(100% - 90px)' }}
+                          >
+                            <div style={{ fontSize: '0.92rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
+                            <ChevronDown size={14} color="#166534" />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const availableDays = [1, 2, 3, 4, 5];
+                              const currentIndex = availableDays.indexOf(board.dayOfWeek);
+                              const nextDay = currentIndex < availableDays.length - 1 ? availableDays[currentIndex + 1] : availableDays[0];
+                              navigateToDay(nextDay);
+                            }}
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '10px',
+                              width: '36px',
+                              height: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                              flexShrink: 0
+                            }}
+                            title="Nächster Tag"
+                          >
+                            <ChevronRight size={20} color="#0f172a" strokeWidth={2.5} />
+                          </button>
+
+                          {/* Floating Day Picker Dropdown Menu */}
+                          {showDayPickerMenu && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                position: 'absolute',
+                                top: '42px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                zIndex: 1500,
+                                background: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '16px',
+                                padding: '8px',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                                minWidth: '200px'
+                              }}
+                            >
+                              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', padding: '4px 8px', textTransform: 'uppercase' }}>Unterrichtstag wählen</div>
+                              {DAYS_OF_WEEK.map(d => {
+                                const bTarget = boards.find(b => b.dayOfWeek === d.value);
+                                const count = bTarget ? bTarget.students.filter(s => !s.isBreak).length : 0;
+                                const isCurrent = board.dayOfWeek === d.value;
+                                return (
+                                  <button
+                                    key={d.value}
+                                    type="button"
+                                    onClick={() => {
+                                      navigateToDay(d.value);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      padding: '8px 12px',
+                                      borderRadius: '10px',
+                                      border: isCurrent ? '1.5px solid #34a853' : 'none',
+                                      background: isCurrent ? '#e6f4ea' : '#f8fafc',
+                                      color: isCurrent ? '#166534' : '#0f172a',
+                                      fontWeight: 800,
+                                      fontSize: '0.82rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <span>{d.name}</span>
+                                    <span>({count})</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
+                        </>
                       )}
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel}</div>
 
                       {/* TVöD / ArbZG Arbeitszeit-Warnhinweis */}
                       {(() => {
@@ -6033,6 +6326,32 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                   >
                                     {bs.duration}m
                                   </span>
+                                  {isMobilePortrait && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        setMoveStudentModalState({ boardId: board.id, student: bs });
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: groupActionColor,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        padding: '1px',
+                                        borderRadius: '4px',
+                                        opacity: 0.8,
+                                        pointerEvents: 'auto'
+                                      }}
+                                      title="Verschieben nach..."
+                                    >
+                                      <MoreVertical size={11} strokeWidth={2.5} />
+                                    </button>
+                                  )}
                                   <button 
                                     type="button" 
                                     onClick={(e) => {
@@ -6049,8 +6368,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                               </div>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: groupTitleColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {bs.isGroup && bs.groupStudents && bs.groupStudents.length > 0
-                                  ? bs.groupStudents.map(s => `${s.first_name || ''} ${maskLastName(s.last_name || '', showRealNames)}`.trim()).filter(Boolean).join(' & ')
-                                  : ((bs.first_name || (bs as any).name || 'Gruppe').trim())}
+                                  ? formatGroupStudentsAnonymized(bs.groupStudents, !showRealNames)
+                                  : formatCombinedStudentNames(bs.first_name || (bs as any).name || 'Gruppe', bs.last_name, bs.id, !showRealNames)}
                               </span>
                             </div>
                           );
@@ -6101,7 +6420,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         }
 
                         let displayAssignedTime = bs.assignedTime || '14:00';
-                        let isLiveShiftedPreview = false;
+                        const isLiveShiftedPreview = false;
 
                         if (dragOverBoardId === board.id && draggedStudentId && draggedStudentId !== bs.id && dragOverIndex !== null && cardIndex >= dragOverIndex) {
                           let shiftMins = 30;
@@ -6276,11 +6595,13 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '2px',
+                                    flexShrink: 0,
+                                    whiteSpace: 'nowrap',
                                     pointerEvents: 'none'
                                   }}
                                   title="Sperrzeit-Konflikt!"
                                 >
-                                  ⚠️ Sperrzeit
+                                  {isMobilePortrait ? '⚠️ Sperre' : '⚠️ Sperrzeit'}
                                 </span>
                               )}
                               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -6427,9 +6748,45 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                         </span>
                       </div>
                     )}
+
+                    {/* Mobile Inline Add Pause/Slot Card */}
+                    {isMobilePortrait && (
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          pushUndoSnapshot();
+                          handleAddBreakToBoard(board.id);
+                          setToast({ message: 'Pause zum Unterrichtstag hinzugefügt! ☕', type: 'success' });
+                        }}
+                        style={{
+                          margin: '12px auto 0 auto',
+                          width: 'calc(100% - 12px)',
+                          padding: '12px',
+                          borderRadius: '14px',
+                          border: '2px dashed #34a853',
+                          background: '#e6f4ea',
+                          color: '#166534',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          boxShadow: '0 2px 6px rgba(52, 168, 83, 0.12)',
+                          transition: 'all 0.2s',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <span>☕</span>
+                        <span>Pause hinzufügen</span>
+                      </div>
+                    )}
                   </div>
-                );
-              })}
+                  );
+                });
+              })()}
 
               {boards.length === 0 && (
                 <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.4)', border: '1.5px dashed rgba(0, 0, 0, 0.08)', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px', textAlign: 'center', minHeight: '400px' }}>
@@ -6442,7 +6799,8 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
               )}
             </div>
 
-            {/* Sidebar Student Pool */}
+            {/* Sidebar Student Pool (Desktop Only) */}
+            {!isMobilePortrait && (
             <div id="tour-student-pool" style={{ 
               background: 'rgba(255, 255, 255, 0.55)', 
               backdropFilter: 'blur(20px) saturate(190%)', 
@@ -6483,68 +6841,42 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                   cursor: 'grab',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.02)',
-                  transition: 'all 0.2s',
-                  userSelect: 'none'
+                  gap: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
+                  transition: 'all 0.15s'
                 }}
               >
-                <span style={{ fontSize: '0.8rem' }}>☕</span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b45309', flex: 1 }}>
-                  Pause herausziehen
-                </span>
-                <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#d97706', background: 'rgba(254, 243, 199, 0.8)', padding: '1px 4px', borderRadius: '4px' }}>
-                  DRAG
-                </span>
+                <div style={{ fontSize: '1rem' }}>☕</div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>
+                    Pause herausziehen
+                  </span>
+                  <span style={{ fontSize: '0.65rem', color: '#d97706', fontWeight: 500 }}>
+                    Beliebige Dauer
+                  </span>
+                </div>
               </div>
 
-              {/* Search input field */}
-              <div style={{ position: 'relative', width: '100%' }}>
-                <Search size={12} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#86868b' }} />
+              <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }} />
+
+              {/* Search & Filter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <input
                   type="text"
                   placeholder="Suchen..."
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  style={{ width: '100%', background: 'rgba(255, 255, 255, 0.5)', border: '1px solid rgba(0, 0, 0, 0.08)', borderRadius: '10px', padding: '6px 10px 6px 28px', fontSize: '0.72rem', fontWeight: 600, outline: 'none' }}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    background: 'rgba(255,255,255,0.7)',
+                    fontSize: '0.75rem',
+                    boxSizing: 'border-box'
+                  }}
                 />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: '#86868b', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
-
-              {/* Sidebar Category Tabs */}
-              <div style={{ display: 'flex', background: 'rgba(0, 0, 0, 0.04)', padding: '2px', borderRadius: '10px', gap: '2px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSidebarTab('unassigned')}
-                  style={{ flex: 1, border: 'none', padding: '4px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', background: sidebarTab === 'unassigned' ? 'white' : 'transparent', color: sidebarTab === 'unassigned' ? '#1d1d1f' : '#86868b', boxShadow: sidebarTab === 'unassigned' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.2s' }}
-                >
-                  Offen ({unassignedCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSidebarTab('assigned')}
-                  style={{ flex: 1, border: 'none', padding: '4px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', background: sidebarTab === 'assigned' ? 'white' : 'transparent', color: sidebarTab === 'assigned' ? '#1d1d1f' : '#86868b', boxShadow: sidebarTab === 'assigned' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.2s' }}
-                >
-                  Verteilt
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSidebarTab('all')}
-                  style={{ flex: 1, border: 'none', padding: '4px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', background: sidebarTab === 'all' ? 'white' : 'transparent', color: sidebarTab === 'all' ? '#1d1d1f' : '#86868b', boxShadow: sidebarTab === 'all' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.2s' }}
-                >
-                  Alle
-                </button>
-              </div>
-
-
 
               {/* Sidebar Student cards list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 'calc(100vh - 280px)', minHeight: '450px', overflowY: 'auto', paddingRight: '2px' }}>
@@ -6556,7 +6888,6 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
 
                   return (
                     <div
-                      key={s.id}
                       draggable={true}
                       onPointerDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => {
@@ -6732,12 +7063,11 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
                 )}
               </div>
             </div>
+            )}
 
+            </div>
           </div>
-
         </>
-      )}
-        </div>
       )}
 
       {/* Fallback rendering of deleteBreakState modal */}
@@ -7741,8 +8071,488 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
           </div>
         )}
 
-        {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
+        {/* Unassigned Students Bottom Drawer (Mobile Sheet) */}
+        {showUnassignedDrawer && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 2000,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-end'
+            }}
+            onClick={() => setShowUnassignedDrawer(false)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px 24px 0 0',
+                width: '100%',
+                maxWidth: '500px',
+                maxHeight: '80vh',
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '20px 20px 32px 20px',
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.2)',
+                boxSizing: 'border-box',
+                animation: 'slideUp 0.3s ease-out'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '2px', margin: '0 auto 16px auto' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={18} color="#34a853" />
+                  <span>🎒 Offene Schüler ({unassignedCount})</span>
+                </h3>
+                <button onClick={() => setShowUnassignedDrawer(false)} style={{ background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
+              </div>
 
+              {/* Search Bar */}
+              <div style={{ marginBottom: '14px' }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Schüler suchen..."
+                  value={drawerSearchQuery}
+                  onChange={(e) => setDrawerSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '12px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                {students.filter(s => !s.assignedDay && !s.isBreak && (
+                  !drawerSearchQuery ||
+                  (s.first_name + ' ' + s.last_name + ' ' + (s.instrument || '')).toLowerCase().includes(drawerSearchQuery.toLowerCase())
+                )).length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', fontWeight: 600 }}>
+                    {drawerSearchQuery ? 'Keine Schüler mit diesem Namen gefunden.' : '🎉 Alle Schüler wurden erfolgreich im Stundenplan zugeteilt!'}
+                  </div>
+                ) : (
+                  students.filter(s => !s.assignedDay && !s.isBreak && (
+                    !drawerSearchQuery ||
+                    (s.first_name + ' ' + s.last_name + ' ' + (s.instrument || '')).toLowerCase().includes(drawerSearchQuery.toLowerCase())
+                  )).map(student => (
+                    <div
+                      key={student.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '14px',
+                        padding: '10px 14px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem' }}>
+                          {student.first_name.charAt(0)}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                            {showRealNames ? formatSingleStudentAnonymized(student.first_name, student.last_name, student.id, showRealNames) : `${student.first_name} ${student.last_name}`}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
+                            {student.instrument || 'Musikschüler'} · {student.duration} Min.
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetDay = focusedDayOfWeek !== null ? focusedDayOfWeek : 1;
+                          const targetBoard = boards.find(b => b.dayOfWeek === targetDay);
+                          if (targetBoard) {
+                            pushUndoSnapshot();
+                            const studentToAssign = { ...student, assignedDay: targetDay };
+                            const targetNext = [...targetBoard.students, studentToAssign];
+                            const updatedTarget = recalculateBoardTimes({ ...targetBoard, students: targetNext }, student.id);
+                            setStudents(prev => prev.map(s => s.id === student.id ? { ...s, assignedDay: targetDay, assignedTime: updatedTarget.students.find(bs => bs.id === student.id)?.assignedTime } : s));
+                            setBoards(prev => prev.map(b => b.dayOfWeek === targetDay ? updatedTarget : b));
+                            setToast({ message: `${student.first_name} eingeteilt! 📅`, type: 'success' });
+                          }
+                          setShowUnassignedDrawer(false);
+                        }}
+                        style={{
+                          background: '#34a853',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '6px 12px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        + Zuweisen
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Mobile Tools Sheet */}
+        {showDesignerToolsSheet && (
+          <div 
+            style={{ 
+              position: 'fixed', 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              background: 'rgba(0,0,0,0.45)', 
+              backdropFilter: 'blur(6px)', 
+              zIndex: 2000, 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'flex-end' 
+            }} 
+            onClick={() => setShowDesignerToolsSheet(false)}
+          >
+            <div 
+              style={{ 
+                background: '#ffffff', 
+                borderRadius: '24px 24px 0 0', 
+                width: '100%', 
+                maxWidth: '500px', 
+                padding: '20px 20px 36px 20px', 
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.2)', 
+                boxSizing: 'border-box', 
+                maxHeight: '85vh',
+                overflowY: 'auto',
+                animation: 'slideUp 0.3s ease-out' 
+              }} 
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '2px', margin: '0 auto 16px auto' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⚙️</span>
+                  <span>Werkzeuge & Aktionen</span>
+                </h3>
+                <button onClick={() => setShowDesignerToolsSheet(false)} style={{ background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
+              </div>
+
+              {/* Section 1: Entwürfe & Auto-Zuteilung */}
+              <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '14px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Entwürfe & Automatisierung</div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                  {drafts.map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        handleSwitchDraft(d.id);
+                        setShowDesignerToolsSheet(false);
+                      }}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        border: activeDraftId === d.id ? '2px solid #34a853' : '1px solid #e2e8f0',
+                        background: activeDraftId === d.id ? '#e6f4ea' : '#ffffff',
+                        color: activeDraftId === d.id ? '#166534' : '#0f172a',
+                        fontWeight: 800,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {d.name}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCreateDraft();
+                      setShowDesignerToolsSheet(false);
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '10px',
+                      border: '1px dashed #cbd5e1',
+                      background: '#ffffff',
+                      color: '#2563eb',
+                      fontWeight: 800,
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Neuer Entwurf
+                  </button>
+                </div>
+
+                <button type="button" onClick={() => { handleAutoAssign(); setShowDesignerToolsSheet(false); }} style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: '#e6f4ea', border: '1px solid #a7f3d0', color: '#166534', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <Sparkles size={16} color="#34a853" />
+                  <span>⚡ Automatisch zuteilen (4-Phasen-Assistent)</span>
+                </button>
+              </div>
+
+              {/* Section 2: Tage & Raster */}
+              <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '14px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Unterrichtstage & Ansicht</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button type="button" onClick={() => { setShowAddBoardForm(true); setShowDesignerToolsSheet(false); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <Plus size={16} color="#34a853" />
+                    <span>+ Neuen Unterrichtstag anlegen</span>
+                  </button>
+                  <button type="button" onClick={() => { toggleRealNames(); setShowDesignerToolsSheet(false); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>{showRealNames ? '🔒 Namen schützen (Vorname N.)' : '👁️ Vollständige Namen anzeigen'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Section 3: Aktionen & Senden */}
+              <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '14px', marginBottom: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Aktionen & Einreichen</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {undoStack.length > 0 && (
+                    <button type="button" onClick={() => { handleUndo(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <RotateCcw size={16} color="#2563eb" />
+                      <span>Rückgängig (Letzte Änderung)</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={async () => {
+                    setShowDesignerToolsSheet(false);
+                    const inviteLink = window.location.origin + "?onboarding=parent";
+                    await navigator.clipboard.writeText(inviteLink);
+                    setToast({ message: 'Onboarding-Link kopiert! 📋', type: 'success' });
+                  }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Send size={15} color="#2563eb" />
+                    <span>Onboarding-Link für Eltern kopieren</span>
+                  </button>
+                  <button type="button" onClick={() => { handleResetAllAssignments(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}>
+                    🗑️ Alle Zuteilungen zurücksetzen
+                  </button>
+                  <button type="button" onClick={() => { handleLockAndSend(); setShowDesignerToolsSheet(false); }} style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', border: 'none', color: '#ffffff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)', marginTop: '4px' }}>
+                    🚀 Einloggen & Senden
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Move Student Action Sheet */}
+        {moveStudentModalState && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 2500,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-end'
+            }}
+            onClick={() => setMoveStudentModalState(null)}
+          >
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '24px 24px 0 0',
+                width: '100%',
+                maxWidth: '500px',
+                padding: '20px 20px 36px 20px',
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.2)',
+                boxSizing: 'border-box',
+                animation: 'slideUp 0.3s ease-out'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '2px', margin: '0 auto 16px auto' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
+                  📅 {moveStudentModalState.student.first_name} verschieben nach...
+                </h3>
+                <button onClick={() => setMoveStudentModalState(null)} style={{ background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {DAYS_OF_WEEK.map(d => {
+                  const isCurrent = moveStudentModalState.student.assignedDay === d.value;
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      disabled={isCurrent}
+                      onClick={() => {
+                        const targetDay = d.value;
+                        const sourceBoardId = moveStudentModalState.boardId;
+                        const studentId = moveStudentModalState.student.id;
+                        
+                        pushUndoSnapshot();
+                        
+                        setBoards(prev => prev.map(b => {
+                          if (b.id === sourceBoardId) {
+                            const nextStudents = b.students.filter(s => s.id !== studentId);
+                            return recalculateBoardTimes({ ...b, students: nextStudents });
+                          }
+                          if (b.dayOfWeek === targetDay) {
+                            const studentToAssign = { ...moveStudentModalState.student, assignedDay: targetDay };
+                            const nextStudents = [...b.students, studentToAssign];
+                            return recalculateBoardTimes({ ...b, students: nextStudents }, studentId);
+                          }
+                          return b;
+                        }));
+
+                        setStudents(prev => prev.map(s => s.id === studentId ? { ...s, assignedDay: targetDay } : s));
+                        setFocusedDayOfWeek(targetDay);
+                        setToast({ message: `${moveStudentModalState.student.first_name} nach ${d.name} verschoben! 📅`, type: 'success' });
+                        setMoveStudentModalState(null);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: isCurrent ? '1.5px solid #cbd5e1' : '1px solid #e2e8f0',
+                        background: isCurrent ? '#f1f5f9' : '#ffffff',
+                        color: isCurrent ? '#64748b' : '#0f172a',
+                        fontWeight: 800,
+                        fontSize: '0.88rem',
+                        cursor: isCurrent ? 'default' : 'pointer'
+                      }}
+                    >
+                      <span>{d.name}</span>
+                      {isCurrent && <span style={{ fontSize: '0.72rem', color: '#64748b' }}>(Aktueller Tag)</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleRemoveStudentFromBoard(moveStudentModalState.boardId, moveStudentModalState.student.id);
+                  setMoveStudentModalState(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #fecaca',
+                  background: '#fef2f2',
+                  color: '#991b1b',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                🎒 Zurück in Schüler-Pool legen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Scrollbar Hide & Light Frosted Glass Floating iOS Dock Bar */}
+        {isMobilePortrait && activeTab === 'designer' && (
+          <div>
+            <style>{`
+              @media (max-width: 768px) {
+                html, body, #root, .main-wrapper, .sim-viewport-mobile, .sim-viewport-portrait, #tour-day-boards, #tour-day-boards * {
+                  scrollbar-width: none !important;
+                  -ms-overflow-style: none !important;
+                }
+                html::-webkit-scrollbar, body::-webkit-scrollbar, #root::-webkit-scrollbar, .main-wrapper::-webkit-scrollbar, .sim-viewport-mobile::-webkit-scrollbar, .sim-viewport-portrait::-webkit-scrollbar, #tour-day-boards::-webkit-scrollbar, #tour-day-boards *::-webkit-scrollbar {
+                  display: none !important;
+                  width: 0 !important;
+                  height: 0 !important;
+                }
+              }
+            `}</style>
+            <div style={{
+              position: 'fixed',
+              bottom: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 900,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'rgba(255, 255, 255, 0.88)',
+              backdropFilter: 'blur(28px) saturate(200%)',
+              WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+              border: '1px solid rgba(203, 213, 225, 0.8)',
+              borderRadius: '100px',
+              padding: '5px 6px',
+              boxShadow: '0 12px 36px rgba(15, 23, 42, 0.15), 0 2px 8px rgba(0,0,0,0.04)',
+              maxWidth: '94vw'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowUnassignedDrawer(true)}
+                style={{
+                  background: unassignedCount > 0 ? 'rgba(15, 23, 42, 0.06)' : '#e6f4ea',
+                  color: unassignedCount > 0 ? '#0f172a' : '#166534',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '9px 14px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <span>{unassignedCount > 0 ? '🎒' : '✨'}</span>
+                <span>{unassignedCount > 0 ? `Offene Schüler (${unassignedCount})` : 'Alle zugeteilt'}</span>
+              </button>
+              
+              <div style={{ width: '1px', height: '20px', background: 'rgba(0, 0, 0, 0.12)', margin: '0 2px' }} />
+
+              <button
+                type="button"
+                onClick={() => setShowDesignerToolsSheet(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '9px 16px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(52, 168, 83, 0.35)'
+                }}
+              >
+                <span>⚙️</span>
+                <span>Werkzeuge & Senden</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+      {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
     </div>
   );
 }

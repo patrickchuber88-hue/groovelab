@@ -76,7 +76,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           sessionStorage.setItem('groovelab_qr_token', authQrToken);
         }
 
-        let userUpdatePayload: any = {
+        const userUpdatePayload: any = {
           personal_pin: pinInput,
           parent_pin: pinInput,
           onboarding_pin: pinInput,

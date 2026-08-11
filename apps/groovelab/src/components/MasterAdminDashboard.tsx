@@ -161,7 +161,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [newOfferActive, setNewOfferActive] = useState(true);
 
   // Master Billing Settings State
-  const [billingCompany, setBillingCompany] = useState('Simplified Work GbR');
+  const [billingCompany, setBillingCompany] = useState('Campus-Groovelab (Einzelunternehmen Patrick Huber)');
   const [billingContact, setBillingContact] = useState('Patrick Huber');
   const [billingStreet, setBillingStreet] = useState('Karl-Fürstenberg-Str. 59');
   const [billingZip, setBillingZip] = useState('79618');
@@ -2902,7 +2902,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                         type="text"
                         value={billingCompany}
                         onChange={(e) => setBillingCompany(e.target.value)}
-                        placeholder="z.B. Simplified Work GbR"
+                        placeholder="z.B. Patrick Huber (Einzelunternehmer)"
                         required
                         style={{
                           width: '100%',

@@ -1248,12 +1248,12 @@ export const testCases: TestCase[] = [
     run: async (client) => {
       // 1. Logged in as teacher - can see lessons
       sessionStorage.setItem('groovelab_user_id', 'teacher-1');
-      let res1 = await client.from('lessons').select('*');
+      const res1 = await client.from('lessons').select('*');
       if (res1.error || res1.data.length === 0) throw new Error('Teacher should see lessons');
       
       // 2. Logged in as admin - cannot see lessons
       sessionStorage.setItem('groovelab_user_id', 'admin-1');
-      let res2 = await client.from('lessons').select('*');
+      const res2 = await client.from('lessons').select('*');
       if (res2.error || res2.data.length > 0) throw new Error('Admin should not see lessons');
     }
   },
@@ -2332,7 +2332,7 @@ export const testCases: TestCase[] = [
         .order('sort_order', { ascending: true });
       if (error) throw new Error(error.message);
       
-      let offset = 0;
+      const offset = 0;
       const act2Offset = data[0].duration + data[1].duration; // 25 mins
       if (act2Offset !== 25) throw new Error('Timeline shift by pause failed');
       

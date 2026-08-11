@@ -128,7 +128,7 @@ export const CampusModule: React.FC<CampusModuleProps> = (props) => {
               />
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            <div className="schueler-board-grid student-board-grid">
               {filteredStudents.map((student: any) => (
                 <div 
                   key={student.id} 

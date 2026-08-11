@@ -109,7 +109,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
       "5": { start: "12:00", end: "20:00" }
     };
     
-    let dayConfig = activeAvail[dayId] || activeAvail[String(dayId)];
+    const dayConfig = activeAvail[dayId] || activeAvail[String(dayId)];
     if (!dayConfig) return null;
 
     let start = dayConfig.start || dayConfig.start_time;

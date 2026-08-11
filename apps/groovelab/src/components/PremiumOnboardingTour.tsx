@@ -62,7 +62,15 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
     const step = steps[currentTourStep];
     if (!step) return;
 
-    if (!step.selector) {
+    if (step.selector) {
+      const el = document.getElementById(step.selector);
+      if (el) {
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+          setTimeout(() => updatePosition(), 350);
+        } catch (_) {}
+      }
+    } else {
       setSpotlightRect(null);
       setTooltipStyle({
         position: 'fixed',
@@ -76,51 +84,80 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
     }
 
     const updatePosition = () => {
-      const el = document.getElementById(step.selector!);
+      const el = document.getElementById(step.selector!) || document.getElementById('tour-teacher-briefing') || document.querySelector('.cg-full-height-board');
       if (el) {
         const rect = el.getBoundingClientRect();
 
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
+        const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-ipad-portrait, .sim-viewport-ipad-landscape, [class*="sim-viewport"]');
+        let frameLeft = 0;
+        let frameRight = window.innerWidth;
+        let frameTop = 0;
+        let frameBottom = window.innerHeight;
+
+        if (simEl) {
+          const simRect = simEl.getBoundingClientRect();
+          frameLeft = simRect.left;
+          frameRight = simRect.right;
+          frameTop = simRect.top;
+          frameBottom = simRect.bottom;
+        }
+
+        const frameWidth = frameRight - frameLeft;
+        const frameHeight = frameBottom - frameTop;
+        const isMobileView = frameWidth <= 768 || Boolean(simEl);
         
         let pos: 'right' | 'left' | 'top' | 'bottom' = 'right';
-        
-        // Decide best placement based on space
-        if (rect.right + 360 < viewportWidth) {
-          pos = 'right';
-        } else if (rect.left - 360 > 0) {
-          pos = 'left';
-        } else if (rect.bottom + 260 < viewportHeight) {
-          pos = 'bottom';
-        } else {
-          pos = 'top';
-        }
-        
         let top = 0;
         let left = 0;
 
-        const cardWidth = Math.min(viewportWidth - 32, 340);
-        const cardHeight = Math.min(viewportHeight - 48, 260);
+        const cardWidth = Math.min(frameWidth - 24, 340);
+        const cardHeight = Math.min(frameHeight - 32, 220);
 
-        if (pos === 'right') {
-          left = rect.right + 18;
-          top = rect.top + rect.height / 2 - 100;
-        } else if (pos === 'left') {
-          left = rect.left - cardWidth - 18;
-          top = rect.top + rect.height / 2 - 100;
-        } else if (pos === 'bottom') {
-          left = rect.left + rect.width / 2 - cardWidth / 2;
-          top = rect.bottom + 18;
+        // Mobile & Tablet Portrait Smart Positioning (including Device Simulator)
+        if (isMobileView) {
+          left = frameLeft + Math.max(12, (frameWidth - cardWidth) / 2);
+          const elementCenterY = rect.top + rect.height / 2;
+          if (elementCenterY > frameTop + frameHeight / 2) {
+            // Target is in bottom half -> place tooltip at top
+            pos = 'top';
+            top = Math.max(frameTop + 16, rect.top - cardHeight - 16);
+          } else {
+            // Target is in top half -> place tooltip at bottom
+            pos = 'bottom';
+            top = Math.min(frameBottom - cardHeight - 16, rect.bottom + 16);
+          }
         } else {
-          left = rect.left + rect.width / 2 - cardWidth / 2;
-          top = rect.top - cardHeight - 18;
+          // Desktop Positioning
+          if (rect.right + 360 < frameRight) {
+            pos = 'right';
+          } else if (rect.left - 360 > frameLeft) {
+            pos = 'left';
+          } else if (rect.bottom + 260 < frameBottom) {
+            pos = 'bottom';
+          } else {
+            pos = 'top';
+          }
+
+          if (pos === 'right') {
+            left = rect.right + 18;
+            top = rect.top + rect.height / 2 - 100;
+          } else if (pos === 'left') {
+            left = rect.left - cardWidth - 18;
+            top = rect.top + rect.height / 2 - 100;
+          } else if (pos === 'bottom') {
+            left = rect.left + rect.width / 2 - cardWidth / 2;
+            top = rect.bottom + 18;
+          } else {
+            left = rect.left + rect.width / 2 - cardWidth / 2;
+            top = rect.top - cardHeight - 18;
+          }
         }
 
-        // Adjust bounds to stay inside viewport safely
-        if (left < 16) left = 16;
-        if (left + cardWidth > viewportWidth - 16) left = viewportWidth - cardWidth - 16;
-        if (top < 16) top = 16;
-        if (top + cardHeight > viewportHeight - 16) top = viewportHeight - cardHeight - 16;
+        // Adjust bounds to stay inside frame safely
+        if (left < frameLeft + 12) left = frameLeft + 12;
+        if (left + cardWidth > frameRight - 12) left = frameRight - cardWidth - 12;
+        if (top < frameTop + 12) top = frameTop + 12;
+        if (top + cardHeight > frameBottom - 12) top = frameBottom - cardHeight - 12;
 
         // Check if anything has changed
         const last = lastPositionRef.current;

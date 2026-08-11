@@ -51,6 +51,20 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     return 4;
   };
 
+  const [mobileTab, setMobileTab] = useState<'metronome' | 'rhythms'>('metronome');
+  const [isMobileView, setIsMobileView] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait');
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(activeSongContext?.targetBpm || targetBpm || 120);
   const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco' | 'singersongwriter'>('metronome');
@@ -734,7 +748,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               if (beats.length > 0) {
                 let closestBeat = beats[0];
                 let minDiffSec = Math.abs(now - closestBeat);
-                for (let b of beats) {
+                for (const b of beats) {
                   const d = Math.abs(now - b);
                   if (d < minDiffSec) {
                     minDiffSec = d;
@@ -1181,18 +1195,78 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
       minHeight: '520px',
       color: '#1d1d1f',
-      padding: '32px 28px',
+      padding: isMobileView ? '16px 16px calc(240px + env(safe-area-inset-bottom, 40px)) 16px' : '32px 28px',
       gap: '24px',
       width: '100%',
+      boxSizing: 'border-box',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     }}>
       
+      {/* Mobile Segmented Switcher for Metronome vs Begleit-Rhythmen */}
+      {isMobileView && (
+        <div style={{
+          display: 'flex',
+          background: '#e2e8f0',
+          borderRadius: '12px',
+          padding: '3px',
+          width: '100%',
+          marginBottom: '8px'
+        }}>
+          <button
+            type="button"
+            onClick={() => setMobileTab('metronome')}
+            style={{
+              flex: 1,
+              background: mobileTab === 'metronome' ? '#ffffff' : 'transparent',
+              color: mobileTab === 'metronome' ? '#1d1d1f' : '#64748b',
+              border: 'none',
+              borderRadius: '9px',
+              padding: '10px 12px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: mobileTab === 'metronome' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <Clock size={15} />
+            <span>Metronom & Coach</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('rhythms')}
+            style={{
+              flex: 1,
+              background: mobileTab === 'rhythms' ? '#ffffff' : 'transparent',
+              color: mobileTab === 'rhythms' ? '#1d1d1f' : '#64748b',
+              border: 'none',
+              borderRadius: '9px',
+              padding: '10px 12px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: mobileTab === 'rhythms' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+          >
+            <Music size={15} />
+            <span>Begleit-Rhythmen & Tracks</span>
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: '28px', flex: 1, width: '100%' }} className="flex-col lg:flex-row">
         {/* Left Column: Equalized Metronome Panel (Generous 50/50 Breathing Room) */}
         <div style={{
           flex: '1 1 0%',
-          minWidth: '320px',
-          display: 'flex',
+          minWidth: isMobileView ? '100%' : '320px',
+          display: (!isMobileView || mobileTab === 'metronome') ? 'flex' : 'none',
           flexDirection: 'column',
           alignItems: 'center',
           background: '#ffffff',
@@ -1858,19 +1932,22 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '20px'
+              padding: '16px',
+              overflowY: 'auto'
             }}>
               <div style={{
                 background: '#ffffff',
-                borderRadius: '28px',
-                padding: '32px 28px',
+                borderRadius: '24px',
+                padding: '24px 20px',
                 maxWidth: '420px',
                 width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
                 textAlign: 'center',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '18px',
+                gap: '16px',
                 boxShadow: '0 25px 50px rgba(0,0,0,0.35)',
                 animation: 'scaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
               }}>
@@ -2109,8 +2186,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         {/* Right Column: Equalized Drum Beat Generator & Mixer Panel (Generous 50/50 Breathing Room) */}
         <div style={{
           flex: '1 1 0%',
-          minWidth: '320px',
-          display: 'flex',
+          minWidth: isMobileView ? '100%' : '320px',
+          display: (!isMobileView || mobileTab === 'rhythms') ? 'flex' : 'none',
           flexDirection: 'column',
           background: '#ffffff',
           borderRadius: '20px',
@@ -2119,11 +2196,58 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           gap: '20px',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)'
         }}>
-          <div>
-            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              BEAT GENERATOR
-            </span>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f', margin: '4px 0 0 0' }}>Begleit-Rhythmen</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                BEAT GENERATOR
+              </span>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f', margin: '2px 0 0 0' }}>Begleit-Rhythmen</h3>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                  audioCtxRef.current.resume();
+                }
+                if (isPlaying) {
+                  setIsPlaying(false);
+                } else {
+                  if (selectedStyle === 'metronome') {
+                    setRhythmCoachActive(true);
+                  }
+                  setIsPlaying(true);
+                }
+              }}
+              className="tactile-btn"
+              style={{
+                background: isPlaying ? '#ea4335' : '#34a853',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '10px 18px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: isPlaying ? '0 4px 14px rgba(234, 67, 53, 0.3)' : '0 4px 14px rgba(52, 168, 83, 0.3)',
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              {isPlaying ? (
+                <>
+                  <Square size={14} fill="currentColor" />
+                  <span>Stoppen</span>
+                </>
+              ) : (
+                <>
+                  <Play size={14} fill="currentColor" />
+                  <span>Starten</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Rhythms Selector Grid */}
@@ -2155,6 +2279,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     if (styleOpt.id !== 'metronome') {
                       setRhythmCoachActive(false);
                     }
+                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                      audioCtxRef.current.resume();
+                    }
+                    setIsPlaying(true);
                   }}
                   className="tactile-btn"
                   style={{

@@ -66,7 +66,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
     if (!isSilent) setLoading(true);
     try {
       // 1. Fetch Ensembles
-      let ensemblesQuery = supabase.from('ensembles').select('*').eq('school_id', schoolId);
+      const ensemblesQuery = supabase.from('ensembles').select('*').eq('school_id', schoolId);
       
       const { data: ensembleData, error: ensembleErr } = await ensemblesQuery;
       if (ensembleErr) throw ensembleErr;
@@ -808,10 +808,10 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                           height: '38px',
                           boxSizing: 'border-box'
                         }}
-                        title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+                        title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
                       >
-                        {showRealNames ? <EyeOff size={15} /> : <Eye size={15} />}
-                        <span>{showRealNames ? "Sperren" : "Anzeigen"}</span>
+                        {showRealNames ? <Eye size={15} /> : <EyeOff size={15} />}
+                        <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
                       </button>
                     )}
                     {isTeacher && (

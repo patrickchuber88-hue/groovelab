@@ -5,17 +5,17 @@ import {
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, 
   ChevronRight, Coffee, Clock, Flame, BookOpen, Share2, Play, 
   Pause, RotateCcw, Volume2, Moon, QrCode, X, EyeOff, Zap, Music, Library, School, Calendar, Check, CheckCircle, Target, MessageSquare, Send,
-  Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck
+  Pencil, Edit3, User, Mail, Phone, MapPin, Activity, Camera, TrendingUp, Users, Shield, Search, Palmtree, Settings, Bell, FileText, ThumbsUp, Heart, AlertTriangle, Anchor, ShieldCheck, CheckCheck, Building
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Tooltip } from 'recharts';
-const CampusEventsBoard = React.lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
+import { CampusEventsBoard } from './CampusEventsBoard';
 import { createPortal } from 'react-dom';
 import { QRCodeModal } from './QRCodeModal';
-const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
-import { ALL_STICKERS } from './MeisterwerkDocumentationModal';
+import { MeisterwerkDocumentationModal, ALL_STICKERS } from './MeisterwerkDocumentationModal';
 import { usePremiumOnboardingTour, TourStep, TourStartButton } from './PremiumOnboardingTour';
-import { cleanHomeworkNotesText } from '../utils/nameHelper';
+import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
+import { cleanHomeworkNotesText, maskLastName } from '../utils/nameHelper';
 
 const showMissionsFeature = false;
 
@@ -510,7 +510,7 @@ function MobileBriefingView({
           </div>
 
           <h2 style={{ fontSize: '24px', fontWeight: 900, margin: 0, color: '#1e293b', fontFamily: "'Urbanist', sans-serif" }}>
-            Willkommen zurück, {studentUser?.first_name || ''}! 👋
+            Willkommen zurück! 👋
           </h2>
 
           <p style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.45, margin: 0, fontWeight: 550 }}>
@@ -2087,9 +2087,9 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
               </div>
 
               {/* Positions Table */}
-              <div style={{ marginBottom: '24px' }}>
+              <div style={{ marginBottom: '24px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                 <h5 style={{ margin: '0 0 10px 0', fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Positionen:</h5>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', fontWeight: 700 }}>
                       <th style={{ padding: '8px 0' }}>Leistungsbeschreibung</th>
@@ -2116,7 +2116,7 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
                 </table>
                 <div style={{ marginTop: '12px', fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right', lineHeight: '1.4' }}>
                   Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).<br />
-                  Kleinbetragsrechnung gemäß § 33 UStDV.
+                  Kleinbetragsrechnung gemäß § 33 UStDV. | Verbraucherhinweis: 14 Tage Widerrufsrecht gemäß § 312g BGB (Details siehe Rechtliche Hinweise / Widerruf).
                 </div>
               </div>
 
@@ -2369,7 +2369,26 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   console.log('StudentAvatarDashboard Render:', { activeTab: parentActiveTab, studentId });
   const [studentUser, setStudentUser] = useState<any>(null);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 1024 : false);
+  const getIsMobileDevice = () => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 1024 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+  };
+
+  const [isMobile, setIsMobile] = useState(getIsMobileDevice());
+
+  useEffect(() => {
+    const handleCheck = () => {
+      setIsMobile(getIsMobileDevice());
+    };
+    handleCheck();
+    window.addEventListener('resize', handleCheck);
+    const observer = new MutationObserver(handleCheck);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    return () => {
+      window.removeEventListener('resize', handleCheck);
+      observer.disconnect();
+    };
+  }, []);
 
   const campusSettings = useMemo(() => {
     return studentUser?.schools?.opening_hours?.campus_settings || {};
@@ -2406,14 +2425,6 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
     steps: tourSteps,
     platformTheme: 'campus'
   });
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 1024);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const getCurrentSchoolYear = (): string => {
     const now = new Date();
@@ -3574,7 +3585,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .select('first_name, last_name')
         .eq('id', studentId)
         .single();
-      const studentName = userData ? `${userData.first_name} ${userData.last_name}` : 'Ein Schüler';
+      const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
 
       await supabase.from('system_alerts').insert({
         school_id: occ.schedule?.school_id || studentUser?.school_id || null,
@@ -3621,7 +3632,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         .select('first_name, last_name')
         .eq('id', studentId)
         .single();
-      const studentName = userData ? `${userData.first_name} ${userData.last_name}` : 'Ein Schüler';
+      const studentName = userData ? `${userData.first_name} ${maskLastName(userData.last_name)}` : 'Ein Schüler';
       const formattedDate = new Date(occ.date).toLocaleDateString('de-DE');
 
       await supabase.from('system_alerts').insert({
@@ -5499,7 +5510,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       setShowCustomParentInput(false);
       setCustomParentMinutes('');
 
-      alert(`🎉 Super! ${minutes} Übe-Minuten für ${studentUser?.first_name || 'dein Kind'} verbucht! Streak gehalten! 🔥`);
+      alert(`🎉 Super! ${minutes} Übe-Minuten verbucht! Streak gehalten! 🔥`);
     } catch (err: any) {
       alert('Fehler beim Eintragen der Übezeit: ' + err.message);
     }
@@ -5839,9 +5850,11 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
 
         const masteredThisMonth = studentSkills.filter((sk: any) => sk.progress_percent === 100 || sk.is_stage_ready);
 
+        const formattedStudentName = `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim();
+
         if (monthlyStreak >= 2) {
           highlights.push({
-            studentName: `${student.first_name} ${student.last_name}`,
+            studentName: formattedStudentName,
             emoji: '🔥',
             title: 'Monats-Konstanz',
             text: `Hat in ${monthlyStreak} verschiedenen Wochen diesen Monats geübt!`
@@ -5849,7 +5862,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
         if (monthlyMins >= 120) {
           highlights.push({
-            studentName: `${student.first_name} ${student.last_name}`,
+            studentName: formattedStudentName,
             emoji: '⚡',
             title: 'Monats-Fokus',
             text: `Hat diesen Monat bereits ${monthlyMins} Minuten trainiert!`
@@ -5857,7 +5870,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         }
         masteredThisMonth.forEach((sk: any) => {
           highlights.push({
-            studentName: `${student.first_name} ${student.last_name}`,
+            studentName: formattedStudentName,
             emoji: '🏆',
             title: 'Meilenstein',
             text: `Hat heute den Song "${(sk.songs as any)?.title || 'Song'}" gemeistert!`
@@ -6590,7 +6603,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
   const strokeDashoffset = circleCircumference - (xpPercentage / 100) * circleCircumference;
 
   return (
-    <div style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', padding: '10px', boxSizing: 'border-box' }}>
+    <div className="cg-full-height-board fluid-board-scroll-container" style={{ fontFamily: '"Outfit", "Inter", sans-serif', maxWidth: '100%', margin: '0 auto', width: '100%', padding: isMobile ? '0 0 140px 0' : '0 0 40px 0', boxSizing: 'border-box' }}>
       
       {/* Holiday Banner */}
       {isTodayHoliday && (
@@ -10201,7 +10214,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     ];
 
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
+                  <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch' }}>
                     {/* Top Left: Header and summary cards */}
                     <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
@@ -10214,7 +10227,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
+                      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
                         {[
                           { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
@@ -10299,7 +10312,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               })()}
 
               {/* Grid Section: Goals | Highlights | Annual Stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
+              <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch' }}>
                 
                 {/* Column 1: Übe-Ziele der Klasse */}
                 <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
@@ -10685,7 +10698,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
         )}
       </div>
 
-      <div style={{ display: activeTab === 'events' ? 'block' : 'none' }}>
+      <div style={{ display: activeTab === 'events' ? 'block' : 'none', width: '100%', boxSizing: 'border-box' }}>
         {activeTab === 'events' && (
           <CampusEventsBoard 
             userId={studentId}
@@ -10982,12 +10995,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     lineHeight: 1.1,
                     letterSpacing: '-0.02em'
                   }}>
-                    Willkommen zurück, <span style={{ 
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      fontWeight: 950
-                    }}>{studentUser?.first_name || ''}</span>! 👋
+                    Willkommen zurück! 👋
                   </h3>
                   
                   <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', color: '#475569', fontWeight: 600, lineHeight: 1.45, maxWidth: '95%' }}>
@@ -13201,8 +13209,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 }}>
                   Campus Schüler
                 </span>
-                <span style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: 750 }}>
-                  🏢 {studentUser.schools?.name || 'Groovelab Campus'}
+                <span style={{ color: '#ffffff', fontSize: '0.85rem', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Building size={14} color="#ffffff" /> {studentUser.schools?.name || 'Campus-Groovelab'}
                 </span>
                 <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', fontWeight: 500 }}>
                   • Mitglied seit {studentUser.created_at && !isNaN(new Date(studentUser.created_at).getTime()) ? new Date(studentUser.created_at).toLocaleDateString('de-DE') : 'unbekannt'}
@@ -14270,7 +14278,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                             setPinFormError('');
 
                             try {
-                              let userUpdatePayload: any = {
+                              const userUpdatePayload: any = {
                                 personal_pin: pinFormNew,
                                 parent_pin: pinFormNew,
                                 onboarding_pin: pinFormNew,
@@ -15166,7 +15174,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 setPinFormError('');
 
                 try {
-                  let payload: any = {
+                  const payload: any = {
                     personal_pin: pinFormNew,
                     parent_pin: pinFormNew,
                     onboarding_pin: pinFormNew,
@@ -15512,7 +15520,8 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>💬</span> 1:1 Shoutbox: Absprache
+                      <MessageSquare size={18} color="#ffffff" />
+                      <span>1:1 Shoutbox: Absprache</span>
                     </h3>
                   </div>
                   <p style={{ margin: '4px 0 6px 0', color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.75rem', fontWeight: 600 }}>
@@ -15520,7 +15529,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   </p>
                   
                   {/* Badges */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                     <span style={{
                       padding: '4px 10px',
                       borderRadius: '8px',
@@ -15531,8 +15540,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       backdropFilter: 'blur(4px)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
-                      whiteSpace: 'nowrap'
+                      gap: '5px'
                     }}>
                       <ShieldCheck size={13} color="#ffffff" />
                       <span>100% DSGVO-konform • End-to-End verschlüsselt</span>

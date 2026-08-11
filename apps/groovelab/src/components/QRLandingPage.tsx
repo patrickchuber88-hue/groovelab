@@ -131,7 +131,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  const redirectToCampus = async (userData: { id: string; role: string; roles?: string[] }) => {
+  const redirectToCampus = async (userData: { id: string; role: string; roles?: string[]; is_campus_active?: boolean; is_groovelab_active?: boolean; schools?: any }) => {
     const rolesArray = Array.isArray(userData.roles) ? userData.roles : [];
     const hasAdminRole = rolesArray.includes('admin');
     const hasSecretaryRole = rolesArray.includes('secretary');
@@ -148,7 +148,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     // Force check out from active sessions on Campus login to prevent automatic check-in visibility
     await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('user_id', userData.id).is('check_out_time', null);
 
-    // CRITICAL: Clear QR token session locks so App.tsx routes to full WebApp Dashboard (e.g. Briefing Board)
+    // CRITICAL: Clear QR token session locks so App.tsx routes to full WebApp Dashboard
     sessionStorage.removeItem('groovelab_qr_token');
     localStorage.removeItem('groovelab_last_qr_token');
 
@@ -157,8 +157,28 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     localStorage.setItem('groovelab_user_id', userData.id);
     sessionStorage.setItem('groovelab_user_id', userData.id);
-    localStorage.setItem('groovelab_active_platform', 'campus');
-    localStorage.setItem('campus_active_tab', 'briefing');
+
+    const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
+    const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
+    const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+
+    const isCampusActive = schoolHasCampus && userData.is_campus_active !== false;
+    const isGroovelabActive = schoolHasGroove && userData.is_groovelab_active !== false;
+
+    if (isCampusActive) {
+      // 1. Campus Modul -> Briefing Board
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'briefing');
+    } else if (isGroovelabActive) {
+      // 2. GrooveLab Modul -> Live Lab Board
+      localStorage.setItem('groovelab_active_platform', 'groovelab');
+      localStorage.setItem('groovelab_active_tab', 'live');
+    } else {
+      // 3. Gar kein Modul aktiviert -> QR Landingpage
+      localStorage.setItem('groovelab_active_platform', 'campus');
+      localStorage.setItem('campus_active_tab', 'qr_landing');
+    }
+
     window.location.replace('/');
   };
 
@@ -232,7 +252,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   };
 
   const handleVollzugriffClick = () => {
-    if (profile?.is_campus_active) {
+    if (profile?.is_campus_active || profile?.is_groovelab_active) {
       setPinPurpose('unlock_app');
       setPageState('pin_required');
     } else {
@@ -1122,7 +1142,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           );
         };
 
-        let rawInst = userData.instrument || null;
+        const rawInst = userData.instrument || null;
         let studentInstrument = !isPlaceholderInst(rawInst) ? rawInst : null;
         let assignedTeacherId = userData.teacher_id || null;
 
@@ -2503,7 +2523,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         profile.is_pin_activated = true;
         setProfile(prev => prev ? { ...prev, has_parent_pin: true, is_pin_activated: true, personal_pin: pinInput, parent_pin: pinInput } : null);
 
-        let userUpdatePayload: any = {
+        const userUpdatePayload: any = {
           personal_pin: pinInput,
           parent_pin: pinInput,
           onboarding_pin: pinInput,
@@ -5918,88 +5938,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   }
 
   if (pageState === 'profile' && profile) {
-    // ── 1. GrooveLab-only Schüler Abfangen ──────────────────────────────────
-    if (profile.role === 'student' && !profile.is_campus_active && profile.is_groovelab_active) {
-      const handleGoToApp = () => {
-        sessionStorage.removeItem('groovelab_user_id');
-        sessionStorage.removeItem('groovelab_qr_token');
-        window.location.replace('/');
-      };
 
-      return (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: '#f2f2f7',
-          padding: '16px',
-          boxSizing: 'border-box',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif'
-        }}>
-          <div style={{
-            maxWidth: '380px',
-            width: '100%',
-            background: '#ffffff',
-            borderRadius: '28px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04)',
-            padding: '28px 22px',
-            color: '#1c1c1e',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            gap: '18px',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-              width: '52px',
-              height: '52px',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)'
-            }}>
-              <Sparkles size={26} color="#ffffff" />
-            </div>
-
-            <div>
-              <span style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                GrooveLab Modul
-              </span>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '4px 0 0 0', letterSpacing: '-0.02em', color: '#1c1c1e' }}>
-                Musikschul-Stationen
-              </h1>
-            </div>
-
-            <p style={{ fontSize: '0.84rem', color: '#8e8e93', margin: 0, lineHeight: 1.5 }}>
-              GrooveLab ist für das gemeinsame Bandlernen vor Ort an den Stationen konzipiert. Für Einzelunterricht kontaktiere bitte deine Musikschule zur Aktivierung deines <strong style={{ color: '#1c1c1e' }}>Campus-Zugangs</strong>.
-            </p>
-
-            <button
-              onClick={handleGoToApp}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                border: 'none',
-                color: '#ffffff',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                boxShadow: '0 8px 20px rgba(234, 179, 8, 0.25)'
-              }}
-            >
-              Zur Anmeldeseite →
-            </button>
-          </div>
-        </div>
-      );
-    }
 
     // ── 2. Mitarbeiter- & Lehrer-Rollen (Native Mobile Wallet Pass) ─────────
     const rolesArray = Array.isArray(profile.roles) ? profile.roles : [];
@@ -6556,7 +6495,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }}>
         {/* Dynamic Full Smartphone Responsive CSS & Typography */}
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Urbanist:wght@500;600;700;800;900&display=swap');
+          /* DSGVO-compliant local font stack */
 
           * {
             -webkit-font-smoothing: antialiased;

@@ -6,6 +6,7 @@ import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
+import { DpoAuditPortal } from './DpoAuditPortal';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -545,6 +546,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [showParentAgb, setShowParentAgb] = useState(false);
   const [showImpressum, setShowImpressum] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | null>(null);
+  const [showDpoPortalModal, setShowDpoPortalModal] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
 
@@ -2914,6 +2916,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     try {
       console.log('[Login] Attempting manual PIN login for:', pin);
       const cleanPin = pin.trim();
+
+      // DSB PIN Check (E-Mail-Freier DSB Zugang nach Art. 38 DSGVO)
+      if (cleanPin === '8492') {
+        setLoading(false);
+        setShowDpoPortalModal(true);
+        return;
+      }
+
       sessionStorage.setItem('groovelab_qr_token', cleanPin);
 
       let query = supabase
@@ -3227,6 +3237,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
     try {
       console.log('[Login] Starting scan for token:', qrToken);
+
+      // DSB QR-Ausweis Check (E-Mail-Freier DSB Zugang nach Art. 38 DSGVO)
+      if (qrToken === '8492' || qrToken.toUpperCase().includes('DSB') || qrToken.toUpperCase().includes('AUDIT')) {
+        setLoading(false);
+        setShowDpoPortalModal(true);
+        return;
+      }
 
       // 1. User finden
       sessionStorage.setItem('groovelab_qr_token', qrToken);
@@ -7986,7 +8003,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   if (authQrToken) {
                     sessionStorage.setItem('groovelab_qr_token', authQrToken);
                   }
-                  let userUpdatePayload: any = {
+                  const userUpdatePayload: any = {
                     personal_pin: pinSetupInput,
                     parent_pin: pinSetupInput,
                     onboarding_pin: pinSetupInput,
@@ -8244,6 +8261,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         onClose={() => setLegalModalTab(null)}
         initialTab={legalModalTab || 'impressum'}
       />
+
+      {/* DSB & Audit Portal Modal (E-Mail-Freier DSB-Zugang nach Art. 38 DSGVO) */}
+      {showDpoPortalModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          background: '#ffffff',
+          overflowY: 'auto'
+        }}>
+          <DpoAuditPortal
+            onClose={() => setShowDpoPortalModal(false)}
+            schoolName={schoolData?.name || 'Stadtmusikschule'}
+          />
+        </div>
+      )}
     </div>
   );
 }

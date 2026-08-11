@@ -65,10 +65,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const isBypass = invoice.subscriptionBypass || invoice.status === 'bypass';
   const isFree = isBypass || isTrial;
   const freeLabel = isBypass ? ' (Bypass aktiv)' : (isTrial ? ' (Probemonat)' : '');
+  const isPreview = invoice.status === 'Vorschau' || invoice.status === 'preview' || invoice.id.startsWith('VS-');
   const isGutschrift = invoice.amount < 0;
-  const displayInvoiceId = isGutschrift 
-    ? invoice.id.replace('INV-', 'GS-') 
-    : invoice.id.replace('INV-', 'RE-');
+  const displayInvoiceId = isPreview
+    ? invoice.id
+    : (isGutschrift ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'));
 
   const getDueDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -213,6 +214,26 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
         {/* Print Area */}
         <div id="printable-invoice" style={{ padding: '24px 30px', overflowY: 'auto', flex: 1, color: '#1e293b', lineHeight: '1.35' }}>
+          {/* Unverbindliche Vorschau Banner */}
+          {isPreview && (
+            <div style={{
+              background: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: '#0369a1',
+              fontSize: '0.74rem',
+              fontWeight: 700
+            }}>
+              <span><strong>UNVERBINDLICHE ABRECHNUNGS-VORSCHAU:</strong> Laufender Zeitraum ({lpStr}). Dieses Dokument dient der transparenten Hochrechnung und ist noch KEINE finale Rechnung.</span>
+              <span style={{ background: '#0284c7', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', fontSize: '0.66rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vorschau</span>
+            </div>
+          )}
+
           {/* Invoice Meta */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div>
@@ -477,12 +498,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               
               {isAkt && billingPayer === 'student' && (
                 <div style={{ fontSize: '0.64rem', color: '#34a853', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
-                  💡 <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Aktivierungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
+                  <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Aktivierungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
                 </div>
               )}
               {isAkt && billingPayer === 'school' && (
                 <div style={{ fontSize: '0.64rem', color: '#ea580c', background: '#ffedd5', border: '1px solid #fed7aa', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
-                  💡 <strong>Sammelabrechnung:</strong> Diese Aktivierungen werden direkt von der Musikschule getragen und über das Sammelzahlungs-Modell abgerechnet.
+                  <strong>Sammelabrechnung:</strong> Diese Aktivierungen werden direkt von der Musikschule getragen und über das Sammelzahlungs-Modell abgerechnet.
                 </div>
               )}
               

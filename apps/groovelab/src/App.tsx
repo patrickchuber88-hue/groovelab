@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -11,18 +11,18 @@ import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, rend
 import { CampusPinUnlockModal } from './components/CampusPinUnlockModal';
 import { PilotOnboardingModal } from './components/PilotOnboardingModal';
 
-const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(module => ({ default: module.TeacherDashboard })));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
-const MasterAdminDashboard = lazy(() => import('./components/MasterAdminDashboard').then(module => ({ default: module.MasterAdminDashboard })));
-const SecretaryDashboard = lazy(() => import('./components/SecretaryDashboard').then(module => ({ default: module.SecretaryDashboard })));
-const StudentAvatarDashboard = lazy(() => import('./components/StudentAvatarDashboard').then(module => ({ default: module.StudentAvatarDashboard })));
-const EnsembleDashboard = lazy(() => import('./components/EnsembleDashboard').then(module => ({ default: module.EnsembleDashboard })));
-const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
-const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(module => ({ default: module.ArtistGateway })));
+import { TeacherDashboard } from './components/TeacherDashboard';
+import { AdminDashboard } from './components/AdminDashboard';
+import { MasterAdminDashboard } from './components/MasterAdminDashboard';
+import { SecretaryDashboard } from './components/SecretaryDashboard';
+import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
+import { EnsembleDashboard } from './components/EnsembleDashboard';
+import BandProfileContent from './components/BandProfileContent';
+import { ArtistGateway } from './components/ArtistGateway';
 
 import { QRCodeModal } from './components/QRCodeModal';
-const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(module => ({ default: module.QRLandingPage })));
-const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').then(module => ({ default: module.DeviceSetupScreen })));
+import { QRLandingPage } from './components/QRLandingPage';
+import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
 import { StudentDetailModal } from './components/StudentDetailModal';
 import { ContractEndPrompt } from './components/ContractEndPrompt';
@@ -2555,6 +2555,11 @@ function App() {
     } else if (targetVal === 'groovelab' && !schoolHasGroove) {
       targetVal = 'campus';
     }
+    // Instantly stop all active camera and microphone streams when switching modules
+    if (typeof (window as any).stopAllCameras === 'function') {
+      (window as any).stopAllCameras();
+    }
+
     setActivePlatformRaw(targetVal);
     localStorage.setItem('groovelab_active_platform', targetVal);
     
@@ -2582,6 +2587,9 @@ function App() {
     return localStorage.getItem('groovelab_active_tab') || 'live';
   });
   const setActiveStudentTab = React.useCallback((val: any) => {
+    if (val === 'messages') {
+      setSelectedCampusRecipient(null);
+    }
     setActiveStudentTabRaw(val);
     // Persist the tab to the correct localStorage key based on the current active platform
     const platform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
@@ -2629,12 +2637,7 @@ function App() {
     }
   }, [user?.id, activePlatform, activeStudentTab]);
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 1024;
-    }
-    return false;
-  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
   const [sidebarNotificationsCount, setSidebarNotificationsCount] = useState<number>(0);
   const [selectedMatchingInsts, setSelectedMatchingInsts] = useState<Record<string, string>>({});
   const [activeBandSubTab, setActiveBandSubTab] = useState<'meine' | 'alle'>(() => {
@@ -3807,7 +3810,7 @@ function App() {
           
           const storageKey = startPlat === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
           const storedTab = localStorage.getItem(storageKey);
-          let startTab = storedTab ? storedTab : defaultTab;
+          const startTab = storedTab ? storedTab : defaultTab;
           
           setActiveStudentTab(startTab);
           localStorage.setItem(storageKey, startTab);
@@ -3919,10 +3922,11 @@ function App() {
 
           const schoolIds = new Set<string>();
           if (sId) schoolIds.add(sId);
-          try {
-            const { data: allSchools } = await supabase.from('schools').select('id');
-            (allSchools || []).forEach(s => { if (s?.id) schoolIds.add(s.id); });
-          } catch (e) {}
+          if (Array.isArray(userData?.schools)) {
+            userData.schools.forEach((s: any) => { if (s?.id) schoolIds.add(s.id); });
+          } else if (userData?.schools?.id) {
+            schoolIds.add(userData.schools.id);
+          }
 
           if (sId) {
             fetchActiveStudentCount(sId).catch(err => console.error('Error fetching student count:', err));
@@ -3937,34 +3941,30 @@ function App() {
           }
 
           const mergedUsersMap = new Map<string, any>();
+          const sidList = Array.from(schoolIds);
 
-          for (const sid of Array.from(schoolIds)) {
-            const [uResExact, uResSchool, uScheds, uOccs] = await Promise.all([
-              supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name'),
-              supabase.from('users').select('*').eq('school_id', sid).order('first_name'),
-              supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid),
-              supabase.from('schedule_occurrences').select('*, student:users!student_id(*)')
+          if (sidList.length > 0) {
+            for (const sid of sidList) {
+              const [uResExact, uResSchool, uScheds] = await Promise.all([
+                supabase.from('users').select('*').eq('school_id', sid).eq('role', 'student').order('first_name'),
+                supabase.from('users').select('*').eq('school_id', sid).order('first_name'),
+                supabase.from('schedules').select('*, student:users!student_id(*)').eq('school_id', sid)
+              ]);
+              (uResExact.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+              (uResSchool.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
+              (uScheds.data || []).forEach((sc: any) => {
+                const u = sc.student || sc.users;
+                if (u && u.id) mergedUsersMap.set(u.id, u);
+              });
+            }
+
+            const schoolIdsSet = new Set(sidList);
+
+            const [uRes2, uResAll, uAllScheds] = await Promise.all([
+              supabase.from('users').select('*').in('school_id', sidList).eq('role', 'student').order('first_name'),
+              supabase.from('users').select('*').in('school_id', sidList).order('first_name'),
+              supabase.from('schedules').select('*, student:users!student_id(*)').in('school_id', sidList)
             ]);
-            (uResExact.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
-            (uResSchool.data || []).forEach((u: any) => mergedUsersMap.set(u.id, u));
-            (uScheds.data || []).forEach((sc: any) => {
-              const u = sc.student || sc.users;
-              if (u && u.id) mergedUsersMap.set(u.id, u);
-            });
-            (uOccs.data || []).forEach((sc: any) => {
-              const u = sc.student || sc.users;
-              if (u && u.id) mergedUsersMap.set(u.id, u);
-            });
-          }
-
-          const schoolIdsSet = new Set(Array.from(schoolIds));
-
-          const [uRes2, uResAll, uAllScheds, uAllOccs] = await Promise.all([
-            supabase.from('users').select('*').eq('role', 'student').order('first_name'),
-            supabase.from('users').select('*').order('first_name'),
-            supabase.from('schedules').select('*, student:users!student_id(*)'),
-            supabase.from('schedule_occurrences').select('*, student:users!student_id(*)')
-          ]);
 
           ((uRes2 as any).data || []).forEach((u: any) => {
             if (u && u.school_id && schoolIdsSet.has(u.school_id)) {
@@ -3985,15 +3985,12 @@ function App() {
               mergedUsersMap.set(u.id, u);
             }
           });
-          ((uAllOccs as any).data || []).forEach((sc: any) => {
-            const u = sc.student || sc.users;
-            if (u && u.id && u.school_id && schoolIdsSet.has(u.school_id)) {
-              mergedUsersMap.set(u.id, u);
-            }
-          });
+          }
 
           try {
-            const { data: pAll } = await supabase.from('pending_students_decrypted').select('*');
+            const { data: pAll } = sidList.length > 0 
+              ? await supabase.from('pending_students_decrypted').select('*').in('school_id', sidList)
+              : { data: [] };
             (pAll || []).forEach((p: any) => {
               if (p && p.id && !mergedUsersMap.has(p.id)) {
                 mergedUsersMap.set(p.id, { ...p, role: 'student', isPendingOnboarding: true });
@@ -4893,13 +4890,17 @@ function App() {
     try {
       setLoading(true);
       // 1. Remove from band_members
-      await supabase.from('band_members').delete().eq('band_id', bandId).eq('user_id', user.id);
+      const { error: err1 } = await supabase.from('band_members').delete().eq('band_id', bandId).eq('user_id', user.id);
+      if (err1) throw err1;
 
       // 2. Remove from band_song_slots for all songs in this band
-      const { data: bandSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId);
+      const { data: bandSongs, error: errSongs } = await supabase.from('band_songs').select('id').eq('band_id', bandId);
+      if (errSongs) throw errSongs;
+
       if (bandSongs && bandSongs.length > 0) {
         const songIds = bandSongs.map(s => s.id);
-        await supabase.from('band_song_slots').delete().in('band_song_id', songIds).eq('user_id', user.id);
+        const { error: err2 } = await supabase.from('band_song_slots').delete().in('band_song_id', songIds).eq('user_id', user.id);
+        if (err2) throw err2;
       }
 
       await fetchDashboardData(user.id);
@@ -6065,7 +6066,8 @@ function App() {
       if (membersErr) throw membersErr;
 
       // 3. Link band_song and clear slots
-      await supabase.from('band_songs').update({ band_id: band.id, status: 'active' }).eq('id', pendingFounding.id);
+      const { error: bsErr } = await supabase.from('band_songs').update({ band_id: band.id, status: 'active' }).eq('id', pendingFounding.id);
+      if (bsErr) throw bsErr;
       
       alert(`Glückwunsch! Die Band "${finalName}" wurde erfolgreich gegründet! 🚀🎸`);
       setShowFoundingModal(false);
@@ -6900,9 +6902,13 @@ function App() {
     updateHeartbeat(); // Immediate heartbeat on load/mount
     const heartbeat = setInterval(updateHeartbeat, 30000);
 
-    // Immediate heartbeat and layout reflow when returning to tab
+    // Immediate heartbeat, layout reflow, and screen blurring protection when backgrounding tab
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.hidden) {
+        document.body.style.filter = 'blur(16px)';
+        document.body.style.transition = 'filter 0.15s ease-out';
+      } else {
+        document.body.style.filter = 'none';
         updateHeartbeat();
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('resize'));
@@ -9725,7 +9731,7 @@ function App() {
                         Campus Lehrkraft
                       </span>
                       <span style={{ color: '#475569', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        🏢 {user.schools?.name || 'Campus-Groovelab'}
+                        <Building size={14} color="#475569" /> {user.schools?.name || 'Campus-Groovelab'}
                       </span>
                       <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontWeight: 500 }}>
                         • Mitglied seit {user.created_at && !isNaN(new Date(user.created_at).getTime()) ? new Date(user.created_at).toLocaleDateString() : 'unbekannt'}
@@ -14426,54 +14432,61 @@ function App() {
             isActive = activeStudentTab === tabName;
           }
 
-          let activeBg = 'rgba(251, 188, 5, 0.12)';
+          let activeBg = '#fef3c7';
           let activeTextColor = '#b45309';
 
           if (activeClass === 'campus') {
-            activeBg = 'rgba(52, 168, 83, 0.08)';
-            activeTextColor = '#34a853';
+            activeBg = '#34a853';
+            activeTextColor = '#ffffff';
           } else if (activeClass === 'briefing') {
-            activeBg = 'rgba(234, 67, 53, 0.08)';
-            activeTextColor = '#ea4335';
+            activeBg = '#ea4335';
+            activeTextColor = '#ffffff';
+          } else if (activeClass === 'groovelab') {
+            activeBg = '#eab308';
+            activeTextColor = '#1e293b';
           }
 
-          const isCompact = windowWidth <= 600;
-
           return {
-            display: 'flex',
+            display: 'inline-flex',
             flexDirection: 'row' as const,
             alignItems: 'center',
             justifyContent: 'center',
-            gap: isCompact ? '0' : '8px',
-            padding: isCompact ? '10px' : '10px 18px',
-            borderRadius: '9999px',
-            border: 'none',
-            background: isActive ? activeBg : 'transparent',
-            color: isActive ? activeTextColor : '#64748b',
+            gap: '6px',
+            padding: '8px 14px',
+            borderRadius: '12px',
+            border: isActive ? 'none' : '1px solid #e2e8f0',
+            background: isActive ? activeBg : '#ffffff',
+            color: isActive ? activeTextColor : '#475569',
             cursor: 'pointer',
-            fontSize: '0.88rem',
-            fontWeight: 700,
+            fontSize: '0.8rem',
+            fontWeight: 800,
             fontFamily: "'Plus Jakarta Sans', sans-serif",
             transition: 'all 0.2s ease',
             whiteSpace: 'nowrap' as const,
             flexShrink: 0,
-            boxShadow: 'none',
-            width: isCompact ? '46px' : 'auto',
-            height: isCompact ? '46px' : 'auto',
+            boxShadow: isActive 
+              ? (activeClass === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.25)' : '0 4px 12px rgba(234, 179, 8, 0.25)') 
+              : '0 2px 5px rgba(0,0,0,0.02)',
+            height: '38px',
             boxSizing: 'border-box' as const
           };
         };
-
-        const isCompact = windowWidth <= 600;
 
         return (
           <nav 
             className="mobile-nav" 
             style={{ 
               display: windowWidth <= 1024 ? 'flex' : 'none',
-              justifyContent: isCompact ? 'space-around' : 'flex-start',
-              gap: isCompact ? '4px' : '12px',
-              padding: isCompact ? '8px 12px 24px 12px' : '12px 16px 28px 16px'
+              justifyContent: 'flex-start',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 14px calc(14px + env(safe-area-inset-bottom)) 14px',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+              whiteSpace: 'nowrap',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
             }}
           >
             {user?.role?.toLowerCase() === 'student' ? (
@@ -14486,33 +14499,32 @@ function App() {
                 return (
                   <>
                     <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
-                      <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
+                      <Monitor size={18} /> <span>Briefing</span>
                     </button>
                     <button onClick={() => setActiveStudentTab('homework_book')} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Aufgaben">
-                      <BookOpen size={isCompact ? 22 : 20} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Aufgaben</span>}
+                      <BookOpen size={18} /> <span>Aufgaben</span>
                     </button>
                     {flamesActive && (
                       <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">
-                        <Zap size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Übe-Pfad</span>}
+                        <Zap size={18} /> <span>Übe-Pfad</span>
                       </button>
                     )}
                     <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
-                      <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
+                      <Library size={18} /> <span>Mediathek</span>
                     </button>
                     <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Termine">
-                      <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Termine</span>}
+                      <Calendar size={18} /> <span>Termine</span>
                     </button>
                     {showLeaderboard && (
                       <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Performance & Highlights">
-                        <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
+                        <Trophy size={18} /> <span>Performance & Highlights</span>
                       </button>
                     )}
-
                     <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
-                      <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                      <User size={18} /> <span>Profil</span>
                     </button>
                     <button onClick={() => setActiveStudentTab('settings')} style={getMobileButtonStyle('settings', 'campus')} className="hover-scale" title="Einstellungen">
-                      <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
+                      <Settings size={18} /> <span>Einstellungen</span>
                     </button>
                   </>
                 );
@@ -14520,32 +14532,32 @@ function App() {
               : (
                 <>
                   <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
-                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Live Lab</span>}
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: isCompact ? '4px' : '6px', right: isCompact ? '4px' : '6px' }} className="animate-pulse"></div>
+                    <Monitor size={18} /> <span>Live Lab</span>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: '4px', right: '4px' }} className="animate-pulse"></div>
                   </button>
                   {!user.is_external_vocalist && (
                     <>
                       <button onClick={() => setActiveStudentTab('practice')} style={getMobileButtonStyle('practice', 'groovelab')} className="hover-scale" title="Üben">
-                        <Play size={isCompact ? 20 : 18} fill={activeStudentTab === 'practice' ? 'white' : 'none'} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Üben</span>}
+                        <Play size={18} fill={activeStudentTab === 'practice' ? '#1e293b' : 'none'} /> <span>Üben</span>
                       </button>
                       <button onClick={() => setActiveStudentTab('library')} style={getMobileButtonStyle('library', 'groovelab')} className="hover-scale" title="Bibliothek">
-                        <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Bibliothek</span>}
+                        <Library size={18} /> <span>Bibliothek</span>
                       </button>
                     </>
                   )}
                   <button onClick={() => setActiveStudentTab('repertoire')} style={getMobileButtonStyle('repertoire', 'groovelab')} className="hover-scale" title="Repertoire">
-                    <Award size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Repertoire</span>}
+                    <Award size={18} /> <span>Repertoire</span>
                   </button>
                   {!user.is_external_vocalist && (
                     <button onClick={() => setActiveStudentTab('matching')} style={getMobileButtonStyle('matching', 'groovelab')} className="hover-scale" title="Band-Matching">
-                      <Users size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Band-Matching</span>}
+                      <Users size={18} /> <span>Band-Matching</span>
                     </button>
                   )}
                   <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
-                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Bands</span>}
+                    <Box size={18} /> <span>Bands</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('messages')} style={{ ...getMobileButtonStyle('messages', 'groovelab'), position: 'relative' }} className="hover-scale" title="Nachrichten">
-                    <Megaphone size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
+                    <Megaphone size={18} /> <span>Nachrichten</span>
                     {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
                       <div style={{ 
                         background: '#ef4444', 
@@ -14560,13 +14572,13 @@ function App() {
                         alignItems: 'center', 
                         justifyContent: 'center',
                         position: 'absolute',
-                        top: isCompact ? '2px' : '4px',
-                        right: isCompact ? '0px' : '4px'
+                        top: '2px',
+                        right: '4px'
                       }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
                     )}
                   </button>
                   <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
-                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                    <User size={18} /> <span>Profil</span>
                   </button>
                 </>
               )
@@ -14574,70 +14586,70 @@ function App() {
               activePlatform === 'campus' ? (
                 <>
                   <button onClick={() => setActiveStudentTab('live')} style={getMobileButtonStyle('live', 'campus')} className="hover-scale" title="Briefing">
-                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Briefing</span>}
+                    <Monitor size={18} /> <span>Briefing</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('schedule')} style={getMobileButtonStyle('schedule', 'campus')} className="hover-scale" title="Stundenplan">
-                    <Calendar size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Stundenplan</span>}
+                    <Calendar size={18} /> <span>Stundenplan</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'campus')} className="hover-scale" title="Schüler">
-                    <Users size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Schüler</span>}
+                    <Users size={18} /> <span>Schüler</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'campus')} className="hover-scale" title="Mediathek">
-                    <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Mediathek</span>}
+                    <Library size={18} /> <span>Mediathek</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'campus')} className="hover-scale" title="Räume">
-                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Räume</span>}
+                    <Box size={18} /> <span>Räume</span>
                   </button>
                   {showMissionsFeature && (
                     <button onClick={() => setActiveStudentTab('missions')} style={getMobileButtonStyle('missions', 'campus')} className="hover-scale" title="Missions">
-                      <Compass size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Missions</span>}
+                      <Compass size={18} /> <span>Missions</span>
                     </button>
                   )}
                   <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Performance & Highlights">
-                    <Trophy size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Performance & Highlights</span>}
+                    <Trophy size={18} /> <span>Performance & Highlights</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Einstellungen">
-                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
+                    <Settings size={18} /> <span>Einstellungen</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
-                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                    <User size={18} /> <span>Profil</span>
                   </button>
                 </>
               ) : (
                 <>
                   <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
-                    <Monitor size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Live Lab</span>}
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: isCompact ? '4px' : '4px', right: isCompact ? '4px' : '4px' }} className="animate-pulse"></div>
+                    <Monitor size={18} /> <span>Live Lab</span>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: '4px', right: '4px' }} className="animate-pulse"></div>
                   </button>
                   <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages', 'groovelab')} className="hover-scale" title="Nachrichten">
-                    <Mail size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Nachrichten</span>}
+                    <Mail size={18} /> <span>Nachrichten</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'groovelab')} className="hover-scale" title="Schüler">
-                    <Users size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Schüler</span>}
+                    <Users size={18} /> <span>Schüler</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('team')} style={getMobileButtonStyle('team', 'groovelab')} className="hover-scale" title="Team">
-                    <Shield size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Team</span>}
+                    <Shield size={18} /> <span>Team</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'groovelab')} className="hover-scale" title="Räume">
-                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Räume</span>}
+                    <Box size={18} /> <span>Räume</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'groovelab')} className="hover-scale" title="Songs">
-                    <Library size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Songs</span>}
+                    <Library size={18} /> <span>Songs</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
-                    <Box size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Bands</span>}
+                    <Box size={18} /> <span>Bands</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'groovelab')} className="hover-scale" title="Statistik">
-                    <Music size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Statistik</span>}
+                    <Music size={18} /> <span>Statistik</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery', 'groovelab')} className="hover-scale" title="ID Galerie">
-                    <QrCode size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>ID Galerie</span>}
+                    <QrCode size={18} /> <span>ID Galerie</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'groovelab')} className="hover-scale" title="Einstellungen">
-                    <Settings size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Einstellungen</span>}
+                    <Settings size={18} /> <span>Einstellungen</span>
                   </button>
                   <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
-                    <User size={isCompact ? 20 : 18} /> {!isCompact && <span style={{ marginLeft: '4px' }}>Profil</span>}
+                    <User size={18} /> <span>Profil</span>
                   </button>
                 </>
               )

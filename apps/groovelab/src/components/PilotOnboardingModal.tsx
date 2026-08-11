@@ -129,10 +129,10 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
             <ShieldCheck size={32} />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#18181b' }}>
-            Erprobung & Pilotphase
+            Nutzungsvereinbarung & Freischaltung
           </h2>
           <p style={{ fontSize: '0.88rem', color: '#71717a', margin: 0, lineHeight: 1.4 }}>
-            Bitte bestätige die Nutzungsbedingungen für die unentgeltliche Pilotphase auf der Plattform Campus-Groovelab.
+            Bitte bestätige die Nutzungsbedingungen für die Nutzung der Plattform Campus-Groovelab.
           </p>
         </div>
 
@@ -175,7 +175,7 @@ export const PilotOnboardingModal: React.FC<PilotOnboardingModalProps> = ({
               style={{ accentColor: '#34a853', marginTop: '3px' }}
             />
             <span style={{ fontSize: '0.85rem', color: '#3f3f46', lineHeight: 1.4 }}>
-              <strong>Haftungsausschluss (§ 599 BGB):</strong> Ich bestätige, dass der Betreiber während der kostenlosen Pilotphase nur für Vorsatz und grobe Fahrlässigkeit haftet. Eine Haftung für einfache Fahrlässigkeit, Datenverlust oder Systemausfälle ist ausgeschlossen.
+              <strong>Haftungsausschluss (§ 599 BGB):</strong> Ich bestätige, dass der Betreiber während der kostenlosen Nutzung nur für Vorsatz und grobe Fahrlässigkeit haftet. Eine Haftung für einfache Fahrlässigkeit, Datenverlust oder Systemausfälle ist ausgeschlossen.
             </span>
           </label>
 

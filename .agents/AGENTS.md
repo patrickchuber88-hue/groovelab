@@ -80,6 +80,9 @@
 - **Cross-Module Side Effects**: Any code modification, feature addition, or configuration change in the Campus module must never affect the visual styling, code structures, or backend logic of the GrooveLab module, and vice versa.
 - **Strict Verification**: Before finalizing any code edits, verify that no unintended side effects have been introduced to the sibling module. Any shared components or database changes that bridge both modules must be explicitly reviewed and highlighted to the user.
 
+## Desktop Layout Protection Rule
+- **Desktop Version Immunity**: All desktop UI layouts, multi-column grids, desktop header tabs, and desktop navigation components across all modules must remain 100% untouched and preserved. Any responsive layout edits, mobile optimizations, or swipe card additions must be strictly scoped to mobile screen sizes (<= 768px) or device simulator classes (.sim-viewport-mobile, .sim-viewport-portrait), with ZERO side-effects on desktop viewports.
+
 ## Future Plans & Notes (Zukünftige Vorhaben)
 - **Profilauswahl-Sicherheit im Campus-Modul**: Das Netflix-Prinzip (Schnellwahl lokaler Profile ohne PIN-Abfrage) ist für Familien mit mehreren Kindern im Campus-Modul gewollt. Im GrooveLab-Modul wird dies nicht benötigt. Bei zukünftigen Modifikationen des Campus-Moduls soll dieses Prinzip dort verankert und gepflegt werden.
 

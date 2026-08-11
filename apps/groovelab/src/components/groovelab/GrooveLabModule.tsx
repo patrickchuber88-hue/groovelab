@@ -125,7 +125,7 @@ export const GrooveLabModule: React.FC<GrooveLabModuleProps> = (props) => {
               />
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '20px' }}>
+            <div className="schueler-board-grid student-board-grid">
               {filteredStudents.map((student: any) => {
                 const isOnline = props.activeSessions.some(sess => sess.user_id === student.id);
                 return (
@@ -141,7 +141,7 @@ export const GrooveLabModule: React.FC<GrooveLabModuleProps> = (props) => {
                       <div style={{ position: 'absolute', bottom: -2, right: -2, width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? '#34a853' : '#cbd5e1', border: '2px solid white' }} />
                     </div>
                     <div>
-                      <strong style={{ fontSize: '0.92rem', display: 'block' }}>{student.first_name} {student.last_name}</strong>
+                      <strong style={{ fontSize: '0.92rem', display: 'block' }}>{student.first_name} {student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}</strong>
                       <span style={{ fontSize: '0.78rem', color: '#64748b' }}>🎸 {student.instrument || 'Gitarre'}</span>
                     </div>
                   </div>
