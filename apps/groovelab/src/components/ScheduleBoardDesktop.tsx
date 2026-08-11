@@ -5086,7 +5086,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         </button>
                       )}
                       <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel}</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
 
                       {/* TVöD / ArbZG Arbeitszeit-Warnhinweis */}
                       {(() => {
