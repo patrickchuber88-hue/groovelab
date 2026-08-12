@@ -1,9 +1,14 @@
 /* DSGVO-Compliant Native Apple & Swiss Modernist Font System (LG München I compliant, 0 External Server Calls) */
-*, body, button, input, select, textarea, h1, h2, h3, h4, h5, h6 {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif !important;
+*, body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, div, span, p, a, strong, b, td, th {
+  font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.011em;
+}
+
+/* Swiss & Apple Typography Utility Classes */
+.font-apple-swiss {
+  font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
 }
 
 :root {
