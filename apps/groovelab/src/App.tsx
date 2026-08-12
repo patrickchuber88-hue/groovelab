@@ -4,24 +4,25 @@ import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { LoginScreen, CustomQRScanner } from './components/LoginScreen';
-import { Startseite2 } from './components/Startseite2';
-import { Startseite } from './components/Startseite';
 import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar } from './components/StudioAvatar';
 import { CampusPinUnlockModal } from './components/CampusPinUnlockModal';
 import { PilotOnboardingModal } from './components/PilotOnboardingModal';
 
-import { TeacherDashboard } from './components/TeacherDashboard';
-import { AdminDashboard } from './components/AdminDashboard';
-import { MasterAdminDashboard } from './components/MasterAdminDashboard';
-import { SecretaryDashboard } from './components/SecretaryDashboard';
-import { StudentAvatarDashboard } from './components/StudentAvatarDashboard';
-import { EnsembleDashboard } from './components/EnsembleDashboard';
-import BandProfileContent from './components/BandProfileContent';
-import { ArtistGateway } from './components/ArtistGateway';
+// Dynamic lazy imports for top-level dashboards to enable code-splitting & reduce initial bundle size by ~75%
+const Startseite2 = lazy(() => import('./components/Startseite2').then(m => ({ default: m.Startseite2 })));
+const Startseite = lazy(() => import('./components/Startseite').then(m => ({ default: m.Startseite })));
+const TeacherDashboard = lazy(() => import('./components/TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const MasterAdminDashboard = lazy(() => import('./components/MasterAdminDashboard').then(m => ({ default: m.MasterAdminDashboard })));
+const SecretaryDashboard = lazy(() => import('./components/SecretaryDashboard').then(m => ({ default: m.SecretaryDashboard })));
+const StudentAvatarDashboard = lazy(() => import('./components/StudentAvatarDashboard').then(m => ({ default: m.StudentAvatarDashboard })));
+const EnsembleDashboard = lazy(() => import('./components/EnsembleDashboard').then(m => ({ default: m.EnsembleDashboard })));
+const BandProfileContent = lazy(() => import('./components/BandProfileContent'));
+const ArtistGateway = lazy(() => import('./components/ArtistGateway').then(m => ({ default: m.ArtistGateway })));
 
 import { QRCodeModal } from './components/QRCodeModal';
-import { QRLandingPage } from './components/QRLandingPage';
+const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(m => ({ default: m.QRLandingPage })));
 import { DeviceSetupScreen } from './components/DeviceSetupScreen';
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { TeacherDetailModal } from './components/TeacherDetailModal';
