@@ -1278,9 +1278,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        // Direkte Anzeige der QR-Landingpage ohne anfängliche PIN-Abfrage (Netflix-Prinzip für Schnellzugriff auf Hausaufgaben & Stundenplan)
-        setParentUnlocked(wasUnlocked);
-        setLessonsUnlocked(wasUnlocked);
+        // Falls eine PIN existiert, aber dieses Gerät noch nicht im Cache freigeschaltet ist -> Zwingend 4-stellige PIN verlangen!
+        if (userData.role === 'student' && hasPinCreated && !wasUnlocked) {
+          sessionStorage.setItem('groovelab_qr_token', token);
+          setPinPurpose('unlock_app');
+          setPageState('pin_required');
+          return;
+        }
+
+        // Nahtlose Anzeige der QR-Landingpage nur auf freigeschalteten Geräten (aus dem Cache)
+        setParentUnlocked(true);
+        setLessonsUnlocked(true);
         sessionStorage.setItem('groovelab_qr_token', token);
         setPageState('profile');
       } catch (err: any) {
