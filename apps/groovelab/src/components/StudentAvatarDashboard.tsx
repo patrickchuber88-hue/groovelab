@@ -2369,6 +2369,23 @@ function StudentBillingInvoicesSection({ studentUser, studentId }: StudentBillin
 export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   console.log('StudentAvatarDashboard Render:', { activeTab: parentActiveTab, studentId });
   const [studentUser, setStudentUser] = useState<any>(null);
+  const [textbausteine] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const stored = localStorage.getItem('groovelab_textbausteine');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error("Error parsing textbausteine in StudentAvatarDashboard:", e);
+      }
+    }
+    return [
+      { id: 'r1', label: '🥁 Puls-Master', text: 'Klopfe den Puls mit dem Fuß...', type: 'both', category: 'rhythm', active: true },
+      { id: 'r2', label: '⏱️ Metronom-Buddy', text: 'Starte mit dem Metronom...', type: 'both', category: 'rhythm', active: true },
+      { id: 't1', label: '🔂 Ritter-Dreierspiel', text: 'Wiederhole exakt dreimal...', type: 'both', category: 'technique', active: true }
+    ];
+  });
   const getIsMobileDevice = () => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth <= 1024 || Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
@@ -4568,8 +4585,28 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
       return [];
     }
   });
-  const [studentDetailSearch, setStudentDetailSearch] = useState('');
-  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke'>('songs');
+  const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
+  const mediathekTouchStartXRef = useRef<number | null>(null);
+
+  const handleMediathekTouchStart = (e: React.TouchEvent) => {
+    mediathekTouchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleMediathekTouchEnd = (e: React.TouchEvent) => {
+    if (mediathekTouchStartXRef.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = mediathekTouchStartXRef.current - touchEndX;
+    if (Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        if (mediathekTab === 'songs') setMediathekTab('lehrwerke');
+        else if (mediathekTab === 'lehrwerke') setMediathekTab('schnelltext');
+      } else {
+        if (mediathekTab === 'schnelltext') setMediathekTab('lehrwerke');
+        else if (mediathekTab === 'lehrwerke') setMediathekTab('songs');
+      }
+    }
+    mediathekTouchStartXRef.current = null;
+  };
 
   const fetchStudentProgress = async (silent = false) => {
     if (!silent) {
@@ -9701,28 +9738,151 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   );
                 })()}
 
-                {/* Unified Smart Search Field */}
-                <div style={{ position: 'relative', width: '100%' }}>
-                  <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-                  <input 
-                    placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
-                    value={songSearch}
-                    onChange={e => setSongSearch(e.target.value)}
-                    style={{ 
-                      width: '100%', 
-                      padding: '12px 14px 12px 48px', 
-                      borderRadius: '14px', 
-                      border: '1px solid #e2e8f0', 
-                      background: '#f8fafc', 
-                      fontWeight: 600, 
-                      fontSize: '0.92rem', 
-                      outline: 'none', 
-                      transition: 'all 0.2s',
-                      boxSizing: 'border-box',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
-                    }}
-                  />
-                </div>
+                {/* Top Mediathek Category Tab Bar */}
+                {(() => {
+                  const brandColor = studentUser?.schools?.brand_color || '#34a853';
+                  return (
+                    <div className="mediathek-pill-bar" style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      margin: '4px 0 4px 0'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: 'rgba(241, 245, 249, 0.95)',
+                        borderRadius: '100px',
+                        padding: '4px',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        gap: '4px',
+                        border: '1px solid rgba(226, 232, 240, 0.8)'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setMediathekTab('songs')}
+                          style={{
+                            flex: 1,
+                            height: '36px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: mediathekTab === 'songs' ? brandColor : 'transparent',
+                            color: mediathekTab === 'songs' ? '#ffffff' : '#64748b',
+                            fontWeight: 850,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            boxShadow: mediathekTab === 'songs' ? `0 2px 8px ${brandColor}40` : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        >
+                          <Music size={14} style={{ color: mediathekTab === 'songs' ? '#ffffff' : '#64748b' }} />
+                          <span>Songs ({songs.length})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setMediathekTab('lehrwerke')}
+                          style={{
+                            flex: 1,
+                            height: '36px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: mediathekTab === 'lehrwerke' ? brandColor : 'transparent',
+                            color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b',
+                            fontWeight: 850,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            boxShadow: mediathekTab === 'lehrwerke' ? `0 2px 8px ${brandColor}40` : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        >
+                          <Library size={14} style={{ color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b' }} />
+                          <span>Lehrwerke ({lehrwerke.length})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setMediathekTab('schnelltext')}
+                          style={{
+                            flex: 1,
+                            height: '36px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: mediathekTab === 'schnelltext' ? brandColor : 'transparent',
+                            color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b',
+                            fontWeight: 850,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            boxShadow: mediathekTab === 'schnelltext' ? `0 2px 8px ${brandColor}40` : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                          }}
+                        >
+                          <Zap size={14} style={{ color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b' }} />
+                          <span>Schnell-Text</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Swipecard Pagination Dots Bar (Mobile Only) */}
+                {(() => {
+                  const brandColor = studentUser?.schools?.brand_color || '#34a853';
+                  return (
+                    <div className="mediathek-swipe-dots" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '-12px 0 4px 0' }}>
+                      <button type="button" onClick={() => setMediathekTab('songs')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+                        <div className={`mediathek-dot ${mediathekTab === 'songs' ? 'active' : ''}`} style={{ background: mediathekTab === 'songs' ? brandColor : '#cbd5e1' }} />
+                      </button>
+                      <button type="button" onClick={() => setMediathekTab('lehrwerke')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+                        <div className={`mediathek-dot ${mediathekTab === 'lehrwerke' ? 'active' : ''}`} style={{ background: mediathekTab === 'lehrwerke' ? brandColor : '#cbd5e1' }} />
+                      </button>
+                      <button type="button" onClick={() => setMediathekTab('schnelltext')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+                        <div className={`mediathek-dot ${mediathekTab === 'schnelltext' ? 'active' : ''}`} style={{ background: mediathekTab === 'schnelltext' ? brandColor : '#cbd5e1' }} />
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Unified Smart Search Field (Hidden on Mobile when Schnelltext tab is selected) */}
+                {!(isMobile && mediathekTab === 'schnelltext') && (
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                    <input 
+                      placeholder="Songs nach Titel/Interpret oder Lehrwerke nach Titel/Autor durchsuchen..." 
+                      value={songSearch}
+                      onChange={e => setSongSearch(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        padding: '12px 14px 12px 48px', 
+                        borderRadius: '14px', 
+                        border: '1px solid #e2e8f0', 
+                        background: '#f8fafc', 
+                        fontWeight: 600, 
+                        fontSize: '0.92rem', 
+                        outline: 'none', 
+                        transition: 'all 0.2s',
+                        boxSizing: 'border-box',
+                        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)'
+                      }}
+                    />
+                  </div>
+                )}
 
                 {/* Two Columns Layout */}
                 {(() => {
@@ -9762,14 +9922,23 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                   });
 
                   return (
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', 
-                      gap: '30px', 
-                      alignItems: 'flex-start' 
-                    }}>
+                    <div 
+                      onTouchStart={handleMediathekTouchStart}
+                      onTouchEnd={handleMediathekTouchEnd}
+                      style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: '1fr', 
+                        gap: '30px', 
+                        alignItems: 'flex-start',
+                        width: '100%'
+                      }}
+                      className="mediathek-grid-layout"
+                    >
                       {/* Left Column: Songs */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div 
+                        style={{ display: mediathekTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
+                        className={`mediathek-col-card mediathek-col-songs ${mediathekTab === 'songs' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+                      >
                         <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Music size={16} color={brandColor} /> Songs ({filteredSongs.length})
                         </h3>
@@ -9900,7 +10069,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                       </div>
 
                       {/* Right Column: Lehrwerke */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div 
+                        style={{ display: mediathekTab === 'lehrwerke' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
+                        className={`mediathek-col-card mediathek-col-lehrwerke ${mediathekTab === 'lehrwerke' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+                      >
                         <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Library size={16} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
                         </h3>
@@ -9977,6 +10149,64 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                               );
                             })
                           )}
+                        </div>
+                      </div>
+
+                      {/* Column 3: Schnell-Text (Mobile view integration) */}
+                      <div 
+                        style={{ display: mediathekTab === 'schnelltext' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
+                        className={`mediathek-col-card mediathek-col-schnelltext-mobile ${mediathekTab === 'schnelltext' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+                      >
+                        <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Zap size={16} color={brandColor} /> Schnell-Text ({textbausteine.filter((tb: any) => tb.active).length})
+                        </h3>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', width: '100%' }}>
+                          {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
+                            const parts = tb.label.split(' ');
+                            const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
+                            const emoji = hasEmoji ? parts[0] : '🎵';
+                            const name = hasEmoji ? parts.slice(1).join(' ') : parts.join(' ');
+
+                            return (
+                              <div 
+                                key={tb.id} 
+                                style={{ 
+                                  border: '1px solid #e2e8f0', 
+                                  borderRadius: '16px', 
+                                  padding: '12px 10px', 
+                                  background: 'white',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  textAlign: 'center',
+                                  gap: '8px',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                                  minHeight: '115px'
+                                }}
+                              >
+                                <span style={{ fontSize: '1.5rem', marginTop: '2px', filter: 'grayscale(100%)' }}>
+                                  {emoji}
+                                </span>
+                                
+                                <span style={{ 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 800, 
+                                  color: '#1e293b', 
+                                  display: '-webkit-box', 
+                                  WebkitLineClamp: 2, 
+                                  WebkitBoxOrient: 'vertical', 
+                                  overflow: 'hidden', 
+                                  lineHeight: '1.2', 
+                                  height: '2.4em', 
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {name}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -10214,20 +10444,20 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     ];
 
                 return (
-                  <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch' }}>
+                  <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
                     {/* Top Left: Header and summary cards */}
-                    <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                    <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Award size={24} />
                         </div>
-                        <div>
-                          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
-                          <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Performance & Highlights</h2>
+                          <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
                         </div>
                       </div>
 
-                      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
+                      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
                         {[
                           { label: 'Deine Klasse', value: classCount, icon: Users, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
@@ -10238,10 +10468,10 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                           { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (liveClassWeeklyFocus / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
                           { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
                         ].map((stat, idx) => (
-                          <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
+                          <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px', width: '100%', boxSizing: 'border-box' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                              <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15` }}>
+                              <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15`, flexShrink: 0 }}>
                                 <stat.icon size={16} />
                               </div>
                             </div>
@@ -10254,7 +10484,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                     </div>
 
                     {/* Top Right: Donut Chart (Gemeinsamer Schul-Beitrag) */}
-                    <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                    <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
                       <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '4px', textAlign: 'left' }}>
                         Gemeinsamer Schul-Beitrag
                       </h3>
@@ -10312,10 +10542,162 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
               })()}
 
               {/* Grid Section: Goals | Highlights | Annual Stats */}
-              <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch' }}>
+              <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
                 
                 {/* Column 1: Übe-Ziele der Klasse */}
-                <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                      <span>🌱</span> Übe-Ziele der Klasse
+                    </h3>
+                  </div>
+
+                  {(() => {
+                    const brandColor = studentUser?.schools?.brand_color || '#34a853';
+                    const targets = classGoals || [];
+                    const totalGoals = targets.length;
+                    const masteredGoals = targets.filter((target: any) => {
+                      const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
+                      return targetPercent >= 100;
+                    }).length;
+                    const highestPercent = targets.length > 0 
+                      ? Math.max(...targets.map((target: any) => Math.round((classWeeklyFocus / target.minutes) * 100)))
+                      : 0;
+
+                    return (
+                      <>
+                        {totalGoals > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#34a853', marginTop: '2px' }}>{masteredGoals}</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {totalGoals === 0 ? (
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
+                              Keine aktiven Ziele angelegt.
+                            </p>
+                          ) : (
+                            targets.map((target: any) => {
+                              const targetPercent = Math.round((classWeeklyFocus / target.minutes) * 100);
+                              const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                              
+                              const maxPercentOnBar = 133;
+                              const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+                              const isAchieved = targetPercent >= 100;
+
+                              return (
+                                <div key={target.id} style={{
+                                  position: 'relative',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  background: '#34a853',
+                                  boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                                  borderRadius: '16px',
+                                  padding: '12px 14px',
+                                  gap: '8px'
+                                }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                      <span style={{
+                                        fontSize: '0.8rem',
+                                        fontWeight: 700,
+                                        color: '#ffffff',
+                                        letterSpacing: '-0.01em',
+                                        lineHeight: '1.25',
+                                        whiteSpace: 'normal',
+                                        wordBreak: 'break-word'
+                                      }}>
+                                        {target.title || 'Challenge'}
+                                      </span>
+                                      {target.deadline && (
+                                        <span style={{
+                                          fontSize: '0.62rem',
+                                          fontWeight: 500,
+                                          color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)',
+                                          lineHeight: '1.2',
+                                          whiteSpace: 'normal'
+                                        }}>
+                                          bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                          {isDeadlinePassed && ' (abgelaufen)'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span style={{
+                                      fontSize: '1.1rem',
+                                      fontWeight: 800,
+                                      color: '#ffffff',
+                                      letterSpacing: '-0.02em',
+                                      fontFeatureSettings: '"tnum"',
+                                      flexShrink: 0,
+                                      alignSelf: 'flex-start'
+                                    }}>
+                                      {targetPercent}%
+                                    </span>
+                                  </div>
+
+                                  {/* Progress bar container */}
+                                  <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
+                                    {/* Target marker (100% line) at 75% width */}
+                                    <div style={{
+                                      position: 'absolute',
+                                      left: '75%',
+                                      top: '-2px',
+                                      height: '10px',
+                                      width: '2px',
+                                      background: '#ffffff',
+                                      zIndex: 3,
+                                      borderRadius: '99px'
+                                    }} />
+
+                                    {/* Bar fill */}
+                                    <div style={{
+                                      width: `${visualWidth}%`,
+                                      height: '100%',
+                                      background: '#ffffff',
+                                      borderRadius: '99px',
+                                      transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                      boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
+                                    }} />
+                                  </div>
+
+                                  {/* Row 3: Current / Target & Status label */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
+                                    <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
+                                      <span style={{ fontWeight: 700, color: '#ffffff' }}>{classWeeklyFocus}</span> / {target.minutes} Min.
+                                    </span>
+                                    <span style={{
+                                      fontWeight: 700,
+                                      color: isAchieved ? '#e6f4ea' : 'rgba(255, 255, 255, 0.8)',
+                                      whiteSpace: 'normal',
+                                      textAlign: 'right'
+                                    }}>
+                                      {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyFocus)} Min.`}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Column 2: Helden-Momente */}
+                <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                       <span>🌱</span> Übe-Ziele der Klasse
@@ -10546,7 +10928,7 @@ export function StudentAvatarDashboard({ studentId, parentActiveTab, onTabChange
                 </div>
 
                 {/* Column 3: Jahresstatistik */}
-                <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
                     <div style={{ background: '#e6f4ea', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
                       <Calendar size={18} />

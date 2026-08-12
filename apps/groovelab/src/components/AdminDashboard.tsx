@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
 import { Music, Calendar, AlertCircle, Library, Shield, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School } from 'lucide-react';
@@ -294,6 +294,27 @@ export function AdminDashboard({
   const tabStorageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab';
   const [activeTab, setActiveTab] = useState<string>(() => forceTab || localStorage.getItem(activePlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab') || 'live');
   const [mediathekTab, setMediathekTab] = useState<'songs' | 'lehrwerke' | 'schnelltext'>('songs');
+  const mediathekTouchStartXRef = useRef<number | null>(null);
+
+  const handleMediathekTouchStart = (e: React.TouchEvent) => {
+    mediathekTouchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleMediathekTouchEnd = (e: React.TouchEvent) => {
+    if (mediathekTouchStartXRef.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = mediathekTouchStartXRef.current - touchEndX;
+    if (Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        if (mediathekTab === 'songs') setMediathekTab('lehrwerke');
+        else if (mediathekTab === 'lehrwerke') setMediathekTab('schnelltext');
+      } else {
+        if (mediathekTab === 'schnelltext') setMediathekTab('lehrwerke');
+        else if (mediathekTab === 'lehrwerke') setMediathekTab('songs');
+      }
+    }
+    mediathekTouchStartXRef.current = null;
+  };
   const [lehrwerke, setLehrwerke] = useState<any[]>([]);
   const [showAddLehrwerk, setShowAddLehrwerk] = useState(false);
   const [newLehrwerk, setNewLehrwerk] = useState({ title: '', author: '', totalPages: 50 });
@@ -332,6 +353,7 @@ export function AdminDashboard({
 
   // Campus Bookings states
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>(() => rooms[0]?.id || '');
+  const [showMobileRoomSlider, setShowMobileRoomSlider] = useState<boolean>(false);
   const [favoriteRoomId, setFavoriteRoomId] = useState<string | null>(() => localStorage.getItem(`groovelab_favorite_room_id_${userId}`));
   const [showUnsuitableList, setShowUnsuitableList] = useState(false);
   const [hoveredInstrumentIdx, setHoveredInstrumentIdx] = useState<number | null>(null);
@@ -620,11 +642,26 @@ export function AdminDashboard({
   }, [schoolObj?.calendar_url]);
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 1024);
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') setWindowWidth(window.innerWidth);
+      const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
+      setIsMobile(window.innerWidth <= 1024 || isSimMobile);
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    const observer = new MutationObserver(() => {
+      checkMobile();
+    });
+    if (typeof document !== 'undefined' && document.body) {
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      observer.disconnect();
+    };
   }, []);
 
   // Pre-select the room where the teacher teaches today
@@ -705,6 +742,18 @@ export function AdminDashboard({
   const [customCooperationName, setCustomCooperationName] = useState<string>('');
   const [cooperationsList, setCooperationsList] = useState<any[]>([]);
   const [roomBlockedSlots, setRoomBlockedSlots] = useState<any[]>([]);
+
+  // World-Class Room Board Mobile & Search Enhancements
+  const [mobileCalendarView, setMobileCalendarView] = useState<'day' | 'week'>('day');
+  const [mobileSelectedDayIdx, setMobileSelectedDayIdx] = useState<number>(() => {
+    const day = new Date().getDay();
+    return day === 0 ? 6 : day - 1; // 0=Mon, ..., 6=Sun
+  });
+  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<string>('Alle');
+  const [showRoomFinderBar, setShowRoomFinderBar] = useState<boolean>(false);
+  const [finderStartTime, setFinderStartTime] = useState<string>('14:00');
+  const [finderEndTime, setFinderEndTime] = useState<string>('15:00');
+  const [finderResultCount, setFinderResultCount] = useState<number | null>(null);
 
 
 
@@ -1474,7 +1523,12 @@ export function AdminDashboard({
   const [vocalistOnlyMode, setVocalistOnlyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
   const [studentsXP, setStudentsXP] = useState<Record<string, number>>({});
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 1024 : false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
+    return window.innerWidth <= 1024 || isSimMobile;
+  });
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
   
   const [showAddBand, setShowAddBand] = useState(false);
   const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: userId, photo_url: '' });
@@ -4817,7 +4871,7 @@ export function AdminDashboard({
                             
                           >
                             <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
-                            {s.first_name} {s.last_name}
+                            {s.first_name} {maskLastName(s.last_name, showRealNames)}
                           </div>
                         ))}
                       </div>
@@ -5151,7 +5205,7 @@ export function AdminDashboard({
                               <img src={s.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                             <div>
-                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {s.last_name}</div>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>
                               {s.is_external_vocalist && <div style={{ fontSize: '0.6rem', color: brandColor, fontWeight: 700 }}>Externer Gesang</div>}
                             </div>
                           </button>
@@ -5224,17 +5278,18 @@ export function AdminDashboard({
             gap: '16px' 
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', justifyContent: 'space-between', alignItems: windowWidth < 768 ? 'stretch' : 'center', gap: '12px', marginBottom: '4px' }}>
+            <h2 style={{ fontSize: windowWidth < 768 ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
               <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#eab308', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
               Schülerverwaltung ({students.length})
             </h2>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '10px', width: windowWidth < 768 ? '100%' : 'auto' }}>
               {/* Apple-like Segmented Switch for Active / Archive */}
               <div style={{
                 display: 'flex',
+                width: windowWidth < 768 ? '100%' : 'auto',
                 background: 'rgba(241, 245, 249, 0.8)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
@@ -5251,7 +5306,7 @@ export function AdminDashboard({
                     color: listType === 'active' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
                     fontWeight: listType === 'active' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'active' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px',
+                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     whiteSpace: 'nowrap'
                   }}
                 >
@@ -5266,7 +5321,7 @@ export function AdminDashboard({
                     color: listType === 'archive' ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : '#64748b',
                     fontWeight: listType === 'archive' ? 800 : 600, fontSize: '0.85rem',
                     boxShadow: listType === 'archive' ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
-                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '6px',
+                    cursor: 'pointer', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     whiteSpace: 'nowrap'
                   }}
                 >
@@ -5276,12 +5331,13 @@ export function AdminDashboard({
               </div>
 
               {canManageStudents && (
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
                   <button
                     onClick={() => toggleRealNames()}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'center',
                       gap: '6px',
                       borderRadius: '12px',
                       padding: '8px 14px',
@@ -5293,6 +5349,7 @@ export function AdminDashboard({
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       height: '38px',
+                      width: windowWidth < 768 ? '100%' : 'auto',
                       boxSizing: 'border-box'
                     }}
                     title={showRealNames ? "Nachnamen maskieren" : "Nachnamen für 10 Sekunden einblenden"}
@@ -5317,7 +5374,9 @@ export function AdminDashboard({
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '6px',
+                        width: windowWidth < 768 ? '100%' : 'auto',
                         boxShadow: `0 4px 12px ${brandColor}20`
                       }}
                       className="hover-scale"
@@ -5333,11 +5392,6 @@ export function AdminDashboard({
                       }}
                       style={{
                         background: '#f1f5f9',
-                        color: '#475569',
-                        border: '1px solid #e2e8f0',
-                        padding: '10px 18px',
-                        borderRadius: '16px',
-                        fontWeight: 800,
                         fontSize: '0.85rem',
                         cursor: 'pointer',
                         display: 'flex',
@@ -5689,7 +5743,7 @@ export function AdminDashboard({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%', paddingBottom: windowWidth < 768 ? '120px' : '0px' }}>
             {(() => {
               const filtered = students.filter(s => {
                 const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
@@ -5751,11 +5805,13 @@ export function AdminDashboard({
                     key={s.id} 
                     className="glass-panel" 
                     style={{ 
-                      padding: '18px 22px', 
+                      padding: windowWidth < 768 ? '14px 12px' : '18px 22px', 
                       background: 'white', 
                       display: 'flex', 
+                      flexDirection: windowWidth < 768 ? 'column' : 'row',
                       justifyContent: 'space-between', 
-                      alignItems: 'center', 
+                      alignItems: windowWidth < 768 ? 'stretch' : 'center', 
+                      gap: windowWidth < 768 ? '12px' : '8px',
                       borderRadius: '24px', 
                       border: '1px solid #e2e8f0', 
                       borderLeft: `6px solid ${brandColor}`, 
@@ -5816,7 +5872,14 @@ export function AdminDashboard({
                         </div>
                       </div>
                     </div>
-                  <div style={{ display: 'flex', gap: '8px', marginLeft: '8px' }}>
+                  <div style={{ 
+                    display: windowWidth < 768 ? 'grid' : 'flex', 
+                    gridTemplateColumns: windowWidth < 768 ? 'repeat(5, 1fr)' : 'none',
+                    gap: '8px', 
+                    marginLeft: windowWidth < 768 ? '0px' : '8px',
+                    width: windowWidth < 768 ? '100%' : 'auto',
+                    marginTop: windowWidth < 768 ? '6px' : '0px'
+                  }}>
                     {canManageStudents && (
                       <>
                         <button 
@@ -5825,13 +5888,15 @@ export function AdminDashboard({
                             background: "#ffffff", 
                             border: "1px solid #cbd5e1", 
                             padding: "10px", 
+                            minHeight: '44px',
                             borderRadius: "12px", 
                             cursor: "pointer", 
                             color: "#475569", 
                             transition: 'all 0.2s',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            width: '100%'
                           }} 
                           className="hover-scale-mini"
                           title="Bearbeiten"
@@ -5844,13 +5909,15 @@ export function AdminDashboard({
                             background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', 
                             border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', 
                             padding: "10px", 
+                            minHeight: '44px',
                             borderRadius: "12px", 
                             cursor: "pointer", 
                             color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', 
                             transition: 'all 0.2s',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            width: '100%'
                           }} 
                           className="hover-scale-mini"
                           title="Löschen"
@@ -5870,12 +5937,14 @@ export function AdminDashboard({
                         background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', 
                         border: activePlatform === 'campus' ? '1px solid #a7f3d0' : '1px solid #fef08a', 
                         padding: "10px", 
+                        minHeight: '44px',
                         borderRadius: "12px", 
                         cursor: "pointer", 
                         transition: 'all 0.2s',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        width: '100%'
                       }} 
                       className="hover-scale-mini"
                       title="Hausaufgabenheft & Schüler-Protokoll öffnen"
@@ -5901,6 +5970,7 @@ export function AdminDashboard({
                         background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
                         border: hasTimetableOnboarding(s) ? '1px solid #a7f3d0' : '1px solid #fef08a', 
                         padding: "10px", 
+                        minHeight: '44px',
                         borderRadius: "12px", 
                         cursor: "pointer", 
                         color: hasTimetableOnboarding(s) ? '#34a853' : '#d97706', 
@@ -5908,7 +5978,8 @@ export function AdminDashboard({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        position: 'relative'
+                        position: 'relative',
+                        width: '100%'
                       }} 
                       className="hover-scale-mini"
                       title={hasTimetableOnboarding(s) ? "Stundenplan-Onboarding: Abgeschlossen (Klicken für Slot-Details)" : "Stundenplan-Onboarding: Ausstehend (Klicken für Manuelles Eintragen)"}
@@ -5931,13 +6002,15 @@ export function AdminDashboard({
                         background: "#ffffff", 
                         border: "1px solid #cbd5e1", 
                         padding: "10px", 
+                        minHeight: '44px',
                         borderRadius: "12px", 
                         cursor: "pointer", 
                         color: "#475569", 
                         transition: 'all 0.2s',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        width: '100%'
                       }} 
                       className="hover-scale-mini"
                       title="QR Code & Ausweis"
@@ -5972,8 +6045,8 @@ export function AdminDashboard({
           gap: '16px' 
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+        <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', justifyContent: 'space-between', alignItems: windowWidth < 768 ? 'stretch' : 'center', gap: '10px', marginBottom: '4px' }}>
+          <h2 style={{ fontSize: windowWidth < 768 ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
             <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
               <Shield size={16} />
             </div>
@@ -5996,7 +6069,9 @@ export function AdminDashboard({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '6px',
+                width: windowWidth < 768 ? '100%' : 'auto',
                 boxShadow: `0 4px 12px ${brandColor}20`
               }}
               className="hover-scale"
@@ -6722,9 +6797,17 @@ export function AdminDashboard({
       };
     };
 
-    // Filter rooms by floor AND availability (if date filter is active)
+    // Filter rooms by floor, equipment AND search query
     const roomsToRender = (rooms.filter(room => {
       if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
+      if (selectedEquipmentFilter !== 'Alle') {
+        const text = `${room.name || ''} ${room.description || ''} ${JSON.stringify(room.equipment || '')}`.toLowerCase();
+        const eq = selectedEquipmentFilter.toLowerCase();
+        if (eq === 'klavier' && !text.includes('klavier') && !text.includes('piano') && !text.includes('flügel')) return false;
+        if (eq === 'schlagzeug' && !text.includes('schlagzeug') && !text.includes('drum')) return false;
+        if (eq === 'pa' && !text.includes('pa') && !text.includes('gesang') && !text.includes('box')) return false;
+        if (eq === 'groovelab' && !text.includes('groovelab') && !text.includes('band') && !(room as any).is_groovelab) return false;
+      }
       if (roomSearchQuery.trim()) {
         const query = roomSearchQuery.toLowerCase();
         const matchesName = room.name?.toLowerCase().includes(query);
@@ -7428,7 +7511,8 @@ export function AdminDashboard({
       setSuccessAnimationRoomId(roomId);
       setTimeout(() => setSuccessAnimationRoomId(null), 1000);
       
-      // Clear inputs
+      // Clear inputs & close mobile sheet
+      setShowMobileRoomSlider(false);
       setBookingPurpose('');
       setBookingStudentId('');
       setStudentSearchTerm('');
@@ -7514,6 +7598,7 @@ export function AdminDashboard({
         }
       }
 
+      setShowMobileRoomSlider(false);
       setSelectedBooking(null);
       setBookingPurpose('');
       setBookingStudentId('');
@@ -7555,7 +7640,7 @@ export function AdminDashboard({
     };
 
 
-    const handleCellClick = (dayIdx: number, hourStr: string, e: React.MouseEvent<HTMLDivElement>) => {
+    const handleCellClick = (dayIdx: number, hourStr: string, e?: React.MouseEvent<any>) => {
       const currentSelectedDate = parseLocalDate(bookingDate);
       const dayOfWeek = currentSelectedDate.getUTCDay();
       const diffToMon = currentSelectedDate.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
@@ -8082,27 +8167,38 @@ export function AdminDashboard({
             .calendar-controls-wrapper {
               width: 100% !important;
               justify-content: space-between !important;
-              gap: 12px !important;
+              gap: 8px !important;
             }
             .calendar-today-btn {
-              padding: 10px 18px !important;
-              font-size: 0.8rem !important;
-              height: 44px !important;
-              border-radius: 14px !important;
-              min-width: 88px !important;
+              padding: 8px 14px !important;
+              font-size: 0.78rem !important;
+              height: 40px !important;
+              border-radius: 12px !important;
+              min-width: 72px !important;
+              flex-shrink: 0 !important;
             }
             .calendar-week-pagination {
-              padding: 6px 14px !important;
-              border-radius: 16px !important;
-              height: 44px !important;
+              padding: 4px 8px !important;
+              border-radius: 14px !important;
+              height: 40px !important;
               flex-grow: 1 !important;
+              min-width: 0 !important;
               justify-content: space-between !important;
+              gap: 4px !important;
             }
             .calendar-week-chevron-btn {
-              padding: 10px 14px !important;
-              border-radius: 12px !important;
-              min-width: 44px !important;
-              height: 44px !important;
+              padding: 6px !important;
+              border-radius: 10px !important;
+              min-width: 36px !important;
+              height: 36px !important;
+              flex-shrink: 0 !important;
+            }
+            .calendar-week-label {
+              min-width: 0 !important;
+              font-size: 0.72rem !important;
+              flex-shrink: 1 !important;
+              white-space: nowrap !important;
+              gap: 4px !important;
             }
           }
           .rooms-board-grid {
@@ -8117,35 +8213,94 @@ export function AdminDashboard({
 
         <div className="rooms-board-grid" style={{ display: 'grid', gap: '20px', alignItems: 'stretch', minWidth: 0 }}>
           {/* Left Column: Room catalog and weekly calendar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, paddingBottom: isMobile ? '120px' : '0px' }}>
             
-            {/* Room Horizontal Picker */}
+            {/* Room Horizontal Picker & Filter Bar */}
             <div 
               className="glass-panel" 
               style={{ 
                 background: 'white', 
                 borderRadius: '24px', 
                 border: '1px solid rgba(0, 0, 0, 0.04)', 
-                padding: '18px 24px', 
+                padding: isMobile ? '14px 16px' : '18px 24px', 
                 boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, letterSpacing: '-0.02em' }}>
-                  <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
-                    <Box size={16} />
-                  </div>
-                  Campus Räumlichkeiten
-                </h2>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '16px', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <h2 style={{ fontSize: isMobile ? '1.15rem' : '1.35rem', fontWeight: 900, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, letterSpacing: '-0.02em' }}>
+                    <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                      <Box size={16} />
+                    </div>
+                    Campus Räumlichkeiten
+                    <span style={{ fontSize: '0.72rem', background: '#f2f2f7', color: '#636366', padding: '3px 8px', borderRadius: '100px', fontWeight: 800 }}>
+                      {rooms.length} Räume
+                    </span>
+                  </h2>
 
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {/* Instant Room Finder Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowRoomFinderBar(prev => !prev)}
+                      style={{
+                        background: showRoomFinderBar ? brandColor : '#f2f2f7',
+                        color: showRoomFinderBar ? '#ffffff' : '#1c1c1e',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '6px 12px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        height: '34px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: showRoomFinderBar ? `0 4px 12px ${brandColor}30` : 'none',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Search size={13} color={showRoomFinderBar ? '#ffffff' : '#1c1c1e'} />
+                      <span>Freien Raum suchen</span>
+                    </button>
+
+                    {/* Header Trigger for Room Info Sheet */}
+                    {isMobile && (
+                      <button
+                        type="button"
+                        onClick={() => setShowMobileRoomSlider(true)}
+                        style={{
+                          background: `${brandColor}15`,
+                          color: brandColor,
+                          border: `1.5px solid ${brandColor}40`,
+                          borderRadius: '12px',
+                          padding: '6px 12px',
+                          fontSize: '0.74rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          height: '34px',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <Zap size={13} fill={brandColor} />
+                        <span>Infos</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px', alignItems: isMobile ? 'stretch' : 'center', width: isMobile ? '100%' : 'auto' }}>
                   {/* Smart Room Search Field */}
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', background: '#f2f2f7', borderRadius: '12px', padding: '6px 12px', gap: '6px', border: '1px solid rgba(0,0,0,0.01)', width: '200px', transition: 'all 0.2s' }}>
+                  <div style={{ position: 'relative', width: isMobile ? '100%' : '200px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#f2f2f7', borderRadius: '12px', padding: '8px 12px', gap: '6px', border: '1px solid rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box', transition: 'all 0.2s' }}>
                       <Search size={14} color="#8e8e93" />
                       <input
                         type="text"
-                        placeholder="Raum suchen..."
+                        placeholder="Raumname suchen..."
                         value={roomSearchQuery}
                         onChange={(e) => {
                           setRoomSearchQuery(e.target.value);
@@ -8179,154 +8334,231 @@ export function AdminDashboard({
                         </button>
                       )}
                     </div>
-
-                    {/* Autocomplete Dropdown List */}
-                    {isRoomSearchDropdownOpen && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: '6px',
-                        background: '#ffffff',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                        borderRadius: '12px',
-                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
-                        zIndex: 1000,
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        padding: '6px'
-                      }}>
-                        {rooms
-                          .filter(r => {
-                            const query = roomSearchQuery.toLowerCase().trim();
-                            if (!query) return true;
-                            return (
-                              r.name?.toLowerCase().includes(query) ||
-                              r.floor?.toLowerCase().includes(query) ||
-                              r.description?.toLowerCase().includes(query)
-                            );
-                          })
-                          .map(r => (
-                            <div
-                              key={r.id}
-                              onClick={() => {
-                                setRoomSearchQuery(r.name);
-                                setSelectedFloor('Alle');
-                                setSelectedCampusRoomId(r.id);
-                                setIsRoomSearchDropdownOpen(false);
-                              }}
-                              style={{
-                                padding: '6px 10px',
-                                borderRadius: '8px',
-                                fontSize: '0.74rem',
-                                color: '#1c1c1e',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                transition: 'background 0.15s'
-                              }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f2f7'; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                            >
-                              <span>{r.name}</span>
-                              <span style={{ fontSize: '0.62rem', color: '#8e8e93', textTransform: 'uppercase', alignSelf: 'center' }}>
-                                {(!r.floor || r.floor === 'Allgemein') ? 'EG' : r.floor}
-                              </span>
-                            </div>
-                          ))}
-                        {rooms.filter(r => {
-                          const query = roomSearchQuery.toLowerCase().trim();
-                          if (!query) return true;
-                          return (
-                            r.name?.toLowerCase().includes(query) ||
-                            r.floor?.toLowerCase().includes(query) ||
-                            r.description?.toLowerCase().includes(query)
-                          );
-                        }).length === 0 && (
-                          <div style={{ padding: '8px 10px', fontSize: '0.74rem', color: '#8e8e93', textAlign: 'center' }}>
-                            Keine Räume gefunden
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Segmented Control for Floor filter */}
-                  <div style={{ 
-                    background: '#f2f2f7', 
-                    borderRadius: '14px', 
-                    padding: '3px', 
-                    display: 'flex', 
-                    gap: '2px', 
-                    border: '1px solid rgba(0,0,0,0.01)',
-                    alignItems: 'center',
-                  }}>
-                    {['Alle', ...uniqueFloors].map((floor) => {
-                      const isSelected = selectedFloor === floor;
-                      return (
-                        <button
-                          key={floor}
-                          onClick={() => setSelectedFloor(floor)}
-                          style={{
-                            padding: '6px 14px',
-                            borderRadius: '11px',
-                            border: 'none',
-                            background: isSelected ? '#ffffff' : 'transparent',
-                            color: isSelected ? brandColor : '#636366',
-                            fontWeight: isSelected ? 800 : 600,
-                            fontSize: '0.75rem',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                            boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                          }}
-                        >
-                          {floor}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Highlighted "Meine Buchungen" Button */}
-                  <button
-                    onClick={() => setShowMyBookingsOnly(prev => !prev)}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '14px',
-                      border: showMyBookingsOnly ? 'none' : '1.5px solid #af52de40',
-                      background: showMyBookingsOnly 
-                        ? 'linear-gradient(135deg, #af52de, #8b5cf6)' 
-                        : '#f6f0ff',
-                      color: showMyBookingsOnly ? '#ffffff' : '#6d28d9',
-                      fontWeight: 800,
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                      display: 'flex',
+                  {/* Filter Controls Flex Row */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '2px' }}>
+                    {/* Segmented Control for Floor filter */}
+                    <div style={{ 
+                      background: '#f2f2f7', 
+                      borderRadius: '14px', 
+                      padding: '3px', 
+                      display: 'flex', 
+                      gap: '2px', 
+                      border: '1px solid rgba(0,0,0,0.01)',
                       alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: showMyBookingsOnly 
-                        ? '0 6px 16px rgba(175, 82, 222, 0.35)' 
-                        : '0 2px 4px rgba(0,0,0,0.01)',
-                      transform: showMyBookingsOnly ? 'scale(1.02)' : 'none',
-                    }}
-                  >
-                    <span>Meine Buchungen</span>
-                    <span style={{ 
-                      fontSize: '0.7rem', 
-                      background: showMyBookingsOnly ? '#ffffff' : '#af52de', 
-                      color: showMyBookingsOnly ? '#af52de' : '#ffffff', 
-                      padding: '2px 8px', 
-                      borderRadius: '8px', 
-                      fontWeight: 900 
+                      flexShrink: 0
                     }}>
-                      {myBookings.length}
-                    </span>
-                  </button>
+                      {['Alle', ...uniqueFloors].map((floor) => {
+                        const isSelected = selectedFloor === floor;
+                        return (
+                          <button
+                            key={floor}
+                            onClick={() => setSelectedFloor(floor)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '11px',
+                              border: 'none',
+                              background: isSelected ? '#ffffff' : 'transparent',
+                              color: isSelected ? brandColor : '#636366',
+                              fontWeight: isSelected ? 800 : 600,
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                              boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {floor}
+                          </button>
+                        );
+                      })}
+                    </div>
 
+                    {/* Equipment Filter Bar */}
+                    <div style={{ 
+                      background: '#f2f2f7', 
+                      borderRadius: '14px', 
+                      padding: '3px', 
+                      display: 'flex', 
+                      gap: '2px', 
+                      alignItems: 'center',
+                      flexShrink: 0
+                    }}>
+                      {[
+                        { label: 'Alle', value: 'Alle' },
+                        { label: '🎹 Klavier', value: 'klavier' },
+                        { label: '🥁 Schlagzeug', value: 'schlagzeug' },
+                        { label: '🔊 PA', value: 'pa' },
+                        { label: '⚡ GrooveLab', value: 'groovelab' }
+                      ].map((eq) => {
+                        const isSelected = selectedEquipmentFilter === eq.value;
+                        return (
+                          <button
+                            key={eq.value}
+                            onClick={() => setSelectedEquipmentFilter(eq.value)}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '11px',
+                              border: 'none',
+                              background: isSelected ? brandColor : 'transparent',
+                              color: isSelected ? '#ffffff' : '#636366',
+                              fontWeight: isSelected ? 800 : 600,
+                              fontSize: '0.72rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {eq.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Highlighted "Meine Buchungen" Button */}
+                    <button
+                      onClick={() => setShowMyBookingsOnly(prev => !prev)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '14px',
+                        border: showMyBookingsOnly ? 'none' : '1.5px solid #af52de40',
+                        background: showMyBookingsOnly 
+                          ? 'linear-gradient(135deg, #af52de, #8b5cf6)' 
+                          : '#f6f0ff',
+                        color: showMyBookingsOnly ? '#ffffff' : '#6d28d9',
+                        fontWeight: 800,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: showMyBookingsOnly 
+                          ? '0 6px 16px rgba(175, 82, 222, 0.35)' 
+                          : '0 2px 4px rgba(0,0,0,0.01)',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <span>Meine Buchungen</span>
+                      <span style={{ 
+                        fontSize: '0.7rem', 
+                        background: showMyBookingsOnly ? '#ffffff' : '#af52de', 
+                        color: showMyBookingsOnly ? '#af52de' : '#ffffff', 
+                        padding: '2px 6px', 
+                        borderRadius: '8px', 
+                        fontWeight: 900 
+                      }}>
+                        {myBookings.length}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Expandable Instant Room Finder Tool */}
+              {showRoomFinderBar && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f0fdf4, #e6f4ea)',
+                  border: `1.5px solid ${brandColor}40`,
+                  borderRadius: '18px',
+                  padding: '14px 16px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  animation: 'fadeIn 0.2s ease'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Zap size={16} color={brandColor} fill={brandColor} />
+                      <span>Smart Room Finder (Freien Raum für Zeitraum suchen)</span>
+                    </div>
+                    <button
+                      onClick={() => setShowRoomFinderBar(false)}
+                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#166534' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr auto', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Datum</label>
+                      <input
+                        type="date"
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '0.78rem', fontWeight: 700, background: '#ffffff', color: '#1c1c1e' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Von</label>
+                      <select
+                        value={finderStartTime}
+                        onChange={(e) => setFinderStartTime(e.target.value)}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '0.78rem', fontWeight: 700, background: '#ffffff', color: '#1c1c1e' }}
+                      >
+                        {Array.from({ length: 27 }, (_, i) => {
+                          const min = i * 30 + 480;
+                          const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                          const mm = String(min % 60).padStart(2, '0');
+                          return `${hh}:${mm}`;
+                        }).map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Bis</label>
+                      <select
+                        value={finderEndTime}
+                        onChange={(e) => setFinderEndTime(e.target.value)}
+                        style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #bbf7d0', fontSize: '0.78rem', fontWeight: 700, background: '#ffffff', color: '#1c1c1e' }}
+                      >
+                        {Array.from({ length: 27 }, (_, i) => {
+                          const min = i * 30 + 480;
+                          const hh = String(Math.floor(min / 60)).padStart(2, '0');
+                          const mm = String(min % 60).padStart(2, '0');
+                          return `${hh}:${mm}`;
+                        }).map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setBookingStartTime(finderStartTime);
+                        setBookingEndTime(finderEndTime);
+                        setIsDateFilterActive(true);
+                        const freeRooms = roomsToRender.filter(r => !isRoomOccupiedNow(r.id));
+                        setFinderResultCount(freeRooms.length);
+                      }}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '12px',
+                        background: brandColor,
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 900,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        marginTop: isMobile ? '4px' : '16px',
+                        boxShadow: `0 4px 12px ${brandColor}40`,
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      🔍 Freie Räume prüfen
+                    </button>
+                  </div>
+
+                  {finderResultCount !== null && (
+                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '6px 12px', borderRadius: '10px', marginTop: '4px' }}>
+                      ✨ {finderResultCount} Räume sind am {new Date(bookingDate).toLocaleDateString('de-DE')} von {finderStartTime} - {finderEndTime} Uhr verfügbar!
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Active Filter Info Banner */}
               {isDateFilterActive && (
@@ -8349,6 +8581,7 @@ export function AdminDashboard({
                     onClick={() => {
                       setIsDateFilterActive(false);
                       setBookingDate(new Date().toISOString().split('T')[0]);
+                      setFinderResultCount(null);
                     }}
                     style={{ 
                       background: 'transparent', 
@@ -8383,7 +8616,14 @@ export function AdminDashboard({
                 {roomsToRender.map((room) => {
                   const isSelected = selectedCampusRoomId === room.id;
                   const occupiedNow = isRoomOccupiedNow(room.id);
-                  const isGroovelabRoom = (room as any).is_groovelab || (room as any).is_groovelab_active || room.name?.toLowerCase().includes('groovelab');
+                  const text = `${room.name || ''} ${room.description || ''} ${JSON.stringify(room.equipment || '')}`.toLowerCase();
+                  
+                  const hasPiano = text.includes('klavier') || text.includes('piano') || text.includes('flügel');
+                  const hasDrums = text.includes('schlagzeug') || text.includes('drum');
+                  const hasPA = text.includes('pa') || text.includes('gesang') || text.includes('box');
+                  const isGroovelab = text.includes('groovelab') || (room as any).is_groovelab;
+                  const roomFloor = (!room.floor || room.floor === 'Allgemein') ? 'EG' : room.floor;
+
                   return (
                     <div
                       key={room.id}
@@ -8393,7 +8633,15 @@ export function AdminDashboard({
                         background: isSelected ? `${brandColor}06` : 'white',
                         border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
                         boxShadow: isSelected ? `0 8px 24px ${brandColor}12` : 'none',
-                        opacity: 1
+                        opacity: 1,
+                        padding: '12px 14px',
+                        borderRadius: '16px',
+                        minWidth: '160px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        transition: 'all 0.2s'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
@@ -8439,15 +8687,23 @@ export function AdminDashboard({
                         </button>
                       </div>
 
+                      {/* Equipment Icons */}
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '0.72rem', color: '#636366' }}>
+                        <span style={{ fontSize: '0.62rem', background: '#f2f2f7', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>📍 {roomFloor}</span>
+                        {hasPiano && <span>🎹</span>}
+                        {hasDrums && <span>🥁</span>}
+                        {hasPA && <span>🔊</span>}
+                        {isGroovelab && <span>⚡</span>}
+                      </div>
 
                       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: 'auto' }}>
                         {occupiedNow ? (
                           <span style={{ padding: '3px 8px', background: '#ffebeb', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#ff453a' }}>
-                            Belegt
+                            🔴 Belegt
                           </span>
                         ) : (
                           <span style={{ padding: '3px 8px', background: '#eafaf1', borderRadius: '8px', fontSize: '0.65rem', fontWeight: 800, color: '#1e7a44' }}>
-                            Frei
+                            🟢 Jetzt frei
                           </span>
                         )}
                       </div>
@@ -8458,7 +8714,7 @@ export function AdminDashboard({
               </div>
             </div>
 
-            {/* Weekly Availability Calendar Grid */}
+            {/* Weekly / Daily Availability Calendar Grid */}
             <div 
               className="calendar-grid-card glass-panel" 
               onClick={() => setDraftBooking(null)}
@@ -8467,259 +8723,379 @@ export function AdminDashboard({
                 background: 'white', 
                 borderRadius: '24px', 
                 border: '1px solid rgba(0, 0, 0, 0.04)', 
-                padding: '20px 24px', 
+                padding: isMobile ? '16px' : '20px 24px', 
                 boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
               }}
             >
-              <div className="calendar-header-flex" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div className="calendar-header-flex" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '16px', gap: '12px' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span>Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}</span>
-                    {myRooms.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '6px' }}>
-                        {myRooms.map((r: any) => {
-                          const isSelected = selectedCampusRoomId === r.id;
-                           return (
-                             <button
-                               key={r.id}
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 setSelectedCampusRoomId(r.id);
-                               }}
-                               title={r.name}
-                               style={{
-                                 display: 'inline-flex',
-                                 alignItems: 'center',
-                                 gap: '3px',
-                                 padding: '3px 8px',
-                                 borderRadius: '6px',
-                                 fontSize: '0.62rem',
-                                 fontWeight: 900,
-                                 cursor: 'pointer',
-                                 transition: 'all 0.15s ease',
-                                 border: isSelected ? `1.5px solid ${brandColor}` : '1.5px solid #e5e5ea',
-                                 background: isSelected ? `${brandColor}12` : '#f8fafc',
-                                 color: isSelected ? brandColor : '#48484a',
-                                 boxShadow: isSelected ? `0 2px 6px ${brandColor}15` : 'none'
-                               }}
-                             >
-                               <span style={{ fontSize: '0.68rem', color: isSelected ? brandColor : '#8e8e93' }}>★</span>
-                               {r.name.length > 10 ? r.name.substring(0, 10) + '...' : r.name}
-                             </button>
-                           );
-                        })}
-                      </div>
-                    )}
+                  <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span>{isMobile && mobileCalendarView === 'day' ? 'Tagesübersicht' : 'Wochenübersicht'}: {selectedRoom?.name || 'Wähle einen Raum'}</span>
                   </h3>
                 </div>
 
-                {/* Week Pagination and Today Button */}
-                <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button
-                    onClick={() => {
-                      const today = new Date();
-                      const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-                      setBookingDate(dateStr);
-                    }}
-                    className="calendar-today-btn"
-                    style={{
-                      border: '1px solid #e5e5ea',
-                      background: 'white',
-                      cursor: 'pointer',
-                      padding: '8px 14px',
-                      borderRadius: '12px',
-                      color: '#1c1c1e',
-                      fontSize: '0.75rem',
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                      height: '38px',
-                      minWidth: '70px'
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f2f2f7'; e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.color = brandColor; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = '#e5e5ea'; e.currentTarget.style.color = '#1c1c1e'; }}
-                  >
-                    Heute
-                  </button>
+                {/* View Switcher & Week Controls */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
+                  {/* Mobile View Toggle Buttons */}
+                  {isMobile && (
+                    <div style={{ background: '#f2f2f7', borderRadius: '12px', padding: '3px', display: 'flex', gap: '2px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setMobileCalendarView('day')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '9px',
+                          border: 'none',
+                          background: mobileCalendarView === 'day' ? '#ffffff' : 'transparent',
+                          color: mobileCalendarView === 'day' ? brandColor : '#636366',
+                          fontWeight: 800,
+                          fontSize: '0.74rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        🗓️ 1 Tag
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMobileCalendarView('week')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '9px',
+                          border: 'none',
+                          background: mobileCalendarView === 'week' ? '#ffffff' : 'transparent',
+                          color: mobileCalendarView === 'week' ? brandColor : '#636366',
+                          fontWeight: 800,
+                          fontSize: '0.74rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        📅 7 Tage
+                      </button>
+                    </div>
+                  )}
 
-                  <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f2f2f7', padding: '4px 10px', borderRadius: '14px', border: '1px solid #e5e5ea', height: '38px' }}>
+                  <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button
-                      onClick={() => changeWeek(-1)}
-                      className="calendar-week-chevron-btn"
-                      style={{
-                        border: 'none',
-                        background: 'none',
-                        cursor: 'pointer',
-                        padding: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#8e8e93',
-                        borderRadius: '10px',
-                        transition: 'background 0.2s'
+                      onClick={() => {
+                        const today = new Date();
+                        const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+                        setBookingDate(dateStr);
+                        const d = today.getDay();
+                        setMobileSelectedDayIdx(d === 0 ? 6 : d - 1);
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <span className="calendar-week-label" style={{ fontSize: '0.76rem', fontWeight: 800, color: '#1c1c1e', minWidth: '155px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <span style={{ color: brandColor, fontWeight: 900 }}>KW {getCalendarWeek(bookingDate)}</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#636366' }}>({getWeekRange(bookingDate)})</span>
-                    </span>
-                    <button
-                      onClick={() => changeWeek(1)}
-                      className="calendar-week-chevron-btn"
+                      className="calendar-today-btn"
                       style={{
-                        border: 'none',
-                        background: 'none',
+                        border: '1px solid #e5e5ea',
+                        background: 'white',
                         cursor: 'pointer',
-                        padding: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#8e8e93',
+                        padding: '6px 12px',
                         borderRadius: '10px',
-                        transition: 'background 0.2s'
+                        color: '#1c1c1e',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        height: '36px'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <ChevronRight size={18} />
+                      Heute
                     </button>
+
+                    <div className="calendar-week-pagination" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f2f2f7', padding: '3px 8px', borderRadius: '12px', border: '1px solid #e5e5ea', height: '36px' }}>
+                      <button
+                        onClick={() => changeWeek(-1)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#8e8e93' }}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="calendar-week-label" style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1c1c1e', whiteSpace: 'nowrap' }}>
+                        <span style={{ color: brandColor, fontWeight: 900 }}>KW {getCalendarWeek(bookingDate)}</span>
+                        <span style={{ fontSize: '0.66rem', color: '#636366', marginLeft: '4px' }}>({getWeekRange(bookingDate)})</span>
+                      </span>
+                      <button
+                        onClick={() => changeWeek(1)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', color: '#8e8e93' }}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Calendar Grid Container */}
-              <div style={{ overflowX: 'auto', width: '100%' }} className="custom-calendar-scrollbar">
-                <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e5e5ea', borderRadius: '16px', overflow: 'hidden', minWidth: '950px' }}>
-                  {/* Header Row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', background: '#ffffff', borderBottom: '1px solid #e5e5ea' }}>
-                    <div style={{ padding: '12px 10px', fontSize: '0.72rem', fontWeight: 800, color: '#8e8e93', textAlign: 'center', borderRight: '1px solid #e5e5ea' }}>Zeit</div>
-                    {DAYS_OF_WEEK.map((day, dayIdx) => {
-                      const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
-                      
-                      // Calculate target date string to check for holidays
-                      const d = parseLocalDate(bookingDate);
-                      const dayVal = d.getUTCDay();
-                      const diff = d.getUTCDate() - (dayVal === 0 ? 6 : dayVal - 1) + dayIdx;
-                      d.setUTCDate(diff);
-                      const targetDateStr = toBerlinYYYYMMDD(d);
-                      
-                      const activeHoliday = holidays.find(h => targetDateStr >= h.start && targetDateStr <= h.end);
+              {/* Mobile 1-Day View Timeline vs Full 7-Day Table */}
+              {isMobile && mobileCalendarView === 'day' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Mobile Day Selector Pill Band */}
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '6px' }}>
+                    {DAYS_OF_WEEK.map((day, dIdx) => {
+                      const isSelected = mobileSelectedDayIdx === dIdx;
+                      const isToday = isTodayInWeek(bookingDate) && isDayToday(dIdx, bookingDate);
+                      const dayDateStr = getWeekdayDate(dIdx, bookingDate);
 
                       return (
-                        <div 
-                          key={day.value} 
-                          style={{ 
-                            padding: activeHoliday ? '6px 4px' : '12px 4px', 
-                            fontSize: '0.74rem', 
-                            fontWeight: 800, 
-                            color: isToday ? brandColor : '#1c1c1e', 
-                            textAlign: 'center', 
-                            borderRight: dayIdx < 6 ? '1px solid #e5e5ea' : 'none',
-                            position: 'relative',
-                            background: isToday ? `${brandColor}04` : '#ffffff',
+                        <button
+                          key={day.value}
+                          onClick={() => setMobileSelectedDayIdx(dIdx)}
+                          style={{
+                            padding: '8px 14px',
+                            borderRadius: '14px',
+                            border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
+                            background: isSelected ? `${brandColor}15` : (isToday ? '#f0fdf4' : '#ffffff'),
+                            color: isSelected ? brandColor : '#1c1c1e',
+                            fontWeight: isSelected ? 900 : 700,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            minWidth: '64px',
+                            flexShrink: 0,
+                            boxShadow: isSelected ? `0 4px 12px ${brandColor}20` : 'none',
+                            transition: 'all 0.2s'
                           }}
                         >
-                          {isToday && (
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: brandColor }} />
-                          )}
-                          <div>{day.label}</div>
-                          <div style={{ fontSize: '0.65rem', color: isToday ? brandColor : '#8e8e93', marginTop: '2px', fontWeight: 700 }}>
-                            {getWeekdayDate(dayIdx, bookingDate)}
+                          <span>{day.label}</span>
+                          <span style={{ fontSize: '0.64rem', color: isSelected ? brandColor : '#8e8e93', marginTop: '2px' }}>{dayDateStr}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 1-Column Day Timeline */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '520px', overflowY: 'auto', paddingRight: '2px' }} className="custom-calendar-scrollbar">
+                    {TIME_SLOTS.map((hour) => {
+                      const slotBookings = getBookingsForSlot(mobileSelectedDayIdx, hour);
+                      const isFree = slotBookings.length === 0;
+
+                      return (
+                        <div
+                          key={hour}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            padding: '10px 12px',
+                            borderRadius: '14px',
+                            border: isFree ? '1px solid #dcfce7' : '1px solid #e2e8f0',
+                            background: isFree ? '#f0fdf4' : '#ffffff',
+                            gap: '6px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>⏰ {hour} Uhr</span>
+                              {isFree ? (
+                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '100px' }}>
+                                  🟢 Frei
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '100px' }}>
+                                  🔴 {slotBookings.length} Belegung{slotBookings.length > 1 ? 'en' : ''}
+                                </span>
+                              )}
+                            </div>
+
+                            {isFree && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCellClick(mobileSelectedDayIdx, hour, e);
+                                }}
+                                style={{
+                                  background: brandColor,
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  padding: '4px 10px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  boxShadow: `0 2px 6px ${brandColor}30`
+                                }}
+                              >
+                                + Raum buchen
+                              </button>
+                            )}
                           </div>
-                          {activeHoliday && (
-                            <div style={{ 
-                              marginTop: '4px', 
-                              fontSize: '0.55rem', 
-                              background: '#ffe2e2', 
-                              color: '#ff3b30', 
-                              padding: '2px 6px', 
-                              borderRadius: '4px', 
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              maxWidth: '90%'
-                            }} title={activeHoliday.name}>
-                              🌴 {activeHoliday.name}
+
+                          {/* Render Bookings for this slot */}
+                          {!isFree && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                              {slotBookings.map((b: any) => {
+                                const isGroovelabBlock = b.teacherId === 'groovelab' || (b.purpose && b.purpose.toLowerCase().includes('groovelab'));
+                                const isOwnBooking = b.teacherId === userId;
+
+                                return (
+                                  <div
+                                    key={b.id}
+                                    onClick={() => setSelectedBooking(b)}
+                                    style={{
+                                      padding: '8px 10px',
+                                      borderRadius: '10px',
+                                      background: isGroovelabBlock ? '#fef08a' : (isOwnBooking ? '#dcfce7' : '#f1f5f9'),
+                                      border: isGroovelabBlock ? '1px solid #facc15' : (isOwnBooking ? '1px solid #86efac' : '1px solid #cbd5e1'),
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <span style={{ fontSize: '0.76rem', fontWeight: 900, color: '#0f172a' }}>
+                                        {b.startTime} - {b.endTime} • {b.teacherName || b.purpose || 'Belegt'}
+                                      </span>
+                                      {b.purpose && (
+                                        <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 700 }}>
+                                          {b.purpose}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {(isOwnBooking || admin?.role === 'admin' || admin?.role === 'secretary') && !b.isSchedule && (
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          await handleCancelBooking(b.id);
+                                        }}
+                                        style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '6px', padding: '4px 8px', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
+                                      >
+                                        Stornieren
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
                       );
                     })}
                   </div>
+                </div>
+              ) : (
+                /* Full 7-Day Calendar Grid Container */
+                <div style={{ overflowX: 'auto', width: '100%' }} className="custom-calendar-scrollbar">
+                  <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e5e5ea', borderRadius: '16px', overflow: 'hidden', minWidth: '950px' }}>
+                    {/* Header Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', background: '#ffffff', borderBottom: '1px solid #e5e5ea' }}>
+                      <div style={{ padding: '12px 10px', fontSize: '0.72rem', fontWeight: 800, color: '#8e8e93', textAlign: 'center', borderRight: '1px solid #e5e5ea' }}>Zeit</div>
+                      {DAYS_OF_WEEK.map((day, dayIdx) => {
+                        const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                        
+                        // Calculate target date string to check for holidays
+                        const d = parseLocalDate(bookingDate);
+                        const dayVal = d.getUTCDay();
+                        const diff = d.getUTCDate() - (dayVal === 0 ? 6 : dayVal - 1) + dayIdx;
+                        d.setUTCDate(diff);
+                        const targetDateStr = toBerlinYYYYMMDD(d);
+                        
+                        const activeHoliday = holidays.find(h => targetDateStr >= h.start && targetDateStr <= h.end);
 
-                  {/* Hourly Rows */}
-                  <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
-                    {TIME_SLOTS.map((hour) => {
-                      const slotHourInt = parseInt(hour.split(':')[0]);
-                      
-                      return (
-                        <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f2f2f7', minHeight: '56px', position: 'relative' }}>
-                          {/* Time cell - Apple Minimalist Style */}
-                          <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 700, color: '#8e8e93', textAlign: 'center', background: '#ffffff', borderRight: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {hour}
+                        return (
+                          <div 
+                            key={day.value} 
+                            style={{ 
+                              padding: activeHoliday ? '6px 4px' : '12px 4px', 
+                              fontSize: '0.74rem', 
+                              fontWeight: 800, 
+                              color: isToday ? brandColor : '#1c1c1e', 
+                              textAlign: 'center', 
+                              borderRight: dayIdx < 6 ? '1px solid #e5e5ea' : 'none',
+                              position: 'relative',
+                              background: isToday ? `${brandColor}04` : '#ffffff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            {isToday && (
+                              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: brandColor }} />
+                            )}
+                            <div>{day.label}</div>
+                            <div style={{ fontSize: '0.65rem', color: isToday ? brandColor : '#8e8e93', marginTop: '2px', fontWeight: 700 }}>
+                              {getWeekdayDate(dayIdx, bookingDate)}
+                            </div>
+                            {activeHoliday && (
+                              <div style={{ 
+                                marginTop: '4px', 
+                                fontSize: '0.55rem', 
+                                background: '#ffe2e2', 
+                                color: '#ff3b30', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px', 
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '90%'
+                              }} title={activeHoliday.name}>
+                                🌴 {activeHoliday.name}
+                              </div>
+                            )}
                           </div>
-                          {/* Day cells */}
-                          {DAYS_OF_WEEK.map((day, dayIdx) => {
-                            const slotBookings = getBookingsForSlot(dayIdx, hour);
-                            const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
-                            const currentHour = new Date().getHours();
-                            const currentMin = new Date().getMinutes();
-                            const showTimeIndicator = isToday && currentHour === slotHourInt;
-                            const isDraggedOver = dragOverCell && dragOverCell.dayIdx === dayIdx && dragOverCell.hour === hour;
+                        );
+                      })}
+                    </div>
 
-                            return (
-                              <div
-                                key={day.value}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCellClick(dayIdx, hour, e);
-                                }}
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCellDoubleClick(dayIdx, hour);
-                                }}
-                                onDragOver={(e) => {
+                    {/* Hourly Rows */}
+                    <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative' }}>
+                      {TIME_SLOTS.map((hour) => {
+                        const slotHourInt = parseInt(hour.split(':')[0]);
+                        
+                        return (
+                          <div key={hour} style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', borderBottom: '1px solid #f2f2f7', minHeight: '56px', position: 'relative' }}>
+                            {/* Time cell - Apple Minimalist Style */}
+                            <div style={{ padding: '10px 4px', fontSize: '0.72rem', fontWeight: 700, color: '#8e8e93', textAlign: 'center', background: '#ffffff', borderRight: '1px solid #e5e5ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {hour}
+                            </div>
+                            {/* Day cells */}
+                            {DAYS_OF_WEEK.map((day, dayIdx) => {
+                              const slotBookings = getBookingsForSlot(dayIdx, hour);
+                              const isToday = isTodayInWeek(bookingDate) && isDayToday(dayIdx, bookingDate);
+                              const currentHour = new Date().getHours();
+                              const currentMin = new Date().getMinutes();
+                              const showTimeIndicator = isToday && currentHour === slotHourInt;
+                              const isDraggedOver = dragOverCell && dragOverCell.dayIdx === dayIdx && dragOverCell.hour === hour;
 
-                                  e.preventDefault();
-                                  if (!isDraggedOver) {
-                                    setDragOverCell({ dayIdx, hour });
-                                  }
-                                }}
-                                onDragLeave={() => {
-                                  setDragOverCell(null);
-                                }}
-                                onDrop={(e) => {
-                                  handleDropOnCell(e, dayIdx, hour);
-                                }}
-                                style={{
-                                  padding: '4px',
-                                  borderRight: dayIdx < 6 ? '1px solid #f2f2f7' : 'none',
-                                  position: 'relative',
-                                  background: isDraggedOver 
-                                    ? `${brandColor}12` 
-                                    : (isToday ? `${brandColor}01` : 'white'),
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '3px',
-                                  justifyContent: 'stretch',
-                                  cursor: 'pointer',
-                                  boxShadow: isDraggedOver ? `inset 0 0 0 2px ${brandColor}` : 'none',
-                                  transition: 'background-color 0.15s ease, box-shadow 0.15s ease'
-                                }}
-                              >
+                              return (
+                                <div
+                                  key={day.value}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCellClick(dayIdx, hour, e);
+                                  }}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCellDoubleClick(dayIdx, hour);
+                                  }}
+                                  onDragOver={(e) => {
+
+                                    e.preventDefault();
+                                    if (!isDraggedOver) {
+                                      setDragOverCell({ dayIdx, hour });
+                                    }
+                                  }}
+                                  onDragLeave={() => {
+                                    setDragOverCell(null);
+                                  }}
+                                  onDrop={(e) => {
+                                    handleDropOnCell(e, dayIdx, hour);
+                                  }}
+                                  style={{
+                                    padding: '4px',
+                                    borderRight: dayIdx < 6 ? '1px solid #f2f2f7' : 'none',
+                                    position: 'relative',
+                                    background: isDraggedOver 
+                                      ? `${brandColor}12` 
+                                      : (isToday ? `${brandColor}01` : 'white'),
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '3px',
+                                    justifyContent: 'stretch',
+                                    cursor: 'pointer',
+                                    boxShadow: isDraggedOver ? `inset 0 0 0 2px ${brandColor}` : 'none',
+                                    transition: 'background-color 0.15s ease, box-shadow 0.15s ease'
+                                  }}
+                                >
                                 {/* Real-time indicator line */}
                                 {showTimeIndicator && (
                                   <div style={{ 
@@ -9226,15 +9602,45 @@ export function AdminDashboard({
                   </div>
                 </div>
               </div>
+              )}
 
+
+              {/* Mobile FAB to trigger room booking sheet */}
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setShowMobileRoomSlider(true)}
+                  style={{
+                    position: 'fixed',
+                    bottom: '80px',
+                    right: '20px',
+                    zIndex: 999,
+                    background: `linear-gradient(135deg, ${brandColor}, #2563eb)`,
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '50px',
+                    padding: '12px 20px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    boxShadow: `0 8px 24px ${brandColor}50`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                  <span>Raum buchen</span>
+                </button>
+              )}
 
             </div>
           </div>
 
           {/* Right Sidebar: Booking Form OR Meine Buchungen */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', alignSelf: 'stretch' }}>
-            
-            {showMyBookingsOnly ? (
+          {!isMobile && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', alignSelf: 'stretch' }}>
+              {showMyBookingsOnly ? (
               /* Meine Buchungen (Shown only when showMyBookingsOnly is true) */
               <div 
                 className="glass-panel" 
@@ -10214,6 +10620,264 @@ export function AdminDashboard({
               </div>
             )}
           </div>
+          )}
+
+          {/* Mobile Bottom-Sheet Slider (Slide-Up Drawer) */}
+          {isMobile && showMobileRoomSlider && (
+            <div 
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'flex-end',
+                background: 'rgba(15, 23, 42, 0.45)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                animation: 'fadeIn 0.2s ease-out'
+              }}
+              onClick={() => setShowMobileRoomSlider(false)}
+            >
+              <div 
+                style={{
+                  background: '#ffffff',
+                  borderTopLeftRadius: '28px',
+                  borderTopRightRadius: '28px',
+                  maxHeight: '85vh',
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
+                  overflow: 'hidden',
+                  animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Sheet Header */}
+                <div style={{
+                  padding: '16px 20px 12px 20px',
+                  borderBottom: '1px solid #f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  position: 'sticky',
+                  top: 0,
+                  background: '#ffffff',
+                  zIndex: 10
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '99px', margin: '0 auto 6px auto' }} />
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Zap size={18} style={{ color: brandColor }} />
+                      Raum buchen & Eigenschaften
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileRoomSlider(false)}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#64748b',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Sheet Body (Scrollable Content) */}
+                <div style={{ padding: '16px 20px 40px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {showMyBookingsOnly ? (
+                    /* Meine Buchungen (Shown only when showMyBookingsOnly is true) */
+                    <div 
+                      className="glass-panel" 
+                      style={{ 
+                        background: 'white', 
+                        borderRadius: '24px', 
+                        border: '1px solid rgba(0, 0, 0, 0.04)', 
+                        padding: '20px', 
+                        boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#1c1c1e', margin: 0 }}>
+                            Meine Buchungen ({myBookings.length})
+                          </h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowMyBookingsOnly(false)}
+                          style={{
+                            background: '#f1f5f9',
+                            border: 'none',
+                            color: '#64748b',
+                            borderRadius: '8px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Schließen
+                        </button>
+                      </div>
+                      
+                      {myBookings.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8' }}>
+                          <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>Keine aktiven Buchungen vorhanden.</p>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
+                          {myBookings.map((b: any) => (
+                            <div key={b.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{b.roomName || 'Raum'}</span>
+                                <span style={{ fontSize: '0.7rem', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '6px', fontWeight: 700 }}>{b.date}</span>
+                              </div>
+                              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 8px 0' }}>{b.startTime} - {b.endTime} Uhr • {b.purpose || 'Kein Titel'}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleCancelBooking(b.ids || b.id)}
+                                style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                Stornieren
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* General Quick Booking Panel */
+                    <div 
+                      className="glass-panel" 
+                      style={{ 
+                        background: 'white', 
+                        borderRadius: '24px', 
+                        border: '1px solid rgba(0, 0, 0, 0.04)', 
+                        padding: '20px', 
+                        boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)' 
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                        <div style={{ background: `${brandColor}12`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex' }}>
+                          <Plus size={16} />
+                        </div>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1c1c1e', margin: 0 }}>Raum schnell buchen</h3>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Raum wählen</label>
+                          <select 
+                            value={selectedCampusRoomId || ''} 
+                            onChange={(e) => setSelectedCampusRoomId(e.target.value)}
+                            className="premium-input"
+                            style={{ width: '100%', height: '40px' }}
+                          >
+                            {rooms.map((r: any) => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Datum</label>
+                          <input 
+                            type="date" 
+                            value={bookingDate} 
+                            onChange={(e) => setBookingDate(e.target.value)} 
+                            className="premium-input" 
+                            style={{ width: '100%', height: '40px' }} 
+                          />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Von</label>
+                            <input 
+                              type="time" 
+                              value={bookingStartTime} 
+                              onChange={(e) => setBookingStartTime(e.target.value)} 
+                              className="premium-input" 
+                              style={{ width: '100%', height: '40px' }} 
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Bis</label>
+                            <input 
+                              type="time" 
+                              value={bookingEndTime} 
+                              onChange={(e) => setBookingEndTime(e.target.value)} 
+                              className="premium-input" 
+                              style={{ width: '100%', height: '40px' }} 
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '4px', display: 'block' }}>Zweck / Notiz</label>
+                          <input 
+                            type="text" 
+                            placeholder="z. B. Klavierunterricht, Bandprobe..." 
+                            value={bookingPurpose} 
+                            onChange={(e) => setBookingPurpose(e.target.value)} 
+                            className="premium-input" 
+                            style={{ width: '100%', height: '40px' }} 
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedRoom) {
+                              if (isEditing) {
+                                handleUpdateBooking();
+                              } else {
+                                handleAddBooking(selectedRoom.id);
+                              }
+                              setShowMobileRoomSlider(false);
+                            }
+                          }}
+                          style={{
+                            background: brandColor,
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '12px',
+                            padding: '12px',
+                            fontWeight: 800,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            marginTop: '8px',
+                            boxShadow: `0 4px 14px ${brandColor}33`,
+                            width: '100%'
+                          }}
+                        >
+                          Kostenfrei buchen
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Properties Widget */}
+                  {selectedRoom && (
+                    <div className="glass-panel" style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0, 0, 0, 0.04)', padding: '20px' }}>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 900, color: '#1c1c1e', margin: '0 0 12px 0' }}>Raum-Details</h3>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}><strong>Kapazität:</strong> {selectedRoom.capacity || 1} Personen</p>
+                      <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '4px 0 0 0' }}><strong>Ausstattung:</strong> {selectedRoom.equipment || 'Keine Angabe'}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -10697,7 +11361,7 @@ export function AdminDashboard({
             )}
           </div>
 
-          {/* Top Mediathek Category Tab Bar (Songs, Lehrwerke, Schnell-Text) */}
+          {/* Top Mediathek Category Tab Bar (Songs, Lehrwerke, Schnell-Text) - Mobile Only */}
           <div className="mediathek-pill-bar" style={{
             width: '100%',
             justifyContent: 'center',
@@ -10741,62 +11405,71 @@ export function AdminDashboard({
                 <span>Songs ({songs.length})</span>
               </button>
 
-              {activePlatform === 'campus' && (
-                <button
-                  type="button"
-                  onClick={() => setMediathekTab('lehrwerke')}
-                  style={{
-                    flex: 1,
-                    height: '36px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: mediathekTab === 'lehrwerke' ? brandColor : 'transparent',
-                    color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b',
-                    fontWeight: 850,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    boxShadow: mediathekTab === 'lehrwerke' ? `0 2px 8px ${brandColor}40` : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
-                  <Library size={14} style={{ color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b' }} />
-                  <span>Lehrwerke ({lehrwerke.length})</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setMediathekTab('lehrwerke')}
+                style={{
+                  flex: 1,
+                  height: '36px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: mediathekTab === 'lehrwerke' ? brandColor : 'transparent',
+                  color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b',
+                  fontWeight: 850,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  boxShadow: mediathekTab === 'lehrwerke' ? `0 2px 8px ${brandColor}40` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <Library size={14} style={{ color: mediathekTab === 'lehrwerke' ? '#ffffff' : '#64748b' }} />
+                <span>Lehrwerke ({lehrwerke.length})</span>
+              </button>
 
-              {activePlatform === 'campus' && (
-                <button
-                  type="button"
-                  onClick={() => setMediathekTab('schnelltext')}
-                  style={{
-                    flex: 1,
-                    height: '36px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: mediathekTab === 'schnelltext' ? brandColor : 'transparent',
-                    color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b',
-                    fontWeight: 850,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    boxShadow: mediathekTab === 'schnelltext' ? `0 2px 8px ${brandColor}40` : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}
-                >
-                  <Zap size={14} style={{ color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b' }} />
-                  <span>Schnell-Text</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setMediathekTab('schnelltext')}
+                style={{
+                  flex: 1,
+                  height: '36px',
+                  borderRadius: '100px',
+                  border: 'none',
+                  background: mediathekTab === 'schnelltext' ? brandColor : 'transparent',
+                  color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b',
+                  fontWeight: 850,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  boxShadow: mediathekTab === 'schnelltext' ? `0 2px 8px ${brandColor}40` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <Zap size={14} style={{ color: mediathekTab === 'schnelltext' ? '#ffffff' : '#64748b' }} />
+                <span>Schnell-Text</span>
+              </button>
             </div>
+          </div>
+
+          {/* Swipecard Pagination Dots Bar (Mobile Only) */}
+          <div className="mediathek-swipe-dots" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '-12px 0 4px 0' }}>
+            <button type="button" onClick={() => setMediathekTab('songs')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+              <div className={`mediathek-dot ${mediathekTab === 'songs' ? 'active' : ''}`} style={{ background: mediathekTab === 'songs' ? brandColor : '#cbd5e1' }} />
+            </button>
+            <button type="button" onClick={() => setMediathekTab('lehrwerke')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+              <div className={`mediathek-dot ${mediathekTab === 'lehrwerke' ? 'active' : ''}`} style={{ background: mediathekTab === 'lehrwerke' ? brandColor : '#cbd5e1' }} />
+            </button>
+            <button type="button" onClick={() => setMediathekTab('schnelltext')} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}>
+              <div className={`mediathek-dot ${mediathekTab === 'schnelltext' ? 'active' : ''}`} style={{ background: mediathekTab === 'schnelltext' ? brandColor : '#cbd5e1' }} />
+            </button>
           </div>
 
           {/* Unified Smart Search Field */}
@@ -10821,16 +11494,22 @@ export function AdminDashboard({
             />
           </div>
 
-          {/* Two Columns Layout or Single Column depending on active platform */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: activePlatform === 'campus' ? '1fr 1fr' : '1fr', 
-            gap: '32px', 
-            alignItems: 'flex-start' 
-          }} className="mediathek-grid-layout">
+          {/* Three Columns Layout or Single Column depending on active platform */}
+          <div 
+            onTouchStart={handleMediathekTouchStart}
+            onTouchEnd={handleMediathekTouchEnd}
+            style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr', 
+              gap: '24px', 
+              alignItems: 'flex-start',
+              width: '100%'
+            }} 
+            className="mediathek-grid-layout"
+          >
             {/* Left Column: Songs */}
             <div 
-              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+              style={{ display: mediathekTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
               className={`mediathek-col-card mediathek-col-songs ${mediathekTab === 'songs' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -11416,12 +12095,11 @@ export function AdminDashboard({
               </div>
             </div>
 
-            {/* Column 2: Lehrwerke (Campus only) */}
-            {activePlatform === 'campus' && (
-              <div 
-                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-                className={`mediathek-col-card mediathek-col-lehrwerke ${mediathekTab === 'lehrwerke' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
-              >
+            {/* Column 2: Lehrwerke */}
+            <div 
+              style={{ display: mediathekTab === 'lehrwerke' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
+              className={`mediathek-col-card mediathek-col-lehrwerke ${mediathekTab === 'lehrwerke' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+            >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Library size={16} color={brandColor} /> Lehrwerke ({lehrwerke.length})
@@ -11648,14 +12326,12 @@ export function AdminDashboard({
                   })}
                 </div>
               </div>
-            )}
 
-            {/* Column 3: Schnell-Text (Mobile view integration) */}
-            {activePlatform === 'campus' && (
-              <div 
-                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-                className={`mediathek-col-card mediathek-col-schnelltext-mobile ${mediathekTab === 'schnelltext' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
-              >
+            {/* Column 3: Schnell-Text */}
+            <div 
+              style={{ display: mediathekTab === 'schnelltext' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }}
+              className={`mediathek-col-card mediathek-col-schnelltext ${mediathekTab === 'schnelltext' ? 'mobile-active-card' : 'mobile-hidden-card'}`}
+            >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ background: `${brandColor}15`, color: brandColor, padding: '3px 6px', borderRadius: '6px', fontSize: '0.95rem' }}>⚡</span>
@@ -11753,173 +12429,8 @@ export function AdminDashboard({
                   })}
                 </div>
               </div>
-            )}
           </div>
         </div>
-
-        {/* Right Side: Textbausteine Sidebar (Desktop Only) */}
-        {activePlatform === 'campus' && (
-          <div 
-            className="mediathek-col-schnelltext-desktop glass-panel" 
-            style={{ 
-              flex: '0 0 260px',
-              width: '260px',
-              minWidth: '240px',
-              background: 'white', 
-              borderRadius: '20px', 
-              border: '1px solid rgba(0, 0, 0, 0.05)', 
-              padding: '24px 16px', 
-              boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '16px',
-              alignSelf: 'stretch'
-            }}
-          >
-          {/* Title */}
-          <div>
-            <h2 style={{ fontSize: '1.2rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 900 }}>
-              <span style={{ background: `${brandColor}15`, color: brandColor, padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', fontSize: '1rem' }}>⚡</span>
-              <span>Schnell-Text</span>
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '4px 0 0 0', fontWeight: 600 }}>
-              Vorlagen für Hausaufgaben.
-            </p>
-          </div>
-
-          {/* Manage Button */}
-          <button
-            type="button"
-            onClick={() => setShowTextbausteinModal(true)}
-            style={{
-              width: '100%',
-              background: `${brandColor}10`,
-              border: `1px solid ${brandColor}30`,
-              borderRadius: '12px',
-              padding: '10px 12px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              color: brandColor,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s'
-            }}
-            className="hover-bg"
-          >
-            <Settings size={14} />
-            <span>Verwalten</span>
-          </button>
-
-          {/* Templates List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Deine Bausteine</span>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: '9999px' }}>
-                {textbausteine.filter((tb: any) => tb.active).length}
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px', overflowY: 'auto', flex: 1, maxHeight: '580px', paddingRight: '2px' }}>
-              {textbausteine.filter((tb: any) => tb.active).map((tb: any) => {
-                const parts = tb.label.split(' ');
-                const hasEmoji = parts[0] && /\p{Emoji}/u.test(parts[0]);
-                const emoji = hasEmoji ? parts[0] : '🎵';
-                const name = hasEmoji ? parts.slice(1).join(' ') : tb.label;
-                const isCopied = copiedTbId === tb.id;
-
-                const handleCardClick = () => {
-                  if (selectedLehrwerkForDetail && selectedStudentForProgress) {
-                    setNewHomeworkNoteText(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
-                    setCopiedTbId(tb.id);
-                    setTimeout(() => setCopiedTbId(null), 850);
-                  } else if (selectedSongForDetail && selectedStudentForProgress) {
-                    setSongLessonNotes(prev => prev ? `${prev}\n\n${tb.text}` : tb.text);
-                    setCopiedTbId(tb.id);
-                    setTimeout(() => setCopiedTbId(null), 850);
-                  } else {
-                    setPreviewingTextbaustein(tb);
-                  }
-                };
-
-                return (
-                  <div 
-                    key={tb.id} 
-                    onClick={handleCardClick}
-                    style={{ 
-                      border: isCopied ? '1.5px solid #34a853' : '1px solid #e2e8f0', 
-                      borderRadius: '12px', 
-                      padding: '10px 8px', 
-                      background: isCopied ? '#e6f4ea' : 'white',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      textAlign: 'center',
-                      gap: '6px',
-                      opacity: tb.active ? 1 : 0.55,
-                      boxShadow: isCopied ? '0 4px 10px rgba(52, 168, 83, 0.15)' : '0 1px 2px rgba(0,0,0,0.01)',
-                      minHeight: '110px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      transform: isCopied ? 'scale(0.96)' : 'none'
-                    }}
-                    className="hover-scale-mini"
-                  >
-                    <span style={{ fontSize: '1.4rem', marginTop: '2px', transform: isCopied ? 'scale(1.15)' : 'none', transition: 'all 0.2s', filter: 'grayscale(100%)' }}>
-                      {isCopied ? '✓' : emoji}
-                    </span>
-                    
-                    <span style={{ 
-                      fontSize: '0.72rem', 
-                      fontWeight: 800, 
-                      color: isCopied ? '#34a853' : '#1e293b', 
-                      display: '-webkit-box', 
-                      WebkitLineClamp: 2, 
-                      WebkitBoxOrient: 'vertical', 
-                      overflow: 'hidden', 
-                      lineHeight: '1.2', 
-                      height: '2.4em', 
-                      wordBreak: 'break-word',
-                      transition: 'color 0.2s'
-                    }}>
-                      {isCopied ? (selectedLehrwerkForDetail || selectedSongForDetail ? 'Eingefügt! ✓' : 'Kopiert! ✓') : name}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleTextbausteinActive(tb.id);
-                      }}
-                      style={{
-                        background: tb.active ? '#e6f4ea' : '#f1f5f9',
-                        color: tb.active ? '#34a853' : '#64748b',
-                        border: tb.active ? '1px solid #e6f4ea' : '1px solid #e2e8f0',
-                        padding: '3px 8px',
-                        borderRadius: '9999px',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        width: '100%',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <span>{tb.active ? '🟢 Aktiv' : '⚪ Inakt.'}</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
       </div>
     );
   };
@@ -12037,22 +12548,22 @@ export function AdminDashboard({
         : 0;
 
       return (
-        <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden', paddingBottom: isMobile ? '120px' : '0px' }}>
           {/* Top Section: Header & Contribution */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
+          <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
             {/* Top Left: Header and summary cards */}
-            <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Award size={24} />
                 </div>
-                <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Performance & Highlights</h2>
-                  <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <h2 style={{ fontSize: isMobile ? '1.35rem' : '1.75rem', fontWeight: 900, color: '#1e293b', margin: 0, wordBreak: 'break-word' }}>Performance & Highlights</h2>
+                  <p style={{ color: '#64748b', margin: 0, fontWeight: 600, fontSize: isMobile ? '0.8rem' : '0.9rem' }}>Feiere die Lernfortschritte deiner Klasse und stärke die Motivation durch positives Feedback.</p>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
                 {[
                   { label: 'Deine Schüler', value: stats.myClassCount || 0, icon: Users, color: brandColor, bg: '#f8fafc', isNeutral: true },
                   { label: 'Klassen-Übezeit (Monat)', value: formatMins(currentMonthMins), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
@@ -12063,10 +12574,10 @@ export function AdminDashboard({
                   { label: 'Ø Zeit / Kopf (Woche)', value: formatMinsToMMSS(classCount > 0 ? (classWeeklyMins / classCount) : 0), icon: Clock, color: brandColor, bg: '#f8fafc', isNeutral: true },
                   { label: 'Ø Zeit / Kopf (Monat)', value: formatMinsToMMSS(classCount > 0 ? (currentMonthMins / classCount) : 0), icon: Award, color: brandColor, bg: '#f8fafc', isNeutral: true }
                 ].map((stat, idx) => (
-                  <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
+                  <div key={idx} style={{ padding: '12px 14px', background: stat.bg, borderRadius: '24px', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}25`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px', width: '100%', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</span>
-                      <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15` }}>
+                      <div style={{ padding: '6px', borderRadius: '8px', background: 'white', color: stat.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: stat.isNeutral ? '1px solid #e2e8f0' : `1px solid ${stat.color}15`, flexShrink: 0 }}>
                         <stat.icon size={16} />
                       </div>
                     </div>
@@ -12079,7 +12590,7 @@ export function AdminDashboard({
             </div>
 
             {/* Top Right: Donut Chart (Gemeinsamer Schul-Beitrag) */}
-            <div className="glass-panel" style={{ padding: '20px 24px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="glass-panel" style={{ padding: isMobile ? '16px' : '20px 24px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', boxSizing: 'border-box' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', width: '100%', marginBottom: '4px', textAlign: 'left' }}>
                 Gemeinsamer Schul-Beitrag
               </h3>
@@ -12135,10 +12646,183 @@ export function AdminDashboard({
           </div>
 
           {/* Grid Section: Goals | Highlights | Annual Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: '32px', alignItems: 'stretch' }}>
+          <div className="pwa-adaptive-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr 1.2fr', gap: isMobile ? '16px' : '32px', alignItems: 'stretch', width: '100%', boxSizing: 'border-box' }}>
             
             {/* Column 1: Übe-Ziele der Klasse */}
-            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0' }}>
+            <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <span>🌱</span> Übe-Ziele der Klasse
+                </h3>
+                <button 
+                  onClick={() => setShowAddGoalForm(!showAddGoalForm)}
+                  style={{ background: brandColor, color: 'white', border: 'none', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  className="hover-scale"
+                >
+                  <span>{showAddGoalForm ? 'Abbrechen' : '+ Ziel'}</span>
+                </button>
+              </div>
+
+              {showAddGoalForm && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>Neues Ziel erstellen</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Titel des Ziels</label>
+                    <input 
+                      type="text" 
+                      value={newGoalTitle} 
+                      onChange={(e) => setNewGoalTitle(e.target.value)} 
+                      placeholder="z.B. Wochenziel, Ferien-Challenge"
+                      style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ziel (Minuten)</label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        value={newGoalMinutes} 
+                        onChange={(e) => setNewGoalMinutes(e.target.value)} 
+                        style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deadline (optional)</label>
+                      <input 
+                        type="date" 
+                        value={newGoalDeadline} 
+                        onChange={(e) => setNewGoalDeadline(e.target.value)} 
+                        style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleAddGoal}
+                    style={{ background: brandColor, color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '4px' }}
+                  >
+                    Ziel hinzufügen
+                  </button>
+                </div>
+              )}
+
+              {(() => {
+                const targets = stats?.weeklyTargets || [];
+                const totalGoals = targets.length;
+                const masteredGoals = targets.filter((target: any) => {
+                  const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                  return targetPercent >= 100;
+                }).length;
+                const highestPercent = targets.length > 0 
+                  ? Math.max(...targets.map((target: any) => Math.round((classWeeklyMins / target.minutes) * 100)))
+                  : 0;
+
+                return (
+                  <>
+                    {totalGoals > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '16px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Missionen</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{totalGoals}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Geknackt</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#34a853', marginTop: '2px' }}>{masteredGoals}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Peak</span>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: brandColor, marginTop: '2px' }}>{highestPercent}%</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {totalGoals === 0 ? (
+                        <p style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', margin: '20px 0', fontWeight: 600 }}>
+                          Keine aktiven Ziele angelegt.
+                        </p>
+                      ) : (
+                        targets.map((target: any) => {
+                          const targetPercent = Math.round((classWeeklyMins / target.minutes) * 100);
+                          const isDeadlinePassed = target.deadline ? new Date(target.deadline) < new Date() : false;
+                          
+                          const maxPercentOnBar = 133;
+                          const visualWidth = Math.min(100, (targetPercent / maxPercentOnBar) * 100);
+                          const isAchieved = targetPercent >= 100;
+
+                          return (
+                            <div key={target.id} style={{
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              background: '#34a853',
+                              boxShadow: '0 6px 20px rgba(52, 168, 83, 0.12)',
+                              borderRadius: '16px',
+                              padding: '12px 14px',
+                              gap: '8px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', lineHeight: '1.25' }}>
+                                    {target.title || 'Challenge'}
+                                  </span>
+                                  {target.deadline && (
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 500, color: isDeadlinePassed ? '#ff8780' : 'rgba(255, 255, 255, 0.75)', lineHeight: '1.2' }}>
+                                      bis {new Date(target.deadline).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                      {isDeadlinePassed && ' (abgelaufen)'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFeatureSettings: '"tnum"' }}>
+                                    {targetPercent}%
+                                  </span>
+                                  <button 
+                                    onClick={() => handleDeleteGoal(target.id)}
+                                    style={{ background: 'rgba(255, 255, 255, 0.15)', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    title="Ziel löschen"
+                                  >
+                                    <X size={12} strokeWidth={2.5} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div style={{ position: 'relative', height: '6px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '99px' }}>
+                                <div style={{
+                                  width: `${visualWidth}%`,
+                                  height: '100%',
+                                  background: '#ffffff',
+                                  borderRadius: '99px',
+                                  transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                  boxShadow: '0 0 6px rgba(255, 255, 255, 0.25)'
+                                }} />
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', gap: '10px' }}>
+                                <span style={{ color: 'rgba(255, 255, 255, 0.9)', fontFeatureSettings: '"tnum"', fontWeight: 500, whiteSpace: 'normal' }}>
+                                  <span style={{ fontWeight: 700, color: '#ffffff' }}>{formatMins(classWeeklyMins)}</span> von {target.minutes} Min.
+                                </span>
+                                <span style={{
+                                  fontWeight: 700,
+                                  color: isAchieved ? '#e6f4ea' : 'rgba(255, 255, 255, 0.8)',
+                                  whiteSpace: 'normal',
+                                  textAlign: 'right'
+                                }}>
+                                  {isAchieved ? 'Erreicht 🎉' : `Noch ${Math.max(0, target.minutes - classWeeklyMins)} Min.`}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Column 2: Helden-Momente */}
+            <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', minHeight: '350px', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                   <span>🌱</span> Übe-Ziele der Klasse
@@ -12368,7 +13052,7 @@ export function AdminDashboard({
             </div>
 
             {/* Column 3: Jahresstatistik */}
-            <div className="glass-panel" style={{ padding: '32px', background: 'white', borderRadius: '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+            <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: isMobile ? '24px' : '32px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
                 <div style={{ background: '#e6f4ea', color: '#34a853', padding: '8px', borderRadius: '12px' }}>
                   <Calendar size={18} />
@@ -18261,7 +18945,7 @@ function DeviceSetupScreen({
   const [activeSubTab, setActiveSubTab] = useState<'academy' | 'device' | 'maintenance'>('academy');
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 1024 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]')));
 
   // Academy Setup state
   const [name, setName] = useState(effectiveSchool?.name || '');

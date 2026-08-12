@@ -1782,13 +1782,46 @@ textarea:focus-visible {
   box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.25) !important;
 }
 
-/* ── Mediathek Board Apple iOS Segmented Control Scoping ── */
+/* ── Mediathek Board Apple iOS Segmented Control & Swipecards Scoping ── */
 .mediathek-pill-bar {
   display: flex !important;
   width: 100% !important;
 }
 
+.mediathek-swipe-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.mediathek-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mediathek-dot.active {
+  width: 24px;
+  border-radius: 12px;
+}
+
+@media (min-width: 769px) {
+  body:not(.sim-viewport-mobile):not(.sim-viewport-portrait) .mediathek-pill-bar,
+  body:not(.sim-viewport-mobile):not(.sim-viewport-portrait) .mediathek-swipe-dots {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
+  .mediathek-pill-bar,
+  .mediathek-swipe-dots {
+    display: flex !important;
+    width: 100% !important;
+  }
   .mediathek-grid-layout {
     grid-template-columns: 1fr !important;
   }
@@ -1998,32 +2031,24 @@ textarea:focus-visible {
   }
 }
 
-.sim-viewport-mobile .mediathek-grid-layout,
-.sim-viewport-portrait .mediathek-grid-layout {
-  grid-template-columns: 1fr !important;
-}
-.sim-viewport-mobile .mediathek-col-card.mobile-hidden-card,
-.sim-viewport-portrait .mediathek-col-card.mobile-hidden-card {
-  display: none !important;
-}
-.sim-viewport-mobile .mediathek-col-card.mobile-active-card,
-.sim-viewport-portrait .mediathek-col-card.mobile-active-card {
+.sim-viewport-mobile .mediathek-pill-bar,
+.sim-viewport-portrait .mediathek-pill-bar,
+.sim-viewport-mobile .mediathek-swipe-dots,
+.sim-viewport-portrait .mediathek-swipe-dots {
   display: flex !important;
   width: 100% !important;
 }
-.sim-viewport-mobile .mediathek-col-schnelltext-desktop,
-.sim-viewport-portrait .mediathek-col-schnelltext-desktop {
+.mediathek-grid-layout {
+  grid-template-columns: 1fr !important;
+}
+.mediathek-col-card.mobile-hidden-card {
   display: none !important;
 }
-
-@media (min-width: 769px) {
-  .mediathek-col-card {
-    display: flex !important;
-  }
-  .mediathek-col-schnelltext-mobile {
-    display: none !important;
-  }
+.mediathek-col-card.mobile-active-card {
+  display: flex !important;
+  width: 100% !important;
 }
+
 
 /* ─────────────────────────────────────────────────────────────
    Apple Style Invisible Vertical Scrollbar across ALL Boards & Views

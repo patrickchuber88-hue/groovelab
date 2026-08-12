@@ -8,7 +8,7 @@ import { StudentDetailModal } from './StudentDetailModal';
 import { MeisterwerkDocumentationModal } from './MeisterwerkDocumentationModal';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { useRealNamesVisibility, maskLastName, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, getGroupTypeLabel, sanitizeBirthDateToDayOnly } from '../utils/nameHelper';
 import { ConfirmDeleteStudentModal, StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { MobileBriefingCarousel } from './ui/MobileBriefingCarousel';
@@ -8518,7 +8518,7 @@ export function TeacherDashboard({
 
               const rName = (b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : '');
               const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
-              const displayStudentName = b.studentName ? (showRealNames ? b.studentName : maskLastName(b.studentName)) : null;
+              const displayStudentName = b.studentName ? formatSingleStudentAnonymized(b.studentName, null, b.id, showRealNames) : null;
 
               return (
                 <div 
@@ -16100,78 +16100,102 @@ export function TeacherDashboard({
           <div style={{ flex: '1 1 300px', minWidth: '0', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Search & Actions Bar */}
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+            <div style={{ display: 'flex', gap: windowWidth < 768 ? '10px' : '16px', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: windowWidth < 768 ? '100%' : '200px' }}>
                 <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input 
                   placeholder="Schüler suchen..." 
                   value={studentSearch} 
                   onChange={e => setStudentSearch(e.target.value)} 
-                  style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }} 
+                  style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.01)', boxSizing: 'border-box' }} 
                 />
               </div>
-              <button
-                onClick={() => toggleRealNames()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  borderRadius: '24px',
-                  padding: '14px 20px',
-                  fontSize: '0.85rem',
-                  fontWeight: 800,
-                  background: showRealNames ? '#fee2e2' : '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: showRealNames ? '#ef4444' : '#64748b',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
-                  height: '50px',
-                  boxSizing: 'border-box'
-                }}
-                className="hover-scale"
-                title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
-              >
-                {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
-                <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
-              </button>
-              {teachersManageStudents && (
+              <div style={{ display: 'flex', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
                 <button
-                  onClick={() => setShowInviteStudent(true)}
+                  onClick={() => toggleRealNames()}
                   style={{
-                    padding: '14px 28px',
-                    borderRadius: '24px',
-                    border: 'none',
-                    background: '#8b5cf6',
-                    color: 'white',
-                    fontWeight: 800,
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(139,92,246,0.15)'
+                    borderRadius: '24px',
+                    padding: '14px 20px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    background: showRealNames ? '#fee2e2' : '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: showRealNames ? '#ef4444' : '#64748b',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+                    height: '50px',
+                    boxSizing: 'border-box',
+                    flex: windowWidth < 768 ? 1 : 'none'
                   }}
                   className="hover-scale"
+                  title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
                 >
-                  <UserPlus size={16} /> Schüler einladen
+                  {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
+                  <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
                 </button>
-              )}
+                {teachersManageStudents && (
+                  <button
+                    onClick={() => setShowInviteStudent(true)}
+                    style={{
+                      padding: '14px 24px',
+                      borderRadius: '24px',
+                      border: 'none',
+                      background: activePlatform === 'campus' ? '#34a853' : '#eab308',
+                      color: activePlatform === 'campus' ? 'white' : '#000000',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      height: '50px',
+                      boxSizing: 'border-box',
+                      flex: windowWidth < 768 ? 1 : 'none'
+                    }}
+                    className="hover-scale"
+                  >
+                    <UserPlus size={16} /> Schüler einladen
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* A-Z Schnellsuche */}
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', background: 'white', padding: '12px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+            <div 
+              style={{ 
+                display: 'flex', 
+                gap: '6px', 
+                background: 'white', 
+                padding: '12px', 
+                borderRadius: '20px', 
+                border: '1px solid #e2e8f0',
+                overflowX: windowWidth < 768 ? 'auto' : 'visible',
+                whiteSpace: 'nowrap',
+                WebkitOverflowScrolling: 'touch',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+              className="no-scrollbar"
+            >
               <button 
                 onClick={() => setStudentLetter(null)}
                 style={{
-                  background: studentLetter === null ? '#8b5cf6' : 'transparent',
-                  color: studentLetter === null ? 'white' : '#64748b',
+                  background: studentLetter === null ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent',
+                  color: studentLetter === null ? (activePlatform === 'campus' ? 'white' : '#000000') : '#64748b',
                   border: 'none',
                   padding: '8px 16px',
                   borderRadius: '12px',
                   fontSize: '0.78rem',
                   fontWeight: 900,
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  flexShrink: 0
                 }}
               >
                 ALLE
@@ -16184,8 +16208,8 @@ export function TeacherDashboard({
                     key={letter}
                     onClick={() => setStudentLetter(isActive ? null : letter)}
                     style={{
-                      background: isActive ? '#8b5cf6' : 'transparent',
-                      color: isActive ? 'white' : hasStudents ? '#1e293b' : '#cbd5e1',
+                      background: isActive ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent',
+                      color: isActive ? (activePlatform === 'campus' ? 'white' : '#000000') : hasStudents ? '#1e293b' : '#cbd5e1',
                       border: 'none',
                       width: '32px',
                       height: '32px',
@@ -16196,7 +16220,8 @@ export function TeacherDashboard({
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      flexShrink: 0
                     }}
                   >
                     {letter}
@@ -16238,9 +16263,14 @@ export function TeacherDashboard({
               }
 
               return (
-                <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px', width: '100%', boxSizing: 'border-box', paddingBottom: windowWidth < 768 ? '120px' : '0px' }}>
                   {filtered.map(student => {
                     const isSessionActive = activeSessions.some(sess => sess.user_id === student.id);
+                    const isGrooveLab = activePlatform === 'groovelab';
+                    const isStudentActive = isGrooveLab 
+                      ? (student.is_groovelab_active || student.isGroovelabActive)
+                      : (student.is_campus_active || student.isCampusActive);
+
                     return (
                       <div 
                         key={student.id} 
@@ -16251,7 +16281,7 @@ export function TeacherDashboard({
                           display: 'flex', 
                           flexDirection: 'column', 
                           gap: '12px',
-                          border: isSessionActive ? '2px solid #34a853' : '1px solid #e2e8f0',
+                          border: isSessionActive ? `2px solid ${isGrooveLab ? '#eab308' : '#34a853'}` : '1px solid #e2e8f0',
                           cursor: 'pointer',
                           width: '100%',
                           maxWidth: '100%',
@@ -16268,8 +16298,17 @@ export function TeacherDashboard({
                               {student.first_name} {maskLastName(student.last_name, showRealNames)}
                             </div>
                             <div style={{ marginTop: '2px' }}>
-                              {(student.is_campus_active || student.isCampusActive) ? (
-                                <span style={{ background: '#d1fae5', color: '#065f46', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', display: 'inline-block' }}>
+                              {isStudentActive ? (
+                                <span style={{ 
+                                  background: isGrooveLab ? '#fefce8' : '#d1fae5', 
+                                  color: isGrooveLab ? '#ca8a04' : '#065f46', 
+                                  border: isGrooveLab ? '1px solid #fef08a' : 'none',
+                                  fontSize: '0.68rem', 
+                                  fontWeight: 800, 
+                                  padding: '2px 8px', 
+                                  borderRadius: '100px', 
+                                  display: 'inline-block' 
+                                }}>
                                   Aktiv
                                 </span>
                               ) : (
@@ -16308,7 +16347,8 @@ export function TeacherDashboard({
                                 flex: 1,
                                 background: '#f1f5f9',
                                 border: 'none',
-                                padding: '8px 12px',
+                                padding: '10px 12px',
+                                minHeight: '44px',
                                 borderRadius: '12px',
                                 fontSize: '0.78rem',
                                 fontWeight: 800,
@@ -16327,14 +16367,15 @@ export function TeacherDashboard({
                               style={{
                                 background: '#fee2e2',
                                 border: 'none',
-                                width: '36px',
-                                height: '36px',
+                                width: '44px',
+                                height: '44px',
                                 borderRadius: '12px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: '#ef4444',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                flexShrink: 0
                               }}
                             >
                               <Trash2 size={14} />
