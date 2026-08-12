@@ -551,7 +551,7 @@ export function CampusSetupScreen({
                       <span style={{ fontSize: '0.7rem', background: '#d1fae5', color: '#065f46', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>AKTIV</span>
                     </div>
                     <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: '1.4' }}>
-                      Unmanipulierbare WORM-Protokolle auf Datenbank-Ebene verhindern nachträgliches Ändern von Protokollen.
+                      Revisionssichere Append-Only Audit-Logs mit SHA-256 Hash-Sicherung verhindern nachträgliches Ändern von Protokollen.
                     </p>
                   </div>
 

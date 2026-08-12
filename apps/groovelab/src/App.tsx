@@ -7378,10 +7378,10 @@ function App() {
     );
   }
 
-  // 2.5 MASTER ADMIN PORTAL BYPASS
-  const isMasterAdminSession = user?.is_master_admin || 
-                               sessionStorage.getItem('groovelab_is_master_admin') === 'true' ||
-                               (user?.role === 'admin' && (user?.is_master_admin || user?.first_name?.toLowerCase() === 'patrick'));
+  // 2.5 MASTER ADMIN PORTAL — nur via is_master_admin DB-Flag
+  // SECURITY: Niemals per Vorname oder Rolle erkennen — ausschließlich das is_master_admin-Flag aus der DB ist maßgeblich.
+  const isMasterAdminSession = user?.is_master_admin === true || 
+                               sessionStorage.getItem('groovelab_is_master_admin') === 'true';
 
   if (isMasterAdminSession) {
     return (

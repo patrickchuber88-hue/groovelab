@@ -10,7 +10,7 @@ const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzc
 // Let's use Elisabeth's bypass token to fetch her profile and try to cancel a virtual or actual occurrence
 const STUDENT_QR_TOKEN = 'ab4b4f50-04bd-407b-a48e-f7f532b620fc';
 
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 async function run() {
   // Initialize the anonymous client with customFetch simulating the QR headers for Patrick

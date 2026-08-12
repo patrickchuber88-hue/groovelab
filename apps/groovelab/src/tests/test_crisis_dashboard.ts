@@ -8,6 +8,13 @@ const cwd = process.cwd();
 dotenv.config({ path: path.resolve(cwd, '.env.local') });
 dotenv.config({ path: path.resolve(cwd, 'apps/groovelab/.env.local') });
 
+
+// 🛡️ AIR-GAPPED PRODUCTION PROTECTION GUARD
+if (process.env.VITE_SUPABASE_URL?.includes('campus-groovelab.de')) {
+  console.error('⛔ SECURITY PROTECTION ERROR: Test scripts are strictly prohibited from executing against the PRODUCTION database!');
+  process.exit(1);
+}
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY!;
 
@@ -17,8 +24,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Master client bypasses RLS using service role key (or anon key fetch injection)
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
-const masterClient = createClient(supabaseUrl, serviceKey);
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const masterClient = createClient(supabaseUrl, serviceKey || "");
 
 // Custom client helper for user testing
 function getClientForUser(userId: string, schoolId: string) {
@@ -266,6 +273,10 @@ async function main() {
       // Sickness logic of school-1 teacher-1 must not touch school-2 schedules
       const { data } = await adminClient.from('schedules').select('*').eq('id', otherSchedId);
       if (data && data.length > 0) throw new Error('Multi-tenant violation: Admin should not query other school schedules');
+
+      // Cleanup — immer ausfuehren, auch wenn Assertion erfolgreich war
+      await masterClient.from('schedules').delete().eq('id', otherSchedId);
+      await masterClient.from('schools').delete().eq('id', otherSchoolId);
     });
 
     await runTest(23, 'Verify that cancelation logic does not impact healthy teacher schedules in same school', async () => {

@@ -761,15 +761,22 @@ async function main() {
   if (useMock) {
     client = new MockSupabaseClient(mockDb);
   } else {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    
+// 🛡️ AIR-GAPPED PRODUCTION PROTECTION GUARD
+if (process.env.VITE_SUPABASE_URL?.includes('campus-groovelab.de')) {
+  console.error('⛔ SECURITY PROTECTION ERROR: Test scripts are strictly prohibited from executing against the PRODUCTION database!');
+  process.exit(1);
+}
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error('Error: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required for real mode.');
       process.exit(1);
     }
 
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
-    const serviceClient = createClient(supabaseUrl, serviceKey);
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    const serviceClient = createClient(supabaseUrl, serviceKey || "");
     await seedRealDatabase(serviceClient);
 
     const idMap: Record<string, string> = {

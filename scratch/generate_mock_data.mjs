@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { Client as SSHClient } from 'ssh2';
 import fs from 'fs';
 
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient('https://supabase.campus-groovelab.de', SERVICE_KEY);
 
 const firstNames = ['Mia', 'Ben', 'Emma', 'Jonas', 'Sofia', 'Leon', 'Hannah', 'Finn', 'Lea', 'Noah', 'Paul', 'Emily', 'Luis', 'Lina', 'Lukas', 'Marie', 'Felix', 'Sophia', 'Maximilian', 'Anna'];

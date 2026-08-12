@@ -37,7 +37,7 @@ BEGIN
       ),
       '{}'::jsonb,
       jsonb_build_object(
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys',
+        'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '',
         'Content-Type', 'application/json'
       )
     );
@@ -65,7 +65,7 @@ BEGIN
         ),
         '{}'::jsonb,
         jsonb_build_object(
-          'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys',
+          'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '',
           'Content-Type', 'application/json'
         )
       );

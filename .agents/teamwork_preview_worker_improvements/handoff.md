@@ -3,7 +3,7 @@
 ## 1. Observation
 - **Database Connection and Credentials**:
   - Found `.env.local` inside `apps/groovelab/` containing `VITE_SUPABASE_URL=https://supabase.campus-groovelab.de` and `VITE_SUPABASE_ANON_KEY=...`.
-  - Found existing migration scripts (`scratch/add_no_submission_column.ts`, `run_exec_sql.ts`) that connect using `SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys'`.
+  - Found existing migration scripts (`scratch/add_no_submission_column.ts`, `run_exec_sql.ts`) that connect using `SERVICE_KEY = '[REDACTED_SUPABASE_SERVICE_ROLE_KEY]'`.
 - **Database Schema and view constraints**:
   - The table `public.users` was previously renamed to `public.users_raw` in migration `172_split_user_emails_encrypted.sql`, which created the view `public.users` over `users_raw`.
   - Attempting to drop/create a policy on `public.users` directly failed with error:

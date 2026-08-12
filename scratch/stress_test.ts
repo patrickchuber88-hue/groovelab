@@ -79,7 +79,7 @@ async function runStage(numSchools: number, numUsers: number): Promise<{ success
   
   const tempSchoolIds: string[] = [];
   const spawnedUsers: { id: string; school_id: string; role: string }[] = [];
-  const masterClient = createClient(supabaseUrl, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys');
+  const masterClient = createClient(supabaseUrl, '[REDACTED_SUPABASE_SERVICE_ROLE_KEY]');
 
   // 1. Provision schools
   logReport(`Provisioning ${numSchools} temporary schools...`);

@@ -18,7 +18,9 @@ BEGIN
     (NULLIF(auth.jwt()->>'school_id', ''))::uuid,
     (NULLIF(auth.jwt()->'app_metadata'->>'school_id', ''))::uuid,
     (NULLIF(auth.jwt()->'user_metadata'->>'school_id', ''))::uuid,
-    (SELECT school_id FROM public.users_raw WHERE id = auth.uid() LIMIT 1)
+    (NULLIF(current_setting('request.headers', true)::json->>'x-invite-school-id', ''))::uuid,
+    (SELECT school_id FROM public.users_raw WHERE id = auth.uid() LIMIT 1),
+    (SELECT school_id FROM public.users_raw WHERE id = public.get_current_user_id() LIMIT 1)
   );
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
@@ -86,7 +88,7 @@ CREATE POLICY "schools_mutation_admin" ON public.schools FOR ALL TO authenticate
 
 -- 2. USERS_RAW
 CREATE POLICY "users_raw_select_school_and_anon" ON public.users_raw FOR SELECT TO authenticated, anon USING (school_id = public.current_school_id() OR public.current_school_id() IS NULL OR id = auth.uid());
-CREATE POLICY "users_raw_update_self_or_admin" ON public.users_raw FOR UPDATE TO authenticated, anon USING (id = auth.uid() OR school_id = public.current_school_id()) WITH CHECK (id = auth.uid() OR school_id = public.current_school_id());
+CREATE POLICY "users_raw_update_self_or_admin" ON public.users_raw FOR UPDATE TO authenticated USING (id = auth.uid() OR (public.current_school_id() IS NOT NULL AND school_id = public.current_school_id())) WITH CHECK (id = auth.uid() OR (public.current_school_id() IS NOT NULL AND school_id = public.current_school_id()));
 CREATE POLICY "users_raw_insert_delete_admin" ON public.users_raw FOR ALL TO authenticated USING (school_id = public.current_school_id()) WITH CHECK (school_id = public.current_school_id());
 
 -- 3. KIOSKS

@@ -57,32 +57,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. Define 6-argument overload for backwards compatibility calling the 7-argument function
-CREATE OR REPLACE FUNCTION public.import_student(
-    first_name TEXT,
-    last_name TEXT,
-    birth_date TEXT,
-    instrument TEXT,
-    school_id UUID,
-    teacher_id UUID
-)
-RETURNS UUID AS $$
-BEGIN
-    RETURN public.import_student(
-        first_name,
-        last_name,
-        birth_date,
-        instrument,
-        school_id,
-        teacher_id,
-        30
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 5. Harden search_path and permissions
+-- 4. Harden search_path and permissions
 ALTER FUNCTION public.import_student(TEXT, TEXT, TEXT, TEXT, UUID, UUID, INT) SET search_path = public, pg_catalog, extensions;
-ALTER FUNCTION public.import_student(TEXT, TEXT, TEXT, TEXT, UUID, UUID) SET search_path = public, pg_catalog, extensions;
 
 GRANT EXECUTE ON FUNCTION public.import_student(TEXT, TEXT, TEXT, TEXT, UUID, UUID, INT) TO authenticated, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.import_student(TEXT, TEXT, TEXT, TEXT, UUID, UUID) TO authenticated, anon, service_role;
+

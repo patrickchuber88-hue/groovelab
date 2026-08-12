@@ -5,7 +5,7 @@
 - **Helper Function Location**: Defined `seedRealDatabase(serviceClient)` starting around line 584.
 - **Service Role Seeding Trigger**: Inside the `main()` function's `else` (real mode) block, around line 748, the service role client is created and `seedRealDatabase` is invoked:
   ```typescript
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '[REDACTED_SUPABASE_SERVICE_ROLE_KEY]';
   const serviceClient = createClient(supabaseUrl, serviceKey);
   await seedRealDatabase(serviceClient);
   ```

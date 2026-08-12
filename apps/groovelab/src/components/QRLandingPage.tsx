@@ -8227,7 +8227,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 color: '#137333'
               }}>
                 <ShieldCheck size={14} color="#34a853" />
-                <span>Vollzugriff aktiv (Ende-zu-Ende verschlüsselt gem. DSGVO Art. 6 Abs. 1 lit. b)</span>
+                <span>Vollzugriff aktiv (TLS 1.3 transportverschlüsselt & AES-256 datenbankgeschützt gem. DSGVO Art. 6 Abs. 1 lit. b)</span>
               </div>
             ) : (
               <div style={{

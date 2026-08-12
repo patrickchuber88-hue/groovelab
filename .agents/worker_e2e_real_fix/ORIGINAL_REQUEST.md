@@ -43,7 +43,7 @@ Specifically:
    - All 7 test users (John Doe, Alice Smith, Jane Smith, Bob Jones, Admin User, Sec Retary, Master Admin) into the `users_raw` table (mapping their mock IDs to UUIDs using the `idMap` in `run_e2e_tests.ts`). Make sure the columns `id`, `school_id`, `role`, `first_name`, `last_name`, `roles`, `is_active`, `is_campus_active`, `is_groovelab_active`, and `is_master_admin` are populated correctly.
    - The 3 test lessons (lesson-1, lesson-2, lesson-3) into the `lessons` table (mapping their mock IDs to UUIDs).
 2. Call `seedRealDatabase(serviceClient)` once at the start of `main()` when `useMock` is false, using a service role client created with the service key:
-   `const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys';`
+   `const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '[REDACTED_SUPABASE_SERVICE_ROLE_KEY]';`
 3. Verify that the tests run and pass in BOTH mock mode and real mode:
    - `USE_MOCK=true npx tsx apps/groovelab/src/tests/run_e2e_tests.ts`
    - `USE_MOCK=false npx tsx apps/groovelab/src/tests/run_e2e_tests.ts`

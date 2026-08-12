@@ -216,7 +216,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
               <div>
                 <strong style={{ color: '#0f172a' }}>Kontakt & Schnelle elektronische Kontaktaufnahme (§ 5 Abs. 1 Nr. 2 DDG):</strong><br />
-                Telefon: <a href="tel:+49000000000" style={{ color: '#34a853', fontWeight: 700 }}>+49 (0) XXX XXXXXXXX (Vor Go-Live anpassen)</a><br />
+                Telefon: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>Auf Anfrage via E-Mail</a><br />
                 E-Mail: <a href="mailto:patrick.huber@musaek.de" style={{ color: '#34a853', fontWeight: 700 }}>patrick.huber@musaek.de</a> / <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#34a853', fontWeight: 700 }}>kontakt@campus-groovelab.de</a><br />
                 Website: <a href="https://campus-groovelab.de" target="_blank" rel="noopener noreferrer" style={{ color: '#34a853', fontWeight: 700 }}>campus-groovelab.de</a>
               </div>

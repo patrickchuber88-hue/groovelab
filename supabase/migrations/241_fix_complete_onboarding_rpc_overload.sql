@@ -75,14 +75,13 @@ BEGIN
 
     new_qr_token := gen_random_uuid();
     
-    INSERT INTO public.users (
+    INSERT INTO public.users_raw (
         id,
         school_id,
         teacher_id,
         role,
         first_name,
         last_name,
-        email,
         instrument,
         qr_token,
         is_active,
@@ -99,7 +98,6 @@ BEGIN
         'student',
         target_first_name,
         target_last_name,
-        NULL,
         target_instrument,
         new_qr_token,
         TRUE,
@@ -110,8 +108,7 @@ BEGIN
         'GL-' || floor(1000 + random() * 9000)::text
     )
     ON CONFLICT (id) DO UPDATE SET
-        email = NULL,
-        qr_token = COALESCE(users.qr_token, EXCLUDED.qr_token),
+        qr_token = COALESCE(users_raw.qr_token, EXCLUDED.qr_token),
         is_active = TRUE,
         is_app_user = TRUE,
         is_campus_active = TRUE,

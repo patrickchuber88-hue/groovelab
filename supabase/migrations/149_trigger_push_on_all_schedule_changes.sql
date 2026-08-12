@@ -54,7 +54,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.student_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
@@ -76,7 +76,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.teacher_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
@@ -97,7 +97,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.teacher_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
@@ -118,7 +118,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.student_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
@@ -146,7 +146,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.student_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
@@ -168,7 +168,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.student_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
 
@@ -188,7 +188,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.teacher_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
@@ -210,7 +210,7 @@ BEGIN
           'http://kong:8000/functions/v1/send-push',
           jsonb_build_object('userId', NEW.student_id, 'title', v_title, 'body', v_body, 'url', v_url, 'notificationId', v_notification_id),
           '{}'::jsonb,
-          jsonb_build_object('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3ODA0MTc4MTUsImV4cCI6NDkzNDAxNzgxNX0.XZd32Y-4LqKhZjiz1l-Ap6TsUk07_SEUA1QN2ot-qys', 'Content-Type', 'application/json')
+          jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true) || '', 'Content-Type', 'application/json')
         );
       END IF;
     END IF;
