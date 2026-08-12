@@ -897,4 +897,12 @@ div:hover > .photo-overlay {
   color: #ffffff !important;
 }
 
+/* Performance rendering optimization for long student and schedule lists */
+.student-list-item-optimized,
+.schedule-card-item,
+.sim-student-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 72px;
+}
+
 

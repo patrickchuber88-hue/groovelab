@@ -1,10 +1,9 @@
-import jsPDF from 'jspdf';
-
-export const generateConsentPDF = (
+export const generateConsentPDF = async (
   schoolName: string, 
   activePlatform: 'campus' | 'groovelab' | 'both', 
   studentBillingOption?: string
 ) => {
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
   
   // Set up document metadata
@@ -229,7 +228,8 @@ export const generateConsentPDF = (
   doc.save(filename);
 };
 
-export const generateDSBCompliancePDF = (schoolName: string) => {
+export const generateDSBCompliancePDF = async (schoolName: string) => {
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF();
 
   doc.setProperties({

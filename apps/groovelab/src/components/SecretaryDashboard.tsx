@@ -25761,9 +25761,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   borderRadius: '14px',
                                   padding: '4px',
                                   display: 'inline-flex',
-                                  gap: '2px',
-                                  border: '1px solid rgba(0, 0, 0, 0.05)',
-                                  boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
+boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
                                 }}>
                                   <button
                                     onClick={() => setActiveBillingSubTab('overview')}
@@ -25818,38 +25816,38 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                     
                                     {/* Visual Status Badges */}
                                     <div className="glass-panel" style={{ padding: '24px' }}>
-                                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', fontFamily: 'Urbanist' }}>Aktive Module &amp; Status</h4>
-                                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 900, color: '#1e293b' }}>Aktive Module &amp; wer bezahlt</h4>
+                                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
                                         {hasCampusSub && (
-                                          <span style={{ fontSize: '0.74rem', background: '#e6f4ea', color: '#34a853', padding: '6px 12px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                          <span style={{ fontSize: '0.76rem', background: '#e6f4ea', color: '#166534', padding: '6px 14px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                             Campus Aktiv
                                           </span>
                                         )}
                                         {hasGroovelabSub && (
-                                          <span style={{ fontSize: '0.74rem', background: '#fef9c3', color: '#854d0e', padding: '6px 12px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                            Groovelab Aktiv
+                                          <span style={{ fontSize: '0.76rem', background: '#fef9c3', color: '#854d0e', padding: '6px 14px', borderRadius: '100px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            GrooveLab Aktiv
                                           </span>
                                         )}
-                                        <span style={{ fontSize: '0.74rem', background: '#f3e8ff', color: '#6b21a8', padding: '6px 12px', borderRadius: '100px', fontWeight: 800 }}>
-                                          Kostenträger: {billingPayer === 'school' ? 'Musikschule (Sammelzahler)' : 'Eltern / Schüler (Selbstzahler)'}
+                                        <span style={{ fontSize: '0.76rem', background: '#f3e8ff', color: '#6b21a8', padding: '6px 14px', borderRadius: '100px', fontWeight: 800 }}>
+                                          💳 Bezahlt von: {billingPayer === 'school' ? 'Musikschule (Kostenlos für Schüler & Eltern)' : 'Eltern & Schüler (Direktabrechnung)'}
                                         </span>
-                                        <span style={{ fontSize: '0.74rem', background: '#e0f2fe', color: '#0369a1', padding: '6px 12px', borderRadius: '100px', fontWeight: 800 }}>
-                                          Schülertarif: {
-                                            studentBillingOption === 'option1' ? 'Jahrespauschale (5,39 € / Jahr)' :
-                                            studentBillingOption === 'option2' ? 'Monatsumlage (0,40 € / Monat)' :
+                                        <span style={{ fontSize: '0.76rem', background: '#e0f2fe', color: '#0369a1', padding: '6px 14px', borderRadius: '100px', fontWeight: 800 }}>
+                                          🎓 Schüler-Beitrag: {
+                                            studentBillingOption === 'option1' ? 'Jahresbeitrag (5,39 € / Jahr pro Schüler)' :
+                                            studentBillingOption === 'option2' ? 'Monatlicher Beitrag (0,40 € / Monat pro Schüler)' :
                                             studentBillingOption === 'option3_2' ? 'Kofinanzierung (Jährlich)' :
                                             studentBillingOption === 'option3_3' ? 'Kofinanzierung (Monatlich)' :
-                                            studentBillingOption === 'debit' ? 'Lastschrift' :
-                                            studentBillingOption === 'cash' ? 'Barzahlung' :
-                                            studentBillingOption === 'both' ? 'Lastschrift & Barzahlung' :
+                                            studentBillingOption === 'debit' ? 'Zahlung per Lastschrift' :
+                                            studentBillingOption === 'cash' ? 'Zahlung per Barzahlung' :
+                                            studentBillingOption === 'both' ? 'Zahlung per Lastschrift & Barzahlung' :
                                             'Standard-Tarif'
                                           }
                                         </span>
                                       </div>
-                                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', lineHeight: '1.4' }}>
-                                        Die System-Nutzung ist für das Schuljahr 2026/2027 vollständig registriert. Du profitierst vom **Campus-Groovelab Kombi-Rabatt**.
+                                      <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: '1.5' }}>
+                                        Euer Zugang ist für das Schuljahr 2026/2027 vollständig freigeschaltet. Da ihr sowohl <strong>Campus</strong> als auch <strong>GrooveLab</strong> nutzt, spart die Musikschule jeden Monat <strong>2,99 € (Kombi-Rabatt)</strong>.
                                       </p>
                                     </div>
 

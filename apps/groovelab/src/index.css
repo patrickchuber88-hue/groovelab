@@ -1,6 +1,9 @@
-/* DSGVO-Compliant Local Font Fallback System (LG München I) */
-body {
-  font-family: 'Inter', 'Outfit', 'Plus Jakarta Sans', 'Urbanist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+/* DSGVO-Compliant Native Apple & Swiss Modernist Font System (LG München I compliant, 0 External Server Calls) */
+*, body, button, input, select, textarea, h1, h2, h3, h4, h5, h6 {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
 }
 
 :root {

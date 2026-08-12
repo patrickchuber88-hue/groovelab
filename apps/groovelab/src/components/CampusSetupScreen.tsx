@@ -619,8 +619,8 @@ export function CampusSetupScreen({
                     <span style={{ fontSize: '0.74rem', color: '#15803d', display: 'block' }}>Vorgefertigtes Freigabe-Dossier inkl. Muster-DSFA (Art. 35 DSGVO), TOM-Datenblatt (Art. 32 DSGVO) &amp; AVV-Bestätigung (Art. 28 DSGVO) als PDF.</span>
                   </div>
                   <button 
-                    onClick={() => {
-                      generateDSBCompliancePDF(schoolName || 'Meine Musikschule');
+                    onClick={async () => {
+                      await generateDSBCompliancePDF(schoolName || 'Meine Musikschule');
                     }}
                     style={{ 
                       padding: '10px 18px',

@@ -33,7 +33,6 @@ import {
   Grid3X3,
   MoreVertical
 } from 'lucide-react';
-import jsPDF from 'jspdf';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { ScheduleBoardDesktop } from './ScheduleBoardDesktop';
@@ -3673,6 +3672,7 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const generatePDFBackup = async (boardsToSave: DayBoard[], allStudents: Student[]) => {
+    const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF();
 
     doc.setProperties({
