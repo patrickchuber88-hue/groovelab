@@ -1901,7 +1901,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                         sectionTitle: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & System-Integrität',
                         sectionBadge: 'Zugangskontrolle & Audit',
                         items: [
-                          { title: '6. Strikte Row-Level Security (RLS)', desc: 'Datenbankseitig erzwungene Mandantentrennung (Multi-Tenancy Isolation) verhindert systemisch jeden fremden Datenzugriff.' },
+                          { title: '6. Strikte Row-Level Security (RLS) & Physische Tabellentrennung', desc: 'Datenbankseitig erzwungene Mandantentrennung sowie physische Entkopplung von Vornamen, Nachnamen, Übe-Zeiten, Streaks und Kalenderdaten in getrennte Tabellen. Ein Kompromittieren einzelner Datenfelder gewährt keinerlei Zugriff auf zusammenhängende Profile.' },
                           { title: '7. Brute-Force Lockout-Protection', desc: 'Automatische 15-minütige Sitzungssperre nach drei fehlerhaften PIN-Eingaben.' },
                           { title: '8. Mikrofonschutz & Konfigurierbare Chat-Modi', desc: 'Sofortige Freigabe des Mikrofonzugriffs auf Betriebssystemebene beim Beenden von Modulen. Flexible Chat-Modi unterstützen wahlweise dauerhafte Schüler-Lehrer-Direktchats, Band- & lehrermoderierte Ensemble-Chats oder termingekoppelte Unterrichts-Chats mit 48h-Auto-Freeze nach Unterrichtsende.' },
                           { title: '9. Automatischer Bildschirm-Schutz (Background-Blurring)', desc: 'Sofortige 16px-Verschwommenheit beim Verlassen der App oder Tab-Wechsel schützt vor Abfotografieren im Raum.' },
